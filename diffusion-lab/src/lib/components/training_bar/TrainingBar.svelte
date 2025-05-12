@@ -2,6 +2,8 @@
     import HyperparameterSelect from '$lib/components/training_bar/HyperparameterSelect.svelte';
     import { hyperparameterMenuConfig } from '$lib/state';
 
+    import { base } from '$app/paths';
+
 </script>
 
 <style>
@@ -56,7 +58,7 @@
 
 <div class="training-bar">
     <div class="training-bar-inner-container">
-        <img src="/BetaLogo.svg" id="beta-logo" alt="Beta Logo" />
+        <img src="{base}/BetaLogo.svg" id="beta-logo" alt="Beta Logo" />
         <p class="title"><b>Diffusion</b>Lab</p>
         <div class="hyperparameter-menu">
             {#each Object.entries(hyperparameterMenuConfig) as [name, entry]}

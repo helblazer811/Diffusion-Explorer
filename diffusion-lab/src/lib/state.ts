@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import { FlowModel } from '$lib/diffusion/flow_matching';
+import {base} from '$app/paths';
 
 // Default values various parts of the UI
 
@@ -32,9 +33,9 @@ export const hyperparameterMenuConfig = {
 
 export const pretrainedModelPaths = {
     "Flow Matching": {
-        "Three Modes": "/models/flow_matching_three_modes/model.json",
+        "Three Modes": base + "/models/flow_matching_three_modes/model.json",
         // "Concentric Circles": "/models/flow_matching_concentric_circles/model.json",
-        "Smiley Face": "/models/flow_matching_smiley_face/model.json",
+        "Smiley Face": base + "/models/flow_matching_smiley_face/model.json",
     }
     // "Diffusion": "/models/diffusion_model.json",
 }
@@ -60,8 +61,8 @@ export const trainingConfig = {
 }
 
 export const datasetNameToPath = {
-    "Smiley Face": "/datasets/smiley_face.json",
-    "Three Modes": "/datasets/three_modes.json",
+    "Smiley Face": base + "/datasets/smiley_face.json",
+    "Three Modes": base + "/datasets/three_modes.json",
     // "Concentric Circles": "/datasets/concentric_circles.json",
 };
 

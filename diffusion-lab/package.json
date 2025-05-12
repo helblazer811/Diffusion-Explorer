@@ -35,6 +35,7 @@
 		"mock-aws-s3": "^4.0.2",
 		"multivariate-normal": "^0.1.2",
 		"nock": "^14.0.4",
-		"numeric": "^1.2.6"
+		"numeric": "^1.2.6",
+		"path.join": "^1.0.0"
 	}
 }

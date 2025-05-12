@@ -3,9 +3,11 @@
 */ 
 import { FlowModel } from '$lib/diffusion/flow_matching';
 import * as tf from '@tensorflow/tfjs';
-import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
-setWasmPaths('/tfjs-backend-wasm/');
-import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
+// // import { base } from '$app/paths';
+// import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
+// // TODO I manually change DiffusionLab here which is a "temporary" fix
+// setWasmPaths('DiffusionLab/tfjs-backend-wasm/');
+// import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
 
 const modelTypeToModelClass = {
     'Flow Matching': FlowModel,
@@ -21,8 +23,20 @@ self.onmessage = async (e) => {
         const numberOfSteps = data.numberOfSteps;
         const numSamples = data.numSamples;
         // Set up tf wasm backend
-        await tf.setBackend('wasm');
+        // try {
+        //     await tf.setBackend('wasm');
+        //     await tf.ready();
+        //     console.log('Using WASM backend');
+        // } catch (e) {
+        //     await tf.setBackend('webgl');
+        //     await tf.ready();
+        //     console.log('Using WebGL backend');
+        // }
+        await tf.setBackend('webgl');
         await tf.ready();
+        console.log('Using WebGL backend');
+        // await tf.setBackend('wasm');
+        // await tf.ready();
         // Load up the model based on the passed model name
         const ModelClass = modelTypeToModelClass[modelType];
         const ourModel = new ModelClass(

@@ -4,6 +4,8 @@
     // setWasmPaths('/tfjs-backend-wasm/');
     // import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
 
+    import {base} from '$app/paths';
+
     import * as d3 from 'd3';
 
     import { onMount, onDestroy} from 'svelte';
@@ -322,7 +324,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 100%;
+        /* height: 100%; */
         margin-right: 10px;
         position: absolute;
         right: 0;
@@ -359,7 +361,7 @@
             </h1>
         </div>
         <a href="https://github.com/helblazer811/DiffusionLab" id="github-logo" target="_blank">
-            <img src="/github-logo.svg" alt="GitHub Logo"/>
+            <img src="{base}/github-logo.svg" alt="GitHub Logo"/>
             Code
         </a>
     </div>
