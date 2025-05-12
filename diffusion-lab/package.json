@@ -11,7 +11,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"postinstall": "cp -r node_modules/@tensorflow/tfjs-backend-wasm/dist/*.wasm static/tfjs-backend-wasm/",
-		"deploy": "npm run build && npx gh-pages -d build"
+		"predeploy": "npm run build",
+		"deploy": "touch build/.nojekyll; gh-pages -d build"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^6.0.0",
