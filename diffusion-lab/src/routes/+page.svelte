@@ -27,9 +27,10 @@
     import { UIState, model } from '$lib/state';
     // Load up the components
     import TimeSlider from '$lib/components/time_slider/TimeSlider.svelte';
-    import TrainingBar from '$lib/components/TrainingBar.svelte';
+    import TrainingBar from '$lib/components/training_bar/TrainingBar.svelte';
     import DisplayArea from '$lib/components/display_area/DisplayArea.svelte';
     import DatasetMenu from '$lib/components/dataset_menu/DatasetMenu.svelte';
+    import Explanation from '$lib/components/Explanation.svelte';
     // Import helper tf functions
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
 
@@ -287,7 +288,7 @@
 
     .main-area {
         background-color: white;
-        height: 680px;
+        height: var(--main-area-height);
         display: flex;
         z-index: -1;
     }
@@ -297,7 +298,7 @@
     }
 
     .main-area-center {
-        width: var(--display-rea-width);
+        /* width: var(--main); */
     }
 
     .main-area-right {
@@ -371,6 +372,7 @@
         <div class="main-area-center">
             <DisplayArea />  
             <TimeSlider /> 
+            <Explanation />
         </div>
         <div class="main-area-right">
             <DatasetMenu datasetDict={datasetDict}/>

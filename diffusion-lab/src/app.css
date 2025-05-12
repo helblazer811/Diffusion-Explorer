@@ -1,7 +1,8 @@
 /* Store global styles here */
 :root {
     --display-area-width: 1100px;
-    --distribution-width: 550px;
+    --distribution-width: 500px;
+    --main-area-height: 580px;
     --mini-distribution-width: 75px;
     --dark-blue: #305886;
     --light-gray: rgb(234, 234, 234);

@@ -12,6 +12,7 @@ You can try out DiffusionLab locally by running the project:
 ```
     git clone https://github.com/helblazer811/DiffusionLab
     cd diffusion-lab
+    npm install
     npm run dev
 ```
 and then access it in your browser at the specified port. 

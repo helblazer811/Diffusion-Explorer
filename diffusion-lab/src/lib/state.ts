@@ -33,7 +33,7 @@ export const hyperparameterMenuConfig = {
 export const pretrainedModelPaths = {
     "Flow Matching": {
         "Three Modes": "/models/flow_matching_three_modes/model.json",
-        "Concentric Circles": "/models/flow_matching_concentric_circles/model.json",
+        // "Concentric Circles": "/models/flow_matching_concentric_circles/model.json",
         "Smiley Face": "/models/flow_matching_smiley_face/model.json",
     }
     // "Diffusion": "/models/diffusion_model.json",
@@ -61,18 +61,19 @@ export const trainingConfig = {
 
 export const datasetNameToPath = {
     "Three Modes": "/datasets/three_modes.json",
-    "Concentric Circles": "/datasets/concentric_circles.json",
+    // "Concentric Circles": "/datasets/concentric_circles.json",
     "Smiley Face": "/datasets/smiley_face.json",
 };
 
 export const userInterfaceConfig = {};
 
 export const interfaceSettings = {
-    distributionWidth: 550,
-    distributionHeight: 550,
+    distributionWidth: 500,
+    distributionHeight: 500,
+    mainAreaHeight: 640,
     miniDistributionWidth: 75,
     displayAreaWidth: 1100,
-    displayAreaHeight: 600,
+    displayAreaHeight: 500,
     pointColor: "#4594e3",
 }
 
