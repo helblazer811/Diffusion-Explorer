@@ -34,7 +34,6 @@ self.onmessage = async (e) => {
         // }
         await tf.setBackend('webgl');
         await tf.ready();
-        console.log('Using WebGL backend');
         // await tf.setBackend('wasm');
         // await tf.ready();
         // Load up the model based on the passed model name

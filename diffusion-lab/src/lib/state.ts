@@ -82,8 +82,8 @@ export const interfaceSettings = {
 
 export const UIState = writable({
     modelType: hyperparameterMenuConfig["Training Objective"].default,
-    numberOfSteps: 200, // Number of steps to take in the sampler
-    numSamples: 2000, // Number of samples to generate
+    numberOfSteps: 100, // Number of steps to take in the sampler
+    numSamples: 500, // Number of samples to generate
     // sourceDistributionSamples: undefined, // This holds a tensorflow tensor containing samples from the source distribution
     // targetDistributionSamples: undefined, // This holds a tensorflow tensor containing samples from the target distribution
     // currentDistributionSamples: undefined, // This holds a tensorflow tensor containing samples from the current distribution

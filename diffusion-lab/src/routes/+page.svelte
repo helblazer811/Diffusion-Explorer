@@ -96,7 +96,6 @@
                 };
                 // TODO fix this logic
                 // domainRange.set(localDomainRange);
-                console.log("Domain range: ", domainRange);
                 // Make the UI state play
                 isPlaying.set(true);
             } else if (type === 'status') {
@@ -137,21 +136,22 @@
         const defaultDataset: string = $datasetName;
         const defaultModelPath: string = pretrainedModelPaths[defaultModelType][defaultDataset];
         // Call the dummy worker thread 
-        console.log("Calling the worker thread to sample...");
+        // console.log("Calling the worker thread to sample...");
         // Set up web worker threads for sampling and training
         samplingWorker = new Worker(
             new URL('$lib/diffusion/workers/sampling_worker.ts', import.meta.url),
             { type: 'module' }
         );
-        // Run sampling worker thread
-        callSamplingWorkerThread(
-            samplingWorker,
-            defaultModelPath,
-            defaultModelType,
-            modelConfig[defaultModelType],
-            readonlyUIState.numSamples,
-            readonlyUIState.numberOfSteps
-        );
+        // // Run sampling worker thread
+        // NOTE: Now I only call this reactively when the dataset changes
+        // callSamplingWorkerThread(
+        //     samplingWorker,
+        //     defaultModelPath,
+        //     defaultModelType,
+        //     modelConfig[defaultModelType],
+        //     readonlyUIState.numSamples,
+        //     readonlyUIState.numberOfSteps
+        // );
         // Load up the chosen training dataset points as tf tensor
         const pointsTensor = datasetDict[$datasetName];
         // Update the UI state with the training dataset
