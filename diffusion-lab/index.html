@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="./favicon.png" />
+		<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+		<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		
+		<link href="./_app/immutable/assets/0.2LcqNzTp.css" rel="stylesheet">
+		<link href="./_app/immutable/assets/2.CBEDUrKT.css" rel="stylesheet">
+		<link rel="modulepreload" href="./_app/immutable/entry/start.kPUdHfad.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/BvL9qNGS.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/CBSIvZe3.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/Dm4A-1Wl.js">
+		<link rel="modulepreload" href="./_app/immutable/entry/app.CNhmeO6z.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/D0UgLEsx.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/CWJOT_lU.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/DoppVUKV.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/0.x5E4fne9.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/dxOKR_YS.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/2.Cl-_Xo1g.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/DLGFd6Uy.js">
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents"><!--[--><!--[--><!----><div class="layout-wrapper"><!----><!----><div class="container"><div class="title-container svelte-1t099ck"><div class="sub-title-container svelte-1t099ck"><h1 class="sub-title svelte-1t099ck">Learn about diffusion and flow  models with interactive visualization.</h1></div> <a href="https://github.com/helblazer811/DiffusionLab" id="github-logo" target="_blank" class="svelte-1t099ck"><img src="/github-logo.svg" alt="GitHub Logo" class="svelte-1t099ck"> Code</a></div> <div class="training-bar-container svelte-1t099ck"><div class="training-bar svelte-rf1qr6"><div class="training-bar-inner-container svelte-rf1qr6"><img src="/BetaLogo.svg" id="beta-logo" alt="Beta Logo" class="svelte-rf1qr6"> <p class="title svelte-rf1qr6"><b>Diffusion</b>Lab</p> <div class="hyperparameter-menu svelte-rf1qr6"><!--[--><div class="control svelte-bqg00i"><label for="Training Objective" class="svelte-bqg00i">Training Objective</label> <div class="select svelte-bqg00i"><select id="Training Objective" class="svelte-bqg00i"><!--[--><option value="Flow Matching">Flow Matching</option><!--]--></select></div></div><div class="control svelte-bqg00i"><label for="Sampler" class="svelte-bqg00i">Sampler</label> <div class="select svelte-bqg00i"><select id="Sampler" class="svelte-bqg00i"><!--[--><option value="Euler">Euler</option><!--]--></select></div></div><!--]--></div></div></div><!----></div> <div class="main-area svelte-1t099ck"><div class="main-area-left svelte-1t099ck"></div> <div class="main-area-center svelte-1t099ck"><div class="display-area svelte-hbt31h" style="width: 1100px; height: 500px;"><!--[1--><svg id="svg_source" width="500" height="500" style="left: 0px;" class="svelte-om0b9n"></svg><!--]--><!----> <!--[1--><svg id="svg_target" width="500" height="500" style="left: 600px;" class="svelte-om0b9n"></svg><!--]--><!----> <!--[1--><svg id="svg_current" width="500" height="500" style="left: 0px;" class="svelte-om0b9n"></svg><!--]--><!----></div><!----> <div class="time-slider-container svelte-1bfk0p8"><div class="play-button-container svelte-1bfk0p8"><button aria-label="Play/Pause" class="svelte-iwxx8j"><!--[!--><svg viewBox="0 0 24 24" class="svelte-iwxx8j"><polygon points="5,3 19,12 5,21"></polygon></svg><!--]--></button><!----></div> <div class="time-slider svelte-1bfk0p8"><input type="range" min="0" max="1" step="0.001" list="ticks" class="slider svelte-1bfk0p8" style="background: linear-gradient(to right, #4594e3 0%, #d3d3d3 0%)" value="0"> <div class="tick-container svelte-1bfk0p8"><div class="tick svelte-1bfk0p8" style="left: 1%;"></div> <div class="tick-label svelte-1bfk0p8" style="left: 1%;">t=0</div> <div class="tick svelte-1bfk0p8" style="left: 99%;"></div> <div class="tick-label svelte-1bfk0p8" style="left: 99%;">t=1</div></div></div></div><!----> <div id="container" class="explanation-container svelte-1w3w9x"><p class="explanation svelte-1w3w9x">Simple <span id="word1" class="highlight svelte-1w3w9x">source distribution</span> transformed to a complex <span id="word2" class="highlight svelte-1w3w9x">data distribution</span>.</p></div><!----></div> <div class="main-area-right svelte-1t099ck"><div class="dataset-menu svelte-1apdfzl"><h1 class="dataset-menu-title svelte-1apdfzl">Datasets</h1> <!--[--><!--]--></div><!----></div></div> <div class="footer svelte-1t099ck"></div></div><!----><!----></div><!----><!--]--> <!--[!--><!--]--><!--]-->
+			
+			<script>
+				{
+					__sveltekit_1372s8k = {
+						base: new URL(".", location).pathname.slice(0, -1)
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("./_app/immutable/entry/start.kPUdHfad.js"),
+						import("./_app/immutable/entry/app.CNhmeO6z.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 2],
+							data: [null,null],
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>
