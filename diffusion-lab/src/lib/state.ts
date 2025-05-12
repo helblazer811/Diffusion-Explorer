@@ -60,9 +60,9 @@ export const trainingConfig = {
 }
 
 export const datasetNameToPath = {
+    "Smiley Face": "/datasets/smiley_face.json",
     "Three Modes": "/datasets/three_modes.json",
     // "Concentric Circles": "/datasets/concentric_circles.json",
-    "Smiley Face": "/datasets/smiley_face.json",
 };
 
 export const userInterfaceConfig = {};
@@ -95,7 +95,7 @@ export const UIState = writable({
     // }
 });
 
-export const datasetName = writable("Three Modes");
+export const datasetName = writable("Smiley Face");
 export const targetDistributionSamples = writable(undefined);
 export const sourceDistributionSamples = writable(undefined);
 export const currentDistributionSamples = writable(undefined);

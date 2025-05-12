@@ -21,7 +21,9 @@
         /* align-items: center; */
         height: 100%;
         width: var(--display-area-width);
+        align-items: center;
         /* margin: 0 auto; */
+        position: relative;
     }  
 
     .hyperparameter-menu {
@@ -39,10 +41,22 @@
         font-family: var(--font-family);
         vertical-align: middle;
     }
+
+    /* Add beta logo "before" the title */
+    #beta-logo {
+        position:absolute;
+        left: -60px;
+        width: 50px;
+        height: 50px;
+        /* margin-left: 10px; */
+        /* vertical-align: middle; */
+    }
+
 </style>
 
 <div class="training-bar">
     <div class="training-bar-inner-container">
+        <img src="/BetaLogo.svg" id="beta-logo" alt="Beta Logo" />
         <p class="title"><b>Diffusion</b>Lab</p>
         <div class="hyperparameter-menu">
             {#each Object.entries(hyperparameterMenuConfig) as [name, entry]}
