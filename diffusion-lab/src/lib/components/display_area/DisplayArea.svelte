@@ -12,7 +12,7 @@
     import { interfaceSettings } from '$lib/state';
 
     import Distribution from '$lib/components/display_area/Distribution.svelte';
-    
+
     // If the currentTime changes then update the current distribution samples in the UI state
     $: if ($currentTime) {
         // Convert current time to index
@@ -31,7 +31,18 @@
 
 <style>
     .display-area {
+        /* position: relative; */
+        /* left: -200px; */
+        /* height: 100%; */
+        /* left: 0; */
+        /* topL: 0; */
+        /* z-index: 5; */
+        /* width: 1100px; */
         position: relative;
+        margin: 0 auto;
+        transform: translateX(-100px);
+        /* transform: translateX(-50%); */
+        /* width: 100%; */
     }
 </style>
 

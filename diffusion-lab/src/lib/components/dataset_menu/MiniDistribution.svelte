@@ -17,6 +17,9 @@
     let svgElement: SVGSVGElement; // Create a separate SVG element for each distribution
 
     function handleClick(){
+        if (distributionId === $datasetName) {
+            return; // Don't do anything if the same dataset is clicked
+        }
         // Change this dataset to be the current one
         datasetName.set(distributionId);
         // Empty out the current Distribution samples and the all time samples
@@ -54,9 +57,9 @@
         const svg = d3.select(svgElement); 
         // Select the group by ID, or create if not exists
         // NOTE: This prevents unwanted recreation of the group
-        let group = svg.select(`#${distributionId}`);
+        let group = svg.select(`#mini_${distributionId}`);
         if (group.empty()) {
-            group = svg.append("g").attr("id", distributionId);
+            group = svg.append("g").attr("id", "mini_" + distributionId);
         } else {
             group.selectAll("*").remove(); // Clear previous contents of this group
         }
@@ -104,11 +107,11 @@
         cursor: pointer;
         border: 3px solid #242424;
     }
-
+/* 
     svg {
         width: 100%;
         height: 100%;
-    }
+    } */
 
 </style>
 
@@ -118,6 +121,6 @@
 >
     <svg 
         bind:this={svgElement}
-        id="{distributionId}"
+        id="mini_{distributionId}"
     ></svg>
 </div>

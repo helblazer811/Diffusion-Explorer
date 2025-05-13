@@ -31,10 +31,11 @@
     import TimeSlider from '$lib/components/time_slider/TimeSlider.svelte';
     import TrainingBar from '$lib/components/training_bar/TrainingBar.svelte';
     import DisplayArea from '$lib/components/display_area/DisplayArea.svelte';
-    import DatasetMenu from '$lib/components/dataset_menu/DatasetMenu.svelte';
-    import Explanation from '$lib/components/Explanation.svelte';
+    // import DatasetMenu from '$lib/components/dataset_menu/DatasetMenu.svelte';
+    // import Explanation from '$lib/components/Explanation.svelte';
     // Import helper tf functions
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
+    import DatasetMenu from '$lib/components/dataset_menu/DatasetMenu.svelte';
 
     export let trainModel: boolean = false; // Flag to indicate if the model is being trained
 
@@ -250,36 +251,25 @@
 
 <style>
 
-    .title-container {
+    .container {
+        position: relative;
+    }
+
+    .sub-title-container {
         height: 60px;
         width: 100%;
         background-color: var(--dark-blue);
         display: flex;
         justify-content: center;
         align-items: center;
-        /* max-width: var(--display-rea-width); */
-        /* margin: 0 auto; */
-    }
-
-    /* .sub-title-inner-container {
-        display: flex;
-        align-items: center;
-        height: 100%;
-        width: var(--display-rea-width);
-    } */
-
-    .sub-title-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100%;
-        width: var(--display-area-width);
-        /* margin-left: 20px; */
     }
 
     .sub-title {
-        width: 100%;
-        margin: 0 auto;
+        width: var(--display-area-width);
+        /* margin: 0 auto; */
         font-size: 1.7em;
         color: white;
         font-family: var(--font-family);
@@ -288,51 +278,15 @@
         vertical-align: middle;
     }
 
-    .main-area {
-        background-color: white;
-        height: var(--main-area-height);
-        display: flex;
-        z-index: -1;
-    }
-
-    .main-area-left {
-        flex: 1;
-    }
-
-    .main-area-center {
-        /* width: var(--main); */
-    }
-
-    .main-area-right {
-        flex: 1;
-    }
-
-    .footer {
-        height: 10px;
-        z-index: 1;
-        position: relative;
-        /* box-shadow: rgba(0, 0, 0, 0.8) 0px -2px -4px 0px; */
-        box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2); /* upward shadow */
-    }
-
-    .training-bar-container {
-        position: relative;
-        box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 4px 0px;
-    }
-
     #github-logo {
         display: flex;
         align-items: center;
         justify-content: center;
-        /* height: 100%; */
         margin-right: 10px;
         position: absolute;
         right: 0;
-        /* margin: 10px; */
-        z-index: 1;
         color: white;
         font-size: 1.7em;
-        /* font-weight: 600; */
         text-decoration: none;
         font-family: var(--font-family);
         font-weight: 200; /* Thin font */
@@ -346,40 +300,66 @@
         width: 30px;
         height: 30px;
         margin-right: 10px;
-        /* vertical-align: middle; */
+    }
+
+    .main-area {
+        /* width: 100%;
+        background-color: white;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        z-index: -1; */
+        /* z-index: 3; */
+        height: var(--main-area-height);
+        background-color: white;
+        /* justify-content: center; */
+        /* display: flex; */
+    }
+
+    .display-area-container {
+        /* width: 100%; */
+        position: relative;
+        margin: 0 auto;
+        /* left: -120px;  */
+        width: var(--display-area-width);
+        /* display: flex; */
+    }
+    
+    /* .dataset-menu-container {
+        top: 50px;
+        height: 100%;
+        position: absolute;
+        left: 0;
+    } */
+
+    .footer {
+        height: 10px;
+        /* z-index: 1; */
+        position: relative;
+        bottom: 10px;
+        /* box-shadow: rgba(0, 0, 0, 0.8) 0px -2px -4px 0px; */
+        box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2); /* upward shadow */
     }
 
 </style>
 
 <div class="container">
-    <div class="title-container">
-        <!-- <div class="title-left"></div> -->
-        <!-- <div class="title-center"> -->
-        <div class="sub-title-container">
-            <h1 class="sub-title"> 
-                Learn about diffusion and flow  models with interactive visualization. 
-            </h1>
-        </div>
+    <div class="sub-title-container">
+        <h1 class="sub-title"> 
+            Learn about diffusion and flow  models with interactive visualization. 
+        </h1>
         <a href="https://github.com/helblazer811/DiffusionLab" id="github-logo" target="_blank">
             <img src="{base}/github-logo.svg" alt="GitHub Logo"/>
             Code
         </a>
     </div>
-    <div class="training-bar-container">
-        <TrainingBar />
-    </div>
+    <TrainingBar/>
     <div class="main-area">
-        <!-- <DisplayOptionsMenu />  Menu of items to choose to collect from -->
-        <div class="main-area-left"></div>
-        <div class="main-area-center">
-            <DisplayArea />  
-            <TimeSlider /> 
-            <Explanation />
-        </div>
-        <div class="main-area-right">
+        <div class="display-area-container">
             <DatasetMenu datasetDict={datasetDict}/>
+            <DisplayArea/>
         </div>
-        <!-- <DatasetMenu />  Dataset selector menu to choose the dataset to train on -->
     </div>
+    <TimeSlider /> 
     <div class="footer"></div>
 </div>

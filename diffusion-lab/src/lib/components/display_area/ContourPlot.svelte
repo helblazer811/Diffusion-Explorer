@@ -27,7 +27,7 @@
         yLocation: number,
         distributionId: string = "target",
     ) {
-        const svg = d3.select("svg");
+        const svg = d3.select(svgElement);
 
         let group = svg.select(`#${distributionId}_latex`);
         if (group.empty()) {
@@ -63,7 +63,7 @@
         distributionId: string = "target",
     ) {
         // Select the group by ID, or create if not exists
-        const svg = d3.select("svg");
+        const svg = d3.select(svgElement);
         // NOTE: This prevents unwanted recreation of the group
         let group = svg.select(`#${distributionId}_text`);
         if (group.empty()) {
@@ -108,7 +108,7 @@
             (values)
 
         // 4. Scales for drawing
-        const svg = d3.select("svg"); 
+        const svg = d3.select(svgElement); 
         // Select the group by ID, or create if not exists
         // NOTE: This prevents unwanted recreation of the group
         let group = svg.select(`#${distributionId}`);
@@ -128,14 +128,12 @@
             .enter()
             .append("path")
             .attr("d", d3.geoPath())
-            // .attr("fill", d => color(d.value))
             .attr("fill", fillColor)
             .attr("stroke", borderColor)
             .attr("stroke-width", showBorder ? 3 : 0)
             .attr("stroke-opacity", opacity)
             .attr("fill-opacity", opacity)
             .attr("mix-blend-mode", "screen")
-            .attr("transform", `translate(${xLocation}, 0)`);
     }
 
     // If the data points change then replot
@@ -144,9 +142,9 @@
         if (label) {
             if (labelIsLatex) {
                 console.log("Label is latex: ", label);
-                displayLatex(label, xLocation + interfaceSettings.distributionWidth / 2, 40, distributionId);
+                displayLatex(label, interfaceSettings.distributionWidth / 2, 40, distributionId);
             } else {
-                displayText(label, xLocation + interfaceSettings.distributionWidth / 2, 40, distributionId);
+                displayText(label, interfaceSettings.distributionWidth / 2, 40, distributionId);
             }
         }
     }
@@ -155,10 +153,6 @@
 <style> 
     svg {
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
     }
 </style>
 

@@ -106,8 +106,8 @@ export const currentTime = writable(0);
 export const isPlaying = writable(false);
 export const playbackSpeed = writable(30);
 export const domainRange = writable({
-    xMin: -3.5,
-    xMax: 3.5,
-    yMin: -3.5,
-    yMax: 3.5,
+    xMin: -3.0,
+    xMax: 3.0,
+    yMin: -3.0,
+    yMax: 3.0,
 });

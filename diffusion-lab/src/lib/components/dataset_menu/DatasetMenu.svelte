@@ -6,16 +6,17 @@
 
 <style>
     .dataset-menu {
-        width: 100%;
         height: 100%;
+        width: 100px;
         display: flex;
         flex-direction: column;
-        align-items: left; 
+        align-items: right; 
         justify-content: center;
-        gap: 20px;                /* Add space between items */
-        margin-left: 20px;
+        gap: 20px;                  
         padding-bottom: 100px;
         box-sizing: border-box;
+        position: absolute;
+        left: -150px;
     }
 
     .dataset-menu-title {
