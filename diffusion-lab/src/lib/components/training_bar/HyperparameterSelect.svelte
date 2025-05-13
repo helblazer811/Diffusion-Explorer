@@ -15,7 +15,7 @@
         color: #777;
         font-size: 18px;
         display: block;
-        margin-bottom: 6px;
+        margin-bottom: 12px;
         font-weight: 300;
         font-family: var(--font-family);
     }
@@ -44,6 +44,7 @@
         border-bottom: solid 1px #ccc;
         color: #333;
         outline: none;
+        height: 40px;
         /* margin-right: 30px; */
         /* padding-right: 30px; make space for arrow */
     }

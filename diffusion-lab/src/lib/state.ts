@@ -72,7 +72,7 @@ export const interfaceSettings = {
     distributionWidth: 500,
     distributionHeight: 500,
     mainAreaHeight: 640,
-    miniDistributionWidth: 75,
+    miniDistributionWidth: 40,
     displayAreaWidth: 1100,
     displayAreaHeight: 500,
     timeToDistributionRatio: 1100 / 500,

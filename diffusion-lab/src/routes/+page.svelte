@@ -30,11 +30,9 @@
     import TimeSlider from '$lib/components/time_slider/TimeSlider.svelte';
     import TrainingBar from '$lib/components/training_bar/TrainingBar.svelte';
     import DisplayArea from '$lib/components/display_area/DisplayArea.svelte';
-    // import DatasetMenu from '$lib/components/dataset_menu/DatasetMenu.svelte';
     // import Explanation from '$lib/components/Explanation.svelte';
     // Import helper tf functions
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
-    import DatasetMenu from '$lib/components/dataset_menu/DatasetMenu.svelte';
 
     export let trainModel: boolean = false; // Flag to indicate if the model is being trained
 
@@ -298,7 +296,7 @@
 
 <div class="container">
     <TitleBar/>
-    <TrainingBar/>
+    <TrainingBar datasetDict={datasetDict}/>
     <div class="main-area">
         <!-- <DatasetMenu datasetDict={datasetDict}/> -->
         <DisplayArea/>
