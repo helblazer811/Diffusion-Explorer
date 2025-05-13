@@ -24,7 +24,7 @@
     .time-slider-inner-container {
         position: absolute;
         display: flex;
-        transform: translateX(-100px);
+        /* transform: translateX(-100px); */
         /* transform: translateX(-175px);  */
         /* center, then shift left by 100px */
         /* width: var(--display-area-width); */

@@ -255,27 +255,54 @@
         position: relative;
     }
 
-    .sub-title-container {
-        height: 60px;
+    .title-container {
+        height: 70px;
         width: 100%;
         background-color: var(--dark-blue);
         display: flex;
         justify-content: center;
         align-items: center;
+    }
+
+    .title-inner-container {
+        height: 100%;
+        width: calc(var(--display-area-width) - 200px);
         display: flex;
-        justify-content: center;
+        flex-direction: row;
+    }
+
+    .title {
+        height: 100%;
+        width: 50%;
+        margin: 0;
+        font-size: 2.8em;
+        color: white;
+        font-family: var(--font-family);
+        vertical-align: middle;
+        text-align: left;
+        display: flex;
         align-items: center;
+        position: relative;
+    }
+
+    .title p {
+        font-weight: 200; /* Thin font */
+        margin: 0;
     }
 
     .sub-title {
-        width: var(--display-area-width);
+        /* width: var(--display-area-width); */
         /* margin: 0 auto; */
-        font-size: 1.7em;
+        margin: 0;
+        width: 50%;
+        font-size: 1.25em;
         color: white;
         font-family: var(--font-family);
         font-weight: 200; /* Thin font */
-        /* text-align: right; */
-        vertical-align: middle;
+        /* Vertically align the text */
+        display: flex;
+        align-items: center;
+        text-align: right;
     }
 
     #github-logo {
@@ -315,7 +342,7 @@
         background-color: white;
         display: flex;
         justify-content: center;
-        overflow-x: hidden;
+        overflow: hidden;
         /* display: flex; */
     }
 
@@ -345,10 +372,15 @@
 </style>
 
 <div class="container">
-    <div class="sub-title-container">
-        <h1 class="sub-title"> 
-            Learn about diffusion and flow  models with interactive visualization. 
-        </h1>
+    <div class="title-container">
+        <div class="title-inner-container">
+            <div class="title">
+                <p><b>Diffusion</b>Lab</p>
+            </div>
+            <h1 class="sub-title"> 
+                Learn about diffusion and flow  models with interactive visualization. 
+            </h1>
+        </div>
         <a href="https://github.com/helblazer811/DiffusionLab" id="github-logo" target="_blank">
             <img src="{base}/github-logo.svg" alt="GitHub Logo"/>
             Code

@@ -17,28 +17,11 @@
     }
 
     .training-bar {
-        position: absolute;
         padding: 10px 0;
         display: flex;
+        /* justify-content: center; */
         align-items: center;
-        width: var(--display-area-width);
-        position: relative; /* Added to position the title and logo */
-    }
-
-    /* Add beta logo "before" the title */
-    #beta-logo {
-        position: absolute;
-        left: -60px;
-        width: 50px;
-        height: 50px;
-    }
-
-    .title {
-        margin: 0;
-        font-size: 3.2em;
-        color: var(--dark-blue);
-        font-family: var(--font-family);
-        vertical-align: middle;
+        width: calc(var(--display-area-width) - 200px);
     }
 
     .hyperparameter-menu {
@@ -52,8 +35,6 @@
 
 <div class="training-bar-container">
     <div class="training-bar">
-        <img src="{base}/BetaLogo.svg" id="beta-logo" alt="Beta Logo" />
-        <p class="title"><b>Diffusion</b>Lab</p>
         <div class="hyperparameter-menu">
             {#each Object.entries(hyperparameterMenuConfig) as [name, entry]}
                 <HyperparameterSelect entry={entry} />

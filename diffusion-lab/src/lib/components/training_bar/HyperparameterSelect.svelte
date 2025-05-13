@@ -7,8 +7,8 @@
         flex-grow: 1;
         max-width: 250px;
         min-width: 180px;
-        margin-left: 30px;
         margin-top: 6px;
+        margin-right: 20px;
     }
 
     .control label {
