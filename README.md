@@ -1,6 +1,10 @@
 # DiffusionLab: Interactive Visualizations of Diffusion and Flow Based Generative Models
 
 [<img src="ToolScreenshot.png"/>](https://alechelbling.com/DiffusionLab)
+<!-- <video controls>
+  <source src="DiffusionLabDemoVideo.mov">
+  Your browser does not support the video tag.
+</video> -->
 
 ---
 
