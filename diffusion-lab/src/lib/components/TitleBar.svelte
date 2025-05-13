@@ -18,6 +18,7 @@
         width: calc(var(--display-area-width) - 200px);
         display: flex;
         flex-direction: row;
+        padding: 0px 10px;
     }
 
     .title {
@@ -52,6 +53,7 @@
         display: flex;
         align-items: center;
         text-align: right;
+        padding: 10px 0;
     }
 
     #github-logo {
@@ -77,6 +79,29 @@
         height: 30px;
         margin-right: 10px;
     }
+    /* Hide github logo if less thatn 1200 screen size */
+    @media (max-width: 1200px) {
+        #github-logo{
+            display: none;
+        }
+    }
+
+    /* If the screen becomes less than 700 wide then change the flex direction */
+    @media (max-width: 700px) {
+        .title-container {
+            height: auto;
+        }
+
+        .title-inner-container {
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .sub-title {
+            width: 100%;
+            text-align: left;
+        }
+    }
 </style>
 
 <div class="title-container">
@@ -90,6 +115,6 @@
     </div>
     <a href="https://github.com/helblazer811/DiffusionLab" id="github-logo" target="_blank">
         <img src="{base}/github-logo.svg" alt="GitHub Logo"/>
-        Code
+        <span>Code</span>
     </a>
 </div>

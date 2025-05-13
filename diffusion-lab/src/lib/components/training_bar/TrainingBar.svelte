@@ -20,12 +20,14 @@
         box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 4px 0px;
         display: flex;
         justify-content: center;
+        padding: 0 10px;
     }
 
     .training-bar {
         padding: 10px 0;
         display: flex;
         /* justify-content: center; */
+        justify-content: left;
         align-items: center;
         width: calc(var(--display-area-width) - 200px);
     }
@@ -38,7 +40,7 @@
     }
 
     .dataset-menu {
-        margin-left: 20px;
+        /* margin-left: 20px; */
         height: 100%;
     }
    
@@ -63,6 +65,44 @@
         margin-bottom: 12px;
     }
 
+    /* If the screen becomes less than 700 wide then change the flex direction */
+    @media (max-width: 700px) {
+        .training-bar-container {
+            height: auto;
+        }
+
+        .training-bar {
+            flex-direction: column;
+            align-items: left;
+            justify-content: left;
+            width: 100%;
+            padding: 10px 0;
+        }
+
+        .mini-distribution-container {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            justify-content: left;
+        }
+
+    }
+    /* IF width becomes below 400 then make the hyperparameter menu flex column */
+    @media (max-width: 400px) {
+        .hyperparameter-menu {
+            flex-direction: column;
+            align-items: left;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .dataset-menu {
+            flex-direction: column;
+            align-items: left;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+    }
 
 </style>
 

@@ -18,9 +18,9 @@
             if ($isPlaying) {
                 // Update currentTime based on playbackSpeed
                 let nextTime = $currentTime + 1 / $UIState.numberOfSteps;
-                // If nextTime is greater than 1, reset it to 1
+                // If nextTime is greater than 1, loop back to 0
                 if (nextTime > 1) {
-                    nextTime = 1;
+                    nextTime = 0;
                 }
                 // Update the curentTime state
                 currentTime.update(() => nextTime);

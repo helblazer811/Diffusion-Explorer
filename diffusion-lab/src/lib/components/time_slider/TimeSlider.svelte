@@ -24,31 +24,12 @@
     .time-slider-inner-container {
         position: absolute;
         display: flex;
-        /* transform: translateX(-100px); */
-        /* transform: translateX(-175px);  */
-        /* center, then shift left by 100px */
-        /* width: var(--display-area-width); */
-        /* height: 40px; */
-        /* padding: 0 200px; */
-        /* padding-left: 200px; */
-        /* padding-right: 200px; */
-        /* margin-left: -200px; */
-        /* margin-right: -200px; */
     }
 
     .time-slider {
-        /* position: absolute; */
-        /* position: absolute; */
-        /* left: -150px; */
-        /* width: 100%; */
-        /* position: relative; */
-        /* width: var(--display-area-width) - ; */
-        /* display area width minus  */
-        /* Add 150px just cause I think it looks a bit better */
         width: calc(var(--display-area-width) - var(--distribution-width) + 100px);
         height: 40px;
         /* Add padding of half the width of the frame to each side 300px */
-        /* padding: 0 200px; */
     }
 
     .slider {
@@ -126,6 +107,13 @@
         align-items: center;
         justify-content: center;
         pointer-events: auto; /* Ensure button is clickable */
+    }
+
+    /* If UI less than 900 then auto downscale the width of the time slider */
+    @media (max-width: 900px) {
+        .time-slider-inner-container {
+            width: 80%;
+        }
     }
 
 </style>

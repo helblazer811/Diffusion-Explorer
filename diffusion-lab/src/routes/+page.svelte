@@ -292,6 +292,13 @@
         box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2); /* upward shadow */
     }
 
+    @media (max-width: 1100px) {
+        .main-area {
+            height: auto;
+            padding-top: 20px;
+        }
+    }
+
 </style>
 
 <div class="container">

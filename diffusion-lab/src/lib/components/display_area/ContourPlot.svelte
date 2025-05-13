@@ -4,7 +4,7 @@
     import * as d3 from 'd3';
 
     import { interfaceSettings, domainRange } from '$lib/state';
-    import { scale } from 'svelte/transition';
+    import { screenWidth } from '$lib/screen';
 
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
@@ -60,6 +60,7 @@
         yLocation: number,
         distributionId: string = "target",
     ) {
+        const screen = $screenWidth || 800;
         // Select the group by ID, or create if not exists
         const svg = d3.select(svgElement);
         // NOTE: This prevents unwanted recreation of the group
@@ -72,9 +73,9 @@
         // Plot title above the contour 
         group.append("text")
             .attr("x", xLocation)
-            .attr("y", yLocation)
+            .attr("y", screen > 600 ? yLocation: yLocation + 20)
             .attr("text-anchor", "middle")
-            .style("font-size", "24px")
+            .style("font-size", screen > 600 ? "24px" : "40px")
             .style("font-family", "Helvetica, sans-serif")
             .style("fill", "#7b7b7b")
             .text(text);
@@ -148,7 +149,7 @@
     }
 
     // If the data points change then replot
-    $: if (data && svgElement) {
+    $: if (data && svgElement && $screenWidth) {
         plotContour(data, time, opacity, distributionId);
         if (label) {
             const xLocation = time * (interfaceSettings.displayAreaWidth - interfaceSettings.distributionWidth) + (interfaceSettings.distributionWidth / 2);
