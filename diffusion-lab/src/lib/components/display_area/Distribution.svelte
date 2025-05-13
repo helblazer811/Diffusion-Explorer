@@ -12,13 +12,14 @@
     // export let targetDistributionSamples = tf.tensor([]); // Number of samples to generate
     // export let sourceDistributionSamples = tf.tensor([]); // Number of samples to generate
     // export let currentDistributionSamples = tf.tensor([]); // Number of samples to generate
+    export let svgElement; // Shared SVG element for all distributions
+    export let time: number = 0.0; // Default value for the time
     export let data: number[][]; // Data to plot
     export let xLocation: number = 0; // X location of the contour
     export let opacity: number = 0.5; // Opacity of the contour
     export let labelIsLatex: boolean = false; // Flag to indicate if the label is in LaTeX format
     export let label: string; // Label for the distribution
     export let distributionId: string; // ID for the distribution canvas
-    export let colorMap: string = "Blues"; // Color map for the heatmap
     export let displayMode: string = "contour"; // Display mode for the distribution
     export let showBorder: boolean = false; // Flag to indicate if the border should be shown
     export let fillColor: string = "#7b7b7b"; // Fill color for the contour
@@ -32,15 +33,15 @@
         distributionId={distributionId}
         xLocation={xLocation}
         opacity={opacity}
-        colorMap={colorMap}
     />
 {:else if displayMode === "contour"}
     <ContourPlot
+        svgElement={svgElement}
         data={data}
+        time={time}
         distributionId={distributionId}
         xLocation={xLocation}
         opacity={opacity}
-        colorMap={colorMap}
         label={label}
         labelIsLatex={labelIsLatex}
         showBorder={showBorder}

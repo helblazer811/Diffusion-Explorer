@@ -4,22 +4,20 @@
     import * as d3 from 'd3';
 
     import { interfaceSettings, domainRange } from '$lib/state';
+    import { scale } from 'svelte/transition';
 
+    export let svgElement; // Shared SVG element for all distributions
+    export let time: number = 0.0; // Default value for the time
     export let data: tf.Tensor; // Data to plot
     export let distributionId: string = "target"; // ID for the distribution canvas
-    export let xLocation: number = 0; // X location of the contour
+    // export let xLocation: number = 0; // X location of the contour
     export let opacity: number = 0.5; // Opacity of the contour
-    export let colorMap: string = "Blues"; // Color map for the heatmap
     export let fillColor: string = "#7b7b7b"; // Fill color for the contour
     export let bandwidth: number = 10; // Bandwidth for the contour density
     export let showBorder: boolean = false; // Flag to indicate if the border should be shown
     export let borderColor: string = "#7b7b7b"; // Border color for the contour
     export let label: string; // Label for the distribution
     export let labelIsLatex: boolean = false; // Flag to indicate if the label is in LaTeX format
-
-    let svgElement: SVGSVGElement; // Create a separate SVG element for each distribution
-
-    let colorScale = d3[`interpolate${colorMap}`];
 
     function displayLatex(
         formula: string,
@@ -81,31 +79,46 @@
             .style("fill", "#7b7b7b")
             .text(text);
     }
-    
-    function plotContour(
-        data: tf.Tensor,
-        opacity: number = 0.9,
-        xLocation: number = 0,
-        distributionId: string = "target",
-        numberOfContours: number = 4,
+
+    function convertDataToDisplayCoordinateFrame(
+        tensorData: tf.Tensor,
+        time: number,
     ) {
-        // Convert data to plain 2d array
-        let values = data.arraySync() as number[][];
-        // 2. Build histogram
+        let data = tensorData.arraySync() as number[][]; // Convert to plain 2D array
+        // 1. Scale from the abstract coordinate frame (~ -3 to 3) to the svg viewbox coordinate frame
         const xScale = d3.scaleLinear()
             .domain([$domainRange.xMin, $domainRange.xMax])
             .range([0, interfaceSettings.distributionWidth]);
         const yScale = d3.scaleLinear()
             .domain([$domainRange.yMin, $domainRange.yMax])
-            .range([0, interfaceSettings.distributionHeight]);
+            .range([0, interfaceSettings.distributionWidth]);
+        // 2. Apply the scale to the data
+        const scaledData = data.map(d => [xScale(d[0]), yScale(d[1])]);
+        // 3. Now translate the data to the correct xLocation based on the time
+        const xLocation = time * (interfaceSettings.displayAreaWidth - interfaceSettings.distributionWidth);
+        const translatedData = scaledData.map(d => [d[0] + xLocation, d[1]]);
 
+        return translatedData;
+    }
+    
+    function plotContour(
+        data: tf.Tensor,
+        time: number,
+        opacity: number = 0.9,
+        // xLocation: number = 0,
+        distributionId: string = "target",
+        numberOfContours: number = 4,
+        densityResolution: number = 100,
+    ) {
+        // 1. Convert data to display coordinate frame
+        let translatedData = convertDataToDisplayCoordinateFrame(data, time);
         const contours = d3.contourDensity()
-            .x(d => xScale(d[0]))
-            .y(d => yScale(d[1]))
-            .size([interfaceSettings.distributionWidth, interfaceSettings.distributionHeight])
-            .bandwidth(30)
+            .x(d => d[0])
+            .y(d => d[1])
+            .size([interfaceSettings.displayAreaWidth, interfaceSettings.displayAreaHeight])
+            .bandwidth(30) // Tune this to spread the density
             .thresholds(numberOfContours)
-            (values)
+            (translatedData);
 
         // 4. Scales for drawing
         const svg = d3.select(svgElement); 
@@ -119,9 +132,6 @@
         } else {
             group.selectAll("*").remove(); // Clear previous contents of this group
         }
-        // Prepare a color palette
-        // const color = d3.scaleSequential(colorScale)
-        //     .domain([0, d3.max(contours, d => d.value) * 1.2]);
         // 5. Draw contours
         group.selectAll("path")
             .data(contours)
@@ -134,33 +144,38 @@
             .attr("stroke-opacity", opacity)
             .attr("fill-opacity", opacity)
             .attr("mix-blend-mode", "screen")
+
     }
 
     // If the data points change then replot
     $: if (data && svgElement) {
-        plotContour(data, opacity, xLocation, distributionId);
+        plotContour(data, time, opacity, distributionId);
         if (label) {
+            const xLocation = time * (interfaceSettings.displayAreaWidth - interfaceSettings.distributionWidth) + (interfaceSettings.distributionWidth / 2);
             if (labelIsLatex) {
-                console.log("Label is latex: ", label);
-                displayLatex(label, interfaceSettings.distributionWidth / 2, 40, distributionId);
+                displayLatex(label, xLocation, 40, distributionId);
             } else {
-                displayText(label, interfaceSettings.distributionWidth / 2, 40, distributionId);
+                displayText(label, xLocation, 40, distributionId);
             }
         }
     }
 </script>
-
+<!-- 
 <style> 
     svg {
         position: absolute;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none; /* Optional: allow interaction to pass through */
     }
 </style>
 
 <svg
     bind:this={svgElement}
     id="svg_{distributionId}" 
-    width={interfaceSettings.distributionWidth}
-    height={interfaceSettings.distributionHeight}
+    viewBox="0 0 {interfaceSettings.displayAreaWidth} {interfaceSettings.distributionHeight}"
     style={"left: " + xLocation + "px;"}
+    preserveAspectRatio="xMidYMid meet"
 >
-</svg>
+</svg> -->

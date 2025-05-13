@@ -75,6 +75,7 @@ export const interfaceSettings = {
     miniDistributionWidth: 75,
     displayAreaWidth: 1100,
     displayAreaHeight: 500,
+    timeToDistributionRatio: 1100 / 500,
     pointColor: "#4594e3",
 }
 

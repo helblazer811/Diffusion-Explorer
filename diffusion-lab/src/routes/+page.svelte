@@ -310,21 +310,22 @@
         justify-content: center;
         z-index: -1; */
         /* z-index: 3; */
+        width: 100%;
         height: var(--main-area-height);
         background-color: white;
-        /* justify-content: center; */
+        display: flex;
+        justify-content: center;
+        overflow-x: hidden;
         /* display: flex; */
     }
 
-    .display-area-container {
-        /* width: 100%; */
+    /* .display-area-container {
         position: relative;
         margin: 0 auto;
-        /* left: -120px;  */
-        width: var(--display-area-width);
-        /* display: flex; */
+        max-width: var(--display-area-width);
     }
-    
+     */
+
     /* .dataset-menu-container {
         top: 50px;
         height: 100%;
@@ -355,10 +356,9 @@
     </div>
     <TrainingBar/>
     <div class="main-area">
-        <div class="display-area-container">
-            <DatasetMenu datasetDict={datasetDict}/>
-            <DisplayArea/>
-        </div>
+        <!-- <DatasetMenu datasetDict={datasetDict}/> -->
+        <DisplayArea/>
+        <!-- </div> -->
     </div>
     <TimeSlider /> 
     <div class="footer"></div>
