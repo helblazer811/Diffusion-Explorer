@@ -33,10 +33,9 @@
     // import Explanation from '$lib/components/Explanation.svelte';
     // Import helper tf functions
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
+    import { callSamplingWorkerThread } from '$lib/diffusion/workers/utils';
 
     export let trainModel: boolean = false; // Flag to indicate if the model is being trained
-
-    let samplingWorker: Worker; // Web worker for sampling
 
     let datasetDict: any = {}; // Dictionary to hold the loaded datasets
 
@@ -63,60 +62,6 @@
         return model;
     }
 
-    function callSamplingWorkerThread(
-        samplingWorker: Worker,
-        modelJSONPath: string,
-        modelType: string,
-        modelConfig: object,
-        numSamples: number,
-        numberOfSteps: number,
-    ) {
-        const readonlyUIState = get(UIState);
-        // Add a listener to the sampling worker thread to receive the samples
-        samplingWorker.onmessage = (e) => {
-            const { type, result: res } = e.data;
-            if (type === 'result') {
-                const allSamples = tf.tensor(e.data.allSamples);
-                // Update the UI state with the all time samples
-                allTimeSamples.set(allSamples);
-                // Compute the range of the points to use for the domain of each contour map
-                let flatAllTimeSamples = tf.reshape(allSamples, [readonlyUIState.numSamples * readonlyUIState.numberOfSteps, 2]); // shape [num_time_steps * num_samples, dim]
-                flatAllTimeSamples = flatAllTimeSamples.arraySync();
-                const xMin = d3.min(flatAllTimeSamples, d => d[0]);
-                const xMax = d3.max(flatAllTimeSamples, d => d[0]);
-                const yMin = d3.min(flatAllTimeSamples, d => d[1]);
-                const yMax = d3.max(flatAllTimeSamples, d => d[1]);
-                const localDomainRange = {
-                    xMin: xMin - 0.08 * (xMax - xMin),
-                    xMax: xMax + 0.08 * (xMax - xMin),
-                    yMin: yMin - 0.08 * (yMax - yMin),
-                    yMax: yMax + 0.08 * (yMax - yMin),
-                };
-                // TODO fix this logic
-                // domainRange.set(localDomainRange);
-                // Make the UI state play
-                isPlaying.set(true);
-            } else if (type === 'status') {
-                console.log('Worker status:', e.data.message);
-            } else if (type === 'error') {
-                console.error('Worker error:', e.data.message);
-            }
-        };
-        // Call the dummy worker thread 
-        console.log("Calling the worker thread to sample...");
-        // Send a message
-        samplingWorker.postMessage({
-            type: 'sample',
-            data: {
-                modelJSONPath: modelJSONPath,
-                modelType: modelType,
-                modelConfig: modelConfig,
-                numSamples: readonlyUIState.numSamples,
-                numberOfSteps: readonlyUIState.numberOfSteps,
-            }
-        });
-    }
-
     onMount(async () => {
         // Load the UI state
         const readonlyUIState = get(UIState);
@@ -133,23 +78,6 @@
         const defaultModelType = readonlyUIState.modelType;
         const defaultDataset: string = $datasetName;
         const defaultModelPath: string = pretrainedModelPaths[defaultModelType][defaultDataset];
-        // Call the dummy worker thread 
-        // console.log("Calling the worker thread to sample...");
-        // Set up web worker threads for sampling and training
-        samplingWorker = new Worker(
-            new URL('$lib/diffusion/workers/sampling_worker.ts', import.meta.url),
-            { type: 'module' }
-        );
-        // // Run sampling worker thread
-        // NOTE: Now I only call this reactively when the dataset changes
-        // callSamplingWorkerThread(
-        //     samplingWorker,
-        //     defaultModelPath,
-        //     defaultModelType,
-        //     modelConfig[defaultModelType],
-        //     readonlyUIState.numSamples,
-        //     readonlyUIState.numberOfSteps
-        // );
         // Load up the chosen training dataset points as tf tensor
         const pointsTensor = datasetDict[$datasetName];
         // Update the UI state with the training dataset
@@ -216,7 +144,8 @@
     });
 
     // Add handler for if datasetName changes
-    $: if ($datasetName && samplingWorker) {
+    $: if ($datasetName && typeof window !== 'undefined') {
+        // NOTE: typof window !== 'undefined' is to prevent SSR errors
         // Pause the animation
         isPlaying.set(false);
         // Load the dataset
@@ -234,13 +163,36 @@
             model.set(loadedModel);
         });
         // Regenerate all of the samples 
+        console.log("Calling the worker thread to sample...");
         callSamplingWorkerThread(
-            samplingWorker,
             defaultModelPath,
             defaultModelType,
             modelConfig[defaultModelType],
             get(UIState).numSamples,
-            get(UIState).numberOfSteps
+            get(UIState).numberOfSteps,
+            (allSamples) => {
+                // Convert all samples to tf tensor
+                allSamples = tf.tensor(allSamples);
+                // Update the UI state with the all time samples
+                allTimeSamples.set(allSamples);
+                // Compute the range of the points to use for the domain of each contour map
+                let flatAllTimeSamples = tf.reshape(allSamples, [get(UIState).numSamples * get(UIState).numberOfSteps, 2]); // shape [num_time_steps * num_samples, dim]
+                flatAllTimeSamples = flatAllTimeSamples.arraySync();
+                const xMin = d3.min(flatAllTimeSamples, d => d[0]);
+                const xMax = d3.max(flatAllTimeSamples, d => d[0]);
+                const yMin = d3.min(flatAllTimeSamples, d => d[1]);
+                const yMax = d3.max(flatAllTimeSamples, d => d[1]);
+                const localDomainRange = {
+                    xMin: xMin - 0.08 * (xMax - xMin),
+                    xMax: xMax + 0.08 * (xMax - xMin),
+                    yMin: yMin - 0.08 * (yMax - yMin),
+                    yMax: yMax + 0.08 * (yMax - yMin),
+                };
+                // TODO fix this logic
+                // domainRange.set(localDomainRange);
+                // Make the UI state play
+                isPlaying.set(true);
+            }
         )
     }
 

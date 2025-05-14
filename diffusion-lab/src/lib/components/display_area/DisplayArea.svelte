@@ -16,6 +16,7 @@
     } from '$lib/state';
 
     import Distribution from '$lib/components/display_area/Distribution.svelte';
+    import SourceDistribution from '$lib/components/display_area/SourceDistribution.svelte';
     import { onMount } from 'svelte';
 
     let sharedSVGElement: SVGSVGElement; // Shared SVG element for all distributions
@@ -77,7 +78,7 @@
     ></svg>
 
     {#if sharedSVGElement}
-        <Distribution
+        <SourceDistribution
             svgElement={sharedSVGElement}
             time={0}
             data={$sourceDistributionSamples}

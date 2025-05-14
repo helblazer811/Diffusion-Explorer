@@ -3,6 +3,7 @@
     // Import components
     import HyperparameterSelect from '$lib/components/training_bar/HyperparameterSelect.svelte';
     import MiniDistribution from '$lib/components/training_bar/MiniDistribution.svelte';
+    import StyleDropdown from '$lib/components/training_bar/StyleDropdown.svelte';
 
     import { hyperparameterMenuConfig } from '$lib/state';
 
@@ -32,16 +33,15 @@
         width: calc(var(--display-area-width) - 200px);
     }
 
+    .menu {
+        height: 100%;
+        padding-right: 20px;
+    }
+
     .hyperparameter-menu {
         display: flex;
         /* margin-left: 20px; */
         flex-direction: row;
-        height: 100%;
-    }
-
-    .dataset-menu {
-        /* margin-left: 20px; */
-        height: 100%;
     }
    
     .mini-distribution-container {
@@ -87,16 +87,9 @@
         }
 
     }
-    /* IF width becomes below 400 then make the hyperparameter menu flex column */
+    /* If width becomes below 400 then make the hyperparameter menu flex column */
     @media (max-width: 400px) {
-        .hyperparameter-menu {
-            flex-direction: column;
-            align-items: left;
-            width: 100%;
-            margin-bottom: 10px;
-        }
-
-        .dataset-menu {
+        .menu {
             flex-direction: column;
             align-items: left;
             width: 100%;
@@ -108,12 +101,16 @@
 
 <div class="training-bar-container">
     <div class="training-bar">
-        <div class="hyperparameter-menu">
+        <div class="menu hyperparameter-menu">
             {#each Object.entries(hyperparameterMenuConfig) as [name, entry]}
                 <HyperparameterSelect entry={entry} />
             {/each}
         </div>
-        <div class="dataset-menu">
+        <div class="menu style-menu">
+            <h1 class="label">Style Settings</h1>
+            <StyleDropdown />
+        </div>
+        <div class="menu dataset-menu">
             <h1 class="label">Dataset</h1>
             <div class="mini-distribution-container">
                 {#each Object.entries(datasetDict) as [name, data]}
