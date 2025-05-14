@@ -5,6 +5,7 @@
     import 'katex/dist/katex.min.css';
 
     import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
+    import ScatterPlot from '$lib/components/display_area/plots/ScatterPlot.svelte';
     
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
@@ -14,23 +15,26 @@
     export let labelIsLatex: boolean = false; // Flag to indicate if the label is in LaTeX format
     export let label: string; // Label for the distribution
     export let distributionId: string; // ID for the distribution canvas
-    export let displayMode: string = "contour"; // Display mode for the distribution
+    export let activePlotTypes: string[] = ["Contour Plot"]; // Active plot types for the distribution
     export let showBorder: boolean = false; // Flag to indicate if the border should be shown
     export let fillColor: string = "#7b7b7b"; // Fill color for the contour
     export let borderColor: string = "#7b7b7b"; // Border color for the contour
 
 </script>
 
-<!-- Iterate through  -->
 
-{#if displayMode === "heatmap"}
-    <Heatmap
+{#if activePlotTypes.includes("Scatter Plot")}
+    <ScatterPlot
+        svgElement={svgElement}
         data={data}
+        time={time}
         distributionId={distributionId}
         xLocation={xLocation}
         opacity={opacity}
+        pointColor={borderColor}
     />
-{:else if displayMode === "contour"}
+{/if}
+{#if activePlotTypes.includes("Contour Plot")}
     <ContourPlot
         svgElement={svgElement}
         data={data}

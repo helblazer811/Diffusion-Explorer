@@ -7,7 +7,9 @@
         sourceDistributionSamples,
         targetDistributionSamples,
         currentDistributionSamples,
-        allTimeSamples
+        allTimeSamples,
+        activePlotTypes
+
     } from '$lib/state';
 
     import {
@@ -111,6 +113,7 @@
             labelIsLatex={true}
             showBorder={true}
             distributionId="current"
+            activePlotTypes={$activePlotTypes}
         />
     {/if}
 </div>
