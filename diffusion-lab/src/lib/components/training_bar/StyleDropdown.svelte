@@ -1,17 +1,25 @@
 <script>
-	let options = ['Show contours', 'Show points', 'Show mesh'];
-	let selected = new Set();
+	import { trainingObjectiveToDisplayOptions } from '$lib/settings';
+	import { trainingObjective, activePlotTypes } from '$lib/state';
+
+	// Reactively compute the available options for current objective
+	$: options = trainingObjectiveToDisplayOptions[$trainingObjective]?.["Plot Types"] || [];
+
 	let isOpen = false;
 
 	function toggleOption(option) {
-		if (selected.has(option)) {
-			selected.delete(option);
+		// Create a new Set from the current value
+		const next = new Set($activePlotTypes);
+		if (next.has(option)) {
+			next.delete(option);
 		} else {
-			selected.add(option);
+			next.add(option);
 		}
-		selected = new Set(selected); // trigger reactivity
+		// Write updated array back to the store
+		activePlotTypes.set(Array.from(next));
 	}
 </script>
+
 
 <style>
 	.dropdown {
@@ -87,19 +95,19 @@
 </style>
 
 <div class="dropdown">
-    <div
-        class="dropdown-button"
-        role="button"
-        tabindex="0"
-        on:click={() => isOpen = !isOpen}
-        on:keydown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault(); // Space key can scroll
-                isOpen = !isOpen;
-            }
-        }}>
-        {selected.size > 0 ? `${selected.size} selected` : 'Select options'}
-    </div>
+	<div
+		class="dropdown-button"
+		role="button"
+		tabindex="0"
+		on:click={() => isOpen = !isOpen}
+		on:keydown={(e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				isOpen = !isOpen;
+			}
+		}}>
+		{$activePlotTypes.length > 0 ? `${$activePlotTypes.length} selected` : 'Select options'}
+	</div>
 
 	{#if isOpen}
 		<div class="dropdown-content">
@@ -107,7 +115,7 @@
 				<label>
 					<input
 						type="checkbox"
-						checked={selected.has(option)}
+						checked={$activePlotTypes.includes(option)}
 						on:change={() => toggleOption(option)} />
 					{option}
 				</label><br />

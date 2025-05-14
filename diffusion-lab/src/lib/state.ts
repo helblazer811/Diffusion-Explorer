@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { FlowModel } from '$lib/diffusion/flow_matching';
 import {base} from '$app/paths';
+import * as settings from '$lib/settings';
 
 // Default values various parts of the UI
 
@@ -112,3 +113,8 @@ export const domainRange = writable({
     yMin: -3.0,
     yMax: 3.0,
 });
+export const activePlotTypes = writable(
+    settings.trainingObjectiveToDisplayOptions[
+        hyperparameterMenuConfig["Training Objective"].default
+    ]["Default Plot Types"]
+);
