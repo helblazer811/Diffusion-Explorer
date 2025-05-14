@@ -45,7 +45,7 @@ export const trainingObjectiveToModelClass = {
     "Flow Matching": FlowModel
 };
 
-export const modelConfig = {
+export const trainingObjectiveToModelConfig = {
     "Flow Matching": {
         dim: 2,
         hidden: 64,
@@ -83,7 +83,7 @@ export const interfaceSettings = {
 // Writeable stores for the UI state
 
 export const UIState = writable({
-    numberOfSteps: 100, // Number of steps to take in the sampler
+    numberOfSteps: 150, // Number of steps to take in the sampler
     numSamples: 500, // Number of samples to generate
     // sourceDistributionSamples: undefined, // This holds a tensorflow tensor containing samples from the source distribution
     // targetDistributionSamples: undefined, // This holds a tensorflow tensor containing samples from the target distribution

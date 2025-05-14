@@ -10,6 +10,7 @@
 
     import { screenWidth } from '$lib/screen';
 
+    export let isActive: boolean = true; // Flag to indicate if the plot is active
     export let time: number = 0.0; // Default value for the time
     export let opacity: number = 0.5; // Opacity of the contour
     export let data: tf.Tensor; // Data to plot
@@ -43,7 +44,7 @@
         time: number = 0.0,
         opacity: number = 0.5,
         distributionId: string = "target",
-        maximumPoints: number = 1000,
+        maximumPoints: number = 300,
     ) {
         // Convert data to plain 2d array
         data = convertDataToDisplayCoordinateFrame(data, time);
@@ -75,8 +76,17 @@
     }
 
     // If the data points change then replot
-    $: if (data && svgElement && $screenWidth) {
+    $: if (data && svgElement && $screenWidth && isActive) {
         plotScatterPlot(data, time, opacity, distributionId);
+    }
+
+    // If the plot is no longer active, remove the group
+    $: if (!isActive && svgElement) {
+        const svg = d3.select(svgElement);
+        const group = svg.select(`#${distributionId}_scatter`);
+        if (!group.empty()) {
+            group.remove();
+        }
     }
 
 </script>

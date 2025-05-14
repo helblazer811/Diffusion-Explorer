@@ -6,6 +6,7 @@
     import { interfaceSettings, domainRange } from '$lib/state';
     import { screenWidth } from '$lib/screen';
 
+    export let isActive: boolean = true; // Flag to indicate if the plot is active
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
     export let data: tf.Tensor; // Data to plot
@@ -125,10 +126,10 @@
         const svg = d3.select(svgElement); 
         // Select the group by ID, or create if not exists
         // NOTE: This prevents unwanted recreation of the group
-        let group = svg.select(`#${distributionId}`);
+        let group = svg.select(`#${distributionId}_contour`);
         if (group.empty()) {
             group = svg.append("g")
-                .attr("id", distributionId)
+                .attr("id", distributionId+"_contour")
                 .attr("isolation", "isolate"); // Prevents blending with other groups
         } else {
             group.selectAll("*").remove(); // Clear previous contents of this group
@@ -149,7 +150,7 @@
     }
 
     // If the data points change then replot
-    $: if (data && svgElement && $screenWidth) {
+    $: if (data && svgElement && $screenWidth && isActive) {
         plotContour(data, time, opacity, distributionId);
         if (label) {
             const xLocation = time * (interfaceSettings.displayAreaWidth - interfaceSettings.distributionWidth) + (interfaceSettings.distributionWidth / 2);
@@ -158,6 +159,14 @@
             } else {
                 displayText(label, xLocation, 40, distributionId);
             }
+        }
+    }
+    // If the plot is no longer active, remove the group
+    $: if (!isActive && svgElement) {
+        const svg = d3.select(svgElement);
+        const group = svg.select(`#${distributionId}_contour`);
+        if (!group.empty()) {
+            group.remove();
         }
     }
 </script>

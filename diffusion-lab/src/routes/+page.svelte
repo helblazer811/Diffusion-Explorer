@@ -12,7 +12,6 @@
     import { 
         pretrainedModelPaths, 
         trainingObjectiveToModelClass, 
-        modelConfig, 
         datasetNameToPath, 
         trainingConfig, 
         sourceDistributionSamples,
@@ -22,7 +21,10 @@
         isPlaying,
         datasetName,
         domainRange,
-        trainingObjective
+        trainingObjective,
+
+        trainingObjectiveToModelConfig
+
     } from '$lib/state';
     // Load up the application state
     import { UIState, model } from '$lib/state';
@@ -67,18 +69,16 @@
         // Load the UI state
         const readonlyUIState = get(UIState);
         // Load up each of the datasets
+        let datasets = {}
         for (const [name, path] of Object.entries(datasetNameToPath)) {
             const pointsTensor = await loadDataset(path);
-            datasetDict = { ...datasetDict, [name]: pointsTensor }; // triggers Svelte reactivity
+            datasets = { ...datasets, [name]: pointsTensor }; // triggers Svelte reactivity
             // console.log(`Loaded dataset ${name} from ${path}`);
             // console.log(`Dataset ${name} shape: `, pointsTensor.shape);
         }
+        datasetDict = datasets;
         // Add a listener to the window to handle keydown events
         window.addEventListener('keydown', handleKeydown);
-        // Load up the default cached model
-        const defaultTrainingObjective = $trainingObjective;
-        const defaultDataset: string = $datasetName;
-        const defaultModelPath: string = pretrainedModelPaths[defaultTrainingObjective][defaultDataset];
         // Load up the chosen training dataset points as tf tensor
         const pointsTensor = datasetDict[$datasetName];
         // Update the UI state with the training dataset
@@ -103,7 +103,8 @@
                 // Get the model path 
                 const tfModelPath = e.data.tfModelPath;
                 // Make the model
-                const ModelClass = trainingObjectiveToModelClass[defaultTrainingObjective];
+                const ModelClass = trainingObjectiveToModelClass[$trainingObjective];
+                const modelConfig = trainingObjectiveToModelConfig[$trainingObjective];
                 const ourModel = new ModelClass(
                     modelConfig.dim,
                     modelConfig.hidden,
@@ -126,8 +127,8 @@
             trainingWorker.postMessage({
                 type: 'train',
                 data: {
-                    trainingObjective: defaultTrainingObjective,
-                    modelConfig: modelConfig[defaultTrainingObjective],
+                    trainingObjective: $trainingObjective,
+                    modelConfig: modelConfig[$trainingObjective],
                     datasetPath: datasetNameToPath[$datasetName],
                     trainingConfig: {
                         iterations: trainingConfig["iterations"],
@@ -145,7 +146,13 @@
     });
 
     // Add handler for if datasetName changes
-    $: if ($datasetName && typeof window !== 'undefined') {
+    $: if (
+        $datasetName && 
+        datasetDict[$datasetName] &&
+        pretrainedModelPaths[$trainingObjective]?.[$datasetName] &&
+        typeof window !== 'undefined'
+    ) {
+        console.log("Dataset name changed to: ", $datasetName);
         // NOTE: typof window !== 'undefined' is to prevent SSR errors
         // Pause the animation
         isPlaying.set(false);
@@ -158,17 +165,16 @@
         // Load up the model corresponding to the dataset
         const defaultTrainingObjective = $trainingObjective;
         const defaultModelPath = pretrainedModelPaths[$trainingObjective][$datasetName];
-        // Load the model
-        loadModel(defaultModelPath).then((loadedModel) => {
-            // Set the model in the UI state
-            model.set(loadedModel);
-        });
+        // // Load the model
+        // loadModel(defaultModelPath).then((loadedModel) => {
+        //     // Set the model in the UI state
+        //     model.set(loadedModel);
+        // });
         // Regenerate all of the samples 
-        console.log("Calling the worker thread to sample...");
         callSamplingWorkerThread(
             defaultModelPath,
             defaultTrainingObjective,
-            modelConfig[defaultTrainingObjective],
+            trainingObjectiveToModelConfig[defaultTrainingObjective],
             get(UIState).numSamples,
             get(UIState).numberOfSteps,
             (allSamples) => {

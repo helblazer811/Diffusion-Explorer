@@ -23,29 +23,27 @@
 </script>
 
 
-{#if activePlotTypes.includes("Scatter Plot")}
-    <ScatterPlot
-        svgElement={svgElement}
-        data={data}
-        time={time}
-        distributionId={distributionId}
-        xLocation={xLocation}
-        opacity={opacity}
-        pointColor={borderColor}
-    />
-{/if}
-{#if activePlotTypes.includes("Contour Plot")}
-    <ContourPlot
-        svgElement={svgElement}
-        data={data}
-        time={time}
-        distributionId={distributionId}
-        xLocation={xLocation}
-        opacity={opacity}
-        label={label}
-        labelIsLatex={labelIsLatex}
-        showBorder={showBorder}
-        fillColor={fillColor}
-        borderColor={borderColor}
-    />
-{/if}
+<ScatterPlot
+    svgElement={svgElement}
+    isActive={activePlotTypes.includes("Scatter Plot")}
+    data={data}
+    time={time}
+    distributionId={distributionId}
+    xLocation={xLocation}
+    opacity={opacity}
+    pointColor={borderColor}
+/>
+<ContourPlot
+    svgElement={svgElement}
+    isActive={activePlotTypes.includes("Contour Plot")}
+    data={data}
+    time={time}
+    distributionId={distributionId}
+    xLocation={xLocation}
+    opacity={opacity}
+    label={label}
+    labelIsLatex={labelIsLatex}
+    showBorder={showBorder}
+    fillColor={fillColor}
+    borderColor={borderColor}
+/>

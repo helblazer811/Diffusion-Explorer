@@ -66,7 +66,7 @@
     }
 
     /* If the screen becomes less than 700 wide then change the flex direction */
-    @media (max-width: 700px) {
+    @media (max-width: 800px) {
         .training-bar-container {
             height: auto;
         }
@@ -94,6 +94,10 @@
             align-items: left;
             width: 100%;
             margin-bottom: 10px;
+        }
+
+        .training-bar-container {
+            padding-left: 20px;
         }
     }
 
