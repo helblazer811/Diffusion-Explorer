@@ -40,7 +40,7 @@ export const pretrainedModelPaths = {
     // "Diffusion": "/models/diffusion_model.json",
 }
 
-export const modelTypeToModelClass = {
+export const trainingObjectiveToModelClass = {
     "Flow Matching": FlowModel
 };
 
@@ -82,7 +82,6 @@ export const interfaceSettings = {
 // Writeable stores for the UI state
 
 export const UIState = writable({
-    modelType: hyperparameterMenuConfig["Training Objective"].default,
     numberOfSteps: 100, // Number of steps to take in the sampler
     numSamples: 500, // Number of samples to generate
     // sourceDistributionSamples: undefined, // This holds a tensorflow tensor containing samples from the source distribution
@@ -97,6 +96,7 @@ export const UIState = writable({
     // }
 });
 
+export const trainingObjective = writable(hyperparameterMenuConfig["Training Objective"].default);
 export const datasetName = writable("Smiley Face");
 export const targetDistributionSamples = writable(undefined);
 export const sourceDistributionSamples = writable(undefined);

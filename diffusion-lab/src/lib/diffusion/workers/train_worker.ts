@@ -7,7 +7,7 @@ import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
 setWasmPaths('/tfjs-backend-wasm/');
 import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
 
-const modelTypeToModelClass = {
+const trainingObjectiveToModelClass = {
     'Flow Matching': FlowModel,
 };
 
@@ -24,14 +24,14 @@ async function loadDataset(path: string) {
 self.onmessage = async (e) => {
     const { type, data } = e.data;
     // Destructure the data
-    const { modelType, modelConfig, datasetPath, trainingConfig } = data;
+    const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
 
     if (type === 'train') {
         // Set up tf wasm backend
         await tf.setBackend('wasm');
         await tf.ready();
         // Initialize the empty model 
-        const ModelClass = modelTypeToModelClass[modelType];
+        const ModelClass = trainingObjectiveToModelClass[trainingObjective];
         const ourModel = new ModelClass(
             modelConfig.dim,
             modelConfig.hidden,
@@ -45,7 +45,7 @@ self.onmessage = async (e) => {
             trainingConfig["batchSize"],
         )
         // Save the model in the browser IndexedDB
-        const modelSaveName = 'indexeddb://' + modelType.replace(/\s+/g, '_') + '_' + Date.now();
+        const modelSaveName = 'indexeddb://' + trainingObjective.replace(/\s+/g, '_') + '_' + Date.now();
         // Pull out just the tf model to save
         const tfModel = ourModel.model;
         // Save the model to IndexedDB

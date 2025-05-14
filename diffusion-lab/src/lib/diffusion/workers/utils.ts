@@ -2,7 +2,7 @@
 
 export function callSamplingWorkerThread(
     modelJSONPath: string,
-    modelType: string,
+    trainingObjective: string,
     modelConfig: object,
     numSamples: number,
     numberOfSteps: number,
@@ -31,7 +31,7 @@ export function callSamplingWorkerThread(
         type: 'sample',
         data: {
             modelJSONPath: modelJSONPath,
-            modelType: modelType,
+            trainingObjective: trainingObjective,
             modelConfig: modelConfig,
             numSamples: numSamples,
             numberOfSteps: numberOfSteps,

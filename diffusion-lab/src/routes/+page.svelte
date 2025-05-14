@@ -11,7 +11,7 @@
     // Load up the application config
     import { 
         pretrainedModelPaths, 
-        modelTypeToModelClass, 
+        trainingObjectiveToModelClass, 
         modelConfig, 
         datasetNameToPath, 
         trainingConfig, 
@@ -21,7 +21,8 @@
         allTimeSamples,
         isPlaying,
         datasetName,
-        domainRange
+        domainRange,
+        trainingObjective
     } from '$lib/state';
     // Load up the application state
     import { UIState, model } from '$lib/state';
@@ -75,9 +76,9 @@
         // Add a listener to the window to handle keydown events
         window.addEventListener('keydown', handleKeydown);
         // Load up the default cached model
-        const defaultModelType = readonlyUIState.modelType;
+        const defaultTrainingObjective = $trainingObjective;
         const defaultDataset: string = $datasetName;
-        const defaultModelPath: string = pretrainedModelPaths[defaultModelType][defaultDataset];
+        const defaultModelPath: string = pretrainedModelPaths[defaultTrainingObjective][defaultDataset];
         // Load up the chosen training dataset points as tf tensor
         const pointsTensor = datasetDict[$datasetName];
         // Update the UI state with the training dataset
@@ -102,7 +103,7 @@
                 // Get the model path 
                 const tfModelPath = e.data.tfModelPath;
                 // Make the model
-                const ModelClass = modelTypeToModelClass[defaultModelType];
+                const ModelClass = trainingObjectiveToModelClass[defaultTrainingObjective];
                 const ourModel = new ModelClass(
                     modelConfig.dim,
                     modelConfig.hidden,
@@ -125,8 +126,8 @@
             trainingWorker.postMessage({
                 type: 'train',
                 data: {
-                    modelType: defaultModelType,
-                    modelConfig: modelConfig[defaultModelType],
+                    trainingObjective: defaultTrainingObjective,
+                    modelConfig: modelConfig[defaultTrainingObjective],
                     datasetPath: datasetNameToPath[$datasetName],
                     trainingConfig: {
                         iterations: trainingConfig["iterations"],
@@ -155,8 +156,8 @@
         // Immediately remove the currentDistributionSamples
         currentDistributionSamples.set(tf.zeros([0, 2]));
         // Load up the model corresponding to the dataset
-        const defaultModelType = get(UIState).modelType;
-        const defaultModelPath = pretrainedModelPaths[defaultModelType][$datasetName];
+        const defaultTrainingObjective = $trainingObjective;
+        const defaultModelPath = pretrainedModelPaths[$trainingObjective][$datasetName];
         // Load the model
         loadModel(defaultModelPath).then((loadedModel) => {
             // Set the model in the UI state
@@ -166,8 +167,8 @@
         console.log("Calling the worker thread to sample...");
         callSamplingWorkerThread(
             defaultModelPath,
-            defaultModelType,
-            modelConfig[defaultModelType],
+            defaultTrainingObjective,
+            modelConfig[defaultTrainingObjective],
             get(UIState).numSamples,
             get(UIState).numberOfSteps,
             (allSamples) => {

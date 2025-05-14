@@ -6,7 +6,7 @@
 
     import { onDestroy } from 'svelte';
 
-    import ContourPlot from '$lib/components/display_area/ContourPlot.svelte';
+    import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
 
     // Get all samples from the state
     import { domainRange, interfaceSettings } from '$lib/state';
@@ -32,18 +32,6 @@
 
     let cleanup = null; // Cleanup function for event listeners
     let isHovered = false;
-
-    // callSamplingWorkerThread(
-    //     defaultModelPath,
-    //     defaultModelType,
-    //     modelConfig[defaultModelType],
-    //     get(UIState).numSamples,
-    //     get(UIState).numberOfSteps,
-    //     (allSamples) => {
-    //         // Convert all samples to tf tensor
-    //         allSamples = tf.tensor(allSamples);
-    //     }
-    // )
 
     function onMove(event: MouseEvent) {
         // Get the mouse position

@@ -4,14 +4,8 @@
     import katex from 'katex';
     import 'katex/dist/katex.min.css';
 
-    import Heatmap from '$lib/components/display_area/Heatmap.svelte';
-    import ContourPlot from '$lib/components/display_area/ContourPlot.svelte';
+    import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
     
-    // export let currentTime: number = 0.0; // Default value for the time
-    // export let isPlaying: boolean = false; // Flag to indicate if the animation is playing
-    // export let targetDistributionSamples = tf.tensor([]); // Number of samples to generate
-    // export let sourceDistributionSamples = tf.tensor([]); // Number of samples to generate
-    // export let currentDistributionSamples = tf.tensor([]); // Number of samples to generate
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
     export let data: number[][]; // Data to plot
@@ -26,6 +20,8 @@
     export let borderColor: string = "#7b7b7b"; // Border color for the contour
 
 </script>
+
+<!-- Iterate through  -->
 
 {#if displayMode === "heatmap"}
     <Heatmap
