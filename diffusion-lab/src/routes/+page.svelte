@@ -245,7 +245,6 @@
         height: 10px;
         /* z-index: 1; */
         position: relative;
-        bottom: 10px;
         /* box-shadow: rgba(0, 0, 0, 0.8) 0px -2px -4px 0px; */
         box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2); /* upward shadow */
     }
