@@ -6,7 +6,7 @@
 */
 export const trainingObjectiveToDisplayOptions = {
     "Flow Matching": {
-        "Plot Types": ["Contour Plot", "Scatter Plot", "Mesh"],
+        "Plot Types": ["Contour Plot", "Scatter Plot", "Mesh Plot"],
         "Default Plot Types": ["Contour Plot"], // Default plot types to show (can be multiple)
     }
 }

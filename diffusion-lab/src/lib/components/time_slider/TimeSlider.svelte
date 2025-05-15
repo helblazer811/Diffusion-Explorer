@@ -15,21 +15,17 @@
         width: 100%;
         height: 100px;
         background-color: #ffffff;
-        bottom: 10px;
-        position: relative;
         display: flex;
         justify-content: center;
     }
 
     .time-slider-inner-container {
-        position: absolute;
         display: flex;
     }
 
     .time-slider {
         width: calc(var(--display-area-width) - var(--distribution-width) + 100px);
         height: 40px;
-        /* Add padding of half the width of the frame to each side 300px */
     }
 
     .slider {

@@ -152,7 +152,6 @@
         pretrainedModelPaths[$trainingObjective]?.[$datasetName] &&
         typeof window !== 'undefined'
     ) {
-        console.log("Dataset name changed to: ", $datasetName);
         // NOTE: typof window !== 'undefined' is to prevent SSR errors
         // Pause the animation
         isPlaying.set(false);

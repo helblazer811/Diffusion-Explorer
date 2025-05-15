@@ -11,7 +11,6 @@
     export let time: number = 0.0; // Default value for the time
     export let data: tf.Tensor; // Data to plot
     export let distributionId: string = "target"; // ID for the distribution canvas
-    // export let xLocation: number = 0; // X location of the contour
     export let opacity: number = 0.5; // Opacity of the contour
     export let fillColor: string = "#7b7b7b"; // Fill color for the contour
     export let bandwidth: number = 10; // Bandwidth for the contour density

@@ -6,6 +6,7 @@
 
     import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
     import ScatterPlot from '$lib/components/display_area/plots/ScatterPlot.svelte';
+    import MeshPlot from '$lib/components/display_area/plots/MeshPlot.svelte';
     
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
@@ -39,11 +40,18 @@
     data={data}
     time={time}
     distributionId={distributionId}
-    xLocation={xLocation}
     opacity={opacity}
     label={label}
     labelIsLatex={labelIsLatex}
     showBorder={showBorder}
     fillColor={fillColor}
     borderColor={borderColor}
+/>
+<MeshPlot
+    svgElement={svgElement}
+    isActive={activePlotTypes.includes("Mesh Plot")}
+    data={data}
+    time={time}
+    distributionId={distributionId}
+    opacity={opacity}
 />

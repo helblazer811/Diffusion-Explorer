@@ -69,5 +69,14 @@ export class Model {
     sample(num_samples: number, num_total_steps: number = 100): tf.Tensor3D {
         throw new Error("Method 'sample()' not implemented.");
     }
+
+    /**
+     * Draw samples from the model using the given initial points
+     * @param initial_points tf.Tensor2D of shape [num_samples, dim]
+     * @param num_total_steps 
+     */
+    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = 100): tf.Tensor3D {
+        throw new Error("Method 'sample_from_initial_points()' not implemented.");
+    }
 }
 

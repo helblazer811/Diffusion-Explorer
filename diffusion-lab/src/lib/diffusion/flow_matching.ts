@@ -114,6 +114,37 @@ export class FlowModel extends Model {
             return tf.stack(all_step_data);
         });
     }
+
+    /**
+    * Draw samples from the model using the given initial points
+    * @param initial_points tf.Tensor2D of shape [num_samples, dim]
+    * @param num_total_steps 
+    */
+    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = 100): tf.Tensor3D {
+        return tf.tidy(() => {
+            // Draw some initial samples from the source distribution 
+            const num_samples = initial_points.shape[0]; 
+            const x_0 = initial_points;
+            // Draw some linear spaced timesteps in [0, 1]
+            const t_steps = tf.linspace(0, 1, num_total_steps + 1);
+            // Simulate the ODE until timestep t for all samples
+            let all_step_data: tf.Tensor2D[] = [];
+            // Store the initial sample
+            let x_t: tf.Tensor2D = x_0;
+            for (let i = 0; i < num_total_steps; i++) {
+                const t_i = t_steps.slice([i], [1]); // current time
+                const t_i_repeated = tf.tile(t_i, [num_samples]);
+                const t_next = t_steps.slice([i + 1], [1]); // next time
+                const t_next_repeated = tf.tile(t_next, [num_samples]);
+                // Do the step using the midpoint method
+                x_t = this.step(x_t, t_i_repeated, t_next_repeated);
+                // Store the result in the all_step_data tensor
+                all_step_data.push(x_t)
+            }
+            // Return all samples
+            return tf.stack(all_step_data);
+        });
+    }
 }
 
 // export function loadFlowModel(path: string) {
