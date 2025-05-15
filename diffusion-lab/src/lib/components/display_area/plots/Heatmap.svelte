@@ -2,7 +2,7 @@
     import * as tf from '@tensorflow/tfjs';
     import * as d3 from 'd3';
 
-    import { interfaceSettings } from '$lib/state';
+    import { interfaceSettings } from '$lib/settings';
 
     export let data: tf.Tensor; // Data to plot
     export let distributionId: string = "target"; // ID for the distribution canvas

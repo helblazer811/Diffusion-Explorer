@@ -3,13 +3,14 @@
     import * as d3 from 'd3';
     import * as tf from '@tensorflow/tfjs';
     import {
-        interfaceSettings, 
         datasetName, 
         currentDistributionSamples, 
         allTimeSamples,
         currentTime,
         isPlaying
     } from '$lib/state';
+
+    import { interfaceSettings } from '$lib/settings';
 
     export let data; // Data to plot
     export let distributionId = "target"; // ID for the distribution canvas

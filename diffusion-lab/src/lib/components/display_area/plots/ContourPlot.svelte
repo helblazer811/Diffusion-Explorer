@@ -3,8 +3,9 @@
     import * as tf from '@tensorflow/tfjs';
     import * as d3 from 'd3';
 
-    import { interfaceSettings, domainRange } from '$lib/state';
+    import { domainRange } from '$lib/state';
     import { screenWidth } from '$lib/screen';
+    import { interfaceSettings } from '$lib/settings';
     import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
     export let isActive: boolean = true; // Flag to indicate if the plot is active

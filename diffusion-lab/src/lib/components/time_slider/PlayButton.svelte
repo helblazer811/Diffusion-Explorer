@@ -1,6 +1,6 @@
 <script>
     import { onDestroy } from 'svelte';
-    import { isPlaying, playbackSpeed, currentTime, UIState} from '$lib/state';
+    import { isPlaying, playbackSpeed, currentTime, numberOfSteps } from '$lib/state';
 
     let interval;
 
@@ -17,7 +17,7 @@
         interval = setInterval(() => {
             if ($isPlaying) {
                 // Update currentTime based on playbackSpeed
-                let nextTime = $currentTime + 1 / $UIState.numberOfSteps;
+                let nextTime = $currentTime + 1 / $numberOfSteps;
                 // If nextTime is greater than 1, loop back to 0
                 if (nextTime > 1) {
                     nextTime = 0;
