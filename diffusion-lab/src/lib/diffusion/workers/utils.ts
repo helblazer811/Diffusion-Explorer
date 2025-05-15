@@ -76,3 +76,40 @@ export function callSamplingWorkerThreadFromInitialPoints(
         }
     });
 }
+
+export function callTrainingWorkerThread(
+    trainingObjective: string,
+    modelConfig: object,
+    datasetPath: string,
+    trainingConfig: object,
+    callback: Function,
+) {
+    // Create the worker
+    const trainingWorker = new Worker(
+        new URL('./train.worker.ts', import.meta.url), // NOTE: This needs to be a relative path
+        { type: 'module' }
+    );
+    // Add a listener to the training worker thread to receive the samples
+    trainingWorker.onmessage = (e) => {
+        const { type, result: res } = e.data;
+        if (type === 'result') {
+            callback(e.data.tfModelPath);
+        } else if (type === 'status') {
+            console.log('Worker status:', e.data.message);
+        } else if (type === 'error') {
+            console.error('Worker error:', e.data.message);
+        }
+    };
+    // Call the dummy worker thread 
+    console.log("Calling the worker thread to train...");
+    // Send a message
+    trainingWorker.postMessage({
+        type: 'train',
+        data: {
+            trainingObjective: trainingObjective,
+            modelConfig: modelConfig,
+            datasetPath: datasetPath,
+            trainingConfig: trainingConfig,
+        }
+    });
+}

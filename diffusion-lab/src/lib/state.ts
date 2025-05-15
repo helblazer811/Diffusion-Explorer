@@ -1,9 +1,10 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import * as settings from '$lib/settings';
 
 export const numberOfSteps = writable(150);
 export const numSamples = writable(500);
-export const trainingObjective = writable(settings.hyperparameterMenuConfig["Training Objective"].default);
+export const trainingObjective = writable("Flow Matching");
+export const sampler = writable("Euler");
 export const datasetName = writable("Smiley Face");
 export const targetDistributionSamples = writable(undefined);
 export const sourceDistributionSamples = writable(undefined);
@@ -20,7 +21,5 @@ export const domainRange = writable({
     yMax: 3.0,
 });
 export const activePlotTypes = writable(
-    settings.trainingObjectiveToDisplayOptions[
-        settings.hyperparameterMenuConfig["Training Objective"].default
-    ]["Default Plot Types"]
+    settings.trainingObjectiveToDisplayOptions[get(trainingObjective)]["Default Plot Types"]
 );

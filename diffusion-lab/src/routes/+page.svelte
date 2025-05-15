@@ -35,7 +35,7 @@
     // import Explanation from '$lib/components/Explanation.svelte';
     // Import helper tf functions
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
-    import { callSamplingWorkerThread } from '$lib/diffusion/workers/utils';
+    import { callSamplingWorkerThread, callTrainingWorkerThread} from '$lib/diffusion/workers/utils';
 
     export let trainModel: boolean = false; // Flag to indicate if the model is being trained
 
@@ -83,18 +83,21 @@
         );
         // Update the UI state with the source distribution samples
         sourceDistributionSamples.set(multivariateNormalSamples);
-        // Create a worker for training the model 
-        const trainingWorker = new Worker(
-            new URL('$lib/diffusion/workers/train.worker.ts', import.meta.url),
-            { type: 'module' }
-        );
+        // // Create a worker for training the model 
+        // const trainingWorker = new Worker(
+        //     new URL('$lib/diffusion/workers/train.worker.ts', import.meta.url),
+        //     { type: 'module' }
+        // );
         // Get the model config and class
         const ModelClass = trainingObjectiveToModelClass[$trainingObjective];
         const modelConfig = trainingObjectiveToModelConfig[$trainingObjective];
         // Add a listener to the training worker thread to receive the model
-        trainingWorker.onmessage = async (e) => {
-            const { type, result: res } = e.data;
-            if (type === 'result') {
+        callTrainingWorkerThread(
+            $trainingObjective,
+            modelConfig,
+            datasetNameToPath[$datasetName],
+            trainingConfig,
+            (e) => {
                 // Get the model path 
                 const tfModelPath = e.data.tfModelPath;
                 // Make the model
@@ -103,17 +106,15 @@
                     modelConfig.hidden,
                 );
                 // Load up a model from the given file path
-                const tfModel = await tf.loadLayersModel(tfModelPath);
-                // // Set the model in the model class
-                ourModel.setModel(tfModel);
-                // Prompt to download the model
-                ourModel.download();
-            } else if (type === 'status') {
-                console.log('Worker status:', e.data.message);
-            } else if (type === 'error') {
-                console.error('Worker error:', e.data.message);
+                tf.loadLayersModel(tfModelPath).then((tfModel) => {
+                    // Set the model in the model class
+                    ourModel.setModel(tfModel);
+                    // Prompt to download the model
+                    ourModel.download();
+                });
             }
-        };
+        );
+            
         // Call the training worker thread
         if (true) {
             console.log("Calling the worker thread to train...");
