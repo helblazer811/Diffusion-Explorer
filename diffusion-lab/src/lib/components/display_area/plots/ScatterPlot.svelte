@@ -9,6 +9,7 @@
     } from '$lib/state';
 
     import { screenWidth } from '$lib/screen';
+    import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
     export let isActive: boolean = true; // Flag to indicate if the plot is active
     export let time: number = 0.0; // Default value for the time
@@ -18,27 +19,6 @@
     export let distributionId: string = "target"; // ID for the distribution canvas
     export let pointColor: string = "#7b7b7b"; // Point color for the scatter plot
 
-    function convertDataToDisplayCoordinateFrame(
-        tensorData: tf.Tensor,
-        time: number,
-    ){
-        let data = tensorData.arraySync() as number[][]; // Convert to plain 2D array
-        // 1. Scale from the abstract coordinate frame (~ -3 to 3) to the svg viewbox coordinate frame
-        const xScale = d3.scaleLinear()
-            .domain([$domainRange.xMin, $domainRange.xMax])
-            .range([0, interfaceSettings.distributionWidth]);
-        const yScale = d3.scaleLinear()
-            .domain([$domainRange.yMin, $domainRange.yMax])
-            .range([0, interfaceSettings.distributionWidth]);
-        // 2. Apply the scale to the data
-        const scaledData = data.map(d => [xScale(d[0]), yScale(d[1])]);
-        // 3. Now translate the data to the correct xLocation based on the time
-        const xLocation = time * (interfaceSettings.displayAreaWidth - interfaceSettings.distributionWidth);
-        const translatedData = scaledData.map(d => [d[0] + xLocation, d[1]]);
-
-        return translatedData;
-    }
-
     function plotScatterPlot(
         data: tf.Tensor,
         time: number = 0.0,
@@ -47,7 +27,13 @@
         maximumPoints: number = 300,
     ) {
         // Convert data to plain 2d array
-        data = convertDataToDisplayCoordinateFrame(data, time);
+        data = convertDataToDisplayCoordinateFrame(
+            data, 
+            time, 
+            interfaceSettings.distributionWidth, 
+            interfaceSettings.displayAreaWidth, 
+            $domainRange
+        );
         // If the data is too large, sample it down to a smaller size
         data = data.slice(0, Math.min(data.length, maximumPoints));
         // Make a scatter plot

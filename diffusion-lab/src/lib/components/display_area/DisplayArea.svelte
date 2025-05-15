@@ -85,7 +85,7 @@
             time={0}
             data={$sourceDistributionSamples}
             opacity={0.25}
-            label="Source Distribution"
+            label=""
             distributionId="source"
             showBorder={true}
             fillColor="rgba(25, 131, 255, 0.2)"
@@ -96,7 +96,7 @@
             time={1.0}
             data={$targetDistributionSamples}
             opacity={0.25}
-            label="Data Distribution"
+            label=""
             distributionId="target"
             showBorder={true}
             fillColor="rgba(25, 131, 255, 0.2)"
