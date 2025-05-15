@@ -10,24 +10,23 @@
     import { get } from 'svelte/store';
     // Load up the application config
     import { 
-        pretrainedModelPaths, 
-        trainingObjectiveToModelClass, 
-        datasetNameToPath, 
-        trainingConfig, 
         sourceDistributionSamples,
         targetDistributionSamples,
         currentDistributionSamples,
         allTimeSamples,
         isPlaying,
         datasetName,
-        domainRange,
         trainingObjective,
-
-        trainingObjectiveToModelConfig
-
+        numSamples,
+        numberOfSteps,
     } from '$lib/state';
-    // Load up the application state
-    import { UIState, model } from '$lib/state';
+    import { 
+        trainingObjectiveToModelConfig,
+        trainingObjectiveToModelClass,
+        datasetNameToPath,
+        trainingConfig,
+        pretrainedModelPaths,
+    } from '$lib/settings';
     // Load up the components
     import TitleBar from '$lib/components/TitleBar.svelte';
     import TimeSlider from '$lib/components/time_slider/TimeSlider.svelte';
@@ -60,14 +59,7 @@
         }
     }
 
-    async function loadModel(modelJSONPath: string) {
-        const model = await tf.loadLayersModel(modelJSONPath);
-        return model;
-    }
-
     onMount(async () => {
-        // Load the UI state
-        const readonlyUIState = get(UIState);
         // Load up each of the datasets
         let datasets = {}
         for (const [name, path] of Object.entries(datasetNameToPath)) {
@@ -87,15 +79,18 @@
         const multivariateNormalSamples = sampleMultivariateNormal(
             [0, 0],
             [[1, 0], [0, 1]],
-            readonlyUIState.numSamples
+            $numSamples
         );
         // Update the UI state with the source distribution samples
         sourceDistributionSamples.set(multivariateNormalSamples);
         // Create a worker for training the model 
         const trainingWorker = new Worker(
-            new URL('$lib/diffusion/workers/train_worker.ts', import.meta.url),
+            new URL('$lib/diffusion/workers/train.worker.ts', import.meta.url),
             { type: 'module' }
         );
+        // Get the model config and class
+        const ModelClass = trainingObjectiveToModelClass[$trainingObjective];
+        const modelConfig = trainingObjectiveToModelConfig[$trainingObjective];
         // Add a listener to the training worker thread to receive the model
         trainingWorker.onmessage = async (e) => {
             const { type, result: res } = e.data;
@@ -103,8 +98,6 @@
                 // Get the model path 
                 const tfModelPath = e.data.tfModelPath;
                 // Make the model
-                const ModelClass = trainingObjectiveToModelClass[$trainingObjective];
-                const modelConfig = trainingObjectiveToModelConfig[$trainingObjective];
                 const ourModel = new ModelClass(
                     modelConfig.dim,
                     modelConfig.hidden,
@@ -122,7 +115,7 @@
             }
         };
         // Call the training worker thread
-        if (false) {
+        if (true) {
             console.log("Calling the worker thread to train...");
             trainingWorker.postMessage({
                 type: 'train',
@@ -145,14 +138,13 @@
         }
     });
 
-    // Add handler for if datasetName changes
+    // Add handler for if datasetName changes or trainingObjective changes
     $: if (
         $datasetName && 
         datasetDict[$datasetName] &&
         pretrainedModelPaths[$trainingObjective]?.[$datasetName] &&
-        typeof window !== 'undefined'
+        typeof window !== 'undefined' // Makes sure this is not run on the server
     ) {
-        // NOTE: typof window !== 'undefined' is to prevent SSR errors
         // Pause the animation
         isPlaying.set(false);
         // Load the dataset
@@ -164,25 +156,20 @@
         // Load up the model corresponding to the dataset
         const defaultTrainingObjective = $trainingObjective;
         const defaultModelPath = pretrainedModelPaths[$trainingObjective][$datasetName];
-        // // Load the model
-        // loadModel(defaultModelPath).then((loadedModel) => {
-        //     // Set the model in the UI state
-        //     model.set(loadedModel);
-        // });
         // Regenerate all of the samples 
         callSamplingWorkerThread(
             defaultModelPath,
             defaultTrainingObjective,
             trainingObjectiveToModelConfig[defaultTrainingObjective],
-            get(UIState).numSamples,
-            get(UIState).numberOfSteps,
+            get(numSamples),
+            get(numberOfSteps),
             (allSamples) => {
                 // Convert all samples to tf tensor
                 allSamples = tf.tensor(allSamples);
                 // Update the UI state with the all time samples
                 allTimeSamples.set(allSamples);
                 // Compute the range of the points to use for the domain of each contour map
-                let flatAllTimeSamples = tf.reshape(allSamples, [get(UIState).numSamples * get(UIState).numberOfSteps, 2]); // shape [num_time_steps * num_samples, dim]
+                let flatAllTimeSamples = tf.reshape(allSamples, [get(numSamples) * get(numberOfSteps), 2]); // shape [num_time_steps * num_samples, dim]
                 flatAllTimeSamples = flatAllTimeSamples.arraySync();
                 const xMin = d3.min(flatAllTimeSamples, d => d[0]);
                 const xMax = d3.max(flatAllTimeSamples, d => d[0]);
@@ -211,42 +198,17 @@
     }
 
     .main-area {
-        /* width: 100%;
-        background-color: white;
-        display: flex;
-        flex-direction: row;
-        justify-content: center;
-        z-index: -1; */
-        /* z-index: 3; */
         width: 100%;
         height: var(--main-area-height);
         background-color: white;
         display: flex;
         justify-content: center;
         overflow: hidden;
-        /* display: flex; */
     }
-
-    /* .display-area-container {
-        position: relative;
-        margin: 0 auto;
-        max-width: var(--display-area-width);
-    }
-     */
-
-    /* .dataset-menu-container {
-        top: 50px;
-        height: 100%;
-        position: absolute;
-        left: 0;
-    } */
 
     .footer {
         height: 10px;
-        /* z-index: 1; */
         position: relative;
-        bottom: 10px;
-        /* box-shadow: rgba(0, 0, 0, 0.8) 0px -2px -4px 0px; */
         box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2); /* upward shadow */
     }
 

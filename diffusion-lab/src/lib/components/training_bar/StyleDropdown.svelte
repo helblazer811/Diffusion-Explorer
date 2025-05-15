@@ -1,9 +1,9 @@
 <script>
-	import { trainingObjectiveToDisplayOptions } from '$lib/settings';
+    import * as settings from '$lib/settings';
 	import { trainingObjective, activePlotTypes } from '$lib/state';
 
 	// Reactively compute the available options for current objective
-	$: options = trainingObjectiveToDisplayOptions[$trainingObjective]?.["Plot Types"] || [];
+	$: options = settings.trainingObjectiveToDisplayOptions[$trainingObjective]?.["Plot Types"] || [];
 
 	let isOpen = false;
 
@@ -25,8 +25,8 @@
 	.dropdown {
 		position: relative;
 		/* display: inline-block; */
-        max-width: 250px;
-        min-width: 180px;
+        max-width: 200px;
+        min-width: 150px;
         margin-top: 6px;
         margin-right: 20px;
 	}

@@ -1,13 +1,9 @@
 <script lang="ts">
-    import * as d3 from 'd3';
-    import * as tf from '@tensorflow/tfjs';
-    import katex from 'katex';
-    import 'katex/dist/katex.min.css';
-
+    // Import components
     import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
     import ScatterPlot from '$lib/components/display_area/plots/ScatterPlot.svelte';
     import MeshPlot from '$lib/components/display_area/plots/MeshPlot.svelte';
-    
+    // Props
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
     export let data: number[][]; // Data to plot

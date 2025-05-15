@@ -2,7 +2,6 @@
 *    Web worker that runs sampling for a given model. 
 */ 
 import { FlowModel } from '$lib/diffusion/flow_matching';
-import { trainingObjectiveToModelClass } from '$lib/state';
 import * as tf from '@tensorflow/tfjs';
 // // import { base } from '$app/paths';
 // import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
@@ -10,8 +9,8 @@ import * as tf from '@tensorflow/tfjs';
 // setWasmPaths('DiffusionLab/tfjs-backend-wasm/');
 // import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
 
-const trainingObjectiveTypeToModelClass = {
-    'Flow Matching': FlowModel,
+const trainingObjectiveToModelClass = {
+    "Flow Matching": FlowModel
 };
 
 self.onmessage = async (e) => {

@@ -2,34 +2,30 @@
     import * as tf from '@tensorflow/tfjs';
 
     import { 
-        UIState, 
         currentTime, 
         sourceDistributionSamples,
         targetDistributionSamples,
         currentDistributionSamples,
         allTimeSamples,
-        activePlotTypes
-
+        activePlotTypes,
+        numberOfSteps,
     } from '$lib/state';
 
-    import {
-        interfaceSettings, 
-        domainRange 
-    } from '$lib/state';
+    import { interfaceSettings } from '$lib/settings';
 
+    // Import components
     import Distribution from '$lib/components/display_area/Distribution.svelte';
     import SourceDistribution from '$lib/components/display_area/SourceDistribution.svelte';
-    import { onMount } from 'svelte';
 
     let sharedSVGElement: SVGSVGElement; // Shared SVG element for all distributions
 
     // If the currentTime changes then update the current distribution samples in the UI state
-    $: if ($currentTime) {
+    $: if ($currentTime && $allTimeSamples) {
         // Convert current time to index
-        let currentTimeIndex = Math.floor($currentTime * $UIState.numberOfSteps);
+        let currentTimeIndex = Math.floor($currentTime * $numberOfSteps);
         // Avoid going out of bounds
-        if (currentTimeIndex >= $UIState.numberOfSteps) {
-            currentTimeIndex = $UIState.numberOfSteps - 1;
+        if (currentTimeIndex >= $numberOfSteps) {
+            currentTimeIndex = $numberOfSteps - 1;
         }
         // Pull out the current time samples from the all time samples
         const currentSamples = tf.tidy(() => $allTimeSamples.gather(currentTimeIndex));
@@ -41,22 +37,8 @@
 
 <style>
     .display-area {
-        /* position: relative; */
-        /* left: -200px; */
-        /* height: 100%; */
-        /* left: 0; */
-        /* topL: 0; */
-        /* z-index: 5; */
-        /* width: 1100px; */
-        /* position: relative; */
-        /* margin: 0 auto; */
-        /* transform: translateX(-100px); */
-        /* transform: translateX(-50%); */
-        /* width: 100%; */
         width: var(--display-area-width);
         transform-origin: top left;
-        /* max-width: var(--display-area-width); */
-        /* max-height: var(--display-area-height); */
         aspect-ratio: calc(var(--display-area-width) / var(--display-area-height));
         position: relative;
     }

@@ -5,17 +5,18 @@
     import { onMount } from 'svelte';
     import { 
         domainRange, 
-        UIState, 
-        trainingObjectiveToModelConfig, 
         trainingObjective,
-        pretrainedModelPaths,
         datasetName,
-        interfaceSettings
-
+        numberOfSteps
     } from '$lib/state';
 
-    import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
+    import {
+        interfaceSettings,
+        pretrainedModelPaths,
+        trainingObjectiveToModelConfig,
+    } from '$lib/settings';
 
+    import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
     import { callSamplingWorkerThread, callSamplingWorkerThreadFromInitialPoints } from '$lib/diffusion/workers/utils';
 
     export let svgElement; // Shared SVG element for all distributions
@@ -23,17 +24,15 @@
     export let time: number = 0.0; // Default value for the time
     export let gridResolution: number = 10; // Resolution of the grid
     export let distributionId: string = "target"; // ID for the distribution canvas
-
     export let strokeWidth: number = 3; // Stroke width for the mesh lines
     export let strokeColor: string = "#424242"; // Stroke color for the mesh lines
-
 
     let trajectoryGrid: number[][][] = []; // Array to hold the trajectories [time, x, y, 2]
 
     // Function to plot the mesh grid for the current timeimport * as d3 from 'd3';
     function plotMesh(time: number) {
         // Convert time to step index
-        const stepIndex = Math.floor(time * ($UIState.numberOfSteps - 1));
+        const stepIndex = Math.floor(time * ($numberOfSteps - 1));
         if (!svgElement || !trajectoryGrid[stepIndex]) return;
 
         let data = trajectoryGrid[stepIndex];
@@ -107,7 +106,7 @@
         const yMax = $domainRange.yMax - 0.1 * height;
         const x = tf.linspace(xMin, xMax, gridResolution);
         const y = tf.linspace(yMin, yMax, gridResolution);
-        let initialPoints = tf.stack(tf.meshgrid(x, y), 2);
+        let initialPoints: tf.Tensor = tf.stack(tf.meshgrid(x, y), 2);
         initialPoints = initialPoints.reshape([gridResolution * gridResolution, 2]); // Flatten the points to be [gridResolution * gridResolution, 2]
         // Sync the points, converting to a 2D array
         initialPoints = initialPoints.arraySync() as number[][];
@@ -117,12 +116,12 @@
             $trainingObjective,
             trainingObjectiveToModelConfig[$trainingObjective],
             initialPoints,
-            $UIState.numberOfSteps,
+            $numberOfSteps,
             (allSamples: number[][]) => {
                 console.log("Received all samples from the worker");
                 let allSamplesTensor = tf.tensor(allSamples);
                 // Reshape the samples to be [time, x, y, 2]
-                allSamplesTensor = allSamplesTensor.reshape([$UIState.numberOfSteps, gridResolution, gridResolution, 2]);
+                allSamplesTensor = allSamplesTensor.reshape([$numberOfSteps, gridResolution, gridResolution, 2]);
                 // Save the samples to the trajectory grid
                 trajectoryGrid = allSamplesTensor.arraySync() as number[][][];
             }

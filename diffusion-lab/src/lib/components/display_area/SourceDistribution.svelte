@@ -1,15 +1,9 @@
 <script lang="ts">
-    import * as d3 from 'd3';
-    import * as tf from '@tensorflow/tfjs';
-    import katex from 'katex';
     import 'katex/dist/katex.min.css';
 
-    import { onDestroy } from 'svelte';
-
     import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
-
     // Get all samples from the state
-    import { domainRange, interfaceSettings } from '$lib/state';
+    import { interfaceSettings  } from '$lib/settings';
 
     
     // export let currentTime: number = 0.0; // Default value for the time

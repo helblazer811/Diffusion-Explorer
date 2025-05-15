@@ -1,12 +1,10 @@
 <script>
-    import { base } from '$app/paths';
     // Import components
     import HyperparameterSelect from '$lib/components/training_bar/HyperparameterSelect.svelte';
     import MiniDistribution from '$lib/components/training_bar/MiniDistribution.svelte';
     import StyleDropdown from '$lib/components/training_bar/StyleDropdown.svelte';
-
-    import { hyperparameterMenuConfig } from '$lib/state';
-
+    // Import settings
+    import * as settings from '$lib/settings';
     
     export let datasetDict = {};
 
@@ -35,13 +33,16 @@
 
     .menu {
         height: 100%;
-        padding-right: 20px;
     }
 
     .hyperparameter-menu {
         display: flex;
         /* margin-left: 20px; */
         flex-direction: row;
+    }
+
+    .dataset-menu {
+        padding-left: 20px;
     }
    
     .mini-distribution-container {
@@ -106,7 +107,7 @@
 <div class="training-bar-container">
     <div class="training-bar">
         <div class="menu hyperparameter-menu">
-            {#each Object.entries(hyperparameterMenuConfig) as [name, entry]}
+            {#each Object.entries(settings.hyperparameterMenuConfig) as [name, entry]}
                 <HyperparameterSelect entry={entry} />
             {/each}
         </div>
