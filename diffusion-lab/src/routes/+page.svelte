@@ -93,7 +93,7 @@
         sourceDistributionSamples.set(multivariateNormalSamples);
         // Create a worker for training the model 
         const trainingWorker = new Worker(
-            new URL('$lib/diffusion/workers/train_worker.ts', import.meta.url),
+            new URL('$lib/diffusion/workers/train.worker.ts', import.meta.url),
             { type: 'module' }
         );
         // Add a listener to the training worker thread to receive the model

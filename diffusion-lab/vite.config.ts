@@ -8,5 +8,5 @@ export default defineConfig({
 			'@mapbox/node-pre-gyp',
 			'@mswjs/interceptors'
 		]
-	}
+	},
 });

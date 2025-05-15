@@ -9,7 +9,7 @@ export function callSamplingWorkerThread(
 ) {
     // Create the worker
     const samplingWorker = new Worker(
-        new URL('$lib/diffusion/workers/sampling_worker.ts', import.meta.url),
+        new URL('./sampling.worker.ts', import.meta.url), // NOTE: This needs to be a relative path
         { type: 'module' }
     );
     // Add a listener to the sampling worker thread to receive the samples
@@ -48,7 +48,7 @@ export function callSamplingWorkerThreadFromInitialPoints(
 ) {
     // Create the worker
     const samplingWorker = new Worker(
-        new URL('$lib/diffusion/workers/sampling_worker.ts', import.meta.url),
+        new URL('./sampling.worker.ts', import.meta.url), // NOTE: This needs to be a relative path
         { type: 'module' }
     );
     // Add a listener to the sampling worker thread to receive the samples
