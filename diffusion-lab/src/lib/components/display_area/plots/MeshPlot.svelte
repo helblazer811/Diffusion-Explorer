@@ -14,6 +14,8 @@
 
     } from '$lib/state';
 
+    import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
+
     import { callSamplingWorkerThread, callSamplingWorkerThreadFromInitialPoints } from '$lib/diffusion/workers/utils';
 
     export let svgElement; // Shared SVG element for all distributions
@@ -27,27 +29,6 @@
 
 
     let trajectoryGrid: number[][][] = []; // Array to hold the trajectories [time, x, y, 2]
-
-    function convertDataToDisplayCoordinateFrame(
-        tensorData: tf.Tensor,
-        time: number,
-    ) {
-        let data = tensorData.arraySync() as number[][]; // Convert to plain 2D array
-        // 1. Scale from the abstract coordinate frame (~ -3 to 3) to the svg viewbox coordinate frame
-        const xScale = d3.scaleLinear()
-            .domain([$domainRange.xMin, $domainRange.xMax])
-            .range([0, interfaceSettings.distributionWidth]);
-        const yScale = d3.scaleLinear()
-            .domain([$domainRange.yMin, $domainRange.yMax])
-            .range([0, interfaceSettings.distributionWidth]);
-        // 2. Apply the scale to the data
-        const scaledData = data.map(d => [xScale(d[0]), yScale(d[1])]);
-        // 3. Now translate the data to the correct xLocation based on the time
-        const xLocation = time * (interfaceSettings.displayAreaWidth - interfaceSettings.distributionWidth);
-        const translatedData = scaledData.map(d => [d[0] + xLocation, d[1]]);
-
-        return translatedData;
-    }
 
     // Function to plot the mesh grid for the current timeimport * as d3 from 'd3';
     function plotMesh(time: number) {
@@ -63,7 +44,13 @@
         // NOTE: This is jancky af, but it works
         data = tf.tensor(data);
         data = data.reshape([gridResolution * gridResolution, 2]);
-        data = convertDataToDisplayCoordinateFrame(data, time);
+        data = convertDataToDisplayCoordinateFrame(
+            data, 
+            time, 
+            interfaceSettings.distributionWidth, 
+            interfaceSettings.displayAreaWidth, 
+            $domainRange
+        );
         data = tf.tensor(data);
         data = data.reshape([gridResolution, gridResolution, 2]);
         data = data.arraySync() as number[][][];
