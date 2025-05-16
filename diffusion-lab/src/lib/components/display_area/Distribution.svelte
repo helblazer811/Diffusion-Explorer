@@ -47,7 +47,6 @@
 <MeshPlot
     svgElement={svgElement}
     isActive={activePlotTypes.includes("Mesh Plot")}
-    data={data}
     time={time}
     distributionId={distributionId}
     opacity={opacity}
@@ -55,6 +54,5 @@
 <TrajectoriesPlot
     svgElement={svgElement}
     isActive={activePlotTypes.includes("Trajectories")}
-    allTimeSamples={allTimeSamples}
     distributionId={distributionId}
 />

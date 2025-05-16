@@ -48,7 +48,7 @@
 		padding: 10px;
 		z-index: 1;
         padding-right: 30px;
-        width: 80%
+        width: 80%;
 	}
 
     .dropdown {
