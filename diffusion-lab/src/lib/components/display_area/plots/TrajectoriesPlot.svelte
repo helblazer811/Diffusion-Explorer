@@ -13,46 +13,55 @@
 
     export let isActive: boolean = true; // Flag to indicate if the plot is active
     export let opacity: number = 0.3; // Opacity of the contour
-    // export let allTimeSamples: tf.Tensor; // Data to plot
+    export let time: number = 0.0; // Default value for the time
     export let svgElement; // Shared SVG element for all distributions
     export let distributionId: string = "target"; // ID for the distribution canvas
-    export let pointColor: string = "#7b7b7b"; // Point color for the scatter plot
+    export let trajectoryColor: string = "rgb(255, 100, 0)";
     export let gridResolution: number = 25; // Resolution of the grid
 
     // Choose some arbitrary initial condition
+    let handleGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
+    let initialized: boolean = false; // Flag to indicate if the plot is initialized
     let initialCondition: number[] = undefined; // Initial condition for the trajectories
     let trajectories: number[][] = undefined; // Array to hold the trajectories [time, x * y, 2]
 
-    function plotTrajectory(
-        initialCondition: number[] = [0.0, 0.0], // Initial condition for the trajectories
-        trajectories: number[][],
-        opacity: number = 0.5,
-        distributionId: string = "target",
-    ) {
-        // Find the initial trajectory closest to the given initial condition for time = 0
+    // tiny helper so we don’t allocate an array every drag tick
+    function nearestTrajectoryIndex(pt: [number, number]) {
         let distances = [];
         for (let i = 0; i < trajectories.length; i++) {
             const trajectoryInitialCondition = trajectories[i][0];
             const distance = Math.sqrt(
-                Math.pow(trajectoryInitialCondition[0] - initialCondition[0], 2) +
-                Math.pow(trajectoryInitialCondition[1] - initialCondition[1], 2)
+                Math.pow(trajectoryInitialCondition[0] - pt[0], 2) +
+                Math.pow(trajectoryInitialCondition[1] - pt[1], 2)
             );
             distances.push(distance);
         }
         const minDistanceIndex = distances.indexOf(Math.min(...distances));
+        return minDistanceIndex;
+    }
+
+    function plotTrajectory(
+        initialCondition: number[] = [0.0, 0.0], // Initial condition for the trajectories
+        trajectories: number[][],
+        time: number = 0.0, // Default value for the time
+        opacity: number = 0.5,
+        distributionId: string = "target",
+    ) {
+        // Find the initial trajectory closest to the given initial condition for time = 0
+        const minDistanceIndex = nearestTrajectoryIndex(initialCondition);
         const trajectory = trajectories[minDistanceIndex]; // Get the trajectory closest to the initial condition
-        // If the data is too large, sample it down to a smaller size
-        // trajectoriesNormalized = trajectoriesNormalized.slice(
-        //     0, 
-        //     Math.min(trajectoriesNormalized.length, maximumPoints)
-        // );
+        // Get the sequence before and after the current time
+        const stepIndex = Math.floor(time * (trajectory.length - 1));
+        const pastSeg = trajectory.slice(0, stepIndex + 1);   // inclusive of current point
+        const futureSeg = trajectory.slice(stepIndex);          // from current point onward
         // Make a scatter plot
         const svg = d3.select(svgElement);
         // Select the group by ID, or create if not exists
         // NOTE: This prevents unwanted recreation of the group
         let group = svg.select(`#${distributionId}_trajectories`);
         if (group.empty()) {
-            group = svg.append("g").attr("id", distributionId+"_trajectories")
+            group = svg.append("g")
+                .attr("id", distributionId+"_trajectories")
                 .attr("isolation", "isolate"); // Prevents blending with other groups
         } else {
             group.selectAll("*").remove(); // Clear previous contents of this group
@@ -62,16 +71,31 @@
             .x(d => d[0])
             .y(d => d[1])
             .curve(d3.curveLinear); // You can also try d3.curveBasis for smoother paths
-        // Draw each trajectory
-        // for (const trajectory of trajectoriesNormalized) {
+
+        // Past segment – darker / more opaque
         group.append("path")
-            .datum(trajectory) // Each trajectory is an array of [x, y] points
+            .datum(pastSeg)
             .attr("d", line)
             .attr("fill", "none")
-            .attr("stroke", pointColor)
-            .attr("stroke-width", 3.0)
-            .attr("opacity", opacity);
-        // }
+            .attr("stroke", trajectoryColor)
+            .attr("stroke-width", 3)
+            // .attr("opacity", opacity);
+
+        // Future segment – lighter / more transparent
+        group.append("path")
+            .datum(futureSeg)
+            .attr("d", line)
+            .attr("fill", "none")
+            .attr("stroke", trajectoryColor)
+            .attr("stroke-width", 3)
+            .attr("opacity", opacity * 0.45); // tweak to taste
+        // Draw a circle at the current point
+        group.append("circle")
+            .attr("cx", trajectory[stepIndex][0])
+            .attr("cy", trajectory[stepIndex][1])
+            .attr("r", 5)
+            .attr("fill", trajectoryColor)
+            // .attr("opacity", opacity);
     }
 
     async function runSampling(
@@ -79,6 +103,7 @@
         currentTrainingObjective: string,
         initialPoints: number[][],
     ) {
+        // NOTE: Moved this out here to avoid unwanted re-runs from the $: block
         // Now call the sampling web worker
         callSamplingWorkerThreadFromInitialPoints(
             base + pretrainedModelPaths[currentTrainingObjective][currentDatasetName],
@@ -88,7 +113,6 @@
             get(numberOfSteps),
             (allSamples: number[][]) => {
                 // allSamples: [time, x * y, 2]
-                console.log(allSamples.length)
                 // Normalize the trajectories so they fit correclty in the display area
                 let trajectoriesNormalized = [];
                 for (let t = 0; t < allSamples.length; t++) {
@@ -113,9 +137,74 @@
         )
     }
 
+    // Setup behavior for the drag handle, will run a single time
+    $: if (!initialized && svgElement && initialCondition && isActive) {
+        initialized = true;
+        console.log("Initializing drag handle");
+        const svg = d3.select(svgElement);
+
+        // 1. Create a group for the drag handle
+        handleGroup = svg.append("g")
+            .attr("id", `${distributionId}_handle`)
+            .style("cursor", "grab");
+
+        // Display the handle from the PointerIcon.svg file
+        handleGroup.append("image")
+            .attr("xlink:href", "/PointerIcon.svg")
+            .attr("x", initialCondition[0])
+            .attr("y", initialCondition[1])
+            .attr("transform", "translate(-20, -20)") // Center the image
+            .attr("width", 40)
+            .attr("height", 40)
+            .attr("z-index", 1000) // Bring the handle to the front
+        // handleGroup.append("circle")
+        //     .attr("cx", initialCondition[0])
+        //     .attr("cy", initialCondition[1])
+        //     .attr("r", 10)
+        //     .attr("fill", "#fff")
+        //     .attr("stroke", trajectoryColor)
+        //     .attr("stroke-width", 2)
+        //     .attr("z-index", 1000) // Bring the handle to the front
+        
+        // Add a label to the drag handle
+        handleGroup.append("text")
+            .attr("x", initialCondition[0])
+            .attr("y", initialCondition[1] - 25)      // 15 px above the circle
+            .attr("text-anchor", "middle")            // center the label
+            .attr("font-size", 16)
+            .attr("font-family", "sans-serif")
+            .attr("fill", "#333333")                   // label color
+            .style("pointer-events", "none")          // so the label itself isn’t draggable
+            .text("Initial Condition");
+
+        // 2. Create a drag behavior
+        const drag = d3.drag<SVGGElement, unknown>()
+            .on("start", () => handleGroup.style("cursor", "grabbing"))
+            .on("drag", (event) => {
+                // pointer coords relative to the SVG
+                let [x, y] = d3.pointer(event, svg.node());
+                // Clamp the coordinates to the source distribution area [0, 0] to [settings.distributionWidth, settings.distributionHeight]
+                x = Math.max(0, Math.min(x, interfaceSettings.distributionWidth));
+                y = Math.max(0, Math.min(y, interfaceSettings.distributionHeight));
+                // move the icon
+                handleGroup.select("image")
+                    .attr("x", x)
+                    .attr("y", y);
+                // Also move the label
+                handleGroup.select("text")
+                    .attr("x", x)
+                    .attr("y", y - 25);
+                // update state → fires your reactive plot block
+                initialCondition = [x, y];          // must assign a *new* array
+            })
+            .on("end", () => handleGroup.style("cursor", "grab"));
+
+        // 3. Attach the drag behavior to the group
+        handleGroup.call(drag);
+    }
+
     // If the dataset name or trainingObjective changes, re-run the sampling
     $ : if ($datasetName && $trainingObjective) {
-        console.log("Dataset or training objective changed, re-running sampling");
         // Run sampling for a uniform grid of points
         const currentDatasetName = $datasetName;
         const currentTrainingObjective = $trainingObjective;
@@ -138,7 +227,7 @@
     }
 
     // If the data points change then replot
-    $ : if (svgElement && trajectories && isActive) {
+    $ : if (svgElement && trajectories && isActive && time) {
         // If initial condition is undefined then randomly choose one from trajectories[0]
         // initialCondition = initialCondition || trajectories[0][Math.floor(Math.random() * trajectories[0].length)];
         // Initialize the initial condition to the mean of the time = 0 points
@@ -149,7 +238,7 @@
             initialCondition = [xMean, yMean];
         }
         // Plot the trajectory closest to the given initial condition
-        plotTrajectory(initialCondition, trajectories, opacity, distributionId);
+        plotTrajectory(initialCondition, trajectories, time, opacity, distributionId);
     }
 
     // If the plot is no longer active, remove the group
@@ -159,6 +248,12 @@
         if (!group.empty()) {
             group.remove();
         }
+        // Hide the drag handle
+        const handleGroup = svg.select(`#${distributionId}_handle`);
+        if (!handleGroup.empty()) {
+            handleGroup.remove();
+        }
+        initialized = false; // Reset the initialized flag
     }
 
 </script>

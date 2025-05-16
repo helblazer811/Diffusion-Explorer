@@ -66,10 +66,10 @@
             svgElement={sharedSVGElement}
             time={0}
             data={$sourceDistributionSamples}
-            opacity={0.25}
+            opacity={0.7}
             label=""
             distributionId="source"
-            showBorder={true}
+            showBorder={false}
             fillColor="rgba(25, 131, 255, 0.2)"
             borderColor="rgba(25, 131, 255, 1)"
         />
@@ -77,10 +77,10 @@
             svgElement={sharedSVGElement}
             time={1.0}
             data={$targetDistributionSamples}
-            opacity={0.25}
+            opacity={0.7}
             label=""
             distributionId="target"
-            showBorder={true}
+            showBorder={false}
             fillColor="rgba(25, 131, 255, 0.2)"
             borderColor="rgba(25, 131, 255, 1)"
         />
@@ -91,10 +91,10 @@
             allTimeSamples={$allTimeSamples}
             opacity={0.8}
             label=""
-            fillColor="rgba(255, 100, 0, 0.3)"
+            fillColor="rgba(255, 100, 0, 0.5)"
             borderColor="rgba(255, 100, 0, 1)"
             labelIsLatex={true}
-            showBorder={true}
+            showBorder={false}
             distributionId="current"
             activePlotTypes={$activePlotTypes}
         />

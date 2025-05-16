@@ -15,7 +15,8 @@
     export let distributionId: string = "target"; // ID for the distribution canvas
     export let opacity: number = 0.5; // Opacity of the contour
     export let fillColor: string = "#7b7b7b"; // Fill color for the contour
-    export let bandwidth: number = 10; // Bandwidth for the contour density
+    export let bandwidth: number = 30; // Bandwidth for the contour density
+    export let numberOfContours: number = 4; // Number of contours to draw
     export let showBorder: boolean = false; // Flag to indicate if the border should be shown
     export let borderColor: string = "#7b7b7b"; // Border color for the contour
     export let label: string; // Label for the distribution
@@ -89,7 +90,6 @@
         opacity: number = 0.9,
         // xLocation: number = 0,
         distributionId: string = "target",
-        numberOfContours: number = 4,
         densityResolution: number = 100,
     ) {
         // 1. Convert data to display coordinate frame
@@ -104,7 +104,7 @@
             .x(d => d[0])
             .y(d => d[1])
             .size([interfaceSettings.displayAreaWidth, interfaceSettings.displayAreaHeight])
-            .bandwidth(30) // Tune this to spread the density
+            .bandwidth(bandwidth) // Tune this to spread the density
             .thresholds(numberOfContours)
             (translatedData);
         // 4. Scales for drawing
