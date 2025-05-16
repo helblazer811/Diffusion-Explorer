@@ -107,13 +107,13 @@
 <div class="title-container">
     <div class="title-inner-container">
         <div class="title">
-            <p><b>Diffusion</b>Lab</p>
+            <p><b>Diffusion</b>Explorer</p>
         </div>
         <h1 class="sub-title"> 
             Learn about diffusion and flow  models with interactive visualization. 
         </h1>
     </div>
-    <a href="https://github.com/helblazer811/DiffusionLab" id="github-logo" target="_blank">
+    <a href="https://github.com/helblazer811/Diffusion-Explorer" id="github-logo" target="_blank">
         <img src="{base}/github-logo.svg" alt="GitHub Logo"/>
         <span>Code</span>
     </a>
