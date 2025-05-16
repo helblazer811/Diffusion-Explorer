@@ -7,7 +7,7 @@
         domainRange, 
         trainingObjective,
         datasetName,
-        numberOfSteps
+        numberOfSteps,
     } from '$lib/state';
 
     import {
@@ -93,7 +93,12 @@
         }
     }
 
-    onMount(() => {
+    // onMount(() => {
+        
+    // });
+
+    // If the dataset name changes, re-run the sampling
+    $ : if ($datasetName) {
         // Run sampling for a uniform grid of points
         console.log("Running sampling for a uniform grid of points");
         // First uniformly sample the x and y coordinates
@@ -126,7 +131,7 @@
                 trajectoryGrid = allSamplesTensor.arraySync() as number[][][];
             }
         )
-    });
+    }
 
     $ : if (svgElement && trajectoryGrid.length > 0 && isActive) {
         // Plot the mesh grid for the current time

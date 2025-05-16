@@ -91,7 +91,7 @@
         // Get the model config and class
         const ModelClass = trainingObjectiveToModelClass[$trainingObjective];
         const modelConfig = trainingObjectiveToModelConfig[$trainingObjective];
-        if (true) {
+        if (false) {
             // Call the training worker thread
             callTrainingWorkerThread(
                 $trainingObjective,
