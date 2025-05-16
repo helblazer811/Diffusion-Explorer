@@ -1,42 +1,46 @@
 /*
 *    Web worker that runs sampling for a given model. 
 */ 
-import { FlowModel } from '$lib/diffusion/flow_matching';
 import * as tf from '@tensorflow/tfjs';
-// // import { base } from '$app/paths';
+// // TODO Fix wasm implementation
 // import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
-// // TODO I manually change DiffusionLab here which is a "temporary" fix
-// setWasmPaths('DiffusionLab/tfjs-backend-wasm/');
+// setWasmPaths('tfjs-backend-wasm/');
 // import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
 
-const trainingObjectiveToModelClass = {
-    "Flow Matching": FlowModel
-};
+import { backend, trainingObjectiveToModelClass } from '$lib/settings';
 
 self.onmessage = async (e) => {
     const { type, data } = e.data;
-
-    if (type === 'sample') {
-        const modelJSONPath = data.modelJSONPath;
-        const trainingObjective = data.trainingObjective;
-        const modelConfig = data.modelConfig;
-        const numberOfSteps = data.numberOfSteps;
-        const numSamples = data.numSamples;
-        // Set up webgl backend
+    // Destructure the data
+    const modelJSONPath = data.modelJSONPath;
+    const trainingObjective = data.trainingObjective;
+    const modelConfig = data.modelConfig;
+    const numberOfSteps = data.numberOfSteps;
+    // Set up the backend
+    if (backend === 'wasm') {
+        // Set up tf wasm backend
+        await tf.setBackend('wasm');
+        await tf.ready();
+    } else if (backend === 'webgl') {
+        // Set up tf wasm backend
         await tf.setBackend('webgl');
         await tf.ready();
-        // await tf.setBackend('wasm');
-        // await tf.ready();
-        // Load up the model based on the passed model name
-        const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-        const ourModel = new ModelClass(
-            modelConfig.dim,
-            modelConfig.hidden,
-        );
-        // Load up a model from the given file path
-        const tfModel = await tf.loadLayersModel(modelJSONPath);
-        // Set the model in the model class
-        ourModel.setModel(tfModel);
+    } else {
+        throw new Error('Invalid backend specified');
+    }
+    // Load up the model based on the passed model name
+    const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+    const ourModel = new ModelClass(
+        modelConfig.dim,
+        modelConfig.hidden,
+    );
+    // Load up a model from the given file path
+    const tfModel = await tf.loadLayersModel(modelJSONPath);
+    // Set the model in the model class
+    ourModel.setModel(tfModel);
+
+    if (type === 'sample') {
+        const numSamples = data.numSamples; 
         // Run sampling with the model based on data.numberOfSteps and data.numSamples
         const allSamples = ourModel.sample(
             numSamples,
@@ -50,24 +54,7 @@ self.onmessage = async (e) => {
             allSamples: allSamplesArray,
         });
     } else if (type === 'sample_from_initial_points') {
-        const modelJSONPath = data.modelJSONPath;
-        const trainingObjective = data.trainingObjective;
-        const modelConfig = data.modelConfig;
-        const numberOfSteps = data.numberOfSteps;
-        const initialPoints = data.initialPoints; // shape [num_samples, dim]
-        // Set up webgl backend
-        await tf.setBackend('webgl');
-        await tf.ready();
-        // Load up the model based on the passed model name
-        const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-        const ourModel = new ModelClass(
-            modelConfig.dim,
-            modelConfig.hidden,
-        );
-        // Load up a model from the given file path
-        const tfModel = await tf.loadLayersModel(modelJSONPath);
-        // Set the model in the model class
-        ourModel.setModel(tfModel);
+        const initialPoints = data.initialPoints;
         // Convert initial points to a tensor
         const initialPointsTensor = tf.tensor(initialPoints);
         // Run sampling with the model based on data.numberOfSteps and data.numSamples

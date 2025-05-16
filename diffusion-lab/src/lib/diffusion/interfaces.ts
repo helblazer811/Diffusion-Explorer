@@ -11,6 +11,7 @@ export class Model {
         // Initialize the network
         this.dim = dim;
         this.model = tf.sequential();
+        // Add one to input layer to account for time conditionoing
         this.model.add(tf.layers.dense({ inputShape: [dim + 1], units: hidden, activation: 'elu' }));
         this.model.add(tf.layers.dense({ units: hidden, activation: 'elu' }));
         this.model.add(tf.layers.dense({ units: hidden, activation: 'elu' }));
@@ -80,3 +81,13 @@ export class Model {
     }
 }
 
+class Sampler {
+
+    step() {
+        throw new Error('Not implemented');
+    }
+
+    sample() {
+        throw new Error('Not implemented');
+    }
+}

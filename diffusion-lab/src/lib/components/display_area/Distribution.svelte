@@ -19,7 +19,6 @@
 
 </script>
 
-
 <ScatterPlot
     svgElement={svgElement}
     isActive={activePlotTypes.includes("Scatter Plot")}

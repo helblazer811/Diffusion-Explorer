@@ -1,6 +1,5 @@
 import { FlowModel } from '$lib/diffusion/flow_matching';
 import { DiffusionModel } from '$lib/diffusion/diffusion';
-import { base } from '$app/paths';
 
 export const backend: "webgl" | "wasm" = "webgl";
 
@@ -27,29 +26,30 @@ export interface HyperparameterMenuEntry {
     options: string[];
 }
 
-export const hyperparameterMenuConfig: Record<string, HyperparameterMenuEntry> = {
-    "Training Objective": {
-        name: "Training Objective",
-        options: [
-            "Flow Matching",
-            // "Diffusion"
-        ]
-    },
-    "Sampler": {
-        name: "Sampler",
-        options: [
-            "Euler",
-        ]
-    }
+export const trainingObjectives: string[] = [
+    "Diffusion",
+    "Flow Matching"
+];
+
+export const trainingObjectiveToSamplers: Record<string, string[]> = {
+    "Flow Matching": [
+        "Euler",
+    ],
+    "Diffusion": [
+        "DDPM",
+        "DDIM"
+    ]
 };
 
 export const pretrainedModelPaths: Record<string, Record<string, string>> = {
     "Flow Matching": {
-        "Three Modes": base + "/models/flow_matching_three_modes/model.json",
+        "Three Modes": "/models/flow_matching_three_modes/model.json",
         // "Concentric Circles": "/models/flow_matching_concentric_circles/model.json",
-        "Smiley Face": base + "/models/flow_matching_smiley_face/model.json",
+        "Smiley Face": "/models/flow_matching_smiley_face/model.json",
+    },
+    "Diffusion": {
+        "Smiley Face": "/models/diffusion_smiley_face/model.json",
     }
-    // "Diffusion": "/models/diffusion_model.json",
 };
 
 export const trainingObjectiveToModelClass: Record<string, any> = {
@@ -77,13 +77,13 @@ export const trainingConfig: {
     iterations: number;
     batchSize: number;
 } = {
-    iterations: 2000,
-    batchSize: 32,
+    iterations: 200000,
+    batchSize: 200,
 };
 
 export const datasetNameToPath: Record<string, string> = {
-    "Smiley Face": base + "/datasets/smiley_face.json",
-    "Three Modes": base + "/datasets/three_modes.json",
+    "Smiley Face": "/datasets/smiley_face.json",
+    "Three Modes": "/datasets/three_modes.json",
     // "Concentric Circles": "/datasets/concentric_circles.json",
 };
 

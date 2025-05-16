@@ -5,6 +5,7 @@
     import StyleDropdown from '$lib/components/training_bar/StyleDropdown.svelte';
     // Import settings
     import * as settings from '$lib/settings';
+    import { trainingObjective, sampler } from '$lib/state';
     
     export let datasetDict = {};
 
@@ -106,10 +107,19 @@
 
 <div class="training-bar-container">
     <div class="training-bar">
-        <div class="menu hyperparameter-menu">
-            {#each Object.entries(settings.hyperparameterMenuConfig) as [name, entry]}
-                <HyperparameterSelect entry={entry} />
-            {/each}
+        <div class="menu training-objective-menu">
+            <HyperparameterSelect 
+                name="Training Objective"
+                bind:current={$trainingObjective}
+                options={settings.trainingObjectives}
+            />
+        </div>
+        <div class="menu sampler-menu">
+            <HyperparameterSelect
+                name="Sampler"
+                bind:current={$sampler}
+                options={settings.trainingObjectiveToSamplers[$trainingObjective]}
+            />
         </div>
         <div class="menu style-menu">
             <h1 class="label">Style Settings</h1>

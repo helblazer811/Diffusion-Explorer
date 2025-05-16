@@ -1,5 +1,8 @@
-<script>
-    export let entry; // Entry is passed from the parent component
+<script lang="ts">
+    export let name: string;
+    export let options: string[];
+    export let current: string;
+
 </script>
 
 <style>
@@ -79,10 +82,10 @@
 </style>
 
 <div class="control">
-    <label for={entry.name}>{entry.name}</label>
+    <label for={name}>{name}</label>
     <div class="select">
-        <select id={entry.name} bind:value={entry.current}>
-            {#each entry.options as option}
+        <select id={name} bind:value={current}>
+            {#each options as option}
                 <option value={option}>{option}</option>
             {/each}
         </select>

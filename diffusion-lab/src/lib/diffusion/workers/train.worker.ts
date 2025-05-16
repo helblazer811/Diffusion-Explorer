@@ -1,15 +1,13 @@
 /*
 *    Web worker that runs training for a given model. 
 */ 
-import { FlowModel } from '$lib/diffusion/flow_matching';
 import * as tf from '@tensorflow/tfjs';
+// TODO Fix the wasm implementation
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
 setWasmPaths('/tfjs-backend-wasm/');
 import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
 
-const trainingObjectiveToModelClass = {
-    'Flow Matching': FlowModel,
-};
+import { backend, trainingObjectiveToModelClass } from '$lib/settings';
 
 async function loadDataset(path: string) {
     return fetch(path)
@@ -28,8 +26,13 @@ self.onmessage = async (e) => {
 
     if (type === 'train') {
         // Set up tf wasm backend
-        await tf.setBackend('wasm');
-        await tf.ready();
+        if (backend === 'wasm') {
+            await tf.setBackend('wasm');
+            await tf.ready();
+        } else if (backend === 'webgl') {
+            await tf.setBackend('webgl');
+            await tf.ready();
+        }
         // Initialize the empty model 
         const ModelClass = trainingObjectiveToModelClass[trainingObjective];
         const ourModel = new ModelClass(
@@ -38,6 +41,8 @@ self.onmessage = async (e) => {
         );
         // Load the dataset
         const pointsTensor = await loadDataset(datasetPath);
+        // 
+        console.log('Loaded dataset:', pointsTensor);
         // Run training
         ourModel.train(
             pointsTensor,

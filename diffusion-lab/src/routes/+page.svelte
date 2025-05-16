@@ -4,6 +4,8 @@
     // setWasmPaths('/tfjs-backend-wasm/');
     // import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
 
+    import {base} from '$app/paths';
+
     import * as d3 from 'd3';
 
     import { onMount, onDestroy} from 'svelte';
@@ -19,6 +21,7 @@
         trainingObjective,
         numSamples,
         numberOfSteps,
+        sampler,
     } from '$lib/state';
     import { 
         trainingObjectiveToModelConfig,
@@ -26,6 +29,7 @@
         datasetNameToPath,
         trainingConfig,
         pretrainedModelPaths,
+        trainingObjectiveToSamplers,
     } from '$lib/settings';
     // Load up the components
     import TitleBar from '$lib/components/TitleBar.svelte';
@@ -42,6 +46,7 @@
     let datasetDict: any = {}; // Dictionary to hold the loaded datasets
 
     function loadDataset(path: string) {
+        path = base + path;
         return fetch(path)
             .then(response => response.json())
             .then(data => {
@@ -83,53 +88,32 @@
         );
         // Update the UI state with the source distribution samples
         sourceDistributionSamples.set(multivariateNormalSamples);
-        // // Create a worker for training the model 
-        // const trainingWorker = new Worker(
-        //     new URL('$lib/diffusion/workers/train.worker.ts', import.meta.url),
-        //     { type: 'module' }
-        // );
         // Get the model config and class
         const ModelClass = trainingObjectiveToModelClass[$trainingObjective];
         const modelConfig = trainingObjectiveToModelConfig[$trainingObjective];
-        // Add a listener to the training worker thread to receive the model
-        callTrainingWorkerThread(
-            $trainingObjective,
-            modelConfig,
-            datasetNameToPath[$datasetName],
-            trainingConfig,
-            (e) => {
-                // Get the model path 
-                const tfModelPath = e.data.tfModelPath;
-                // Make the model
-                const ourModel = new ModelClass(
-                    modelConfig.dim,
-                    modelConfig.hidden,
-                );
-                // Load up a model from the given file path
-                tf.loadLayersModel(tfModelPath).then((tfModel) => {
-                    // Set the model in the model class
-                    ourModel.setModel(tfModel);
-                    // Prompt to download the model
-                    ourModel.download();
-                });
-            }
-        );
-            
-        // Call the training worker thread
         if (true) {
-            console.log("Calling the worker thread to train...");
-            trainingWorker.postMessage({
-                type: 'train',
-                data: {
-                    trainingObjective: $trainingObjective,
-                    modelConfig: modelConfig[$trainingObjective],
-                    datasetPath: datasetNameToPath[$datasetName],
-                    trainingConfig: {
-                        iterations: trainingConfig["iterations"],
-                        batchSize: trainingConfig["batchSize"],
-                    },
+            // Call the training worker thread
+            callTrainingWorkerThread(
+                $trainingObjective,
+                modelConfig,
+                base + datasetNameToPath[$datasetName],
+                trainingConfig,
+                (tfModelPath: string) => {
+                    // Make the model
+                    const ourModel = new ModelClass(
+                        modelConfig.dim,
+                        modelConfig.hidden,
+                    );
+                    // Load up a model from the given file path
+                    tf.loadLayersModel(tfModelPath).then((tfModel) => {
+                        console.log("Downloading model from: ", tfModelPath);
+                        // Set the model in the model class
+                        ourModel.setModel(tfModel);
+                        // Prompt to download the model
+                        ourModel.download();
+                    });
                 }
-            });
+            );
         }
     });
 
@@ -143,9 +127,18 @@
     $: if (
         $datasetName && 
         datasetDict[$datasetName] &&
-        pretrainedModelPaths[$trainingObjective]?.[$datasetName] &&
         typeof window !== 'undefined' // Makes sure this is not run on the server
     ) {
+        // Check that there is a trained model for the given dataset
+        if (!pretrainedModelPaths[$trainingObjective][$datasetName]) {
+            console.error(`No pretrained model found for ${$trainingObjective} on ${$datasetName}`);
+        }
+        // Check if the sampler is valid for $trainingObjective and if not set it to a valid default
+        // NOTE: This is done here to avoid conflicting with the training objective
+        if (!trainingObjectiveToSamplers[$trainingObjective].includes($sampler)) {
+            // Set the sampler to the first one in the list
+            sampler.set(trainingObjectiveToSamplers[$trainingObjective][0]);
+        }
         // Pause the animation
         isPlaying.set(false);
         // Load the dataset

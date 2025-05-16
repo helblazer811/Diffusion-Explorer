@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs'
-import { Model } from './model';
+import { Model } from './interfaces';
 
 export class FlowModel extends Model {
   
