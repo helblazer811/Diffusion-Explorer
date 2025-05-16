@@ -13,7 +13,7 @@ export interface DisplayOptions {
 export const trainingObjectiveToDisplayOptions: Record<string, DisplayOptions> = {
     "Flow Matching": {
         "Plot Types": ["Contour Plot", "Scatter Plot", "Mesh Plot", "Trajectories"],
-        "Default Plot Types": ["Contour Plot"],
+        "Default Plot Types": ["Contour Plot", "Trajectories"],
     }, 
     "Diffusion": {
         "Plot Types": ["Contour Plot", "Scatter Plot"],

@@ -53,6 +53,7 @@
 />
 <TrajectoriesPlot
     svgElement={svgElement}
+    time={time}
     isActive={activePlotTypes.includes("Trajectories")}
     distributionId={distributionId}
 />
