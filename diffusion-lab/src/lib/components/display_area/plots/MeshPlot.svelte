@@ -102,7 +102,7 @@
     // If the dataset name changes, re-run the sampling
     $ : if ($datasetName) {
         // Run sampling for a uniform grid of points
-        console.log("Running sampling for a uniform grid of points");
+        // console.log("Running sampling for a uniform grid of points");
         // First uniformly sample the x and y coordinates
         const width = $domainRange.xMax - $domainRange.xMin;
         const height = $domainRange.yMax - $domainRange.yMin;
@@ -125,7 +125,6 @@
             initialPoints,
             $numberOfSteps,
             (allSamples: number[][]) => {
-                console.log("Received all samples from the worker");
                 let allSamplesTensor = tf.tensor(allSamples);
                 // Reshape the samples to be [time, x, y, 2]
                 allSamplesTensor = allSamplesTensor.reshape([$numberOfSteps, gridResolution, gridResolution, 2]);

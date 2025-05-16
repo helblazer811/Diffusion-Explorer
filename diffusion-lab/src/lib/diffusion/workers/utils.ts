@@ -24,7 +24,7 @@ export function callSamplingWorkerThread(
         }
     };
     // Call the dummy worker thread 
-    console.log("Calling the worker thread to sample...");
+    // console.log("Calling the worker thread to sample...");
     // Send a message
     samplingWorker.postMessage({
         type: 'sample',
@@ -63,7 +63,7 @@ export function callSamplingWorkerThreadFromInitialPoints(
         }
     };
     // Call the dummy worker thread 
-    console.log("Calling the worker thread to sample...");
+    // console.log("Calling the worker thread to sample...");
     // Send a message
     samplingWorker.postMessage({
         type: 'sample_from_initial_points',
@@ -101,7 +101,7 @@ export function callTrainingWorkerThread(
         }
     };
     // Call the dummy worker thread 
-    console.log("Calling the worker thread to train...");
+    // console.log("Calling the worker thread to train...");
     // Send a message
     trainingWorker.postMessage({
         type: 'train',

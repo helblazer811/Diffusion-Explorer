@@ -3,10 +3,12 @@
     import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
     import ScatterPlot from '$lib/components/display_area/plots/ScatterPlot.svelte';
     import MeshPlot from '$lib/components/display_area/plots/MeshPlot.svelte';
+    import TrajectoriesPlot from '$lib/components/display_area/plots/TrajectoriesPlot.svelte';
     // Props
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
     export let data: number[][]; // Data to plot
+    export let allTimeSamples: number[][][]; // All time samples for the distribution
     export let xLocation: number = 0; // X location of the contour
     export let opacity: number = 0.5; // Opacity of the contour
     export let labelIsLatex: boolean = false; // Flag to indicate if the label is in LaTeX format
@@ -49,4 +51,10 @@
     time={time}
     distributionId={distributionId}
     opacity={opacity}
+/>
+<TrajectoriesPlot
+    svgElement={svgElement}
+    isActive={activePlotTypes.includes("Trajectories")}
+    allTimeSamples={allTimeSamples}
+    distributionId={distributionId}
 />

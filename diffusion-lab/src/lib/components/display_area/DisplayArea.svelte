@@ -88,6 +88,7 @@
             svgElement={sharedSVGElement}
             time={$currentTime}
             data={$currentDistributionSamples}
+            allTimeSamples={$allTimeSamples}
             opacity={0.8}
             label=""
             fillColor="rgba(255, 100, 0, 0.3)"

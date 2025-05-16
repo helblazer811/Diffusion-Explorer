@@ -3,7 +3,7 @@ import { DiffusionModel } from '$lib/diffusion/diffusion';
 
 export const backend: "webgl" | "wasm" = "webgl";
 
-type PlotType = "Contour Plot" | "Scatter Plot" | "Mesh Plot";
+type PlotType = "Contour Plot" | "Scatter Plot" | "Mesh Plot" | "Trajectories";
 
 export interface DisplayOptions {
     "Plot Types": PlotType[];
@@ -12,7 +12,7 @@ export interface DisplayOptions {
 
 export const trainingObjectiveToDisplayOptions: Record<string, DisplayOptions> = {
     "Flow Matching": {
-        "Plot Types": ["Contour Plot", "Scatter Plot", "Mesh Plot"],
+        "Plot Types": ["Contour Plot", "Scatter Plot", "Mesh Plot", "Trajectories"],
         "Default Plot Types": ["Contour Plot"],
     }, 
     "Diffusion": {
