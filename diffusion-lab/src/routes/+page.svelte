@@ -149,7 +149,7 @@
         currentDistributionSamples.set(tf.zeros([0, 2]));
         // Load up the model corresponding to the dataset
         const defaultTrainingObjective = $trainingObjective;
-        const defaultModelPath = pretrainedModelPaths[$trainingObjective][$datasetName];
+        const defaultModelPath = base + pretrainedModelPaths[$trainingObjective][$datasetName];
         // Regenerate all of the samples 
         callSamplingWorkerThread(
             defaultModelPath,

@@ -2,6 +2,8 @@
     import * as tf from '@tensorflow/tfjs';
     import * as d3 from 'd3';
 
+    import { base } from '$app/paths';
+
     import { onMount } from 'svelte';
     import { 
         domainRange, 
@@ -117,7 +119,7 @@
         initialPoints = initialPoints.arraySync() as number[][];
         // Now call the sampling web worker
         callSamplingWorkerThreadFromInitialPoints(
-            pretrainedModelPaths[$trainingObjective][$datasetName],
+            base + pretrainedModelPaths[$trainingObjective][$datasetName],
             $trainingObjective,
             trainingObjectiveToModelConfig[$trainingObjective],
             initialPoints,

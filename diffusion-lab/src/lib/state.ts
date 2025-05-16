@@ -3,8 +3,8 @@ import * as settings from '$lib/settings';
 
 export const numberOfSteps = writable(100);
 export const numSamples = writable(500);
-export const trainingObjective = writable("Diffusion");
-export const sampler = writable("DDPM");
+export const trainingObjective = writable("Flow Matching");
+export const sampler = writable("Euler");
 export const datasetName = writable("Smiley Face");
 export const targetDistributionSamples = writable(undefined);
 export const sourceDistributionSamples = writable(undefined);
