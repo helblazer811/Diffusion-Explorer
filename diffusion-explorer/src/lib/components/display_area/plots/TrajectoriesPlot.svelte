@@ -72,6 +72,52 @@
             .y(d => d[1])
             .curve(d3.curveLinear); // You can also try d3.curveBasis for smoother paths
 
+        // Draw a white outline with a slightly larger stroke width
+        // White outline (drawn first, underneath)
+        group.append("path")
+            .datum(pastSeg)
+            .attr("d", line)
+            .attr("fill", "none")
+            .attr("stroke", "white")
+            .attr("stroke-width", 7) // slightly larger than the main stroke
+            .attr("stroke-linejoin", "round")
+            .attr("stroke-linecap", "round")
+            .attr("opacity", opacity); // match opacity
+
+        // Draw an arrow head aat the end
+        // Define the arrowhead marker (only needs to be done once per SVG)
+        const defs = group.append("defs");
+
+        // defs.append("marker")
+        //     .attr("id", "arrowhead")
+        //     .attr("viewBox", "0 -5 10 10")
+        //     .attr("refX", 0) // position of the arrow along the path
+        //     .attr("refY", 0)
+        //     .attr("markerWidth", 6)
+        //     .attr("markerHeight", 6)
+        //     .attr("orient", "auto")
+        //     .attr("markerUnits", "strokeWidth")
+        //     .append("path")
+        //     .attr("d", "M0,-5L10,0L0,5")
+        //     .attr("fill", trajectoryColor)
+        //     // .attr("filter", "url(#path-shadow)") // Apply the shadow filter
+
+        // // Add a drop shadow filter
+        // const svgDefs = group.append("defs");
+
+        // svgDefs.append("filter")
+        //     .attr("id", "path-shadow")
+        //     .attr("x", "0%")
+        //     .attr("y", "0%")
+        //     .attr("width", "200%")
+        //     .attr("height", "200%")
+        //     .append("feDropShadow")
+        //     .attr("dx", 0)  // horizontal offset
+        //     .attr("dy", 0)  // vertical offset
+        //     .attr("stdDeviation", 2)  // blur radius
+        //     .attr("flood-color", "#fff")  // shadow color
+        //     .attr("flood-opacity", 0.7);  // shadow opacity
+
         // Past segment – darker / more opaque
         group.append("path")
             .datum(pastSeg)
@@ -79,6 +125,8 @@
             .attr("fill", "none")
             .attr("stroke", trajectoryColor)
             .attr("stroke-width", 3)
+            .attr("marker-end", "url(#arrowhead)")
+            // .attr("filter", "url(#path-shadow)") // Apply the shadow filter
             // .attr("opacity", opacity);
 
         // Future segment – lighter / more transparent
@@ -88,7 +136,8 @@
             .attr("fill", "none")
             .attr("stroke", trajectoryColor)
             .attr("stroke-width", 3)
-            .attr("opacity", opacity * 0.45); // tweak to taste
+            .attr("opacity", opacity) // tweak to taste
+
         // Draw a circle at the current point
         group.append("circle")
             .attr("cx", trajectory[stepIndex][0])
