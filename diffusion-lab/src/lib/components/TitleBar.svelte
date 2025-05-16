@@ -80,7 +80,7 @@
         margin-right: 10px;
     }
     /* Hide github logo if less thatn 1200 screen size */
-    @media (max-width: 1200px) {
+    @media (max-width: 1280px) {
         #github-logo{
             display: none;
         }

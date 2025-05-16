@@ -27,8 +27,8 @@ export interface HyperparameterMenuEntry {
 }
 
 export const trainingObjectives: string[] = [
-    "Diffusion",
-    "Flow Matching"
+    "Flow Matching",
+    // "Diffusion"
 ];
 
 export const trainingObjectiveToSamplers: Record<string, string[]> = {
@@ -100,7 +100,7 @@ export const interfaceSettings: {
     distributionHeight: 500,
     mainAreaHeight: 640,
     miniDistributionWidth: 40,
-    displayAreaWidth: 1400,
+    displayAreaWidth: 1200,
     displayAreaHeight: 500,
     pointColor: "#4594e3",
 };
