@@ -2,7 +2,6 @@
     // Import components
     import HyperparameterSelect from '$lib/components/training_bar/HyperparameterSelect.svelte';
     import MiniDistribution from '$lib/components/training_bar/MiniDistribution.svelte';
-    import StyleDropdown from '$lib/components/training_bar/StyleDropdown.svelte';
     // Import settings
     import * as settings from '$lib/settings';
     import { trainingObjective, sampler } from '$lib/state';
@@ -120,10 +119,6 @@
                 options={settings.trainingObjectiveToSamplers[$trainingObjective]}
             />
         </div>
-        <!-- <div class="menu style-menu">
-            <h1 class="label">Style Settings</h1>
-            <StyleDropdown />
-        </div> -->
         <div class="menu dataset-menu">
             <h1 class="label">Dataset</h1>
             <div class="mini-distribution-container">
