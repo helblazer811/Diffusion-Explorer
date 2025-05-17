@@ -218,9 +218,9 @@
         // Add a label to the drag handle
         handleGroup.append("text")
             .attr("x", initialCondition[0])
-            .attr("y", initialCondition[1] - 25)      // 15 px above the circle
+            .attr("y", initialCondition[1] - 45)      // 15 px above the circle
             .attr("text-anchor", "middle")            // center the label
-            .attr("font-size", 16)
+            .attr("font-size", 24)
             .attr("font-family", "sans-serif")
             .attr("fill", "#333333")                   // label color
             .style("pointer-events", "none")          // so the label itself isn’t draggable

@@ -3,7 +3,7 @@ import { DiffusionModel } from '$lib/diffusion/diffusion';
 
 export const backend: "webgl" | "wasm" = "webgl";
 
-type PlotType = "Contour Plot" | "Scatter Plot" | "Mesh Plot" | "Trajectories";
+type PlotType = "Contour" | "Scatter" | "Mesh" | "Trajectories";
 
 export interface DisplayOptions {
     "Plot Types": PlotType[];
@@ -12,12 +12,12 @@ export interface DisplayOptions {
 
 export const trainingObjectiveToDisplayOptions: Record<string, DisplayOptions> = {
     "Flow Matching": {
-        "Plot Types": ["Contour Plot", "Scatter Plot", "Mesh Plot", "Trajectories"],
-        "Default Plot Types": ["Contour Plot", "Trajectories"],
+        "Plot Types": ["Contour", "Scatter", "Mesh", "Trajectories"],
+        "Default Plot Types": ["Contour", "Trajectories"],
     }, 
     "Diffusion": {
-        "Plot Types": ["Contour Plot", "Scatter Plot"],
-        "Default Plot Types": ["Contour Plot"],
+        "Plot Types": ["Contour", "Scatter"],
+        "Default Plot Types": ["Contour"],
     },
 };
 
@@ -28,7 +28,7 @@ export interface HyperparameterMenuEntry {
 
 export const trainingObjectives: string[] = [
     "Flow Matching",
-    // "Diffusion"
+    "Diffusion"
 ];
 
 export const trainingObjectiveToSamplers: Record<string, string[]> = {
@@ -87,6 +87,23 @@ export const datasetNameToPath: Record<string, string> = {
     // "Concentric Circles": "/datasets/concentric_circles.json",
 };
 
+export const miniDistributionSettings: {
+    pointRadius: number;
+    pointColor: string;
+} = {
+    pointRadius: 2,
+    pointColor: "rgba(25, 131, 255, 1.0)"
+};
+
+export const scatterPlotSettings: {
+    pointRadius: number;
+    pointColor: string;
+    pointOpacity: number;
+} = {
+    pointRadius: 5,
+    pointOpacity: 0.6,
+};
+
 export const interfaceSettings: {
     distributionWidth: number;
     distributionHeight: number;
@@ -95,6 +112,7 @@ export const interfaceSettings: {
     displayAreaWidth: number;
     displayAreaHeight: number;
     pointColor: string;
+    scatterPlotOpacity: number;
 } = {
     distributionWidth: 500,
     distributionHeight: 500,
@@ -102,5 +120,4 @@ export const interfaceSettings: {
     miniDistributionWidth: 40,
     displayAreaWidth: 1200,
     displayAreaHeight: 500,
-    pointColor: "#4594e3",
 };

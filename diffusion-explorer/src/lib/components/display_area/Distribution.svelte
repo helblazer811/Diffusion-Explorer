@@ -4,6 +4,7 @@
     import ScatterPlot from '$lib/components/display_area/plots/ScatterPlot.svelte';
     import MeshPlot from '$lib/components/display_area/plots/MeshPlot.svelte';
     import TrajectoriesPlot from '$lib/components/display_area/plots/TrajectoriesPlot.svelte';
+    import { interfaceSettings } from '$lib/settings';
     // Props
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
@@ -14,7 +15,7 @@
     export let labelIsLatex: boolean = false; // Flag to indicate if the label is in LaTeX format
     export let label: string; // Label for the distribution
     export let distributionId: string; // ID for the distribution canvas
-    export let activePlotTypes: string[] = ["Contour Plot"]; // Active plot types for the distribution
+    export let activePlotTypes: string[] = ["Contour"]; // Active plot types for the distribution
     export let showBorder: boolean = false; // Flag to indicate if the border should be shown
     export let fillColor: string = "#7b7b7b"; // Fill color for the contour
     export let borderColor: string = "#7b7b7b"; // Border color for the contour
@@ -23,17 +24,17 @@
 
 <ScatterPlot
     svgElement={svgElement}
-    isActive={activePlotTypes.includes("Scatter Plot")}
+    isActive={activePlotTypes.includes("Scatter")}
     data={data}
     time={time}
     distributionId={distributionId}
     xLocation={xLocation}
-    opacity={opacity}
+    opacity={interfaceSettings.scatterPlotOpacity}
     pointColor={borderColor}
 />
 <ContourPlot
     svgElement={svgElement}
-    isActive={activePlotTypes.includes("Contour Plot")}
+    isActive={activePlotTypes.includes("Contour")}
     data={data}
     time={time}
     distributionId={distributionId}
@@ -46,7 +47,7 @@
 />
 <MeshPlot
     svgElement={svgElement}
-    isActive={activePlotTypes.includes("Mesh Plot")}
+    isActive={activePlotTypes.includes("Mesh")}
     time={time}
     distributionId={distributionId}
     opacity={opacity}

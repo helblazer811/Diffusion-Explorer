@@ -4,7 +4,7 @@
     import * as tf from '@tensorflow/tfjs';
 
     import { domainRange } from '$lib/state';
-    import { interfaceSettings } from '$lib/settings';
+    import { scatterPlotSettings, interfaceSettings } from '$lib/settings';
     import { screenWidth } from '$lib/screen';
     import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
@@ -21,7 +21,7 @@
         time: number = 0.0,
         opacity: number = 0.5,
         distributionId: string = "target",
-        maximumPoints: number = 300,
+        maximumPoints: number = 1000,
     ) {
         // Convert data to plain 2d array
         data = convertDataToDisplayCoordinateFrame(
@@ -52,8 +52,8 @@
             .append("circle")
             .attr("cx", d => d[0])
             .attr("cy", d => d[1])
-            .attr("r", 3)
-            .attr("opacity", opacity)
+            .attr("r", scatterPlotSettings.pointRadius)
+            .attr("opacity", scatterPlotSettings.pointOpacity)
             .attr("fill", pointColor)
             // .attr("transform", `translate(${xLocation}, 0)`);
     }

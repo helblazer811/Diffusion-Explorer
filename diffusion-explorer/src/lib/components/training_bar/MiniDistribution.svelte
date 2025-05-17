@@ -10,7 +10,7 @@
         isPlaying
     } from '$lib/state';
 
-    import { interfaceSettings } from '$lib/settings';
+    import { interfaceSettings, miniDistributionSettings } from '$lib/settings';
 
     export let data; // Data to plot
     export let distributionId = "target"; // ID for the distribution canvas
@@ -72,7 +72,7 @@
             .attr("cx", d => xScale(d[0]))
             .attr("cy", d => yScale(d[1]))
             .attr("r", 1)
-            .attr("fill", interfaceSettings.pointColor);
+            .attr("fill", miniDistributionSettings.pointColor);
     }
 
     // If data changes, replot the points

@@ -20,7 +20,6 @@
         box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 4px 0px;
         display: flex;
         justify-content: center;
-        padding: 0 10px;
     }
 
     .training-bar {
@@ -121,10 +120,10 @@
                 options={settings.trainingObjectiveToSamplers[$trainingObjective]}
             />
         </div>
-        <div class="menu style-menu">
+        <!-- <div class="menu style-menu">
             <h1 class="label">Style Settings</h1>
             <StyleDropdown />
-        </div>
+        </div> -->
         <div class="menu dataset-menu">
             <h1 class="label">Dataset</h1>
             <div class="mini-distribution-container">

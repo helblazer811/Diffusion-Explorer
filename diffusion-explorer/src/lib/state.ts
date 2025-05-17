@@ -1,7 +1,7 @@
 import { writable, get } from 'svelte/store';
 import * as settings from '$lib/settings';
 
-export const numberOfSteps = writable(100);
+export const numberOfSteps = writable(200);
 export const numSamples = writable(500);
 export const trainingObjective = writable("Flow Matching");
 export const sampler = writable("Euler");

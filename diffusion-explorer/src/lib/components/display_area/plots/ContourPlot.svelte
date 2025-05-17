@@ -115,7 +115,7 @@
         if (group.empty()) {
             group = svg.append("g")
                 .attr("id", distributionId+"_contour")
-                .attr("isolation", "isolate"); // Prevents blending with other groups
+                // .attr("isolation", "isolate"); // Prevents blending with other groups
         } else {
             group.selectAll("*").remove(); // Clear previous contents of this group
         }
