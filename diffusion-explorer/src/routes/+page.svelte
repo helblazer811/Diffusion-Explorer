@@ -40,7 +40,6 @@
     import TimeSlider from '$lib/components/time_slider/TimeSlider.svelte';
     import TrainingBar from '$lib/components/training_bar/TrainingBar.svelte';
     import DisplayArea from '$lib/components/display_area/DisplayArea.svelte';
-    import StyleBar from '$lib/components/training_bar/StyleBar.svelte';
     // import Explanation from '$lib/components/Explanation.svelte';
     // Import helper tf functions
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
@@ -269,7 +268,6 @@
     <TrainingBar datasetDict={datasetDict}/>
     <div class="main-area">
         <!-- <DatasetMenu datasetDict={datasetDict}/> -->
-        <!-- <StyleBar/> -->
         <DisplayArea/>
         <!-- </div> -->
     </div>

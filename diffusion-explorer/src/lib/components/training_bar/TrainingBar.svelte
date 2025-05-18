@@ -4,6 +4,7 @@
     // Import components
     import ToggleButton from '$lib/components/primitives/ToggleButton.svelte';
     import HyperparameterSelect from '$lib/components/training_bar/HyperparameterSelect.svelte';
+    import DropDown from '$lib/components/primitives/DropDown.svelte';
     import MiniDistribution from '$lib/components/training_bar/MiniDistribution.svelte';
     // Import settings
     import *  as settings from '$lib/settings';
@@ -39,7 +40,7 @@
 
 <style>
     .training-bar-container {
-        height: 120px;
+        height: 100px;
         width: 100%;
         background-color: rgb(243, 243, 243);
         position: relative;
@@ -55,24 +56,30 @@
         justify-content: left;
         align-items: center;
         width: calc(var(--display-area-width) - 200px);
-        gap: 20px;
+        gap: 10px;
     }
 
     .menu {
+        display: flex;
+        flex-direction: column;
         height: 100%;
     }
 
-    .reset-training-button {
-        margin-left: 50px;
+    .menu-contents {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
 
     .mini-distribution-container {
         /* height: 60px; */
         display: flex;
+        flex-grow: 1;
         flex-direction: row;
         align-items: center;
         justify-content: center;
-        gap: 20px;
+        gap: 10px;
         box-sizing: border-box;
     }
 
@@ -82,9 +89,9 @@
         display: block;
         font-weight: 300;
         font-family: var(--font-family);
-        margin: 0;
+        /* margin: 0px 6px; */
         margin-top: 6px;
-        margin-bottom: 12px;
+        margin-bottom: 6px;
     }
 
     .training-section-container {
@@ -101,6 +108,10 @@
         height: 100%;
     }
 
+    .dataset-menu {
+        margin-left: 20px;
+    }
+
     :global(.train-button) {
         height: 40px;
         width: 140px;
@@ -113,19 +124,19 @@
         font-weight: 300;
         color: #777;
         margin: 0;
-        margin-top: 14px;
-        margin-bottom: 12px;
+        /* margin-top: 14px; */
+        /* margin-bottom: 12px; */
     }
 
     :global(.style-menu-button) {
-        height: 27px;
+        height: 22px;
         width: 80px;
     }
     .grid-2x2 {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         /* gap: 8px; */
-        row-gap: 4px;
+        row-gap: 0px;
         column-gap: 4px;
     }
 
@@ -174,22 +185,26 @@
 <div class="training-bar-container">
     <div class="training-bar">
         <div class="menu training-objective-menu">
-            <HyperparameterSelect 
-                name="Training Objective"
-                bind:current={$trainingObjective}
-                options={settings.trainingObjectives}
-            />
+            <h1 class="label">Training Objective</h1>
+            <div class="menu-contents">
+                <DropDown
+                    bind:value={$trainingObjective}
+                    options={settings.trainingObjectives}
+                />
+            </div>
         </div>
         <div class="menu sampler-menu">
-            <HyperparameterSelect
-                name="Sampler"
-                bind:current={$sampler}
-                options={settings.trainingObjectiveToSamplers[$trainingObjective]}
-            />
+            <h1 class="label">Sampler</h1>
+            <div class="menu-contents">
+                <DropDown
+                    bind:value={$sampler}
+                    options={settings.trainingObjectiveToSamplers[$trainingObjective]}
+                />
+            </div>
         </div>
         <div class="menu style-menu">
             <h1 class="label">Plot Types</h1>
-            <div class="grid-2x2">
+            <div class="grid-2x2 menu-contents">
                 {#each $enabledPlotTypes as plotType}
                     <ToggleButton
                         className="style-menu-button"
@@ -220,19 +235,23 @@
             </div>
         </div>
         <div class="training-section-container">
-            <div class="train-button-container">
+            <div class="menu train-button-container">
                 <h1 class="label">Run Training</h1>
-                <ToggleButton
-                    className="train-button"
-                    label="Run Training"
-                    activeLabel="Stop Training"
-                    active={derived(isTraining, $v => $v)}
-                    toggle={() => isTraining.update(v => !v)} 
-                />
+                <div class="menu-contents">
+                    <ToggleButton
+                        className="train-button"
+                        label="Run Training"
+                        activeLabel="Stop Training"
+                        active={derived(isTraining, $v => $v)}
+                        toggle={() => isTraining.update(v => !v)} 
+                    />
+                </div>
             </div>
-            <div class="epoch-counter">
+            <div class="menu epoch-counter">
                 <h1 class="label">Epoch</h1>
-                <p class="epoch-counter-value">{padEpochValue($epochValue)}</p>
+                <div class="menu-contents">
+                    <p class="epoch-counter-value">{padEpochValue($epochValue)}</p>
+                </div>
             </div>
         </div>
     </div>
