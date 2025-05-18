@@ -5,7 +5,7 @@
     import MeshPlot from '$lib/components/display_area/plots/MeshPlot.svelte';
     import TrajectoriesPlot from '$lib/components/display_area/plots/TrajectoriesPlot.svelte';
     // Import settings
-    import { interfaceSettings } from '$lib/settings';
+    import { contourPlotSettings, interfaceSettings, meshPlotSettings, scatterPlotSettings } from '$lib/settings';
     import { trainingObjectiveToDisplayOptions } from '$lib/settings';
     // Import state
     import { trainingObjective } from '$lib/state';
@@ -34,8 +34,8 @@
     time={time}
     distributionId={distributionId}
     xLocation={xLocation}
-    opacity={interfaceSettings.scatterPlotOpacity}
-    pointColor={borderColor}
+    opacity={scatterPlotSettings.pointOpacity}
+    pointColor={scatterPlotSettings.pointColor}
 />
 <ContourPlot
     svgElement={svgElement}
@@ -44,10 +44,8 @@
     data={data}
     time={time}
     distributionId={distributionId}
-    opacity={opacity}
     label={label}
     labelIsLatex={labelIsLatex}
-    showBorder={showBorder}
     fillColor={fillColor}
     borderColor={borderColor}
 />
@@ -58,6 +56,7 @@
     time={time}
     distributionId={distributionId}
     opacity={opacity}
+    gridResolution={meshPlotSettings.gridResolution}
 />
 <TrajectoriesPlot
     svgElement={svgElement}

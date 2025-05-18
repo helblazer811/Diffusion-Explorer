@@ -88,27 +88,21 @@ export const datasetNameToPath: Record<string, string> = {
 };
 
 export const miniDistributionSettings: {
+    width: number;
+    height: number;
     pointRadius: number;
     pointColor: string;
 } = {
+    width: 30,
+    height: 30,
     pointRadius: 2,
     pointColor: "rgba(25, 131, 255, 1.0)"
-};
-
-export const scatterPlotSettings: {
-    pointRadius: number;
-    pointColor: string;
-    pointOpacity: number;
-} = {
-    pointRadius: 5,
-    pointOpacity: 0.6,
 };
 
 export const interfaceSettings: {
     distributionWidth: number;
     distributionHeight: number;
     mainAreaHeight: number;
-    miniDistributionWidth: number;
     displayAreaWidth: number;
     displayAreaHeight: number;
     pointColor: string;
@@ -117,7 +111,42 @@ export const interfaceSettings: {
     distributionWidth: 500,
     distributionHeight: 500,
     mainAreaHeight: 640,
-    miniDistributionWidth: 40,
     displayAreaWidth: 1200,
     displayAreaHeight: 500,
+};
+
+/* Styling for the various plots */
+
+export const contourPlotSettings: {
+    opacity: number;
+    showBorder: boolean;
+    fillColor: string;
+    borderColor: string;
+    borderWidth: number;
+    bandwidth: number;
+    contourLevels: number;
+} = {
+    opacity: 0.4,
+    showBorder: false,
+    borderWidth: 1,
+    bandwidth: 30,
+    contourLevels: 4,
+};
+
+export const scatterPlotSettings: {
+    pointRadius: number;
+    pointColor: string;
+    pointOpacity: number;
+} = {
+    pointRadius: 3,
+    pointColor: "rgba(255, 100, 0, 1)",
+    pointOpacity: 0.4,
+};
+
+export const meshPlotSettings: {
+    gridResolution: number;
+    gridColor: string;
+} = {
+    gridResolution: 7,
+    gridColor: "rgba(35, 35, 35, 1.0)",
 };

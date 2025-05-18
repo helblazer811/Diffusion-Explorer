@@ -8,14 +8,14 @@
     import { screenWidth } from '$lib/screen';
     import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
+    export let svgElement; // Shared SVG element for all distributions
     export let isActive: boolean = true; // Flag to indicate if the plot is active
     export let isEnabled: boolean = true; // Flag to indicate if the plot is enabled
     export let time: number = 0.0; // Default value for the time
-    export let opacity: number = 0.5; // Opacity of the contour
+    export let opacity: number; // Opacity of the contour
     export let data: tf.Tensor; // Data to plot
-    export let svgElement; // Shared SVG element for all distributions
     export let distributionId: string = "target"; // ID for the distribution canvas
-    export let pointColor: string = "#7b7b7b"; // Point color for the scatter plot
+    export let pointColor: string; // Point color for the scatter plot
 
     function plotScatterPlot(
         data: tf.Tensor,

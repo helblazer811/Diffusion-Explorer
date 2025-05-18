@@ -10,7 +10,7 @@
         isPlaying
     } from '$lib/state';
 
-    import { interfaceSettings, miniDistributionSettings } from '$lib/settings';
+    import { miniDistributionSettings } from '$lib/settings';
 
     export let data; // Data to plot
     export let distributionId = "target"; // ID for the distribution canvas
@@ -52,8 +52,8 @@
         xMax += margin * xRange;
         yMin -= margin * yRange;
         yMax += margin * yRange;
-        const xScale = d3.scaleLinear().domain([xMin, xMax]).range([0, interfaceSettings.miniDistributionWidth]);
-        const yScale = d3.scaleLinear().domain([yMin, yMax]).range([0, interfaceSettings.miniDistributionWidth]);
+        const xScale = d3.scaleLinear().domain([xMin, xMax]).range([0, miniDistributionSettings.width]);
+        const yScale = d3.scaleLinear().domain([yMin, yMax]).range([0, miniDistributionSettings.height]);
         // Make a scatter plot
         const svg = d3.select(svgElement); 
         // Select the group by ID, or create if not exists
@@ -108,11 +108,6 @@
         cursor: pointer;
         border: 3px solid #242424;
     }
-/* 
-    svg {
-        width: 100%;
-        height: 100%;
-    } */
 
 </style>
 

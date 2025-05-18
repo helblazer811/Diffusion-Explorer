@@ -141,7 +141,6 @@
 
     // If the plot is no longer active, remove the group, or if the plot is disabled
     $: if (!isActive && svgElement || !isEnabled && svgElement) {
-        console.log("Removing mesh grid");
         const svg = d3.select(svgElement);
         const group = svg.select(`#${distributionId}_mesh_grid`);
         if (!group.empty()) {

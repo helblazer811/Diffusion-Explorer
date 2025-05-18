@@ -62,7 +62,7 @@
     ></svg>
 
     {#if sharedSVGElement}
-        <SourceDistribution
+        <Distribution
             svgElement={sharedSVGElement}
             time={0}
             data={$sourceDistributionSamples}

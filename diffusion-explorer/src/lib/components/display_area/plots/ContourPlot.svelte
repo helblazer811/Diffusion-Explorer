@@ -5,7 +5,7 @@
 
     import { domainRange } from '$lib/state';
     import { screenWidth } from '$lib/screen';
-    import { interfaceSettings } from '$lib/settings';
+    import { contourPlotSettings, interfaceSettings } from '$lib/settings';
     import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
     export let isActive: boolean = true; // Flag to indicate if the plot is active
@@ -14,12 +14,13 @@
     export let time: number = 0.0; // Default value for the time
     export let data: tf.Tensor; // Data to plot
     export let distributionId: string = "target"; // ID for the distribution canvas
-    export let opacity: number = 0.5; // Opacity of the contour
-    export let fillColor: string = "#7b7b7b"; // Fill color for the contour
-    export let bandwidth: number = 30; // Bandwidth for the contour density
-    export let numberOfContours: number = 4; // Number of contours to draw
-    export let showBorder: boolean = false; // Flag to indicate if the border should be shown
-    export let borderColor: string = "#7b7b7b"; // Border color for the contour
+    export let opacity: number = contourPlotSettings.opacity; // Opacity of the contour
+    export let fillColor: string; // Fill color for the contour
+    export let bandwidth: number = contourPlotSettings.bandwidth; // Bandwidth for the contour density
+    export let contourLevels: number = contourPlotSettings.contourLevels; // Number of contours to draw
+    export let showBorder: boolean = contourPlotSettings.showBorder; // Flag to indicate if the border should be shown
+    export let borderWidth: number = contourPlotSettings.borderWidth; // Width of the border
+    export let borderColor: string = contourPlotSettings.borderColor; // Border color for the contour
     export let label: string; // Label for the distribution
     export let labelIsLatex: boolean = false; // Flag to indicate if the label is in LaTeX format
 
@@ -106,7 +107,7 @@
             .y(d => d[1])
             .size([interfaceSettings.displayAreaWidth, interfaceSettings.displayAreaHeight])
             .bandwidth(bandwidth) // Tune this to spread the density
-            .thresholds(numberOfContours)
+            .thresholds(contourLevels)
             (translatedData);
         // 4. Scales for drawing
         const svg = d3.select(svgElement); 
@@ -128,7 +129,7 @@
             .attr("d", d3.geoPath())
             .attr("fill", fillColor)
             .attr("stroke", borderColor)
-            .attr("stroke-width", showBorder ? 3 : 0)
+            .attr("stroke-width", showBorder ? borderWidth : 0)
             .attr("stroke-opacity", opacity)
             .attr("fill-opacity", opacity)
             .attr("mix-blend-mode", "screen")
