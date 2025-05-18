@@ -13,11 +13,11 @@ export interface DisplayOptions {
 export const trainingObjectiveToDisplayOptions: Record<string, DisplayOptions> = {
     "Flow Matching": {
         "Plot Types": ["Contour", "Scatter", "Mesh", "Trajectories"],
-        "Default Plot Types": ["Contour", "Trajectories"],
+        "Default Plot Types": ["Contour", "Scatter", "Trajectories"],
     }, 
     "Diffusion": {
         "Plot Types": ["Contour", "Scatter", "Trajectories"],
-        "Default Plot Types": ["Contour"],
+        "Default Plot Types": ["Contour", "Scatter", "Trajectories"],
     },
 };
 

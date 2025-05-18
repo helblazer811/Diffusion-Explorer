@@ -15,7 +15,6 @@
 
     // Import components
     import Distribution from '$lib/components/display_area/Distribution.svelte';
-    import SourceDistribution from '$lib/components/display_area/SourceDistribution.svelte';
 
     let sharedSVGElement: SVGSVGElement; // Shared SVG element for all distributions
 
