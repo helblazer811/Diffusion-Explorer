@@ -3,7 +3,7 @@
     import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
     import ScatterPlot from '$lib/components/display_area/plots/ScatterPlot.svelte';
     import MeshPlot from '$lib/components/display_area/plots/MeshPlot.svelte';
-    import TrajectoriesPlot from '$lib/components/display_area/plots/TrajectoriesPlot.svelte';
+    import PathPlot from '$lib/components/display_area/plots/PathPlot.svelte';
     // Import settings
     import { contourPlotSettings, interfaceSettings, meshPlotSettings, scatterPlotSettings } from '$lib/settings';
     import { trainingObjectiveToDisplayOptions } from '$lib/settings';
@@ -71,11 +71,11 @@
         opacity={opacity}
         gridResolution={meshPlotSettings.gridResolution}
     />
-    <TrajectoriesPlot
+    <PathPlot
         svgElement={groupElement}
         time={time}
-        isActive={activePlotTypes.includes("Trajectories")}
-        isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Trajectories")}
+        isActive={activePlotTypes.includes("Path")}
+        isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Path")}
         distributionId={distributionId}
     />
 </g>

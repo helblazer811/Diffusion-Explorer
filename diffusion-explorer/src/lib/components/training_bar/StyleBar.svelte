@@ -3,13 +3,14 @@
     import { derived, get } from 'svelte/store';
     import { trainingObjectiveToDisplayOptions } from '$lib/settings';
 	import { trainingObjective, activePlotTypes } from '$lib/state';
+    import ToggleButton from '../primitives/ToggleButton.svelte';
 
-    const plotTypes = ['Scatter', 'Contour', 'Mesh', 'Trajectories'];
+    const plotTypes = ['Scatter', 'Contour', 'Mesh', 'Path'];
     const plotTypeIcons = {
         "Scatter": `${base}/StyleIcons/PointsIcon.svg`,
         "Contour": `${base}/StyleIcons/ContourIcon.svg`,
         "Mesh": `${base}/StyleIcons/MeshIcon.svg`,
-        "Trajectories": `${base}/StyleIcons/TrajectoryIcon.svg`
+        "Path": `${base}/StyleIcons/PathIcon.svg`
     };
 
     const enabledPlotTypes = derived(trainingObjective, $trainingObjective =>
@@ -23,22 +24,22 @@
         return 'inactive';
     }
 
-    // Handler for button click
-    function onClickHandler(event: MouseEvent) {
-        const plotType = event.currentTarget.querySelector('p').textContent;
-        const nextActivePlotTypes = new Set(get(activePlotTypes));
+    // // Handler for button click
+    // function onClickHandler(event: MouseEvent) {
+    //     const plotType = event.currentTarget.querySelector('p').textContent;
+    //     const nextActivePlotTypes = new Set(get(activePlotTypes));
 
-        if (!get(enabledPlotTypes).includes(plotType)) {
-            return; // Do nothing if the plot type is not enabled
-        }
-        if (nextActivePlotTypes.has(plotType)) {
-            nextActivePlotTypes.delete(plotType);
-        } else {
-            nextActivePlotTypes.add(plotType);
-        }
+    //     if (!get(enabledPlotTypes).includes(plotType)) {
+    //         return; // Do nothing if the plot type is not enabled
+    //     }
+    //     if (nextActivePlotTypes.has(plotType)) {
+    //         nextActivePlotTypes.delete(plotType);
+    //     } else {
+    //         nextActivePlotTypes.add(plotType);
+    //     }
 
-        activePlotTypes.set(Array.from(nextActivePlotTypes));
-    }
+    //     activePlotTypes.set(Array.from(nextActivePlotTypes));
+    // }
 
     // Each button has three states: active, inactive, disabled
     // The button is disabled if it is not in trainingObjectiveToDisplayOptions[trainingObjective]["Plot Types"]
@@ -46,7 +47,7 @@
     // The button is inactive if it is not in activePlotTypes, and it is not disabled
 
 </script>
-
+<!-- 
 <style>
     .style-bar-container {
         position: absolute;
@@ -134,5 +135,20 @@
                 </div>
             {/each}
         </div>
+    </div>
+</div> -->
+
+<div class="style-bar-container">
+    <div class="style-bar">
+        {#each $enabledPlotTypes as plotType}
+            <ToggleButton
+                class="style-bar-button"
+                icon={plotTypeIcons[plotType]}
+                disabled={!$enabledPlotTypes.includes(plotType)}
+                label={plotType}
+                value={activePlotTypes}
+                on:click={onClickHandler}
+            />
+        {/each}
     </div>
 </div>

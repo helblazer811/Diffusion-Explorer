@@ -1,14 +1,28 @@
 <script>
     import { base } from '$app/paths';
+    import { derived } from 'svelte/store';
     // Import components
-    import ToggleButton from '$lib/components/ToggleButton.svelte';
+    import ToggleButton from '$lib/components/primitives/ToggleButton.svelte';
     import HyperparameterSelect from '$lib/components/training_bar/HyperparameterSelect.svelte';
     import MiniDistribution from '$lib/components/training_bar/MiniDistribution.svelte';
     // Import settings
-    import * as settings from '$lib/settings';
-    import { trainingObjective, sampler, epochValue, isTraining } from '$lib/state';
+    import *  as settings from '$lib/settings';
+    import { 
+        trainingObjective, 
+        sampler, 
+        epochValue, 
+        isTraining,
+        activePlotTypes
+    } from '$lib/state';
     
     export let datasetDict = {};
+
+    const plotTypeIcons = {
+        "Scatter": `${base}/StyleIcons/PointsIcon.svg`,
+        "Contour": `${base}/StyleIcons/ContourIcon.svg`,
+        "Mesh": `${base}/StyleIcons/MeshIcon.svg`,
+        "Path": `${base}/StyleIcons/PathIcon.svg`
+    };
 
     function padEpochValue(value) {
         // Take the epoch value and convert it to a 5 digit number, with leading zeros and a comma
@@ -16,11 +30,16 @@
         return paddedValue.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
     }
 
+    // Make a derived type for updating which plot types are enabled
+    const enabledPlotTypes = derived(trainingObjective, $trainingObjective =>
+        settings.trainingObjectiveToDisplayOptions[$trainingObjective]?.["Plot Types"] ?? []
+    );
+
 </script>
 
 <style>
     .training-bar-container {
-        height: 110px;
+        height: 120px;
         width: 100%;
         background-color: rgb(243, 243, 243);
         position: relative;
@@ -30,7 +49,7 @@
     }
 
     .training-bar {
-        padding: 10px 0;
+        padding: 5px 0;
         display: flex;
         /* justify-content: center; */
         justify-content: left;
@@ -98,6 +117,22 @@
         margin-bottom: 12px;
     }
 
+    :global(.style-menu-button) {
+        height: 27px;
+        width: 80px;
+    }
+    .grid-2x2 {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        /* gap: 8px; */
+        row-gap: 4px;
+        column-gap: 4px;
+    }
+
+    :global(.train-button) {
+        width: 100px;
+    }
+
     /* If the screen becomes less than 700 wide then change the flex direction */
     @media (max-width: 800px) {
         .training-bar-container {
@@ -152,6 +187,30 @@
                 options={settings.trainingObjectiveToSamplers[$trainingObjective]}
             />
         </div>
+        <div class="menu style-menu">
+            <h1 class="label">Plot Types</h1>
+            <div class="grid-2x2">
+                {#each $enabledPlotTypes as plotType}
+                    <ToggleButton
+                        className="style-menu-button"
+                        icon={plotTypeIcons[plotType]}
+                        disabled={!$enabledPlotTypes.includes(plotType)}
+                        label={plotType}
+                        active={derived(activePlotTypes, $v => $v.includes(plotType))}
+                        toggle={() => {
+                            const nextActivePlotTypes = new Set($activePlotTypes);
+                            if (nextActivePlotTypes.has(plotType)) {
+                                nextActivePlotTypes.delete(plotType);
+                            } else {
+                                nextActivePlotTypes.add(plotType);
+                            }
+                            // Update the actual store
+                            activePlotTypes.set(Array.from(nextActivePlotTypes));
+                        }}
+                    />
+                {/each}
+            </div>
+        </div>
         <div class="menu dataset-menu">
             <h1 class="label">Dataset</h1>
             <div class="mini-distribution-container">
@@ -166,8 +225,9 @@
                 <ToggleButton
                     className="train-button"
                     label="Run Training"
-                    activeLabel="Pause Training"
-                    value={isTraining}
+                    activeLabel="Stop Training"
+                    active={derived(isTraining, $v => $v)}
+                    toggle={() => isTraining.update(v => !v)} 
                 />
             </div>
             <div class="epoch-counter">

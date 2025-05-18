@@ -1,11 +1,13 @@
 <script lang="ts">
-    export let className: string = ''; // Additional class names
-    export let value; // store passed from parent component
-    export let disabled: boolean = false;
-    export let icon: string | null = null; // URL to icon image
-    export let label: string = '';
-    export let activeLabel: string | null= null; // Label when active;
+    import { type Readable } from 'svelte/store';
 
+    export let active: Readable<boolean>; // Can be from boolean or derived logic
+    export let toggle: () => void;        // Toggle logic passed from parent
+    export let className: string = '';
+    export let disabled: boolean = false;
+    export let icon: string | null = null;
+    export let label: string = '';
+    export let activeLabel: string | null = null;
 </script>
 
 <style>
@@ -67,19 +69,11 @@
 </style>
 
 <div
-    class="toggle-button {$value ? 'active' : 'inactive'} {disabled ? 'disabled' : ''} {className}"
-    on:click={() => {
-        if (!disabled) {
-            value.update((v) => !v);
-        }
-    }}
+    class="toggle-button {$active ? 'active' : 'inactive'} {disabled ? 'disabled' : ''} {className}"
+    on:click={() => { if (!disabled) toggle(); }}
 >
     {#if icon}
         <img src={icon} alt={label} />
     {/if}
-    {#if activeLabel}
-        <p>{$value ? activeLabel : label}</p>
-    {:else}
-        <p>{label}</p>
-    {/if}
+    <p>{$active && activeLabel ? activeLabel : label}</p>
 </div>
