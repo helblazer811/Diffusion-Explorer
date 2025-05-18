@@ -92,6 +92,11 @@
         /* margin-left: 20px; */
     }
 
+    .mini-distribution svg {
+        width: 100%;
+        height: 100%;
+    }
+
     .active-dataset {
         border: 3px solid #393939;
         opacity: 1;

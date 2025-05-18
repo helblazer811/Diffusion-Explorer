@@ -93,8 +93,8 @@ export const miniDistributionSettings: {
     pointRadius: number;
     pointColor: string;
 } = {
-    width: 30,
-    height: 30,
+    width: 35,
+    height: 35,
     pointRadius: 2,
     pointColor: "rgba(25, 131, 255, 1.0)"
 };

@@ -1,12 +1,20 @@
 <script>
+    import { base } from '$app/paths';
     // Import components
+    import ToggleButton from '$lib/components/ToggleButton.svelte';
     import HyperparameterSelect from '$lib/components/training_bar/HyperparameterSelect.svelte';
     import MiniDistribution from '$lib/components/training_bar/MiniDistribution.svelte';
     // Import settings
     import * as settings from '$lib/settings';
-    import { trainingObjective, sampler } from '$lib/state';
+    import { trainingObjective, sampler, epochValue, isTraining } from '$lib/state';
     
     export let datasetDict = {};
+
+    function padEpochValue(value) {
+        // Take the epoch value and convert it to a 5 digit number, with leading zeros and a comma
+        const paddedValue = String(value).padStart(5, '0');
+        return paddedValue.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
+    }
 
 </script>
 
@@ -28,22 +36,17 @@
         justify-content: left;
         align-items: center;
         width: calc(var(--display-area-width) - 200px);
+        gap: 20px;
     }
 
     .menu {
         height: 100%;
     }
 
-    .hyperparameter-menu {
-        display: flex;
-        /* margin-left: 20px; */
-        flex-direction: row;
+    .reset-training-button {
+        margin-left: 50px;
     }
 
-    .dataset-menu {
-        padding-left: 20px;
-    }
-   
     .mini-distribution-container {
         /* height: 60px; */
         display: flex;
@@ -62,6 +65,21 @@
         font-family: var(--font-family);
         margin: 0;
         margin-top: 6px;
+        margin-bottom: 12px;
+    }
+
+    :global(.train-button) {
+        height: 40px;
+        width: 140px;
+    }
+
+    .epoch-counter-value {
+        font-family: var(--font-family);
+        font-size: 26px;
+        font-weight: 300;
+        color: #777;
+        margin: 0;
+        margin-top: 16px;
         margin-bottom: 12px;
     }
 
@@ -126,6 +144,27 @@
                     <MiniDistribution data={data} distributionId={name} />
                 {/each}
             </div>
+        </div>
+        <div class="menu reset-training-button">
+            <!-- Reset icon -->
+            <h1 class="label">&#8203;</h1>
+            <img src="{base}/ResetIcon.svg" alt="Reset" width="34" height="34" />
+        </div>
+        <div class="menu train-button-container">
+            <h1 class="label">Run Training</h1>
+            <ToggleButton
+                className="train-button"
+                label="Run Training"
+                activeLabel="Pause Training"
+                bind:current={$isTraining}
+                on:click={() => {
+                    $isTraining = !$isTraining;
+                }}
+            />
+        </div>
+        <div class="menu epoch-counter">
+            <h1 class="label">Epoch</h1>
+            <p class="epoch-counter-value">{padEpochValue($epochValue)}</p>
         </div>
     </div>
 </div>

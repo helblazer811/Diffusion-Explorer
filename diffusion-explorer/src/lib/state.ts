@@ -3,6 +3,7 @@ import * as settings from '$lib/settings';
 
 export const numberOfSteps = writable(200);
 export const numSamples = writable(500);
+export const epochValue = writable(1000);
 export const trainingObjective = writable("Flow Matching");
 export const sampler = writable("Euler");
 export const datasetName = writable("Smiley Face");
@@ -13,6 +14,7 @@ export const allTimeSamples = writable(undefined);
 export const model = writable(null);
 export const currentTime = writable(0);
 export const isPlaying = writable(false);
+export const isTraining = writable(false);
 export const playbackSpeed = writable(30);
 export const domainRange = writable({
     xMin: -3.0,
