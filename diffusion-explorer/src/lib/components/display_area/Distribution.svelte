@@ -4,7 +4,11 @@
     import ScatterPlot from '$lib/components/display_area/plots/ScatterPlot.svelte';
     import MeshPlot from '$lib/components/display_area/plots/MeshPlot.svelte';
     import TrajectoriesPlot from '$lib/components/display_area/plots/TrajectoriesPlot.svelte';
+    // Import settings
     import { interfaceSettings } from '$lib/settings';
+    import { trainingObjectiveToDisplayOptions } from '$lib/settings';
+    // Import state
+    import { trainingObjective } from '$lib/state';
     // Props
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
@@ -25,6 +29,7 @@
 <ScatterPlot
     svgElement={svgElement}
     isActive={activePlotTypes.includes("Scatter")}
+    isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Scatter")}
     data={data}
     time={time}
     distributionId={distributionId}
@@ -35,6 +40,7 @@
 <ContourPlot
     svgElement={svgElement}
     isActive={activePlotTypes.includes("Contour")}
+    isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Contour")}
     data={data}
     time={time}
     distributionId={distributionId}
@@ -48,6 +54,7 @@
 <MeshPlot
     svgElement={svgElement}
     isActive={activePlotTypes.includes("Mesh")}
+    isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Mesh")}
     time={time}
     distributionId={distributionId}
     opacity={opacity}
@@ -56,5 +63,6 @@
     svgElement={svgElement}
     time={time}
     isActive={activePlotTypes.includes("Trajectories")}
+    isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Trajectories")}
     distributionId={distributionId}
 />

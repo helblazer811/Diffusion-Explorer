@@ -16,7 +16,7 @@ export const trainingObjectiveToDisplayOptions: Record<string, DisplayOptions> =
         "Default Plot Types": ["Contour", "Trajectories"],
     }, 
     "Diffusion": {
-        "Plot Types": ["Contour", "Scatter"],
+        "Plot Types": ["Contour", "Scatter", "Trajectories"],
         "Default Plot Types": ["Contour"],
     },
 };

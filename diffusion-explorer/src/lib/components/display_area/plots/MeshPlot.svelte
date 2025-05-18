@@ -23,6 +23,7 @@
 
     export let svgElement; // Shared SVG element for all distributions
     export let isActive: boolean = false; // Flag to indicate if the plot is active
+    export let isEnabled: boolean = true; // Flag to indicate if the plot is enabled
     export let time: number = 0.0; // Default value for the time
     export let gridResolution: number = 10; // Resolution of the grid
     export let distributionId: string = "target"; // ID for the distribution canvas
@@ -102,7 +103,6 @@
     // If the dataset name changes, re-run the sampling
     $ : if ($datasetName) {
         // Run sampling for a uniform grid of points
-        // console.log("Running sampling for a uniform grid of points");
         // First uniformly sample the x and y coordinates
         const width = $domainRange.xMax - $domainRange.xMin;
         const height = $domainRange.yMax - $domainRange.yMin;
@@ -134,13 +134,14 @@
         )
     }
 
-    $ : if (svgElement && trajectoryGrid.length > 0 && isActive) {
+    $ : if (svgElement && trajectoryGrid.length > 0 && isActive && isEnabled) {
         // Plot the mesh grid for the current time
         plotMesh(time);
     }
 
-    // If the plot is no longer active, remove the group
-    $: if (!isActive && svgElement) {
+    // If the plot is no longer active, remove the group, or if the plot is disabled
+    $: if (!isActive && svgElement || !isEnabled && svgElement) {
+        console.log("Removing mesh grid");
         const svg = d3.select(svgElement);
         const group = svg.select(`#${distributionId}_mesh_grid`);
         if (!group.empty()) {

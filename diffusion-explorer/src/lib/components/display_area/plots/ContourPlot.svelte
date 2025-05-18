@@ -9,6 +9,7 @@
     import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
     export let isActive: boolean = true; // Flag to indicate if the plot is active
+    export let isEnabled: boolean = true; // Flag to indicate if the plot is enabled
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
     export let data: tf.Tensor; // Data to plot
