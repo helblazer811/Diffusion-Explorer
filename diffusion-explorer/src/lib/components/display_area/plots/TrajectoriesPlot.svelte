@@ -190,7 +190,6 @@
     // Setup behavior for the drag handle, will run a single time
     $: if (!initialized && svgElement && initialCondition && isActive) {
         initialized = true;
-        console.log("Initializing drag handle");
         const svg = d3.select(svgElement);
 
         // 1. Create a group for the drag handle

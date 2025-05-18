@@ -22,6 +22,8 @@
         numSamples,
         numberOfSteps,
         sampler,
+        isTraining,
+        epochValue,
     } from '$lib/state';
     import { 
         trainingObjectiveToModelConfig,
@@ -42,7 +44,8 @@
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
     import { callSamplingWorkerThread, callTrainingWorkerThread} from '$lib/diffusion/workers/utils';
 
-    export let trainModel: boolean = false; // Flag to indicate if the model is being trained
+    let trainingInitiated = false; // Flag to check if training has ever been initiated
+    let trainingWorker: Worker; // Variable to hold the training worker
 
     let datasetDict: any = {}; // Dictionary to hold the loaded datasets
 
@@ -89,33 +92,6 @@
         );
         // Update the UI state with the source distribution samples
         sourceDistributionSamples.set(multivariateNormalSamples);
-        // Get the model config and class
-        const ModelClass = trainingObjectiveToModelClass[$trainingObjective];
-        const modelConfig = trainingObjectiveToModelConfig[$trainingObjective];
-        if (false) {
-            // Call the training worker thread
-            callTrainingWorkerThread(
-                $trainingObjective,
-                modelConfig,
-                base + datasetNameToPath[$datasetName],
-                trainingConfig,
-                (tfModelPath: string) => {
-                    // Make the model
-                    const ourModel = new ModelClass(
-                        modelConfig.dim,
-                        modelConfig.hidden,
-                    );
-                    // Load up a model from the given file path
-                    tf.loadLayersModel(tfModelPath).then((tfModel) => {
-                        console.log("Downloading model from: ", tfModelPath);
-                        // Set the model in the model class
-                        ourModel.setModel(tfModel);
-                        // Prompt to download the model
-                        ourModel.download();
-                    });
-                }
-            );
-        }
     });
 
     onDestroy(() => {
@@ -182,6 +158,58 @@
                 isPlaying.set(true);
             }
         )
+    }
+
+    // Add a handler for when training is running
+    $ : if ($isTraining) {
+        console.log("Training is running");
+        trainingInitiated = true; // Set the flag to true
+        // Pause the playing animation
+        isPlaying.set(false);
+        // Get the model config and class
+        const ModelClass = trainingObjectiveToModelClass[$trainingObjective];
+        const modelConfig = trainingObjectiveToModelConfig[$trainingObjective];
+        // Call the training worker thread
+        trainingWorker = callTrainingWorkerThread(
+            $trainingObjective,
+            modelConfig,
+            base + datasetNameToPath[$datasetName],
+            trainingConfig,
+            // Callback for when training is done
+            (tfModelPath: string) => {
+                // Make the model
+                const ourModel = new ModelClass(
+                    modelConfig.dim,
+                    modelConfig.hidden,
+                );
+                // Load up a model from the given file path
+                tf.loadLayersModel(tfModelPath).then((tfModel) => {
+                    // console.log("Downloading model from: ", tfModelPath);
+                    // Set the model in the model class
+                    // ourModel.setModel(tfModel);
+                    // Prompt to download the model
+                    // ourModel.download();
+                });
+            },
+            // Callback for after each epoch
+            (epoch: number, loss: number) => {
+                // Update the epoch value
+                epochValue.set(epoch);
+                // Update the loss value
+                // lossValue.set(loss);
+                // Update the UI state with the current distribution samples
+                // const pointsTensor = datasetDict[$datasetName];
+                // const currentSamples = pointsTensor.slice([0, 0], [get(numSamples), 2]);
+                // currentDistributionSamples.set(currentSamples);
+            }
+        );
+    }
+    // If training stopped, then stop the training thread
+    // Becuase it is stopped by default, we need to check if training was ever initiated by the user
+    $: if (!$isTraining && trainingInitiated && trainingWorker) {
+        console.log("Training is stopped");
+        // Stop the training thread by posting a "stop_training" message.
+        trainingWorker.postMessage({ type: 'stop_training' });
     }
 
 </script>

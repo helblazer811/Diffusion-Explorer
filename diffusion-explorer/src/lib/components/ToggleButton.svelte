@@ -1,21 +1,11 @@
 <script lang="ts">
-    import { createEventDispatcher } from 'svelte';
-
     export let className: string = ''; // Additional class names
-    export let value: boolean = false; // Bound to parent store
+    export let value; // store passed from parent component
     export let disabled: boolean = false;
     export let icon: string | null = null; // URL to icon image
     export let label: string = '';
     export let activeLabel: string | null= null; // Label when active;
 
-    const dispatch = createEventDispatcher();
-
-    function handleClick() {
-        if (!disabled) {
-            value = !value; // Triggers binding update
-            dispatch('toggle', value);
-        }
-    }
 </script>
 
 <style>
@@ -77,14 +67,18 @@
 </style>
 
 <div
-    class="toggle-button {value ? 'active' : 'inactive'} {disabled ? 'disabled' : ''} {className}"
-    on:click={handleClick}
+    class="toggle-button {$value ? 'active' : 'inactive'} {disabled ? 'disabled' : ''} {className}"
+    on:click={() => {
+        if (!disabled) {
+            value.update((v) => !v);
+        }
+    }}
 >
     {#if icon}
         <img src={icon} alt={label} />
     {/if}
     {#if activeLabel}
-        <p>{value ? activeLabel : label}</p>
+        <p>{$value ? activeLabel : label}</p>
     {:else}
         <p>{label}</p>
     {/if}

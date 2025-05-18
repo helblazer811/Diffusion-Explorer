@@ -19,12 +19,17 @@ async function loadDataset(path: string) {
         });
 }
 
+// Make a boolean that tracks if the training is stopped
+// It is important to be out of the on message function so the value persists across message receives
+let trainingStopped = false;
+
 self.onmessage = async (e) => {
     const { type, data } = e.data;
-    // Destructure the data
-    const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
 
     if (type === 'train') {
+        console.log("Training started in worker thread...");
+        // Destructure the data
+        const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
         // Set up tf wasm backend
         if (backend === 'wasm') {
             await tf.setBackend('wasm');
@@ -41,13 +46,20 @@ self.onmessage = async (e) => {
         );
         // Load the dataset
         const pointsTensor = await loadDataset(datasetPath);
-        // 
-        console.log('Loaded dataset:', pointsTensor);
         // Run training
         ourModel.train(
             pointsTensor,
             trainingConfig["iterations"],
             trainingConfig["batchSize"],
+            () => { return trainingStopped }, // Closure needed to get most recent value of trainingStopped
+            (epoch, intermediateSamples) => {
+                // Send the intermediate samples to the main thread
+                self.postMessage({ 
+                    type: 'epoch_chunk', 
+                    epoch: epoch, 
+                    intermediateSamples: intermediateSamples,
+                });
+            }
         )
         // Save the model in the browser IndexedDB
         const modelSaveName = 'indexeddb://' + trainingObjective.replace(/\s+/g, '_') + '_' + Date.now();
@@ -61,6 +73,9 @@ self.onmessage = async (e) => {
             tfModelPath: modelSaveName,
             // allSamples: allSamplesArray,
         });
+    } else if (type === 'stop_training') {
+        // Figure out how to stop the training
+        trainingStopped = true;
     } else {
         console.error('Unknown message type:', type);
     }

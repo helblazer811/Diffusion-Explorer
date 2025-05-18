@@ -156,10 +156,7 @@
                 className="train-button"
                 label="Run Training"
                 activeLabel="Pause Training"
-                bind:current={$isTraining}
-                on:click={() => {
-                    $isTraining = !$isTraining;
-                }}
+                value={isTraining}
             />
         </div>
         <div class="menu epoch-counter">

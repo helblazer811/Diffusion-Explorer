@@ -36,7 +36,8 @@ export class Model {
     train(
         data: tf.Tensor2D,
         iterations: number = 10000,
-        batchSize: number = 32
+        batchSize: number = 32,
+        stopTraining: () => boolean | Promise<boolean> = () => { false },
     ){
         throw new Error("Method 'train()' not implemented.");
     }

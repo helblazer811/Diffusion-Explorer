@@ -82,18 +82,22 @@ export function callTrainingWorkerThread(
     modelConfig: object,
     datasetPath: string,
     trainingConfig: object,
-    callback: Function,
+    finishCallback: Function,
+    epochCallback: Function
 ) {
     // Create the worker
     const trainingWorker = new Worker(
         new URL('./train.worker.ts', import.meta.url), // NOTE: This needs to be a relative path
         { type: 'module' }
     );
-    // Add a listener to the training worker thread to receive the samples
+    // Add listeners that recieve messages from the worker thread on the main thread (client)
     trainingWorker.onmessage = (e) => {
         const { type, result: res } = e.data;
         if (type === 'result') {
-            callback(e.data.tfModelPath);
+            finishCallback(e.data.tfModelPath);
+        } else if (type === 'epoch_chunk') {
+            // Recieved a chunk of data from the worker thread
+            epochCallback(e.data.epoch, e.data.intermediateSamples);
         } else if (type === 'status') {
             console.log('Worker status:', e.data.message);
         } else if (type === 'error') {
@@ -112,4 +116,6 @@ export function callTrainingWorkerThread(
             trainingConfig: trainingConfig,
         }
     });
+    // Return the worker so that a "stop_training" message can be sent to it
+    return trainingWorker;
 }
