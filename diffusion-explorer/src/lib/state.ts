@@ -10,6 +10,13 @@ export const datasetName = writable("Smiley Face");
 export const targetDistributionSamples = writable(undefined);
 export const sourceDistributionSamples = writable(undefined);
 export const currentDistributionSamples = writable(undefined);
+export const intermediateTrainingSamples = writable(undefined);
+export const distributionVisiblity = writable({
+    target: true,
+    source: true,
+    current: true,
+    training: false,
+})
 export const allTimeSamples = writable(undefined);
 export const model = writable(null);
 export const currentTime = writable(0);

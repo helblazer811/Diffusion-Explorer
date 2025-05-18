@@ -68,18 +68,33 @@
         margin-bottom: 12px;
     }
 
+    .training-section-container {
+        margin-left: auto; /* Push the training section to the right */
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        gap: 20px;
+    }
+
+    .train-button-container { 
+        height: 100%;
+    }
+
     :global(.train-button) {
         height: 40px;
         width: 140px;
     }
 
     .epoch-counter-value {
+        width: 100px;
         font-family: var(--font-family);
         font-size: 26px;
         font-weight: 300;
         color: #777;
         margin: 0;
-        margin-top: 16px;
+        margin-top: 14px;
         margin-bottom: 12px;
     }
 
@@ -145,23 +160,20 @@
                 {/each}
             </div>
         </div>
-        <div class="menu reset-training-button">
-            <!-- Reset icon -->
-            <h1 class="label">&#8203;</h1>
-            <img src="{base}/ResetIcon.svg" alt="Reset" width="34" height="34" />
-        </div>
-        <div class="menu train-button-container">
-            <h1 class="label">Run Training</h1>
-            <ToggleButton
-                className="train-button"
-                label="Run Training"
-                activeLabel="Pause Training"
-                value={isTraining}
-            />
-        </div>
-        <div class="menu epoch-counter">
-            <h1 class="label">Epoch</h1>
-            <p class="epoch-counter-value">{padEpochValue($epochValue)}</p>
+        <div class="training-section-container">
+            <div class="train-button-container">
+                <h1 class="label">Run Training</h1>
+                <ToggleButton
+                    className="train-button"
+                    label="Run Training"
+                    activeLabel="Pause Training"
+                    value={isTraining}
+                />
+            </div>
+            <div class="epoch-counter">
+                <h1 class="label">Epoch</h1>
+                <p class="epoch-counter-value">{padEpochValue($epochValue)}</p>
+            </div>
         </div>
     </div>
 </div>

@@ -156,23 +156,5 @@
             group.remove();
         }
     }
-</script>
-<!-- 
-<style> 
-    svg {
-        position: absolute;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none; /* Optional: allow interaction to pass through */
-    }
-</style>
 
-<svg
-    bind:this={svgElement}
-    id="svg_{distributionId}" 
-    viewBox="0 0 {interfaceSettings.displayAreaWidth} {interfaceSettings.distributionHeight}"
-    style={"left: " + xLocation + "px;"}
-    preserveAspectRatio="xMidYMid meet"
->
-</svg> -->
+</script>

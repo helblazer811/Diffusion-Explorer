@@ -9,6 +9,8 @@
         allTimeSamples,
         activePlotTypes,
         numberOfSteps,
+        distributionVisiblity,
+        intermediateTrainingSamples
     } from '$lib/state';
 
     import { interfaceSettings } from '$lib/settings';
@@ -58,44 +60,61 @@
         preserveAspectRatio="xMidYMid meet"
         width="100%"
         height="100%"
-    ></svg>
-
-    {#if sharedSVGElement}
-        <Distribution
-            svgElement={sharedSVGElement}
-            time={0}
-            data={$sourceDistributionSamples}
-            opacity={0.7}
-            label=""
-            distributionId="source"
-            showBorder={false}
-            fillColor="rgba(25, 131, 255, 0.2)"
-            borderColor="rgba(25, 131, 255, 1)"
-        />
-        <Distribution
-            svgElement={sharedSVGElement}
-            time={1.0}
-            data={$targetDistributionSamples}
-            opacity={0.7}
-            label=""
-            distributionId="target"
-            showBorder={false}
-            fillColor="rgba(25, 131, 255, 0.2)"
-            borderColor="rgba(25, 131, 255, 1)"
-        />
-        <Distribution
-            svgElement={sharedSVGElement}
-            time={$currentTime}
-            data={$currentDistributionSamples}
-            allTimeSamples={$allTimeSamples}
-            opacity={0.8}
-            label=""
-            fillColor="rgba(255, 100, 0, 0.5)"
-            borderColor="rgba(255, 100, 0, 1)"
-            labelIsLatex={true}
-            showBorder={false}
-            distributionId="current"
-            activePlotTypes={$activePlotTypes}
-        />
-    {/if}
+    >
+        {#if sharedSVGElement}
+            <Distribution
+                svgElement={sharedSVGElement}
+                visible={$distributionVisiblity.source}
+                time={0}
+                data={$sourceDistributionSamples}
+                opacity={0.7}
+                label=""
+                distributionId="source"
+                showBorder={false}
+                fillColor="rgba(25, 131, 255, 0.2)"
+                borderColor="rgba(25, 131, 255, 1)"
+            />
+            <Distribution
+                svgElement={sharedSVGElement}
+                visible={$distributionVisiblity.target}
+                time={1.0}
+                data={$targetDistributionSamples}
+                opacity={0.7}
+                label=""
+                distributionId="target"
+                showBorder={false}
+                fillColor="rgba(25, 131, 255, 0.2)"
+                borderColor="rgba(25, 131, 255, 1)"
+            />
+            <Distribution
+                svgElement={sharedSVGElement}
+                visible={$distributionVisiblity.current}
+                time={$currentTime}
+                data={$currentDistributionSamples}
+                allTimeSamples={$allTimeSamples}
+                opacity={0.8}
+                label=""
+                fillColor="rgba(255, 100, 0, 0.5)"
+                borderColor="rgba(255, 100, 0, 1)"
+                labelIsLatex={true}
+                showBorder={false}
+                distributionId="current"
+                activePlotTypes={$activePlotTypes}
+            />
+            <Distribution
+                svgElement={sharedSVGElement}
+                visible={$distributionVisiblity.training}
+                time={1.0}
+                data={$intermediateTrainingSamples}
+                opacity={0.8}
+                label=""
+                fillColor="rgba(255, 100, 0, 0.5)"
+                borderColor="rgba(255, 100, 0, 1)"
+                labelIsLatex={true}
+                showBorder={false}
+                distributionId="training"
+                activePlotTypes={["Contour"]}
+            />
+        {/if}
+    </svg>
 </div>

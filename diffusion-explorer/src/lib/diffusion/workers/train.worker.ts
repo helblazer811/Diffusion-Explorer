@@ -54,6 +54,7 @@ self.onmessage = async (e) => {
             () => { return trainingStopped }, // Closure needed to get most recent value of trainingStopped
             (epoch, intermediateSamples) => {
                 // Send the intermediate samples to the main thread
+                console.log("Posting intermediate samples to main thread... ", intermediateSamples);
                 self.postMessage({ 
                     type: 'epoch_chunk', 
                     epoch: epoch, 

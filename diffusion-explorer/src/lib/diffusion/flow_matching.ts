@@ -21,7 +21,7 @@ export class FlowModel extends Model {
         batchSize: number = 32,
         stopTraining: () => boolean = () => { return false; },
         endEpochCallback: (epoch: number, intermediateSamples: number[][] | null) => void = () => { },
-        intermediateSampleInterval: number = 100,
+        intermediateSampleInterval: number = 50,
     ): Promise<void> {
         // Run training
         // Set up the loss
@@ -62,10 +62,10 @@ export class FlowModel extends Model {
                 const allTimeSamples = this.sample(
                     500, // number of samples
                     100 // number of steps
-                );
+                ); // shape [num_total_steps, num_samples, dim]
                 // Pull out the last time step
-                const lastTimeStep = allTimeSamples.slice([allTimeSamples.shape[0] - 1], [1]);
-                intermediateSamples = lastTimeStep.dataSync();
+                const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0); // shape [num_samples, dim]
+                intermediateSamples = lastTimeStep.arraySync();
             }
             // Run the end epoch callback
             // TODO: add the loss

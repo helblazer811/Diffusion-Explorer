@@ -24,6 +24,8 @@
         sampler,
         isTraining,
         epochValue,
+        distributionVisiblity,
+        intermediateTrainingSamples,
     } from '$lib/state';
     import { 
         trainingObjectiveToModelConfig,
@@ -43,6 +45,7 @@
     // Import helper tf functions
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
     import { callSamplingWorkerThread, callTrainingWorkerThread} from '$lib/diffusion/workers/utils';
+    import Distribution from '$lib/components/display_area/Distribution.svelte';
 
     let trainingInitiated = false; // Flag to check if training has ever been initiated
     let trainingWorker: Worker; // Variable to hold the training worker
@@ -162,8 +165,14 @@
 
     // Add a handler for when training is running
     $ : if ($isTraining) {
-        console.log("Training is running");
         trainingInitiated = true; // Set the flag to true
+        // Hide the source and current distributions
+        distributionVisiblity.set({
+            current: false,
+            source: false,
+            training: true,
+            target: true,
+        });
         // Pause the playing animation
         isPlaying.set(false);
         // Get the model config and class
@@ -192,10 +201,14 @@
                 });
             },
             // Callback for after each epoch
-            (epoch: number, loss: number) => {
+            (epoch: number, intermediateSamples: number[][]) => {
                 // Update the epoch value
                 epochValue.set(epoch);
-                // Update the loss value
+                // Convert the intermediate samples to a tensor
+                if (intermediateSamples != null) {
+                    intermediateSamples = tf.tensor(intermediateSamples);
+                    intermediateTrainingSamples.set(intermediateSamples);
+                } 
                 // lossValue.set(loss);
                 // Update the UI state with the current distribution samples
                 // const pointsTensor = datasetDict[$datasetName];
@@ -207,9 +220,15 @@
     // If training stopped, then stop the training thread
     // Becuase it is stopped by default, we need to check if training was ever initiated by the user
     $: if (!$isTraining && trainingInitiated && trainingWorker) {
-        console.log("Training is stopped");
         // Stop the training thread by posting a "stop_training" message.
         trainingWorker.postMessage({ type: 'stop_training' });
+        // Hide the training distribution and unhide the source and current distributions
+        distributionVisiblity.set({
+            current: true,
+            source: true,
+            training: false,
+            target: true,
+        });
     }
 
 </script>
