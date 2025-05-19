@@ -39,7 +39,7 @@
 
 <style>
     .training-bar-container {
-        height: 100px;
+        height: 120px;
         width: 100%;
         background-color: rgb(243, 243, 243);
         position: relative;
@@ -137,10 +137,43 @@
         /* gap: 8px; */
         row-gap: 0px;
         column-gap: 4px;
+        padding: 10px 0;
     }
 
     :global(.train-button) {
         width: 100px;
+    }
+
+    .dataset-menu-container {
+        display: flex;
+        flex-direction: column;
+        align-items: left;
+        justify-content: center;
+        gap: 8px;
+        padding-bottom: 15px;
+        padding-top: 5px;
+    }
+
+    .dataset-menu-container span {
+        font-family: var(--font-family);
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        color: #777;
+    }
+
+    .mini-distribution-container {
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+        justify-content: left;
+    }
+
+    .brush-mini-distribution {
+        width: 24px;
+        height: 24px;
+        margin-left: 10px;
+        margin-top: 5px;
     }
 
     /* If the screen becomes less than 700 wide then change the flex direction */
@@ -155,13 +188,6 @@
             justify-content: left;
             width: 100%;
             padding: 10px 0;
-        }
-
-        .mini-distribution-container {
-            width: 100%;
-            display: flex;
-            flex-direction: row;
-            justify-content: left;
         }
 
     }
@@ -232,10 +258,17 @@
         </div>
         <div class="menu dataset-menu">
             <h1 class="label">Dataset</h1>
-            <div class="mini-distribution-container">
-                {#each Object.entries(datasetDict) as [name, data]}
-                    <MiniDistribution data={data} distributionId={name} />
-                {/each}
+            <div class="menu-contents dataset-menu-container">
+                <div class="mini-distribution-container">
+                    {#each Object.entries(datasetDict) as [name, data]}
+                        <MiniDistribution data={data} distributionId={name} />
+                    {/each}
+                    <MiniDistribution showBrush={true} data={null} distributionId="brush"/>
+                </div>
+                <span>
+                    <input type="checkbox" id="scales" name="scales" checked />
+                    Use pretrained
+                </span>
             </div>
         </div>
         <div class="training-section-container">

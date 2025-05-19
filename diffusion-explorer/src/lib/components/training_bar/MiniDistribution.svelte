@@ -2,6 +2,7 @@
 <script lang="ts"> 
     import * as d3 from 'd3';
     import * as tf from '@tensorflow/tfjs';
+    import { base } from '$app/paths';
     import {
         datasetName, 
         currentDistributionSamples, 
@@ -13,6 +14,7 @@
     import { miniDistributionSettings } from '$lib/settings';
 
     export let data; // Data to plot
+    export let showBrush = false; // Whether to show the brush
     export let distributionId = "target"; // ID for the distribution canvas
 
     let svgElement: SVGSVGElement; // Create a separate SVG element for each distribution
@@ -88,11 +90,11 @@
         height: var(--mini-distribution-width);
         position: relative;
         /* Rounded corners */
-        border-radius: 5px;
+        border-radius: 3px;
         /* margin-left: 20px; */
     }
 
-    .mini-distribution svg {
+    .mini-distribution svg, img {
         width: 100%;
         height: 100%;
     }
@@ -120,8 +122,12 @@
     class={distributionId === $datasetName ? "mini-distribution active-dataset" : "mini-distribution inactive-dataset"}
     on:click={handleClick}
 >
-    <svg 
-        bind:this={svgElement}
-        id="mini_{distributionId}"
-    ></svg>
+    {#if showBrush}
+        <img src="{base}/StyleIcons/BrushIcon.svg" alt="Brush" />
+    {:else}
+        <svg 
+            bind:this={svgElement}
+            id="mini_{distributionId}"
+        ></svg>
+    {/if}
 </div>

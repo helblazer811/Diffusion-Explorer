@@ -39,7 +39,7 @@ export const trainingObjectiveToSamplers: Record<string, string[]> = {
     ],
     "Diffusion": [
         "DDPM",
-        "DDIM"
+        // "DDIM" // TODO: Implement DDIM
     ]
 };
 
@@ -95,9 +95,9 @@ export const miniDistributionSettings: {
     pointRadius: number;
     pointColor: string;
 } = {
-    width: 35,
-    height: 35,
-    pointRadius: 2,
+    width: 26,
+    height: 26,
+    pointRadius: 1,
     pointColor: "rgba(25, 131, 255, 1.0)"
 };
 

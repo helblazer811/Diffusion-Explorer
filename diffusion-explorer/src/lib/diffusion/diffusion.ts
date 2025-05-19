@@ -43,40 +43,67 @@ export class DiffusionModel extends Model {
      * @param batchSize number of samples to use in each batch
      * @returns Promise<void>
      */
-    async train(data: tf.Tensor2D, iterations = 10000, batchSize = 32): Promise<void> {
+    async train(
+        data: tf.Tensor2D, 
+        epochs = 1000, 
+        batchSize = 32,
+        stopTraining: () => boolean = () => { return false; },
+        endEpochCallback: (epoch: number, intermediateSamples: number[][] | null) => void = () => { },
+        intermediateSampleInterval: number = 50,
+    ): Promise<void> {
         const B = batchSize;
         const N = data.shape[0];
         const optimizer = tf.train.adam(1e-4);
         const mse = (a: tf.Tensor, b: tf.Tensor) => tf.losses.meanSquaredError(a, b);
         const losses: number[] = [];
 
-        for (let i = 0; i < iterations; ++i) {
-            tf.tidy(() => {// Clear memory 
-                // Get random batch of data
-                const idx = tf.randomUniform([B], 0, N, 'int32');
-                const x0 = tf.gather(data, idx);
-                // Sample random gaussian noise
-                const noise = tf.randomNormal(x0.shape as [number, number]);
-                // Sample a random timestep t
-                const tInt = tf.randomUniform([B], 0, this.T, 'int32');
-                // Add noise to x0
-                const x_t = this.addNoise(x0, noise, tInt);
-                // Run the optimizer
-                optimizer.minimize(() => {
-                    // Get the model prediction
-                    const eps = this.forward(x_t, tInt);
-                    // Compute the loss
-                    const loss = mse(noise, eps);
-                    // Store the losses
-                    losses.push(loss.dataSync()[0]);
+        for (let epoch = 0; epoch < epochs; ++epoch) {
+            for (let i = 0; i < Math.floor(data.shape[0] / batchSize); i++) {
+                tf.tidy(() => {// Clear memory 
+                    // Get random batch of data
+                    const idx = tf.randomUniform([B], 0, N, 'int32');
+                    const x0 = tf.gather(data, idx);
+                    // Sample random gaussian noise
+                    const noise = tf.randomNormal(x0.shape as [number, number]);
+                    // Sample a random timestep t
+                    const tInt = tf.randomUniform([B], 0, this.T, 'int32');
+                    // Add noise to x0
+                    const x_t = this.addNoise(x0, noise, tInt);
+                    // Run the optimizer
+                    optimizer.minimize(() => {
+                        // Get the model prediction
+                        const eps = this.forward(x_t, tInt);
+                        // Compute the loss
+                        const loss = mse(noise, eps);
+                        // Store the losses
+                        losses.push(loss.dataSync()[0]);
 
-                    return loss;
+                        return loss;
+                    });
                 });
-            });
-
-            if (i % 1000 === 0) {
-                const avgLoss = losses.slice(-100).reduce((a, b) => a + b, 0) / 100;
-                console.log(`Iteration ${i}, Loss: ${avgLoss}`);
+            }
+            // Run intermediate sampling
+            let intermediateSamples = null;
+            if (epoch % intermediateSampleInterval === 0) {
+                // Sample from the model
+                // TODO put these in the settings
+                const allTimeSamples = this.sample(
+                    500, // number of samples
+                    100 // number of steps
+                ); // shape [num_total_steps, num_samples, dim]
+                // Pull out the last time step
+                const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0); // shape [num_samples, dim]
+                intermediateSamples = lastTimeStep.arraySync();
+            }
+            // Run the end epoch callback
+            // TODO: add the loss
+            endEpochCallback(epoch, intermediateSamples);
+            // Yield control to the worker event loop to handle stop events
+            await tf.nextFrame();
+            // Check if the training should continue
+            if (stopTraining()) {
+                console.log("Training stopped by user.");
+                break;
             }
         }
     }
