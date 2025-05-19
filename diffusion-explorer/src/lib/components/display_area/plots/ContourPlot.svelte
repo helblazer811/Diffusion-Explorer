@@ -133,11 +133,11 @@
             .attr("stroke-opacity", opacity)
             .attr("fill-opacity", opacity)
             .attr("mix-blend-mode", "screen")
-
     }
-
+    
     // If the data points change then replot
     $: if (data && svgElement && $screenWidth && isActive) {
+        console.log("Plotting contour for distribution: ", distributionId);
         plotContour(data, time, opacity, distributionId);
         if (label) {
             const xLocation = time * (interfaceSettings.displayAreaWidth - interfaceSettings.distributionWidth) + (interfaceSettings.distributionWidth / 2);

@@ -54,6 +54,12 @@ export const pretrainedModelPaths: Record<string, Record<string, string>> = {
     }
 };
 
+export const cachedSamplesPaths: Record<string, Record<string, string>> = {
+    "Flow Matching": {
+        "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face.json",
+    },
+}
+
 export const trainingObjectiveToModelClass: Record<string, any> = {
     "Flow Matching": FlowModel,
     "Diffusion": DiffusionModel

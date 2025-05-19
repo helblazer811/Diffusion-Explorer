@@ -8,7 +8,8 @@
         currentDistributionSamples, 
         allTimeSamples,
         currentTime,
-        isPlaying
+        isPlaying,
+        isEditing
     } from '$lib/state';
 
     import { miniDistributionSettings } from '$lib/settings';
@@ -23,15 +24,29 @@
         if (distributionId === $datasetName) {
             return; // Don't do anything if the same dataset is clicked
         }
-        // Change this dataset to be the current one
-        datasetName.set(distributionId);
-        // Empty out the current Distribution samples and the all time samples
-        currentDistributionSamples.set(tf.tensor([]));
-        allTimeSamples.set(tf.tensor([]));
-        // Set time to zero 
-        currentTime.set(0);
-        // Pause the animation
-        isPlaying.set(false);
+        // Handle if it was the brush that was clicked
+        if (showBrush) {
+            // Change the dataset name to be the current one
+            datasetName.set(distributionId);
+            // Pause the animation from playing
+            isPlaying.set(false);
+            // Turn on the editing mode
+            isEditing.set(true);
+        } else {
+            if ($isEditing) {
+                // If the brush was not clicked, then turn off the editing mode
+                isEditing.set(false);
+            }
+            // Change this dataset to be the current one
+            datasetName.set(distributionId);
+            // Empty out the current Distribution samples and the all time samples
+            currentDistributionSamples.set(tf.tensor([]));
+            allTimeSamples.set(tf.tensor([]));
+            // Set time to zero 
+            currentTime.set(0);
+            // Pause the animation
+            isPlaying.set(false);
+        }
     }
 
     async function plotPoints(

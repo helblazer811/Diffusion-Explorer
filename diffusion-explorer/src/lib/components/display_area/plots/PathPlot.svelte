@@ -9,7 +9,7 @@
     import { interfaceSettings, pretrainedModelPaths, trainingObjectiveToModelConfig } from '$lib/settings';
     // Import utils
     import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
-    import { callSamplingWorkerThreadFromInitialPoints } from '$lib/diffusion/workers/utils';
+    import { callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/utils';
 
     export let isActive: boolean = true; // Flag to indicate if the plot is active
     export let isEnabled: boolean = true; // Flag to indicate if the plot is enabled
@@ -151,15 +151,16 @@
     async function runSampling(
         currentDatasetName: string,
         currentTrainingObjective: string,
-        initialPoints: number[][],
+        gridResolution: number,
     ) {
         // NOTE: Moved this out here to avoid unwanted re-runs from the $: block
         // Now call the sampling web worker
-        callSamplingWorkerThreadFromInitialPoints(
+        callSamplingWorkerThreadGrid(
             base + pretrainedModelPaths[currentTrainingObjective][currentDatasetName],
             currentTrainingObjective,
             trainingObjectiveToModelConfig[currentTrainingObjective],
-            initialPoints,
+            gridResolution,
+            get(domainRange),
             get(numberOfSteps),
             (allSamples: number[][]) => {
                 // allSamples: [time, x * y, 2]
@@ -253,26 +254,12 @@
     }
 
     // If the dataset name or trainingObjective changes, re-run the sampling
-    $ : if ($datasetName && $trainingObjective) {
-        // Run sampling for a uniform grid of points
-        const currentDatasetName = $datasetName;
-        const currentTrainingObjective = $trainingObjective;
-        // First uniformly sample the x and y coordinates
-        const width = get(domainRange).xMax - get(domainRange).xMin;
-        const height = get(domainRange).yMax - get(domainRange).yMin;
-        // Make range of data bit wider
-        const xMin = get(domainRange).xMin + 0.0 * width;
-        const xMax = get(domainRange).xMax - 0.0 * width;
-        const yMin = get(domainRange).yMin + 0.0 * height;
-        const yMax = get(domainRange).yMax - 0.0 * height;
-        const x = tf.linspace(xMin, xMax, gridResolution);
-        const y = tf.linspace(yMin, yMax, gridResolution);
-        let initialPoints: tf.Tensor = tf.stack(tf.meshgrid(x, y), 2);
-        initialPoints = initialPoints.reshape([gridResolution * gridResolution, 2]); // Flatten the points to be [gridResolution * gridResolution, 2]
-        // Sync the points, converting to a 2D array
-        initialPoints = initialPoints.arraySync() as number[][];
-        // Now call the sampling web worker
-        runSampling(currentDatasetName, currentTrainingObjective, initialPoints);
+    $ : if ($datasetName && $trainingObjective && $datasetName != "brush") {
+        runSampling(
+            $datasetName,
+            $trainingObjective,
+            gridResolution
+        );
     }
 
     // If the data points change then replot

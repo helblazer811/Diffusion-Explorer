@@ -36,6 +36,7 @@
         trainingConfig,
         pretrainedModelPaths,
         trainingObjectiveToSamplers,
+        cachedSamplesPaths,
     } from '$lib/settings';
     // Load up the components
     import TitleBar from '$lib/components/TitleBar.svelte';
@@ -46,7 +47,6 @@
     // Import helper tf functions
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
     import { callSamplingWorkerThread, callTrainingWorkerThread} from '$lib/diffusion/workers/utils';
-    import Distribution from '$lib/components/display_area/Distribution.svelte';
 
     let trainingInitiated = false; // Flag to check if training has ever been initiated
     let trainingWorker: Worker; // Variable to hold the training worker
@@ -70,6 +70,19 @@
             // Toggle the play/pause state
             isPlaying.update(state => !state);
         }
+    }
+
+    function downloadJSON(data, filename = 'data.json') {
+        const jsonStr = JSON.stringify(data, null, 2); // pretty-print
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+
+        URL.revokeObjectURL(url); // Clean up
     }
 
     onMount(async () => {
@@ -110,6 +123,7 @@
         datasetDict[$datasetName] &&
         typeof window !== 'undefined' // Makes sure this is not run on the server
     ) {
+        console.log("Loading dataset: ", $datasetName);
         // Check that there is a trained model for the given dataset
         if (!pretrainedModelPaths[$trainingObjective][$datasetName]) {
             console.error(`No pretrained model found for ${$trainingObjective} on ${$datasetName}`);
@@ -128,40 +142,62 @@
         targetDistributionSamples.set(pointsTensor);
         // Immediately remove the currentDistributionSamples
         currentDistributionSamples.set(tf.zeros([0, 2]));
-        // Load up the model corresponding to the dataset
-        const defaultTrainingObjective = $trainingObjective;
-        const defaultModelPath = base + pretrainedModelPaths[$trainingObjective][$datasetName];
-        // Regenerate all of the samples 
-        callSamplingWorkerThread(
-            defaultModelPath,
-            defaultTrainingObjective,
-            trainingObjectiveToModelConfig[defaultTrainingObjective],
-            get(numSamples),
-            get(numberOfSteps),
-            (allSamples) => {
-                // Convert all samples to tf tensor
-                allSamples = tf.tensor(allSamples);
-                // Update the UI state with the all time samples
-                allTimeSamples.set(allSamples);
-                // Compute the range of the points to use for the domain of each contour map
-                let flatAllTimeSamples = tf.reshape(allSamples, [get(numSamples) * get(numberOfSteps), 2]); // shape [num_time_steps * num_samples, dim]
-                flatAllTimeSamples = flatAllTimeSamples.arraySync();
-                const xMin = d3.min(flatAllTimeSamples, d => d[0]);
-                const xMax = d3.max(flatAllTimeSamples, d => d[0]);
-                const yMin = d3.min(flatAllTimeSamples, d => d[1]);
-                const yMax = d3.max(flatAllTimeSamples, d => d[1]);
-                const localDomainRange = {
-                    xMin: xMin - 0.08 * (xMax - xMin),
-                    xMax: xMax + 0.08 * (xMax - xMin),
-                    yMin: yMin - 0.08 * (yMax - yMin),
-                    yMax: yMax + 0.08 * (yMax - yMin),
-                };
-                // TODO fix this logic
-                // domainRange.set(localDomainRange);
-                // Make the UI state play
-                isPlaying.set(true);
-            }
-        )
+        // Check if there are cached samples for the given dataset and model
+        if (cachedSamplesPaths[$trainingObjective][$datasetName]) {
+            // Load the cached samples
+            // concole log time when start loading
+            console.time("Loading cached samples");
+            const cachedSamplesPath = base + cachedSamplesPaths[$trainingObjective][$datasetName];
+            fetch(cachedSamplesPath)
+                .then(response => response.json())
+                .then(data => {
+                    // Convert the data to a tensor
+                    const pointsTensor = tf.tensor(data);
+                    // Update the UI state with the cached samples
+                    allTimeSamples.set(pointsTensor);
+                    // Start playing
+                    isPlaying.set(true);
+                    // console log time when done loading
+                    console.timeEnd("Loading cached samples");
+                });
+        } else {
+            // Load up the model corresponding to the dataset
+            const defaultTrainingObjective = $trainingObjective;
+            const defaultModelPath = base + pretrainedModelPaths[$trainingObjective][$datasetName];
+            // Regenerate all of the samples 
+            callSamplingWorkerThread(
+                defaultModelPath,
+                defaultTrainingObjective,
+                trainingObjectiveToModelConfig[defaultTrainingObjective],
+                get(numSamples),
+                get(numberOfSteps),
+                (allSamples) => {
+                    // Convert all samples to tf tensor
+                    allSamples = tf.tensor(allSamples);
+                    // Update the UI state with the all time samples
+                    allTimeSamples.set(allSamples);
+                    // Compute the range of the points to use for the domain of each contour map
+                    // let flatAllTimeSamples = tf.reshape(allSamples, [get(numSamples) * get(numberOfSteps), 2]); // shape [num_time_steps * num_samples, dim]
+                    // flatAllTimeSamples = flatAllTimeSamples.arraySync();
+                    // const xMin = d3.min(flatAllTimeSamples, d => d[0]);
+                    // const xMax = d3.max(flatAllTimeSamples, d => d[0]);
+                    // const yMin = d3.min(flatAllTimeSamples, d => d[1]);
+                    // const yMax = d3.max(flatAllTimeSamples, d => d[1]);
+                    // const localDomainRange = {
+                    //     xMin: xMin - 0.08 * (xMax - xMin),
+                    //     xMax: xMax + 0.08 * (xMax - xMin),
+                    //     yMin: yMin - 0.08 * (yMax - yMin),
+                    //     yMax: yMax + 0.08 * (yMax - yMin),
+                    // };
+                    // TODO fix this logic
+                    // domainRange.set(localDomainRange);
+                    // Make the UI state play
+                    isPlaying.set(true);
+                    // Download the samples as json 
+                    downloadJSON(allSamples.arraySync(), `${$datasetName}_${$trainingObjective}_samples.json`);
+                }
+            )
+        }
     }
 
     // Add a handler for when training is running

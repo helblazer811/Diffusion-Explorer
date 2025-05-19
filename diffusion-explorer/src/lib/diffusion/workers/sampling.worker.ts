@@ -69,5 +69,33 @@ self.onmessage = async (e) => {
             type: 'result', 
             allSamples: allSamplesArray,
         });
+    } else if (type === "sample_grid") {
+        // Sample a uniform grid of the given gridResolution and then sample from those initial points
+        const gridResolution = data.gridResolution;
+        const domainRange = data.domainRange;
+        // First uniformly sample the x and y coordinates
+        const width = domainRange.xMax - domainRange.xMin;
+        const height = domainRange.yMax - domainRange.yMin;
+        // Make range of data bit wider
+        const xMin = domainRange.xMin + 0.0 * width;
+        const xMax = domainRange.xMax - 0.0 * width;
+        const yMin = domainRange.yMin + 0.0 * height;
+        const yMax = domainRange.yMax - 0.0 * height;
+        const x = tf.linspace(xMin, xMax, gridResolution);
+        const y = tf.linspace(yMin, yMax, gridResolution);
+        let initialPoints: tf.Tensor = tf.stack(tf.meshgrid(x, y), 2);
+        initialPoints = initialPoints.reshape([gridResolution * gridResolution, 2]); // Flatten the points to be [gridResolution * gridResolution, 2]
+        // Call the sample_from_initial_points function
+        const allSamples = ourModel.sample_from_initial_points(
+            initialPoints,
+            numberOfSteps,
+        ); // shape [num_time_steps, num_samples, dim]
+        // Convert the tensor to a 2D array
+        const allSamplesArray = allSamples.arraySync();
+        // Return the result to the main thread
+        self.postMessage({ 
+            type: 'result', 
+            allSamples: allSamplesArray,
+        });
     }
 };

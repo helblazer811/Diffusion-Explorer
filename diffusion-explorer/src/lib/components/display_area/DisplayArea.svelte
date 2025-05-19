@@ -10,13 +10,15 @@
         activePlotTypes,
         numberOfSteps,
         distributionVisiblity,
-        intermediateTrainingSamples
+        intermediateTrainingSamples,
+        isEditing,
     } from '$lib/state';
 
     import { interfaceSettings } from '$lib/settings';
 
     // Import components
     import Distribution from '$lib/components/display_area/Distribution.svelte';
+    import DistributionEditWindow from './DistributionEditWindow.svelte';
 
     let sharedSVGElement: SVGSVGElement; // Shared SVG element for all distributions
 
@@ -116,5 +118,9 @@
                 activePlotTypes={["Contour"]}
             />
         {/if}
+        <DistributionEditWindow
+            svgElement={sharedSVGElement}
+            active={$isEditing}
+        />
     </svg>
 </div>

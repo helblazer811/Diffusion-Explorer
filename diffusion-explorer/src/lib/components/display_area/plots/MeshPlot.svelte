@@ -101,7 +101,8 @@
     // });
 
     // If the dataset name changes, re-run the sampling
-    $ : if ($datasetName) {
+    // Don't do anything if the dataset name changed to "brush", a reserved name
+    $ : if ($datasetName && $datasetName != "brush") {
         // Run sampling for a uniform grid of points
         // First uniformly sample the x and y coordinates
         const width = $domainRange.xMax - $domainRange.xMin;

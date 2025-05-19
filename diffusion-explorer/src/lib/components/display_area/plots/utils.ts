@@ -24,3 +24,26 @@ export function convertDataToDisplayCoordinateFrame(
 
     return translatedData;
 }
+
+export function convertDisplayCoordinateFrameToData(
+    displayData: number[][],
+    time: number,
+    distributionWidth: number,
+    displayAreaWidth: number,
+    domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
+){
+    // 1. Translate the data to the abstract coordinate frame
+    const xLocation = time * (displayAreaWidth - distributionWidth);
+    const translatedData = displayData.map(d => [d[0] - xLocation, d[1]]);
+    // 2. Scale from the svg viewbox coordinate frame to the abstract coordinate frame
+    const xScale = d3.scaleLinear()
+        .domain([0, distributionWidth])
+        .range([domainRange.xMin, domainRange.xMax]);
+    const yScale = d3.scaleLinear()
+        .domain([0, distributionWidth])
+        .range([domainRange.yMin, domainRange.yMax]);
+    // 3. Apply the scale to the data
+    const scaledData = translatedData.map(d => [xScale(d[0]), yScale(d[1])]);
+
+    return scaledData;
+}

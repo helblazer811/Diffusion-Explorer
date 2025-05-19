@@ -20,8 +20,6 @@ export const distributionVisiblity = writable({
 export const allTimeSamples = writable(undefined);
 export const model = writable(null);
 export const currentTime = writable(0);
-export const isPlaying = writable(false);
-export const isTraining = writable(false);
 export const playbackSpeed = writable(30);
 export const domainRange = writable({
     xMin: -3.0,
@@ -33,3 +31,7 @@ export const activePlotTypes = writable(
     settings.trainingObjectiveToDisplayOptions[get(trainingObjective)]["Default Plot Types"]
 );
 export const cachedModelPaths = writable({}); // Cache for models
+// TODO: perhaps package these into mutually exclusive page states, rather than independent stores
+export const isPlaying = writable(false);
+export const isTraining = writable(false);
+export const isEditing = writable(false);
