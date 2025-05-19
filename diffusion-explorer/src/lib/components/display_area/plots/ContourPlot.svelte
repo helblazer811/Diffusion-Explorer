@@ -2,7 +2,6 @@
 <script lang="ts">
     import * as d3 from 'd3';
 
-    import { domainRange } from '$lib/state';
     import { screenWidth } from '$lib/screen';
     import { contourPlotSettings, interfaceSettings } from '$lib/settings';
     // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';

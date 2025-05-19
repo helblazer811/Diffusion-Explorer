@@ -1,5 +1,4 @@
 import * as d3 from 'd3';
-import * as tf from '@tensorflow/tfjs';
 
 export function convertDataToDisplayCoordinateFrame(
     data: number[][], // shape: [N, 2]

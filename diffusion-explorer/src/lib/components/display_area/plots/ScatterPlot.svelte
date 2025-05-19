@@ -3,8 +3,7 @@
     import * as d3 from 'd3';
     import * as tf from '@tensorflow/tfjs';
 
-    import { domainRange } from '$lib/state';
-    import { scatterPlotSettings, interfaceSettings } from '$lib/settings';
+    import { scatterPlotSettings, interfaceSettings, domainRange } from '$lib/settings';
     import { screenWidth } from '$lib/screen';
     // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 

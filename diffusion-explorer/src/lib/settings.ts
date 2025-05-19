@@ -123,6 +123,18 @@ export const interfaceSettings: {
     displayAreaHeight: 500,
 };
 
+export const domainRange: {
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+} = {
+    xMin: -3.0,
+    xMax: 3.0,
+    yMin: -3.0,
+    yMax: 3.0,
+};
+
 /* Styling for the various plots */
 
 export const contourPlotSettings: {

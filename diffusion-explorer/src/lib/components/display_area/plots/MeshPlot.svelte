@@ -6,7 +6,6 @@
     import { get } from 'svelte/store';
 
     import { 
-        domainRange, 
         trainingObjective,
         datasetName,
         numberOfSteps,
@@ -16,6 +15,7 @@
         interfaceSettings,
         pretrainedModelPaths,
         trainingObjectiveToModelConfig,
+        domainRange, 
     } from '$lib/settings';
 
     // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
@@ -125,7 +125,7 @@
             trainingObjectiveToModelConfig[$trainingObjective],
             gridResolution,
             $numberOfSteps,
-            get(domainRange),
+            domainRange,
             interfaceSettings.distributionWidth,
             interfaceSettings.displayAreaWidth,
             (allSamples: number[][]) => {

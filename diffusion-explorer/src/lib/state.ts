@@ -21,12 +21,6 @@ export const allTimeSamples = writable(undefined);
 export const model = writable(null);
 export const currentTime = writable(0);
 export const playbackSpeed = writable(30);
-export const domainRange = writable({
-    xMin: -3.0,
-    xMax: 3.0,
-    yMin: -3.0,
-    yMax: 3.0,
-});
 export const activePlotTypes = writable(
     settings.trainingObjectiveToDisplayOptions[get(trainingObjective)]["Default Plot Types"]
 );

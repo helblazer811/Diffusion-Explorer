@@ -3,8 +3,8 @@
     import * as tf from '@tensorflow/tfjs';
     import * as d3 from 'd3';
 
-    import { interfaceSettings } from '$lib/settings';
-    import { targetDistributionSamples, domainRange, isEditing } from '$lib/state';
+    import { interfaceSettings, domainRange } from '$lib/settings';
+    import { targetDistributionSamples, isEditing } from '$lib/state';
     import { convertDisplayCoordinateFrameToData } from '$lib/components/display_area/plots/utils';
 
     // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
@@ -72,7 +72,7 @@
                             time,
                             interfaceSettings.distributionWidth,
                             interfaceSettings.displayAreaWidth,
-                            get(domainRange)
+                            domainRange
                         );
                         targetDistributionSamples.update(samples => {
                             return tf.concat([samples, rescaledData], 0);

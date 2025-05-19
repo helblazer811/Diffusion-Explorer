@@ -5,8 +5,13 @@
     import { get } from 'svelte/store';
     import { base } from '$app/paths';
     // Import state and settings
-    import { datasetName, domainRange, trainingObjective, numberOfSteps } from '$lib/state';
-    import { interfaceSettings, pretrainedModelPaths, trainingObjectiveToModelConfig } from '$lib/settings';
+    import { datasetName, trainingObjective, numberOfSteps } from '$lib/state';
+    import { 
+        interfaceSettings, 
+        pretrainedModelPaths, 
+        trainingObjectiveToModelConfig, 
+        domainRange 
+    } from '$lib/settings';
     // Import utils
     // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
     import { callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/utils';
@@ -161,7 +166,7 @@
             trainingObjectiveToModelConfig[currentTrainingObjective],
             gridResolution,
             get(numberOfSteps),
-            get(domainRange),
+            domainRange,
             interfaceSettings.distributionWidth,
             interfaceSettings.displayAreaWidth,
             (allSamples: number[][][]) => {

@@ -3,13 +3,9 @@
     // import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
     // setWasmPaths('/tfjs-backend-wasm/');
     // import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
-
-    import {base} from '$app/paths';
-
-    import * as d3 from 'd3';
-
-    import { onMount, onDestroy} from 'svelte';
     import { get } from 'svelte/store';
+    import { onMount, onDestroy} from 'svelte';
+    import {base} from '$app/paths';
     // Load up the application config
     import { 
         sourceDistributionSamples,
@@ -28,7 +24,6 @@
         intermediateTrainingSamples,
         currentTime,
         cachedModelPaths,
-        domainRange
     } from '$lib/state';
     import { 
         trainingObjectiveToModelConfig,
@@ -39,6 +34,7 @@
         trainingObjectiveToSamplers,
         cachedSamplesPaths,
         interfaceSettings,
+        domainRange
     } from '$lib/settings';
     // Load up the components
     import TitleBar from '$lib/components/TitleBar.svelte';
@@ -108,7 +104,7 @@
             1.0, // Time of target distribution
             interfaceSettings.distributionWidth,
             interfaceSettings.displayAreaWidth,
-            get(domainRange)
+            domainRange
         );
         // Update the UI state with the training dataset
         targetDistributionSamples.set(translatedData);
@@ -126,7 +122,7 @@
             0.0, // Time of source distribution
             interfaceSettings.distributionWidth,
             interfaceSettings.displayAreaWidth,
-            get(domainRange)
+            domainRange
         );
         // Update the UI state with the source distribution samples
         sourceDistributionSamples.set(translatedSamples);
@@ -165,7 +161,7 @@
             1.0, // Time of target distribution
             interfaceSettings.distributionWidth,
             interfaceSettings.displayAreaWidth,
-            get(domainRange)
+            domainRange
         );
         // Update the UI state with the training dataset
         targetDistributionSamples.set(translatedData);
@@ -190,14 +186,13 @@
             const defaultTrainingObjective = $trainingObjective;
             const defaultModelPath = base + pretrainedModelPaths[$trainingObjective][$datasetName];
             // Regenerate all of the samples 
-            console.log("Calling sampling worker thread");
             callSamplingWorkerThread(
                 defaultModelPath,
                 defaultTrainingObjective,
                 trainingObjectiveToModelConfig[defaultTrainingObjective],
                 get(numSamples),
                 get(numberOfSteps),
-                get(domainRange),
+                domainRange,
                 interfaceSettings.distributionWidth,
                 interfaceSettings.displayAreaWidth,
                 // Callback for when the sampling is done
