@@ -54,7 +54,7 @@
             .attr('rx', 5) // Rounded corners
             .attr('ry', 5);
 
-            let isDrawing = false;
+        let isDrawing = false;
 
         groupD3Element.on('mousedown', function (event) {
             const [x, y] = d3.pointer(event);

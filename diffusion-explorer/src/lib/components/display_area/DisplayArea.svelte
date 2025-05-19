@@ -31,7 +31,8 @@
             currentTimeIndex = $numberOfSteps - 1;
         }
         // Pull out the current time samples from the all time samples
-        const currentSamples = tf.tidy(() => $allTimeSamples.gather(currentTimeIndex));
+        const currentSamples = $allTimeSamples[currentTimeIndex];
+        // const currentSamples = tf.tidy(() => $allTimeSamples.gather(currentTimeIndex));
         // Update the current distribution samples in the UI state
         currentDistributionSamples.set(currentSamples);
     }

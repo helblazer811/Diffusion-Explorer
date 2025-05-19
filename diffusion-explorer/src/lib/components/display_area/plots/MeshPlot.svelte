@@ -3,8 +3,8 @@
     import * as d3 from 'd3';
 
     import { base } from '$app/paths';
+    import { get } from 'svelte/store';
 
-    import { onMount } from 'svelte';
     import { 
         domainRange, 
         trainingObjective,
@@ -18,8 +18,8 @@
         trainingObjectiveToModelConfig,
     } from '$lib/settings';
 
-    import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
-    import { callSamplingWorkerThread, callSamplingWorkerThreadFromInitialPoints } from '$lib/diffusion/workers/utils';
+    // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
+    import { callSamplingWorkerThread, callSamplingWorkerThreadFromInitialPoints, callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/utils';
 
     export let svgElement; // Shared SVG element for all distributions
     export let isActive: boolean = false; // Flag to indicate if the plot is active
@@ -41,18 +41,18 @@
         let data = trajectoryGrid[stepIndex];
         // Convert data to display coordinates
         // NOTE: This is jancky af, but it works
-        data = tf.tensor(data);
-        data = data.reshape([gridResolution * gridResolution, 2]);
-        data = convertDataToDisplayCoordinateFrame(
-            data, 
-            time, 
-            interfaceSettings.distributionWidth, 
-            interfaceSettings.displayAreaWidth, 
-            $domainRange
-        );
-        data = tf.tensor(data);
-        data = data.reshape([gridResolution, gridResolution, 2]);
-        data = data.arraySync() as number[][][];
+        // data = tf.tensor(data);
+        // data = data.reshape([gridResolution * gridResolution, 2]);
+        // // data = convertDataToDisplayCoordinateFrame(
+        // //     data, 
+        // //     time, 
+        // //     interfaceSettings.distributionWidth, 
+        // //     interfaceSettings.displayAreaWidth, 
+        // //     $domainRange
+        // // );
+        // data = tf.tensor(data);
+        // data = data.reshape([gridResolution, gridResolution, 2]);
+        // data = data.arraySync() as number[][][];
 
         const svg = d3.select(svgElement);
 
@@ -103,28 +103,31 @@
     // If the dataset name changes, re-run the sampling
     // Don't do anything if the dataset name changed to "brush", a reserved name
     $ : if ($datasetName && $datasetName != "brush") {
-        // Run sampling for a uniform grid of points
-        // First uniformly sample the x and y coordinates
-        const width = $domainRange.xMax - $domainRange.xMin;
-        const height = $domainRange.yMax - $domainRange.yMin;
-        // Make range of data bit wider
-        const xMin = $domainRange.xMin + 0.1 * width;
-        const xMax = $domainRange.xMax - 0.1 * width;
-        const yMin = $domainRange.yMin + 0.1 * height;
-        const yMax = $domainRange.yMax - 0.1 * height;
-        const x = tf.linspace(xMin, xMax, gridResolution);
-        const y = tf.linspace(yMin, yMax, gridResolution);
-        let initialPoints: tf.Tensor = tf.stack(tf.meshgrid(x, y), 2);
-        initialPoints = initialPoints.reshape([gridResolution * gridResolution, 2]); // Flatten the points to be [gridResolution * gridResolution, 2]
-        // Sync the points, converting to a 2D array
-        initialPoints = initialPoints.arraySync() as number[][];
+        // // Run sampling for a uniform grid of points
+        // // First uniformly sample the x and y coordinates
+        // const width = $domainRange.xMax - $domainRange.xMin;
+        // const height = $domainRange.yMax - $domainRange.yMin;
+        // // Make range of data bit wider
+        // const xMin = $domainRange.xMin + 0.1 * width;
+        // const xMax = $domainRange.xMax - 0.1 * width;
+        // const yMin = $domainRange.yMin + 0.1 * height;
+        // const yMax = $domainRange.yMax - 0.1 * height;
+        // const x = tf.linspace(xMin, xMax, gridResolution);
+        // const y = tf.linspace(yMin, yMax, gridResolution);
+        // let initialPoints: tf.Tensor = tf.stack(tf.meshgrid(x, y), 2);
+        // initialPoints = initialPoints.reshape([gridResolution * gridResolution, 2]); // Flatten the points to be [gridResolution * gridResolution, 2]
+        // // Sync the points, converting to a 2D array
+        // initialPoints = initialPoints.arraySync() as number[][];
         // Now call the sampling web worker
-        callSamplingWorkerThreadFromInitialPoints(
+        callSamplingWorkerThreadGrid(
             base + pretrainedModelPaths[$trainingObjective][$datasetName],
             $trainingObjective,
             trainingObjectiveToModelConfig[$trainingObjective],
-            initialPoints,
+            gridResolution,
             $numberOfSteps,
+            get(domainRange),
+            interfaceSettings.distributionWidth,
+            interfaceSettings.displayAreaWidth,
             (allSamples: number[][]) => {
                 let allSamplesTensor = tf.tensor(allSamples);
                 // Reshape the samples to be [time, x, y, 2]

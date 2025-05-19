@@ -8,7 +8,7 @@
     import { datasetName, domainRange, trainingObjective, numberOfSteps } from '$lib/state';
     import { interfaceSettings, pretrainedModelPaths, trainingObjectiveToModelConfig } from '$lib/settings';
     // Import utils
-    import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
+    // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
     import { callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/utils';
 
     export let isActive: boolean = true; // Flag to indicate if the plot is active
@@ -160,30 +160,49 @@
             currentTrainingObjective,
             trainingObjectiveToModelConfig[currentTrainingObjective],
             gridResolution,
-            get(domainRange),
             get(numberOfSteps),
-            (allSamples: number[][]) => {
+            get(domainRange),
+            interfaceSettings.distributionWidth,
+            interfaceSettings.displayAreaWidth,
+            (allSamples: number[][][]) => {
+                // allSamples: [time, x * y, 2]
+                // Reshape so it is [x * y, time, 2]
+                const T = allSamples.length;
+                const N = allSamples[0].length;
+
+                const result = Array.from({ length: N }, () =>
+                    Array.from({ length: T }, () => [0, 0])
+                );
+
+                for (let t = 0; t < T; t++) {
+                    for (let n = 0; n < N; n++) {
+                        result[n][t] = allSamples[t][n];
+                    }
+                }
+
+                trajectories = result; // Save the samples to the trajectory grid
+
                 // allSamples: [time, x * y, 2]
                 // Normalize the trajectories so they fit correclty in the display area
-                let trajectoriesNormalized = [];
-                for (let t = 0; t < allSamples.length; t++) {
-                    const pointsAtTimeT = allSamples[t]; // Get the points at time t
-                    // Convert the data to a tensor
-                    const pointsAtTimeTTensor = tf.tensor(pointsAtTimeT);
-                    // console.log(allTimeSamples.shape);
-                    const trajectoryNormalized = convertDataToDisplayCoordinateFrame(
-                        pointsAtTimeTTensor, 
-                        t / allSamples.length, // Normalize the time
-                        interfaceSettings.distributionWidth, 
-                        interfaceSettings.displayAreaWidth, 
-                        get(domainRange)
-                    );
-                    trajectoriesNormalized.push(trajectoryNormalized);
-                }
-                trajectories = tf.stack(trajectoriesNormalized);
-                // Transpose trajecotries form [time, x * y, 2] to [x * y, time, 2]
-                trajectories = tf.transpose(trajectories, [1, 0, 2]);
-                trajectories = trajectories.arraySync() as number[][]; // Convert to a 2D array
+                // let trajectoriesNormalized = [];
+                // for (let t = 0; t < allSamples.length; t++) {
+                //     const pointsAtTimeT = allSamples[t]; // Get the points at time t
+                //     // Convert the data to a tensor
+                //     // const pointsAtTimeTTensor = tf.tensor(pointsAtTimeT);
+                //     // console.log(allTimeSamples.shape);
+                //     // const trajectoryNormalized = convertDataToDisplayCoordinateFrame(
+                //     //     pointsAtTimeTTensor, 
+                //     //     t / allSamples.length, // Normalize the time
+                //     //     interfaceSettings.distributionWidth, 
+                //     //     interfaceSettings.displayAreaWidth, 
+                //     //     get(domainRange)
+                //     // );
+                //     trajectoriesNormalized.push(pointsAtTimeT);
+                // }
+                // trajectories = tf.stack(trajectoriesNormalized);
+                // // Transpose trajecotries form [time, x * y, 2] to [x * y, time, 2]
+                // trajectories = tf.transpose(trajectories, [1, 0, 2]);
+                // trajectories = trajectories.arraySync() as number[][]; // Convert to a 2D array
             }
         )
     }

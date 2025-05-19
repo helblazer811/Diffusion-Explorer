@@ -54,9 +54,9 @@
         distributionId: string = "target", // ID for the distribution canvas
     ){
         // Replace distributionId spaces with underscores
-        const replacedDistributionId = distributionId.replace(/\s+/g, '_');
+        // const replacedDistributionId = distributionId.replace(/\s+/g, '_');
         // Convert data to plain 2d array
-        data = await data.arraySync() as number[][];
+        // data = await data.arraySync() as number[][];
         // Comptue the range of the data
         let xMin = d3.min(data, d => d[0]);
         let xMax = d3.max(data, d => d[0]);

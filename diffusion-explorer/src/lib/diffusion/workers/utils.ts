@@ -5,6 +5,9 @@ export function callSamplingWorkerThread(
     modelConfig: object,
     numSamples: number,
     numberOfSteps: number,
+    domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
+    distributionWidth: number,
+    displayAreaWidth: number,
     callback: Function,
 ) {
     // Create the worker
@@ -34,6 +37,9 @@ export function callSamplingWorkerThread(
             modelConfig: modelConfig,
             numSamples: numSamples,
             numberOfSteps: numberOfSteps,
+            domainRange: domainRange,
+            distributionWidth: distributionWidth,
+            displayAreaWidth: displayAreaWidth,
         }
     });
 }
@@ -44,6 +50,9 @@ export function callSamplingWorkerThreadFromInitialPoints(
     modelConfig: object,
     initialPoints: number[][],
     numberOfSteps: number,
+    domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
+    distributionWidth: number,
+    displayAreaWidth: number,
     callback: Function,
 ) {
     // Create the worker
@@ -73,6 +82,9 @@ export function callSamplingWorkerThreadFromInitialPoints(
             modelConfig: modelConfig,
             initialPoints: initialPoints,
             numberOfSteps: numberOfSteps,
+            domainRange: domainRange,
+            distributionWidth: distributionWidth,
+            displayAreaWidth: displayAreaWidth,
         }
     });
 }
@@ -82,8 +94,10 @@ export function callSamplingWorkerThreadGrid(
     trainingObjective: string,
     modelConfig: object,
     gridResolution: number,
-    domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
     numberOfSteps: number,
+    domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
+    distributionWidth: number,
+    displayAreaWidth: number,
     callback: Function,
 ) {
     // Create the worker
@@ -112,8 +126,10 @@ export function callSamplingWorkerThreadGrid(
             trainingObjective: trainingObjective,
             modelConfig: modelConfig,
             gridResolution: gridResolution,
-            domainRange: domainRange,
             numberOfSteps: numberOfSteps,
+            domainRange: domainRange,
+            distributionWidth: distributionWidth,
+            displayAreaWidth: displayAreaWidth,
         }
     });
 }

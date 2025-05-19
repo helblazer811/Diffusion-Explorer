@@ -1,18 +1,17 @@
 
 <script lang="ts">
-    import * as tf from '@tensorflow/tfjs';
     import * as d3 from 'd3';
 
     import { domainRange } from '$lib/state';
     import { screenWidth } from '$lib/screen';
     import { contourPlotSettings, interfaceSettings } from '$lib/settings';
-    import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
+    // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
     export let isActive: boolean = true; // Flag to indicate if the plot is active
     export let isEnabled: boolean = true; // Flag to indicate if the plot is enabled
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
-    export let data: tf.Tensor; // Data to plot
+    export let data: number[][]; // Data to plot
     export let distributionId: string = "target"; // ID for the distribution canvas
     export let opacity: number = contourPlotSettings.opacity; // Opacity of the contour
     export let fillColor: string; // Fill color for the contour
@@ -87,7 +86,7 @@
     }
     
     function plotContour(
-        data: tf.Tensor,
+        data: number[][],
         time: number,
         opacity: number = 0.9,
         // xLocation: number = 0,
@@ -95,20 +94,21 @@
         densityResolution: number = 100,
     ) {
         // 1. Convert data to display coordinate frame
-        let translatedData = convertDataToDisplayCoordinateFrame(
-            data, 
-            time, 
-            interfaceSettings.distributionWidth, 
-            interfaceSettings.displayAreaWidth, 
-            $domainRange
-        );
+        // let translatedData = data.arraySync() as number[][]; // Convert to plain 2D array
+        // let translatedData = convertDataToDisplayCoordinateFrame(
+        //     data, 
+        //     time, 
+        //     interfaceSettings.distributionWidth, 
+        //     interfaceSettings.displayAreaWidth, 
+        //     $domainRange
+        // );
         const contours = d3.contourDensity()
             .x(d => d[0])
             .y(d => d[1])
             .size([interfaceSettings.displayAreaWidth, interfaceSettings.displayAreaHeight])
             .bandwidth(bandwidth) // Tune this to spread the density
             .thresholds(contourLevels)
-            (translatedData);
+            (data);
         // 4. Scales for drawing
         const svg = d3.select(svgElement); 
         // Select the group by ID, or create if not exists
@@ -137,7 +137,6 @@
     
     // If the data points change then replot
     $: if (data && svgElement && $screenWidth && isActive) {
-        console.log("Plotting contour for distribution: ", distributionId);
         plotContour(data, time, opacity, distributionId);
         if (label) {
             const xLocation = time * (interfaceSettings.displayAreaWidth - interfaceSettings.distributionWidth) + (interfaceSettings.distributionWidth / 2);

@@ -6,7 +6,7 @@
     import { domainRange } from '$lib/state';
     import { scatterPlotSettings, interfaceSettings } from '$lib/settings';
     import { screenWidth } from '$lib/screen';
-    import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
+    // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
     export let svgElement; // Shared SVG element for all distributions
     export let isActive: boolean = true; // Flag to indicate if the plot is active
@@ -18,20 +18,12 @@
     export let pointColor: string; // Point color for the scatter plot
 
     function plotScatterPlot(
-        data: tf.Tensor,
+        data: number[][],
         time: number = 0.0,
         opacity: number = 0.5,
         distributionId: string = "target",
-        maximumPoints: number = 1000,
+        maximumPoints: number = 300,
     ) {
-        // Convert data to plain 2d array
-        data = convertDataToDisplayCoordinateFrame(
-            data, 
-            time, 
-            interfaceSettings.distributionWidth, 
-            interfaceSettings.displayAreaWidth, 
-            $domainRange
-        );
         // If the data is too large, sample it down to a smaller size
         data = data.slice(0, Math.min(data.length, maximumPoints));
         // Make a scatter plot

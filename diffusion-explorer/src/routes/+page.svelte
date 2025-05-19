@@ -27,7 +27,8 @@
         distributionVisiblity,
         intermediateTrainingSamples,
         currentTime,
-        cachedModelPaths
+        cachedModelPaths,
+        domainRange
     } from '$lib/state';
     import { 
         trainingObjectiveToModelConfig,
@@ -37,6 +38,7 @@
         pretrainedModelPaths,
         trainingObjectiveToSamplers,
         cachedSamplesPaths,
+        interfaceSettings,
     } from '$lib/settings';
     // Load up the components
     import TitleBar from '$lib/components/TitleBar.svelte';
@@ -47,6 +49,7 @@
     // Import helper tf functions
     import { sampleMultivariateNormal } from '$lib/diffusion/utils';
     import { callSamplingWorkerThread, callTrainingWorkerThread} from '$lib/diffusion/workers/utils';
+    import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
     let trainingInitiated = false; // Flag to check if training has ever been initiated
     let trainingWorker: Worker; // Variable to hold the training worker
@@ -59,8 +62,8 @@
             .then(response => response.json())
             .then(data => {
                 // Convert the data to a tensor
-                const pointsTensor = tf.tensor(data.points);
-                return pointsTensor;
+                // const pointsTensor = tf.tensor(data.points);
+                return data.points;
             });
     }
 
@@ -89,8 +92,8 @@
         // Load up each of the datasets
         let datasets = {}
         for (const [name, path] of Object.entries(datasetNameToPath)) {
-            const pointsTensor = await loadDataset(path);
-            datasets = { ...datasets, [name]: pointsTensor }; // triggers Svelte reactivity
+            const pointData = await loadDataset(path);
+            datasets = { ...datasets, [name]: pointData }; // triggers Svelte reactivity
             // console.log(`Loaded dataset ${name} from ${path}`);
             // console.log(`Dataset ${name} shape: `, pointsTensor.shape);
         }
@@ -98,17 +101,35 @@
         // Add a listener to the window to handle keydown events
         window.addEventListener('keydown', handleKeydown);
         // Load up the chosen training dataset points as tf tensor
-        const pointsTensor = datasetDict[$datasetName];
+        const pointData = datasetDict[$datasetName];
+        // Convert the points to the correct coordinate frame
+        const translatedData = convertDataToDisplayCoordinateFrame(
+            pointData,
+            1.0, // Time of target distribution
+            interfaceSettings.distributionWidth,
+            interfaceSettings.displayAreaWidth,
+            get(domainRange)
+        );
         // Update the UI state with the training dataset
-        targetDistributionSamples.set(pointsTensor);
+        targetDistributionSamples.set(translatedData);
         // // Draw some gaussian samples to put into the UI state as well
         const multivariateNormalSamples = sampleMultivariateNormal(
             [0, 0],
             [[1, 0], [0, 1]],
             $numSamples
         );
+        // Convert to array
+        const multivariateNormalSamplesArray = multivariateNormalSamples.arraySync() as number[][];
+        // Convert the points to the correct coordinate frame
+        const translatedSamples = convertDataToDisplayCoordinateFrame(
+            multivariateNormalSamplesArray,
+            0.0, // Time of source distribution
+            interfaceSettings.distributionWidth,
+            interfaceSettings.displayAreaWidth,
+            get(domainRange)
+        );
         // Update the UI state with the source distribution samples
-        sourceDistributionSamples.set(multivariateNormalSamples);
+        sourceDistributionSamples.set(translatedSamples);
     });
 
     onDestroy(() => {
@@ -137,64 +158,56 @@
         // Pause the animation
         isPlaying.set(false);
         // Load the dataset
-        const pointsTensor = datasetDict[$datasetName];
+        const pointsData = datasetDict[$datasetName];
+        // Convert the points to the correct coordinate frame
+        const translatedData = convertDataToDisplayCoordinateFrame(
+            pointsData,
+            1.0, // Time of target distribution
+            interfaceSettings.distributionWidth,
+            interfaceSettings.displayAreaWidth,
+            get(domainRange)
+        );
         // Update the UI state with the training dataset
-        targetDistributionSamples.set(pointsTensor);
+        targetDistributionSamples.set(translatedData);
         // Immediately remove the currentDistributionSamples
-        currentDistributionSamples.set(tf.zeros([0, 2]));
+        currentDistributionSamples.set([[]]);
         // Check if there are cached samples for the given dataset and model
-        if (cachedSamplesPaths[$trainingObjective][$datasetName]) {
+        if (cachedSamplesPaths[$trainingObjective] && cachedSamplesPaths[$trainingObjective][$datasetName]) {
             // Load the cached samples
             // concole log time when start loading
-            console.time("Loading cached samples");
             const cachedSamplesPath = base + cachedSamplesPaths[$trainingObjective][$datasetName];
             fetch(cachedSamplesPath)
                 .then(response => response.json())
                 .then(data => {
-                    // Convert the data to a tensor
-                    const pointsTensor = tf.tensor(data);
                     // Update the UI state with the cached samples
-                    allTimeSamples.set(pointsTensor);
+                    allTimeSamples.set(data);
                     // Start playing
                     isPlaying.set(true);
                     // console log time when done loading
-                    console.timeEnd("Loading cached samples");
                 });
         } else {
             // Load up the model corresponding to the dataset
             const defaultTrainingObjective = $trainingObjective;
             const defaultModelPath = base + pretrainedModelPaths[$trainingObjective][$datasetName];
             // Regenerate all of the samples 
+            console.log("Calling sampling worker thread");
             callSamplingWorkerThread(
                 defaultModelPath,
                 defaultTrainingObjective,
                 trainingObjectiveToModelConfig[defaultTrainingObjective],
                 get(numSamples),
                 get(numberOfSteps),
+                get(domainRange),
+                interfaceSettings.distributionWidth,
+                interfaceSettings.displayAreaWidth,
+                // Callback for when the sampling is done
                 (allSamples) => {
-                    // Convert all samples to tf tensor
-                    allSamples = tf.tensor(allSamples);
                     // Update the UI state with the all time samples
                     allTimeSamples.set(allSamples);
-                    // Compute the range of the points to use for the domain of each contour map
-                    // let flatAllTimeSamples = tf.reshape(allSamples, [get(numSamples) * get(numberOfSteps), 2]); // shape [num_time_steps * num_samples, dim]
-                    // flatAllTimeSamples = flatAllTimeSamples.arraySync();
-                    // const xMin = d3.min(flatAllTimeSamples, d => d[0]);
-                    // const xMax = d3.max(flatAllTimeSamples, d => d[0]);
-                    // const yMin = d3.min(flatAllTimeSamples, d => d[1]);
-                    // const yMax = d3.max(flatAllTimeSamples, d => d[1]);
-                    // const localDomainRange = {
-                    //     xMin: xMin - 0.08 * (xMax - xMin),
-                    //     xMax: xMax + 0.08 * (xMax - xMin),
-                    //     yMin: yMin - 0.08 * (yMax - yMin),
-                    //     yMax: yMax + 0.08 * (yMax - yMin),
-                    // };
-                    // TODO fix this logic
-                    // domainRange.set(localDomainRange);
                     // Make the UI state play
                     isPlaying.set(true);
                     // Download the samples as json 
-                    downloadJSON(allSamples.arraySync(), `${$datasetName}_${$trainingObjective}_samples.json`);
+                    downloadJSON(allSamples, `${$datasetName}_${$trainingObjective}_samples.json`);
                 }
             )
         }

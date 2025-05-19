@@ -2,13 +2,13 @@ import * as d3 from 'd3';
 import * as tf from '@tensorflow/tfjs';
 
 export function convertDataToDisplayCoordinateFrame(
-    tensorData: tf.Tensor,
+    data: number[][], // shape: [N, 2]
     time: number,
     distributionWidth: number,
     displayAreaWidth: number,
     domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
 ){
-    let data = tensorData.arraySync() as number[][]; // Convert to plain 2D array
+    // let data = tensorData.arraySync() as number[][]; // Convert to plain 2D array
     // 1. Scale from the abstract coordinate frame (~ -3 to 3) to the svg viewbox coordinate frame
     const xScale = d3.scaleLinear()
         .domain([domainRange.xMin, domainRange.xMax])
