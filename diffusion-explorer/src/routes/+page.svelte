@@ -228,6 +228,9 @@
             training: false,
             target: true,
         });
+        // Set the timer to zero, and set playing to true
+        isPlaying.set(true);
+        epochValue.set(0);
     }
 
 </script>

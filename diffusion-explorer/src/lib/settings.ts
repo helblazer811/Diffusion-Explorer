@@ -5,6 +5,8 @@ export const backend: "webgl" | "wasm" = "webgl";
 
 type PlotType = "Contour" | "Scatter" | "Mesh" | "Path";
 
+export const plotTypes: PlotType[] = ["Contour", "Scatter", "Mesh", "Path"];
+
 export interface DisplayOptions {
     "Plot Types": PlotType[];
     "Default Plot Types": PlotType[];

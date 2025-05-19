@@ -3,7 +3,6 @@
     import { derived } from 'svelte/store';
     // Import components
     import ToggleButton from '$lib/components/primitives/ToggleButton.svelte';
-    import HyperparameterSelect from '$lib/components/training_bar/HyperparameterSelect.svelte';
     import DropDown from '$lib/components/primitives/DropDown.svelte';
     import MiniDistribution from '$lib/components/training_bar/MiniDistribution.svelte';
     // Import settings
@@ -205,7 +204,7 @@
         <div class="menu style-menu">
             <h1 class="label">Plot Types</h1>
             <div class="grid-2x2 menu-contents">
-                {#each $enabledPlotTypes as plotType}
+                {#each settings.plotTypes as plotType}
                     <ToggleButton
                         className="style-menu-button"
                         icon={plotTypeIcons[plotType]}
