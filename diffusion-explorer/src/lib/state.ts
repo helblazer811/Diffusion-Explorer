@@ -32,3 +32,4 @@ export const domainRange = writable({
 export const activePlotTypes = writable(
     settings.trainingObjectiveToDisplayOptions[get(trainingObjective)]["Default Plot Types"]
 );
+export const cachedModelPaths = writable({}); // Cache for models

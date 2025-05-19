@@ -26,6 +26,8 @@
         epochValue,
         distributionVisiblity,
         intermediateTrainingSamples,
+        currentTime,
+        cachedModelPaths
     } from '$lib/state';
     import { 
         trainingObjectiveToModelConfig,
@@ -174,9 +176,18 @@
         });
         // Pause the playing animation
         isPlaying.set(false);
+        // Set epoch value to 0
+        epochValue.set(0);
         // Get the model config and class
         const ModelClass = trainingObjectiveToModelClass[$trainingObjective];
         const modelConfig = trainingObjectiveToModelConfig[$trainingObjective];
+        // Fill up the intermediate training samples with some random samples
+        const randomSamples = sampleMultivariateNormal(
+            [0, 0],
+            [[1, 0], [0, 1]],
+            get(numSamples)
+        );
+        intermediateTrainingSamples.set(randomSamples);
         // Call the training worker thread
         trainingWorker = callTrainingWorkerThread(
             $trainingObjective,
@@ -185,19 +196,51 @@
             trainingConfig,
             // Callback for when training is done
             (tfModelPath: string) => {
-                // Make the model
-                const ourModel = new ModelClass(
-                    modelConfig.dim,
-                    modelConfig.hidden,
+                // Save the path to the model in the state
+                cachedModelPaths.update(
+                    (cachedModelPaths) => {
+                        return {
+                            ...cachedModelPaths,
+                            [$trainingObjective]: {
+                                ...cachedModelPaths[$trainingObjective],
+                                [$datasetName]: tfModelPath,
+                            }
+                        }
+                    }
+                )
+                // TODO: decide if I load it from the browser database or state later
+                // Load up a model from the given file path and save it in state
+                // tf.loadLayersModel(tfModelPath).then((tfModel) => {
+                //     // Save the tfModel in state
+                //     // cachedModels.update(
+                //     //     (cachedModels) => {
+                //     //         return {
+                //     //             ...cachedModels,
+                //     //             [$trainingObjective]: {
+                //     //                 ...cachedModels[$trainingObjective],
+                //     //                 [$datasetName]: tfModel,
+                //     //             }
+                //     //         }
+                //     //     }
+                //     // )
+                //     // console.log("Downloading model from: ", tfModelPath);
+                //     // Prompt to download the model
+                //     // ourModel.download();
+                // });
+                // Run sampling with the saved model 
+                callSamplingWorkerThread(
+                    tfModelPath,
+                    $trainingObjective,
+                    modelConfig,
+                    get(numSamples),
+                    get(numberOfSteps),
+                    (allSamples) => {
+                        // Convert all samples to tf tensor
+                        allSamples = tf.tensor(allSamples);
+                        // Update the UI state with the all time samples
+                        allTimeSamples.set(allSamples);
+                    }
                 );
-                // Load up a model from the given file path
-                tf.loadLayersModel(tfModelPath).then((tfModel) => {
-                    // console.log("Downloading model from: ", tfModelPath);
-                    // Set the model in the model class
-                    // ourModel.setModel(tfModel);
-                    // Prompt to download the model
-                    // ourModel.download();
-                });
             },
             // Callback for after each epoch
             (epoch: number, intermediateSamples: number[][]) => {
@@ -230,7 +273,7 @@
         });
         // Set the timer to zero, and set playing to true
         isPlaying.set(true);
-        epochValue.set(0);
+        currentTime.set(0);
     }
 
 </script>

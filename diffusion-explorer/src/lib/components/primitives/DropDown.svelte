@@ -1,6 +1,7 @@
 <script lang="ts">
     export let options: string[];
     export let value: string;
+    export let disabled: boolean = false;
 
 </script>
 
@@ -39,11 +40,6 @@
         padding-left: 10px;
         font-size: 16px;
         border: none;
-        /* border-bottom: solid 1px #ccc; */
-        /* color: #333; */
-        /* height: 40px; */
-        /* margin-right: 30px; */
-        /* padding-right: 30px; make space for arrow */
     }
 
     /* Arrow */
@@ -66,11 +62,20 @@
         top: 8px;
         pointer-events: none;
     }
+
+    /* Make a disabled state for the dropdown */
+    .select.disabled {
+        background-color: #f0f0f0;
+        cursor: not-allowed;
+    }
+    .select.disabled select {
+        color: #b0b0b0;
+    }
     
 </style>
 
 <div class="dropdown">
-    <div class="select">
+    <div class="select {disabled ? 'disabled' : ''}">
         <select bind:value={value}>
             {#each options as option}
                 <option value={option}>{option}</option>

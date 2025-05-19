@@ -188,6 +188,7 @@
             <div class="menu-contents">
                 <DropDown
                     bind:value={$trainingObjective}
+                    disabled={$isTraining}
                     options={settings.trainingObjectives}
                 />
             </div>
@@ -197,6 +198,7 @@
             <div class="menu-contents">
                 <DropDown
                     bind:value={$sampler}
+                    disabled={$isTraining}
                     options={settings.trainingObjectiveToSamplers[$trainingObjective]}
                 />
             </div>
@@ -208,7 +210,10 @@
                     <ToggleButton
                         className="style-menu-button"
                         icon={plotTypeIcons[plotType]}
-                        disabled={!$enabledPlotTypes.includes(plotType)}
+                        disabled={
+                            !$enabledPlotTypes.includes(plotType)
+                            || $isTraining
+                        }
                         label={plotType}
                         active={derived(activePlotTypes, $v => $v.includes(plotType))}
                         toggle={() => {
