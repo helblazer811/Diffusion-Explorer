@@ -34,7 +34,6 @@ self.onmessage = async (e) => {
     const { type, data } = e.data;
 
     if (type === 'train') {
-        console.log("Training started in worker thread...");
         // Destructure the data
         const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
         // Set up tf wasm backend
@@ -78,7 +77,6 @@ self.onmessage = async (e) => {
             // allSamples: allSamplesArray,
         });
     } else if (type === 'stop_training') {
-        console.log("Stop training message received on worker thread...");
         // Figure out how to stop the training
         trainingStopped = true;
     } else {

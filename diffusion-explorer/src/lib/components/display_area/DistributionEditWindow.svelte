@@ -16,17 +16,14 @@
 
     // Change the visibility of the distribution edit window based on the active state
     $ : if (active && initialized) {
-        console.log("Setting distribution edit window to active");
         groupElement.style.visibility = "visible";
     } else if (!active && initialized) {
-        console.log("Setting distribution edit window to inactive");
         groupElement.style.visibility = "hidden";
     }
 
     $ : if (svgElement && !initialized) {
         initialized = true; // Set the flag to true to prevent re-initialization
         const svg = d3.select(svgElement);
-        console.log("Loading distribution edit window");
         // Create a group for the distribution edit window
         const groupD3Element = svg.append('g')
             .attr('id', 'distribution-edit-window')
@@ -68,7 +65,6 @@
                             const sigma = 5.0;
                             const sampleX = d3.randomNormal(currX, sigma)();
                             const sampleY = d3.randomNormal(currY, sigma)();
-                            const sample = [sampleX, sampleY];
                             // Clip the sample to the bounding box
                             const clippedSample = [
                                 Math.max(xCoordinate, Math.min(sampleX, xCoordinate + width)),
@@ -78,6 +74,7 @@
                             targetDistributionSamples.update(samples => {
                                 return [...samples, clippedSample];
                             });
+                            console.log($targetDistributionSamples)
                         }
                     }, drawTimeout);
                 }

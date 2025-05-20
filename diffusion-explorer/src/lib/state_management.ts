@@ -28,7 +28,7 @@ import {
 // Helper functions
 import { sampleMultivariateNormal } from '$lib/diffusion/utils';
 import { callTrainingWorkerThread, callSamplingWorkerThread } from '$lib/diffusion/workers/utils';
-import { convertDataToDisplayCoordinateFrame } from '$lib/utils';
+import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
 
 /*
 * This function handles loading up the pre-defined datasets into 
@@ -160,8 +160,17 @@ export function startTraining() {
     const datasetNameVal = get(datasetName);
     const datasetNameToPath = settings.datasetNameToPath;
     if (datasetNameVal === "brush") {
+        // Convert the data to the data coordinate frame
+        const translatedSamples = convertDisplayCoordinateFrameToData(
+            get(targetDistributionSamples),
+            1.0,
+            settings.interfaceSettings.distributionWidth,
+            settings.interfaceSettings.displayAreaWidth,
+            settings.domainRange
+        );
+        // Create a blob from the data
         const blob = new Blob([
-            JSON.stringify({ points: get(targetDistributionSamples) })
+            JSON.stringify({ points: translatedSamples })
         ], { type: 'application/json' });
         jsonURL = URL.createObjectURL(blob);
     }
@@ -220,5 +229,5 @@ export function startEditing() {
     isPlaying.set(false);
     epochValue.set(0);
     // Empty the target distribution samples
-    targetDistributionSamples.set([[]]);
+    targetDistributionSamples.set([]);
 }
