@@ -8,52 +8,7 @@ import * as tf from '@tensorflow/tfjs';
 // import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
 
 import { backend, trainingObjectiveToModelClass } from '$lib/settings';
-
-// function convertDataToDisplayCoordinateFrame(
-//     data: tf.Tensor, // Tensor of shape [num_time_steps, num_samples, dim]
-//     time: number,
-//     domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
-//     distributionWidth: number,
-//     displayAreaWidth: number,
-// ) {
-//     // 1. Scale from the abstract coordinate frame (~ -3 to 3) to the svg viewbox coordinate frame
-//     // const xScale = d3.scaleLinear()
-//     //     .domain([domainRange.xMin, domainRange.xMax])
-//     //     .range([0, distributionWidth]);
-//     // const yScale = d3.scaleLinear()
-//     //     .domain([domainRange.yMin, domainRange.yMax])
-//     //     .range([0, distributionWidth]);
-//     // // 2. Apply the scale to the data
-//     // const dataArray = data.arraySync() as number[][]; // Convert to plain 2D array
-//     // const scaledData = dataArray.map(d => [xScale(d[0]), yScale(d[1])]);
-//     // // 3. Now translate the data to the correct xLocation based on the time
-//     // const xLocation = time * (displayAreaWidth - distributionWidth);
-//     // const translatedData = scaledData.map(d => [d[0] + xLocation, d[1]]);
-//     // return translatedData;
-// }
-
-function convertDataToDisplayCoordinateFrame(
-    data: tf.Tensor, // shape: [T, N, 2]
-    domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
-    distributionWidth: number,
-    displayAreaWidth: number,
-    numSteps: number,
-): tf.Tensor {
-    return tf.tidy(() => {
-        const min = tf.tensor([domainRange.xMin, domainRange.yMin]);
-        const range = tf.tensor([domainRange.xMax - domainRange.xMin, domainRange.yMax - domainRange.yMin]);
-        const offsetScale = tf.tensor([displayAreaWidth - distributionWidth, 0]);
-
-        const dataNorm = data.sub(min).div(range);           // [T, N, 2]
-        const dataScaled = dataNorm.mul(distributionWidth);  // [T, N, 2]
-
-        const time = tf.linspace(0, 1, numSteps).reshape([numSteps, 1, 1]); // [T, 1, 1]
-        const offset = time.mul(offsetScale);                // [T, 1, 2]
-        const result = dataScaled.add(offset);               // [T, N, 2]
-
-        return result;
-    });
-}
+import { convertDataToDisplayCoordinateFrame } from '$lib/diffusion/workers/utils';
 
 self.onmessage = async (e) => {
     const { type, data } = e.data;

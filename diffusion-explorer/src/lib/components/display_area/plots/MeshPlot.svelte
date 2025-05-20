@@ -18,8 +18,7 @@
         domainRange, 
     } from '$lib/settings';
 
-    // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
-    import { callSamplingWorkerThread, callSamplingWorkerThreadFromInitialPoints, callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/utils';
+    import { callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/utils';
 
     export let svgElement; // Shared SVG element for all distributions
     export let isActive: boolean = false; // Flag to indicate if the plot is active
@@ -30,6 +29,7 @@
     export let strokeWidth: number = 3; // Stroke width for the mesh lines
     export let strokeColor: string = "#424242"; // Stroke color for the mesh lines
 
+    let lastDatasetName: string = ""; // Store the last dataset name to avoid unnecessary updates
     let trajectoryGrid: number[][][] = []; // Array to hold the trajectories [time, x, y, 2]
 
     // Function to plot the mesh grid for the current timeimport * as d3 from 'd3';
@@ -96,22 +96,20 @@
         }
     }
 
-    // onMount(() => {
-        
-    // });
-
     // If the dataset name changes, re-run the sampling
     // Don't do anything if the dataset name changed to "brush", a reserved name
-    $ : if ($datasetName && $datasetName != "brush") {
+    $ : if ($datasetName && $datasetName != "brush" && $datasetName != lastDatasetName && isActive) {
+        // Debouncing the dataset name change
+        lastDatasetName = $datasetName; // Update the last dataset name
         // // Run sampling for a uniform grid of points
         // // First uniformly sample the x and y coordinates
-        // const width = $domainRange.xMax - $domainRange.xMin;
-        // const height = $domainRange.yMax - $domainRange.yMin;
+        const width = domainRange.xMax - domainRange.xMin;
+        const height = domainRange.yMax - domainRange.yMin;
         // // Make range of data bit wider
-        // const xMin = $domainRange.xMin + 0.1 * width;
-        // const xMax = $domainRange.xMax - 0.1 * width;
-        // const yMin = $domainRange.yMin + 0.1 * height;
-        // const yMax = $domainRange.yMax - 0.1 * height;
+        const xMin = domainRange.xMin + 0.1 * width;
+        const xMax = domainRange.xMax - 0.1 * width;
+        const yMin = domainRange.yMin + 0.1 * height;
+        const yMax = domainRange.yMax - 0.1 * height;
         // const x = tf.linspace(xMin, xMax, gridResolution);
         // const y = tf.linspace(yMin, yMax, gridResolution);
         // let initialPoints: tf.Tensor = tf.stack(tf.meshgrid(x, y), 2);
@@ -125,7 +123,7 @@
             trainingObjectiveToModelConfig[$trainingObjective],
             gridResolution,
             $numberOfSteps,
-            domainRange,
+            {xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax},
             interfaceSettings.distributionWidth,
             interfaceSettings.displayAreaWidth,
             (allSamples: number[][]) => {

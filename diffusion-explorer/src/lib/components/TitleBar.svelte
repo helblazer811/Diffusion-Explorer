@@ -115,6 +115,5 @@
     </div>
     <a href="https://github.com/helblazer811/Diffusion-Explorer" id="github-logo" target="_blank">
         <img src="{base}/github-logo.svg" alt="GitHub Logo"/>
-        <span>Code</span>
     </a>
 </div>

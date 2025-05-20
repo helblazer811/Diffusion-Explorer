@@ -1,6 +1,6 @@
 /* Store global styles here */
 :root {
-    --display-area-width: 1200px;
+    --display-area-width: 1300px;
     --distribution-width: 500px;
     --main-area-height: 500px;
     --mini-distribution-width: 26px;
@@ -15,4 +15,5 @@ body, html {
     height: 100%;
     background-color: var(--light-gray);
     overflow-x: hidden;
+    overflow-y: hidden;
 }

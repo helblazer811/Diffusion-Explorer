@@ -19,6 +19,13 @@ async function loadDataset(path: string) {
         });
 }
 
+async function saveModel(model: tf.LayersModel, path: string) {
+    // Save the model to IndexedDB
+    const modelSaveName = 'indexeddb://' + path.replace(/\s+/g, '_') + '_' + Date.now();
+    await model.save(modelSaveName);
+    return modelSaveName;
+}
+
 // Make a boolean that tracks if the training is stopped
 // It is important to be out of the on message function so the value persists across message receives
 let trainingStopped = false;
@@ -47,11 +54,13 @@ self.onmessage = async (e) => {
         // Load the dataset
         const pointsTensor = await loadDataset(datasetPath);
         // Run training
-        ourModel.train(
+        await ourModel.train(
             pointsTensor,
-            trainingConfig["iterations"],
+            trainingConfig["epochs"],
             trainingConfig["batchSize"],
-            () => { return trainingStopped }, // Closure needed to get most recent value of trainingStopped
+            trainingConfig["updateInterval"],
+            // Stop training function that handles halting the training
+            () => { return trainingStopped; },
             (epoch, intermediateSamples) => {
                 // Send the intermediate samples to the main thread
                 self.postMessage({ 
@@ -61,19 +70,15 @@ self.onmessage = async (e) => {
                 });
             }
         )
-        // Save the model in the browser IndexedDB
-        const modelSaveName = 'indexeddb://' + trainingObjective.replace(/\s+/g, '_') + '_' + Date.now();
-        // Pull out just the tf model to save
-        const tfModel = ourModel.model;
-        // Save the model to IndexedDB
-        await tfModel.save(modelSaveName);
-        // Return the result to the main thread
+        const modelSaveName = await saveModel(ourModel.model, trainingObjective)
+        console.log("Training worker thread posting result...");
         self.postMessage({ 
             type: 'result', 
             tfModelPath: modelSaveName,
             // allSamples: allSamplesArray,
         });
     } else if (type === 'stop_training') {
+        console.log("Stop training message received on worker thread...");
         // Figure out how to stop the training
         trainingStopped = true;
     } else {

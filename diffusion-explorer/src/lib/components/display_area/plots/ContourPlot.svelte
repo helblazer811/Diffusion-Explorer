@@ -4,7 +4,6 @@
 
     import { screenWidth } from '$lib/screen';
     import { contourPlotSettings, interfaceSettings } from '$lib/settings';
-    // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
 
     export let isActive: boolean = true; // Flag to indicate if the plot is active
     export let isEnabled: boolean = true; // Flag to indicate if the plot is enabled

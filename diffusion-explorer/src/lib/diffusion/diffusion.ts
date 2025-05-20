@@ -39,17 +39,18 @@ export class DiffusionModel extends Model {
     /**
      * Train the diffusion model with denoising score matching
      * @param data tf.Tensor2D of shape [num_samples, dim]
-     * @param iterations number of iterations to train the model
+     * @param epochs number of epochs to train the model
      * @param batchSize number of samples to use in each batch
+     * @param updateInterval number of epochs to wait before updating the model
      * @returns Promise<void>
      */
     async train(
         data: tf.Tensor2D, 
         epochs = 1000, 
         batchSize = 32,
+        updateInterval: number = 50,
         stopTraining: () => boolean = () => { return false; },
         endEpochCallback: (epoch: number, intermediateSamples: number[][] | null) => void = () => { },
-        intermediateSampleInterval: number = 50,
     ): Promise<void> {
         const B = batchSize;
         const N = data.shape[0];
@@ -84,7 +85,7 @@ export class DiffusionModel extends Model {
             }
             // Run intermediate sampling
             let intermediateSamples = null;
-            if (epoch % intermediateSampleInterval === 0) {
+            if (epoch % updateInterval === 0) {
                 // Sample from the model
                 // TODO put these in the settings
                 const allTimeSamples = this.sample(

@@ -29,14 +29,17 @@ export class Model {
     /**
      * Train the model using its respective objective
      * @param data tf.Tensor2D of shape [num_samples, dim]
-     * @param iterations number of iterations to train the model
+     * @param epochs number of iterations to train the model
      * @param batchSize number of samples to use in each batch
+     * @param updateInterval number of epochs to wait before updating the model
      * @returns 
      */
     train(
         data: tf.Tensor2D,
-        iterations: number = 10000,
+        epochs: number = 1000,
         batchSize: number = 32,
+        updateInterval: number = 50,
+        endEpochCallback: (epoch: number, intermediateSamples: number[][] | null) => void = () => { },
         stopTraining: () => boolean | Promise<boolean> = () => { false },
     ){
         throw new Error("Method 'train()' not implemented.");

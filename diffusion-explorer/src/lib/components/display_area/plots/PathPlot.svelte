@@ -231,25 +231,6 @@
             .attr("width", 40)
             .attr("height", 40)
             .attr("z-index", 1000) // Bring the handle to the front
-        // handleGroup.append("circle")
-        //     .attr("cx", initialCondition[0])
-        //     .attr("cy", initialCondition[1])
-        //     .attr("r", 10)
-        //     .attr("fill", "#fff")
-        //     .attr("stroke", trajectoryColor)
-        //     .attr("stroke-width", 2)
-        //     .attr("z-index", 1000) // Bring the handle to the front
-        
-        // // Add a label to the drag handle
-        // handleGroup.append("text")
-        //     .attr("x", initialCondition[0])
-        //     .attr("y", initialCondition[1] - 45)      // 15 px above the circle
-        //     .attr("text-anchor", "middle")            // center the label
-        //     .attr("font-size", 24)
-        //     .attr("font-family", "sans-serif")
-        //     .attr("fill", "#333333")                   // label color
-        //     .style("pointer-events", "none")          // so the label itself isn’t draggable
-        //     .text("Initial Condition");
 
         // 2. Create a drag behavior
         const drag = d3.drag<SVGGElement, unknown>()
@@ -278,7 +259,7 @@
     }
 
     // If the dataset name or trainingObjective changes, re-run the sampling
-    $ : if ($datasetName && $trainingObjective && $datasetName != "brush") {
+    $ : if ($datasetName && $trainingObjective && $datasetName != "brush" && isActive) {
         runSampling(
             $datasetName,
             $trainingObjective,

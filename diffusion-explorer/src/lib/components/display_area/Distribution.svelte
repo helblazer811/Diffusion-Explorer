@@ -9,6 +9,7 @@
     import { trainingObjectiveToDisplayOptions } from '$lib/settings';
     // Import state
     import { trainingObjective } from '$lib/state';
+    import { fill } from '@tensorflow/tfjs-core';
     // Props
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
@@ -39,17 +40,6 @@
 </script>
 
 <g id="group-{distributionId}" class="distribution-group" bind:this={groupElement}>
-    <ScatterPlot
-        svgElement={groupElement}
-        isActive={activePlotTypes.includes("Scatter")}
-        isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Scatter")}
-        data={data}
-        time={time}
-        distributionId={distributionId}
-        xLocation={xLocation}
-        opacity={scatterPlotSettings.pointOpacity}
-        pointColor={scatterPlotSettings.pointColor}
-    />
     <ContourPlot
         svgElement={groupElement}
         isActive={activePlotTypes.includes("Contour")}
@@ -61,6 +51,17 @@
         labelIsLatex={labelIsLatex}
         fillColor={fillColor}
         borderColor={borderColor}
+    />
+    <ScatterPlot
+        svgElement={groupElement}
+        isActive={activePlotTypes.includes("Scatter")}
+        isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Scatter")}
+        data={data}
+        time={time}
+        distributionId={distributionId}
+        xLocation={xLocation}
+        opacity={scatterPlotSettings.pointOpacity}
+        pointColor={fillColor}
     />
     <MeshPlot
         svgElement={groupElement}

@@ -7,6 +7,7 @@ export const epochValue = writable(0);
 export const trainingObjective = writable("Flow Matching");
 export const sampler = writable("Euler");
 export const datasetName = writable("Smiley Face");
+export const datasetDict = writable({});
 export const targetDistributionSamples = writable(undefined);
 export const sourceDistributionSamples = writable(undefined);
 export const currentDistributionSamples = writable(undefined);
@@ -25,6 +26,7 @@ export const activePlotTypes = writable(
     settings.trainingObjectiveToDisplayOptions[get(trainingObjective)]["Default Plot Types"]
 );
 export const cachedModelPaths = writable({}); // Cache for models
+export const usePretrained = writable(true);
 // TODO: perhaps package these into mutually exclusive page states, rather than independent stores
 export const isPlaying = writable(false);
 export const isTraining = writable(false);

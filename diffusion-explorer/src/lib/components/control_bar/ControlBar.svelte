@@ -1,10 +1,10 @@
 <script>
     import { base } from '$app/paths';
-    import { derived } from 'svelte/store';
+    import { derived, get } from 'svelte/store';
     // Import components
     import ToggleButton from '$lib/components/primitives/ToggleButton.svelte';
     import DropDown from '$lib/components/primitives/DropDown.svelte';
-    import MiniDistribution from '$lib/components/training_bar/MiniDistribution.svelte';
+    import MiniDistribution from '$lib/components/control_bar/MiniDistribution.svelte';
     // Import settings
     import *  as settings from '$lib/settings';
     import { 
@@ -12,17 +12,40 @@
         sampler, 
         epochValue, 
         isTraining,
-        activePlotTypes
+        activePlotTypes,
+        usePretrained,
+        datasetName,
+        datasetDict,
+        isPlaying,
+        targetDistributionSamples,
+        currentDistributionSamples,
+        allTimeSamples,
+        numSamples,
+        numberOfSteps
     } from '$lib/state';
-    
-    export let datasetDict = {};
 
+    import { convertDataToDisplayCoordinateFrame } from '$lib/utils';
+    import { callSamplingWorkerThread } from '$lib/diffusion/workers/utils';
+    
     const plotTypeIcons = {
         "Scatter": `${base}/StyleIcons/PointsIcon.svg`,
         "Contour": `${base}/StyleIcons/ContourIcon.svg`,
         "Mesh": `${base}/StyleIcons/MeshIcon.svg`,
         "Path": `${base}/StyleIcons/PathIcon.svg`
     };
+
+    function downloadJSON(data, filename = 'data.json') {
+        const jsonStr = JSON.stringify(data, null, 2); // pretty-print
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+
+        URL.revokeObjectURL(url); // Clean up
+    }
 
     function padEpochValue(value) {
         // Take the epoch value and convert it to a 5 digit number, with leading zeros and a comma
@@ -34,6 +57,79 @@
     const enabledPlotTypes = derived(trainingObjective, $trainingObjective =>
         settings.trainingObjectiveToDisplayOptions[$trainingObjective]?.["Plot Types"] ?? []
     );
+
+    // Add handler for if datasetName changes 
+    $: if (
+        $datasetName && 
+        $datasetDict[$datasetName] &&
+        typeof window !== 'undefined' // Makes sure this is not run on the server
+    ) {
+        // Check that there is a trained model for the given dataset
+        if (!settings.pretrainedModelPaths[$trainingObjective][$datasetName]) {
+            console.error(`No pretrained model found for ${$trainingObjective} on ${$datasetName}`);
+        }
+        // Check if the sampler is valid for $trainingObjective and if not set it to a valid default
+        // NOTE: This is done here to avoid conflicting with the training objective
+        if (!settings.trainingObjectiveToSamplers[$trainingObjective].includes($sampler)) {
+            // Set the sampler to the first one in the list
+            sampler.set(settings.trainingObjectiveToSamplers[$trainingObjective][0]);
+        }
+        // Pause the animation
+        isPlaying.set(false);
+        // Load the dataset
+        const pointsData = $datasetDict[$datasetName];
+        // Convert the points to the correct coordinate frame
+        const translatedData = convertDataToDisplayCoordinateFrame(
+            pointsData,
+            1.0, // Time of target distribution
+            settings.interfaceSettings.distributionWidth,
+            settings.interfaceSettings.displayAreaWidth,
+            settings.domainRange
+        );
+        // Update the UI state with the training dataset
+        targetDistributionSamples.set(translatedData);
+        // Immediately remove the currentDistributionSamples
+        currentDistributionSamples.set([[]]);
+        // Check if there are cached samples for the given dataset and model
+        if (settings.cachedSamplesPaths[$trainingObjective] && settings.cachedSamplesPaths[$trainingObjective][$datasetName]) {
+            // Load the cached samples
+            // concole log time when start loading
+            const cachedSamplesPath = base + settings.cachedSamplesPaths[$trainingObjective][$datasetName];
+            fetch(cachedSamplesPath)
+                .then(response => response.json())
+                .then(data => {
+                    // Update the UI state with the cached samples
+                    allTimeSamples.set(data);
+                    // Start playing
+                    isPlaying.set(true);
+                    // console log time when done loading
+                });
+        } else {
+            // Load up the model corresponding to the dataset
+            const defaultTrainingObjective = $trainingObjective;
+            const defaultModelPath = base + settings.pretrainedModelPaths[$trainingObjective][$datasetName];
+            // Regenerate all of the samples 
+            callSamplingWorkerThread(
+                defaultModelPath,
+                defaultTrainingObjective,
+                settings.trainingObjectiveToModelConfig[defaultTrainingObjective],
+                get(numSamples),
+                get(numberOfSteps),
+                settings.domainRange,
+                settings.interfaceSettings.distributionWidth,
+                settings.interfaceSettings.displayAreaWidth,
+                // Callback for when the sampling is done
+                (allSamples) => {
+                    // Update the UI state with the all time samples
+                    allTimeSamples.set(allSamples);
+                    // Make the UI state play
+                    isPlaying.set(true);
+                    // Download the samples as json 
+                    downloadJSON(allSamples, `${$datasetName}_${$trainingObjective}_samples.json`);
+                }
+            )
+        }
+    }
 
 </script>
 
@@ -260,13 +356,19 @@
             <h1 class="label">Dataset</h1>
             <div class="menu-contents dataset-menu-container">
                 <div class="mini-distribution-container">
-                    {#each Object.entries(datasetDict) as [name, data]}
+                    {#each Object.entries($datasetDict) as [name, data]}
                         <MiniDistribution data={data} distributionId={name} />
                     {/each}
                     <MiniDistribution showBrush={true} data={null} distributionId="brush"/>
                 </div>
                 <span>
-                    <input type="checkbox" id="scales" name="scales" checked />
+                    <input
+                        type="checkbox"
+                        id="scales"
+                        name="scales"
+                        style={$datasetName == "brush" ? "pointer-events: none; accent-color: lightgray; color: white;" : ""}
+                        bind:checked={$usePretrained}
+                    />
                     Use pretrained
                 </span>
             </div>

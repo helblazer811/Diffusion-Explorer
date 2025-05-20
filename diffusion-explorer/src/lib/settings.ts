@@ -14,12 +14,12 @@ export interface DisplayOptions {
 
 export const trainingObjectiveToDisplayOptions: Record<string, DisplayOptions> = {
     "Flow Matching": {
-        "Plot Types": ["Contour", "Scatter", "Mesh", "Path"],
-        "Default Plot Types": ["Contour", "Scatter", "Path"],
+        "Plot Types": ["Contour", "Scatter", "Mesh"],
+        "Default Plot Types": ["Contour", "Scatter"],
     }, 
     "Diffusion": {
-        "Plot Types": ["Contour", "Scatter", "Path"],
-        "Default Plot Types": ["Contour", "Scatter", "Path"],
+        "Plot Types": ["Contour", "Scatter"],
+        "Default Plot Types": ["Contour", "Scatter"],
     },
 };
 
@@ -56,6 +56,7 @@ export const pretrainedModelPaths: Record<string, Record<string, string>> = {
 
 export const cachedSamplesPaths: Record<string, Record<string, string>> = {
     "Flow Matching": {
+        "Three Modes": "/cached_samples/flow_matching_euler_three_modes.json",
         "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face.json",
     },
 }
@@ -82,11 +83,13 @@ export const trainingObjectiveToModelConfig: Record<string, ModelConfig> = {
 };
 
 export const trainingConfig: {
-    iterations: number;
+    epochs: number;
     batchSize: number;
+    updateInterval: number;
 } = {
-    iterations: 200000,
+    epochs: 1000,
     batchSize: 200,
+    updateInterval: 50,
 };
 
 export const datasetNameToPath: Record<string, string> = {
@@ -119,7 +122,7 @@ export const interfaceSettings: {
     distributionWidth: 500,
     distributionHeight: 500,
     mainAreaHeight: 640,
-    displayAreaWidth: 1200,
+    displayAreaWidth: 1300,
     displayAreaHeight: 500,
 };
 

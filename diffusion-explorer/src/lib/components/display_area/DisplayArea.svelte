@@ -1,5 +1,5 @@
 <script lang="ts">
-    import * as tf from '@tensorflow/tfjs';
+    import { onMount } from 'svelte';
 
     import { 
         currentTime, 
@@ -18,7 +18,8 @@
 
     // Import components
     import Distribution from '$lib/components/display_area/Distribution.svelte';
-    import DistributionEditWindow from './DistributionEditWindow.svelte';
+    import DistributionEditWindow from '$lib/components/display_area/DistributionEditWindow.svelte';
+    import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
 
     let sharedSVGElement: SVGSVGElement; // Shared SVG element for all distributions
 
@@ -36,6 +37,9 @@
         // Update the current distribution samples in the UI state
         currentDistributionSamples.set(currentSamples);
     }
+
+    onMount(() => {
+    });
 
 </script>
 
@@ -64,6 +68,10 @@
         width="100%"
         height="100%"
     >
+        <DistributionEditWindow
+            svgElement={sharedSVGElement}
+            active={$isEditing}
+        />
         {#if sharedSVGElement}
             <Distribution
                 svgElement={sharedSVGElement}
@@ -86,8 +94,9 @@
                 label=""
                 distributionId="target"
                 showBorder={false}
-                fillColor="rgba(25, 131, 255, 0.2)"
+                fillColor="rgba(25, 131, 255, 0.4)"
                 borderColor="rgba(25, 131, 255, 1)"
+                activePlotTypes={$isEditing ? ["Contour", "Scatter"] : ["Contour"]}
             />
             <Distribution
                 svgElement={sharedSVGElement}
@@ -119,9 +128,5 @@
                 activePlotTypes={["Contour"]}
             />
         {/if}
-        <DistributionEditWindow
-            svgElement={sharedSVGElement}
-            active={$isEditing}
-        />
     </svg>
 </div>
