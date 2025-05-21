@@ -1,6 +1,6 @@
 <script>
     import { base } from '$app/paths';
-    import { derived, get } from 'svelte/store';
+    import { derived } from 'svelte/store';
     // Import components
     import ToggleButton from '$lib/components/primitives/ToggleButton.svelte';
     import DropDown from '$lib/components/primitives/DropDown.svelte';
@@ -16,16 +16,7 @@
         usePretrained,
         datasetName,
         datasetDict,
-        isPlaying,
-        targetDistributionSamples,
-        currentDistributionSamples,
-        allTimeSamples,
-        numSamples,
-        numberOfSteps
     } from '$lib/state';
-
-    import { convertDataToDisplayCoordinateFrame } from '$lib/utils';
-    import { callSamplingWorkerThread } from '$lib/diffusion/workers/utils';
     
     const plotTypeIcons = {
         "Scatter": `${base}/StyleIcons/PointsIcon.svg`,
@@ -186,6 +177,12 @@
         margin-top: 5px;
     }
 
+    input.disabled {
+        pointer-events: none;
+        accent-color: lightgray;
+        color: white;
+    }
+
     /* If the screen becomes less than 700 wide then change the flex direction */
     @media (max-width: 800px) {
         .training-bar-container {
@@ -271,14 +268,24 @@
             <div class="menu-contents dataset-menu-container">
                 <div class="mini-distribution-container">
                     {#each Object.entries($datasetDict) as [name, data]}
-                        <MiniDistribution data={data} distributionId={name} />
+                        <MiniDistribution 
+                            data={data} 
+                            distributionId={name} 
+                            disabled={$isTraining}
+                        />
                     {/each}
-                    <MiniDistribution showBrush={true} data={null} distributionId="brush"/>
+                    <MiniDistribution 
+                        showBrush={true} 
+                        data={null} 
+                        distributionId="brush"
+                        disabled={$isTraining}
+                    />
                 </div>
                 <span>
                     <input
                         type="checkbox"
                         id="scales"
+                        class:disabled={$isTraining}
                         name="scales"
                         style={$datasetName == "brush" ? "pointer-events: none; accent-color: lightgray; color: white;" : ""}
                         bind:checked={$usePretrained}

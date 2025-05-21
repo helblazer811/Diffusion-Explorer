@@ -64,7 +64,7 @@ export class FlowModel extends Model {
                 // TODO put these in the settings
                 const allTimeSamples = this.sample(
                     500, // number of samples
-                    100 // number of steps
+                    30 // number of steps
                 ); // shape [num_total_steps, num_samples, dim]
                 // Pull out the last time step
                 const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0); // shape [num_samples, dim]

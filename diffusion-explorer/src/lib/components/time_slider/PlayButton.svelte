@@ -2,10 +2,14 @@
     import { onDestroy } from 'svelte';
     import { isPlaying, playbackSpeed, currentTime, numberOfSteps } from '$lib/state';
 
+    export let disabled = false; // Whether the button is disabled
     let interval;
 
     // Toggle manually
     function togglePlay() {
+        if (disabled) {
+            return; // Don't do anything if the button is disabled
+        }
         isPlaying.update(value => !value);
     }
     // If isPlaying is true then update currentTime until it reaches 1 based on playbackSpeed
@@ -50,18 +54,28 @@
         height: 100%;
         fill: #7b7b7b;
     }
+
+    svg.disabled {
+        fill: #d3d3d3;
+    }
 </style>
 
 <button on:click={togglePlay} aria-label="Play/Pause">
     {#if $isPlaying}
         <!-- Pause Icon -->
-        <svg viewBox="0 0 24 24">
+        <svg 
+            class:disabled={disabled}
+            viewBox="0 0 24 24"
+        >
             <rect x="6" y="5" width="4" height="14" />
             <rect x="14" y="5" width="4" height="14" />
         </svg>
     {:else}
         <!-- Play Icon -->
-        <svg viewBox="0 0 24 24">
+        <svg 
+            class:disabled={disabled}
+            viewBox="0 0 24 24"
+        >
             <polygon points="5,3 19,12 5,21" />
         </svg>
     {/if}

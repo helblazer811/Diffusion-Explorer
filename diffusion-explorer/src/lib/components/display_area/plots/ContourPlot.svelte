@@ -75,11 +75,13 @@
         // Plot title above the contour 
         group.append("text")
             .attr("x", xLocation)
-            .attr("y", screen > 600 ? yLocation: yLocation + 20)
+            .attr("y", screen > 600 ? yLocation: yLocation)
             .attr("text-anchor", "middle")
             .style("font-size", screen > 600 ? "24px" : "40px")
             .style("font-family", "Helvetica, sans-serif")
             .style("fill", "#7b7b7b")
+            .style("pointer-events", "none") // Prevents mouse events on the text
+            .style("user-select", "none") // Prevents text selection
             .text(text);
     }
     
@@ -141,7 +143,7 @@
             if (labelIsLatex) {
                 displayLatex(label, xLocation, 40, distributionId);
             } else {
-                displayText(label, xLocation, 40, distributionId);
+                displayText(label, xLocation, 35, distributionId);
             }
         }
     }

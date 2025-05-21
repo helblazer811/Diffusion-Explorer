@@ -7,7 +7,7 @@ type PlotType = "Contour" | "Scatter" | "Mesh" | "Path";
 
 export const plotTypes: PlotType[] = ["Contour", "Scatter", "Mesh", "Path"];
 
-export const downloadSamplesIfNotCached: boolean = false;
+export const downloadSamplesIfNotCached: boolean = true;
 
 export interface DisplayOptions {
     "Plot Types": PlotType[];
@@ -32,7 +32,7 @@ export interface HyperparameterMenuEntry {
 
 export const trainingObjectives: string[] = [
     "Flow Matching",
-    "Diffusion"
+    // "Diffusion"
 ];
 
 export const trainingObjectiveToSamplers: Record<string, string[]> = {
@@ -58,14 +58,14 @@ export const pretrainedModelPaths: Record<string, Record<string, string>> = {
 
 export const cachedSamplesPaths: Record<string, Record<string, string>> = {
     "Flow Matching": {
-        // "Three Modes": "/cached_samples/flow_matching_euler_three_modes.json",
-        "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face_samples.json",
+        "Three Modes": "/cached_samples/flow_matching_euler_three_modes.json",
+        "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face.json",
     },
 }
 
 export const cachedGridSamplesPaths: Record<string, Record<string, string>> = {
     "Flow Matching": {
-        // "Three Modes": "/cached_samples/flow_matching_euler_three_modes_grid.json",
+        "Three Modes": "/cached_samples/flow_matching_euler_three_modes_grid.json",
         "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face_grid.json",
     },
 }
@@ -141,10 +141,10 @@ export const domainRange: {
     yMin: number;
     yMax: number;
 } = {
-    xMin: -3.0,
-    xMax: 3.0,
-    yMin: -3.0,
-    yMax: 3.0,
+    xMin: -3.5,
+    xMax: 3.5,
+    yMin: -3.5,
+    yMax: 3.5,
 };
 
 /* Styling for the various plots */

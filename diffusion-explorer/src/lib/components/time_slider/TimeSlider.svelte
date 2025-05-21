@@ -1,6 +1,14 @@
 <script>
-    import { currentTime } from '$lib/state';
+    import { currentTime, isTraining, isEditing } from '$lib/state';
     import PlayButton from '$lib/components/time_slider/PlayButton.svelte';
+
+    let disabled = false; // Whether the slider is disabled
+
+    $ : if ($isTraining || $isEditing) {
+        disabled = true; // Disable the slider if training is in progress
+    } else {
+        disabled = false; // Enable the slider if not training
+    }
 
     let sliderStyle; 
     // Add dynamic background color based on the current time
@@ -56,6 +64,11 @@
         background: #4594e3;
         border-radius: 50%;
         cursor: pointer;
+    }
+
+    .disabled {
+        pointer-events: none; /* Disable pointer events */
+        opacity: 0.5; /* Make it look disabled */
     }
 
     .label-container {
@@ -116,10 +129,15 @@
 
 <div class="time-slider-container">
     <div class="time-slider-inner-container">
-        <div class="play-button-container">
-            <PlayButton />
+        <div 
+            class="play-button-container"
+        >
+            <PlayButton disabled={disabled}/>
         </div>
-        <div class="time-slider">
+        <div 
+            class="time-slider"
+            class:disabled={disabled}
+        >
             <input 
                 type="range" 
                 min="0" 

@@ -106,7 +106,6 @@ export async function initializeDistributions() {
 * NOTE: This function is also called on applicaiton load. 
 */
 export async function handleDatasetChange() {
-    console.log("Dataset changed");
     const trainingObjectiveVal = get(trainingObjective);
     const datasetNameVal = get(datasetName);
     const datasetDictVal = get(datasetDict);
@@ -115,9 +114,15 @@ export async function handleDatasetChange() {
     const gridResolution = settings.meshPlotSettings.gridResolution;
     // Pause the animation
     isPlaying.set(false);
+    // Set epoch to 0
+    epochValue.set(0);
+    // If training is in progress, then send a stop training event
+    if (get(isTraining)) {
+        isTraining.set(false);
+    }
     // Check that there is a trained model for the given dataset
     if (!settings.pretrainedModelPaths[trainingObjectiveVal][datasetNameVal]) {
-        // If there is no model, switch pretreind to false
+        // If there is no model, switch pretrained to false
         usePretrained.set(false);
     }
     // Check if the sampler is valid for $trainingObjective and if not set it to a valid default
@@ -159,8 +164,10 @@ export async function handleDatasetChange() {
                     .then(data => {
                         // Update the UI state with the cached samples
                         allTimeGridSamples.set(data);
-                        // Start playing
-                        isPlaying.set(true);
+                        // Start playing if not already training
+                        if (!get(isTraining)) {
+                            isPlaying.set(true);
+                        }
                     });
             });
     } else {
@@ -182,7 +189,9 @@ export async function handleDatasetChange() {
                 // Update the UI state with the all time samples
                 allTimeSamples.set(allSamples);
                 // Make the UI state play
-                isPlaying.set(true);
+                if (!get(isTraining)) {
+                    isPlaying.set(true);
+                }
                 // Download the samples as json 
                 if (settings.downloadSamplesIfNotCached) {
                     downloadJSON(allSamples, `${datasetNameVal}_${trainingObjectiveVal}_samples.json`);
@@ -226,9 +235,6 @@ export async function finishTraining(
     modelConfig: object,
     jsonURL: string | null = null
 ) {
-    // Set training state to stop
-    // NOTE: This won't trigget another update because training_initialized is already set to false
-    isTraining.set(false);
     // Remove the dataset temp file if it exists
     if (jsonURL) URL.revokeObjectURL(jsonURL);
     // Save the model in the cache
@@ -241,6 +247,7 @@ export async function finishTraining(
             }
         };
     });
+    
     // Run sampling from the model
     callSamplingWorkerThread(
         tfModelPath,
@@ -363,7 +370,7 @@ export function startTraining() {
 }
 
 /*
-* This function handles stoppping or interrupting the training process.
+* This function handles stopping or interrupting the training process.
 */
 export async function stopTraining(trainingWorker: Worker) {
     // Stop the training thread by posting a "stop_training" message.
@@ -384,4 +391,12 @@ export function startEditing() {
 
 export function stopEditing() {
     // Do nothing for now. 
+}
+
+/* 
+* Handle when the user clicks usePretrained
+*/
+export function handleUsePretrained() {
+    // For now just run the dataset change function
+    handleDatasetChange();
 }

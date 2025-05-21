@@ -17,12 +17,16 @@
     export let data; // Data to plot
     export let showBrush = false; // Whether to show the brush
     export let distributionId = "target"; // ID for the distribution canvas
+    export let disabled = false; // Whether the distribution is disabled
 
     let svgElement: SVGSVGElement; // Create a separate SVG element for each distribution
 
     function handleClick(){
         if (distributionId === $datasetName) {
             return; // Don't do anything if the same dataset is clicked
+        }
+        if (disabled) {
+            return; // Don't do anything if the distribution is disabled
         }
         // Handle if it was the brush that was clicked
         if (showBrush) {
@@ -131,10 +135,16 @@
         border: 3px solid #242424;
     }
 
+    .inactive-dataset.disabled:hover {
+        cursor: not-allowed;
+        border: 3px solid #c4c4c4; /* Keep the same color */
+    }
+
 </style>
 
 <div 
     class={distributionId === $datasetName ? "mini-distribution active-dataset" : "mini-distribution inactive-dataset"}
+    class:disabled={disabled}
     on:click={handleClick}
 >
     {#if showBrush}

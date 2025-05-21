@@ -80,7 +80,7 @@
                 time={0}
                 data={$sourceDistributionSamples}
                 opacity={0.7}
-                label=""
+                label="Source Distribution"
                 distributionId="source"
                 showBorder={false}
                 fillColor="rgba(25, 131, 255, 0.2)"
@@ -92,10 +92,10 @@
                 time={1.0}
                 data={$targetDistributionSamples}
                 opacity={0.7}
-                label=""
+                label="Data Distribution"
                 distributionId="target"
                 showBorder={false}
-                fillColor="rgba(25, 131, 255, 0.4)"
+                fillColor="rgba(25, 131, 255, 0.2)"
                 borderColor="rgba(25, 131, 255, 1)"
                 activePlotTypes={$isEditing ? ["Contour", "Scatter"] : ["Contour"]}
                 scatterPlotMaximumPoints={3000}

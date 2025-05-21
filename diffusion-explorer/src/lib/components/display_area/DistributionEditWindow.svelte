@@ -43,11 +43,37 @@
             .attr('width', width)
             .attr('height', height)
             .attr('fill', 'transparent')
-            .attr('stroke', '#aaaaaa')
+            .attr('stroke', 'rgb(0, 0, 0)')
+            .attr('stroke-opacity', 0.2)
             .attr('stroke-width', 3)
             // .attr('stroke-dasharray', '5, 5')
             .attr('rx', 5) // Rounded corners
             .attr('ry', 5);
+
+        // // Add styling for when hovering
+        // groupD3Element.append('style')
+        //     .text(`
+        //         #distribution-edit-window:hover rect {
+        //             stroke: rgba(0, 0, 0, 0.0);
+        //         }
+        //     `);
+
+        // Add a label centered above the rectangle
+        groupD3Element.append('text')
+            .attr('x', xCoordinate + width / 2)
+            .attr('y', yCoordinate + height / 2) // Adjust the y position to be above the rectangle
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '24px')
+            .attr('fill', '#aaaaaa')
+            .text('Draw a Distribution Here');
+
+        // When mouse is in the rectangle, hide the label
+        groupD3Element.append('style')
+            .text(`
+                #distribution-edit-window:hover text {
+                    visibility: hidden;
+                }
+            `);
 
         let isDrawing = false;
         let lastPointer = [0, 0];

@@ -48,6 +48,10 @@
         color: #565656;
     }
 
+    .toggle-button.active.disabled:hover {
+        background-color: #f0f0f0;
+    }
+
     .toggle-button.inactive img {
         filter: grayscale(100%);
     }

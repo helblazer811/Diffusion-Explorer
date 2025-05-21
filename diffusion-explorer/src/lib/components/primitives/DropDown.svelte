@@ -70,12 +70,16 @@
     }
     .select.disabled select {
         color: #b0b0b0;
+        pointer-events: none;
     }
     
 </style>
 
 <div class="dropdown">
-    <div class="select {disabled ? 'disabled' : ''}">
+    <div
+        class="select"
+        class:disabled={disabled}
+    >
         <select bind:value={value}>
             {#each options as option}
                 <option value={option}>{option}</option>
