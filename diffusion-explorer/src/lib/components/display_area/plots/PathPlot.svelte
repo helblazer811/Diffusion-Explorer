@@ -1,21 +1,12 @@
 
 <script lang="ts">
     import * as d3 from 'd3';
-    import * as tf from '@tensorflow/tfjs';
-    import { get } from 'svelte/store';
     import { base } from '$app/paths';
+    import { derived } from 'svelte/store';
     // Import state and settings
-    import { datasetName, trainingObjective, numberOfSteps } from '$lib/state';
-    import { 
-        interfaceSettings, 
-        pretrainedModelPaths, 
-        trainingObjectiveToModelConfig, 
-        domainRange 
-    } from '$lib/settings';
-    // Import utils
-    // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
-    import { callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/utils';
-
+    import { allTimeGridSamples } from '$lib/state';
+    import { interfaceSettings } from '$lib/settings';
+    
     export let isActive: boolean = true; // Flag to indicate if the plot is active
     export let isEnabled: boolean = true; // Flag to indicate if the plot is enabled
     export let opacity: number = 0.3; // Opacity of the contour
@@ -23,19 +14,40 @@
     export let svgElement; // Shared SVG element for all distributions
     export let distributionId: string = "target"; // ID for the distribution canvas
     export let trajectoryColor: string = "rgb(255, 100, 0)";
-    export let gridResolution: number = 25; // Resolution of the grid
 
     // Choose some arbitrary initial condition
     let handleGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
     let initialized: boolean = false; // Flag to indicate if the plot is initialized
     let initialCondition: number[] = undefined; // Initial condition for the trajectories
-    let trajectories: number[][] = undefined; // Array to hold the trajectories [time, x * y, 2]
+
+    // Make a derived store called trajectories that transposes allTimeGridSamples
+
+    export const trajectories = derived(allTimeGridSamples, ($allTimeGridSamples) => {
+        const allSamples = $allTimeGridSamples;
+        if (!allSamples || allSamples.length === 0) return [];
+
+        // Transpose allSamples: [time, x * y, 2] -> [time, 2, x * y]
+        const T = allSamples.length;
+        const N = allSamples[0].length;
+
+        const result = Array.from({ length: N }, () =>
+            Array.from({ length: T }, () => [0, 0])
+        );
+
+        for (let t = 0; t < T; t++) {
+            for (let n = 0; n < N; n++) {
+                result[n][t] = allSamples[t][n];
+            }
+        }
+
+        return result; // Shape: [N, T, 2]
+    });
 
     // tiny helper so we don’t allocate an array every drag tick
     function nearestTrajectoryIndex(pt: [number, number]) {
         let distances = [];
-        for (let i = 0; i < trajectories.length; i++) {
-            const trajectoryInitialCondition = trajectories[i][0];
+        for (let i = 0; i < $trajectories.length; i++) {
+            const trajectoryInitialCondition = $trajectories[i][0];
             const distance = Math.sqrt(
                 Math.pow(trajectoryInitialCondition[0] - pt[0], 2) +
                 Math.pow(trajectoryInitialCondition[1] - pt[1], 2)
@@ -94,36 +106,6 @@
         // Define the arrowhead marker (only needs to be done once per SVG)
         const defs = group.append("defs");
 
-        // defs.append("marker")
-        //     .attr("id", "arrowhead")
-        //     .attr("viewBox", "0 -5 10 10")
-        //     .attr("refX", 0) // position of the arrow along the path
-        //     .attr("refY", 0)
-        //     .attr("markerWidth", 6)
-        //     .attr("markerHeight", 6)
-        //     .attr("orient", "auto")
-        //     .attr("markerUnits", "strokeWidth")
-        //     .append("path")
-        //     .attr("d", "M0,-5L10,0L0,5")
-        //     .attr("fill", trajectoryColor)
-        //     // .attr("filter", "url(#path-shadow)") // Apply the shadow filter
-
-        // // Add a drop shadow filter
-        // const svgDefs = group.append("defs");
-
-        // svgDefs.append("filter")
-        //     .attr("id", "path-shadow")
-        //     .attr("x", "0%")
-        //     .attr("y", "0%")
-        //     .attr("width", "200%")
-        //     .attr("height", "200%")
-        //     .append("feDropShadow")
-        //     .attr("dx", 0)  // horizontal offset
-        //     .attr("dy", 0)  // vertical offset
-        //     .attr("stdDeviation", 2)  // blur radius
-        //     .attr("flood-color", "#fff")  // shadow color
-        //     .attr("flood-opacity", 0.7);  // shadow opacity
-
         // Past segment – darker / more opaque
         group.append("path")
             .datum(pastSeg)
@@ -153,67 +135,25 @@
             // .attr("opacity", opacity);
     }
 
-    async function runSampling(
-        currentDatasetName: string,
-        currentTrainingObjective: string,
-        gridResolution: number,
-    ) {
-        // NOTE: Moved this out here to avoid unwanted re-runs from the $: block
-        // Now call the sampling web worker
-        callSamplingWorkerThreadGrid(
-            base + pretrainedModelPaths[currentTrainingObjective][currentDatasetName],
-            currentTrainingObjective,
-            trainingObjectiveToModelConfig[currentTrainingObjective],
-            gridResolution,
-            get(numberOfSteps),
-            domainRange,
-            interfaceSettings.distributionWidth,
-            interfaceSettings.displayAreaWidth,
-            (allSamples: number[][][]) => {
-                // allSamples: [time, x * y, 2]
-                // Reshape so it is [x * y, time, 2]
-                const T = allSamples.length;
-                const N = allSamples[0].length;
-
-                const result = Array.from({ length: N }, () =>
-                    Array.from({ length: T }, () => [0, 0])
-                );
-
-                for (let t = 0; t < T; t++) {
-                    for (let n = 0; n < N; n++) {
-                        result[n][t] = allSamples[t][n];
-                    }
-                }
-
-                trajectories = result; // Save the samples to the trajectory grid
-
-                // allSamples: [time, x * y, 2]
-                // Normalize the trajectories so they fit correclty in the display area
-                // let trajectoriesNormalized = [];
-                // for (let t = 0; t < allSamples.length; t++) {
-                //     const pointsAtTimeT = allSamples[t]; // Get the points at time t
-                //     // Convert the data to a tensor
-                //     // const pointsAtTimeTTensor = tf.tensor(pointsAtTimeT);
-                //     // console.log(allTimeSamples.shape);
-                //     // const trajectoryNormalized = convertDataToDisplayCoordinateFrame(
-                //     //     pointsAtTimeTTensor, 
-                //     //     t / allSamples.length, // Normalize the time
-                //     //     interfaceSettings.distributionWidth, 
-                //     //     interfaceSettings.displayAreaWidth, 
-                //     //     get(domainRange)
-                //     // );
-                //     trajectoriesNormalized.push(pointsAtTimeT);
-                // }
-                // trajectories = tf.stack(trajectoriesNormalized);
-                // // Transpose trajecotries form [time, x * y, 2] to [x * y, time, 2]
-                // trajectories = tf.transpose(trajectories, [1, 0, 2]);
-                // trajectories = trajectories.arraySync() as number[][]; // Convert to a 2D array
-            }
-        )
+    // If the data points change then replot
+    $ : if (svgElement && $trajectories && isActive && time) {
+        // If initial condition is undefined then randomly choose one from trajectories[0]
+        // initialCondition = initialCondition || trajectories[0][Math.floor(Math.random() * trajectories[0].length)];
+        // Initialize the initial condition to the mean of the time = 0 points
+        if (initialCondition === undefined) {
+            const initialConditions = $trajectories.map(trajectory => trajectory[0]);
+            const xMean = d3.mean(initialConditions, d => d[0]);
+            const yMean = d3.mean(initialConditions, d => d[1]);
+            initialCondition = [xMean, yMean];
+        }
+        // Plot the trajectory closest to the given initial condition
+        plotTrajectory(initialCondition, $trajectories, time, opacity, distributionId);
     }
+
 
     // Setup behavior for the drag handle, will run a single time
     $: if (!initialized && svgElement && initialCondition && isActive) {
+        console.log("Initializing drag handle");
         initialized = true;
         const svg = d3.select(svgElement);
 
@@ -256,30 +196,6 @@
 
         // 3. Attach the drag behavior to the group
         handleGroup.call(drag);
-    }
-
-    // If the dataset name or trainingObjective changes, re-run the sampling
-    $ : if ($datasetName && $trainingObjective && $datasetName != "brush" && isActive) {
-        runSampling(
-            $datasetName,
-            $trainingObjective,
-            gridResolution
-        );
-    }
-
-    // If the data points change then replot
-    $ : if (svgElement && trajectories && isActive && time) {
-        // If initial condition is undefined then randomly choose one from trajectories[0]
-        // initialCondition = initialCondition || trajectories[0][Math.floor(Math.random() * trajectories[0].length)];
-        // Initialize the initial condition to the mean of the time = 0 points
-        if (initialCondition === undefined) {
-            const initialConditions = trajectories.map(trajectory => trajectory[0]);
-            const xMean = d3.mean(initialConditions, d => d[0]);
-            const yMean = d3.mean(initialConditions, d => d[1]);
-            initialCondition = [xMean, yMean];
-        }
-        // Plot the trajectory closest to the given initial condition
-        plotTrajectory(initialCondition, trajectories, time, opacity, distributionId);
     }
 
     // If the plot is no longer active, remove the group

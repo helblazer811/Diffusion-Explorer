@@ -7,7 +7,7 @@
     // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
     
     export let svgElement: SVGSVGElement;
-    export let drawTimeout: number = 30; // Number of milliseconds to wait before drawing the next point when mouse holding
+    export let drawTimeout: number = 50; // Number of milliseconds to wait before drawing the next point when mouse holding
     export let active: boolean = false;
 
     let initialized = false; // Flag to indicate if the edit area has been initialized
@@ -63,18 +63,23 @@
                         const [currX, currY] = lastPointer;
                         if (currX > xCoordinate && currX < xCoordinate + width && currY > yCoordinate && currY < yCoordinate + height) {
                             const sigma = 5.0;
-                            const sampleX = d3.randomNormal(currX, sigma)();
-                            const sampleY = d3.randomNormal(currY, sigma)();
-                            // Clip the sample to the bounding box
-                            const clippedSample = [
-                                Math.max(xCoordinate, Math.min(sampleX, xCoordinate + width)),
-                                Math.max(yCoordinate, Math.min(sampleY, yCoordinate + height))
-                            ];
+                            let newSamples = [];
+                            for (let i = 0; i < 10; i++) {
+                                // Sample from a normal distribution around the current mouse position
+                                // with a standard deviation of sigma
+                                const sampleX = d3.randomNormal(currX, sigma)();
+                                const sampleY = d3.randomNormal(currY, sigma)();
+                                // Clip the sample to the bounding box
+                                const clippedSample = [
+                                    Math.max(xCoordinate, Math.min(sampleX, xCoordinate + width)),
+                                    Math.max(yCoordinate, Math.min(sampleY, yCoordinate + height))
+                                ];
+                                newSamples.push(clippedSample);
+                            }
                             // Convert the sample to data coordinates
                             targetDistributionSamples.update(samples => {
-                                return [...samples, clippedSample];
+                                return [...samples, ...newSamples];
                             });
-                            console.log($targetDistributionSamples)
                         }
                     }, drawTimeout);
                 }

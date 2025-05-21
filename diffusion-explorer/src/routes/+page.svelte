@@ -2,16 +2,15 @@
     import * as state_management from '$lib/state_management';
     import { onMount, onDestroy} from 'svelte';
     // Load up the application config
-    import { 
-        targetDistributionSamples,
+    import {
         isPlaying,
         datasetName,
         trainingObjective,
         isTraining,
-        distributionVisiblity,
         cachedModelPaths,
         isEditing,
         usePretrained,
+        datasetDict,
     } from '$lib/state';
     // Load up the components
     import TitleBar from '$lib/components/TitleBar.svelte';
@@ -53,12 +52,20 @@
     // Check if the dataset name is set to "brush" and if so, toggle off usePretrained
     $: if ($datasetName === "brush") {
         usePretrained.set(false);
+    } else {
+        // If the dataset name is not "brush", set usePretrained to true by default
+        // NOTE: this still allows switching to a non-pretrained model if the $datasetName is already active
+        usePretrained.set(true);
     }
 
     // Add a handler for when training is running
     let trainingInitiated = false;
     $ : if ($isTraining && !trainingInitiated) {
         trainingInitiated = true;
+        // If is editing then turn editing off
+        if ($isEditing) {
+            isEditing.set(false);
+        }
         trainingWorker = state_management.startTraining();
     }
     // If training stopped, then stop the training thread
@@ -75,13 +82,27 @@
         state_management.startEditing(); 
     }
 
+    // If editing stopped, handle hiding the UI
+    $ : if (!$isEditing && editingInitiated) {
+        editingInitiated = false;
+        state_management.stopEditing();
+    }
+
+    // Handle dataset name change 
+    $: if ($datasetName && $datasetDict[$datasetName] && typeof window !== 'undefined') { 
+        // typof window ... makes sure this is not run on the server
+        state_management.handleDatasetChange();
+    }
+
     // Switch to a non-pretrained model if usePretrained is set false, or back to pretrained if set true
     let lastPretrainedState = true;
     $ : if ($usePretrained && !lastPretrainedState && $datasetName !== "brush") { 
         lastPretrainedState = true;
         // Switch to using a pretrained model (if it exists)
+        console.log("Switching to pretrained model");
     } else if (!$usePretrained && lastPretrainedState && $datasetName !== "brush") {
         lastPretrainedState = false;
+        console.log("Switching to non-pretrained model");
         // Switch to using a non-pretrained model
         // If the model does not exist, then create a random model, save it, and run sampling with it
         // Check if the model exists
@@ -96,7 +117,6 @@
 </script>
 
 <style>
-
     .container {
         position: relative;
     }

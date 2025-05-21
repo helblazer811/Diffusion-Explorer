@@ -39,6 +39,7 @@
     }
 
     onMount(() => {
+        // Populate the display with the 
     });
 
 </script>
@@ -97,6 +98,7 @@
                 fillColor="rgba(25, 131, 255, 0.4)"
                 borderColor="rgba(25, 131, 255, 1)"
                 activePlotTypes={$isEditing ? ["Contour", "Scatter"] : ["Contour"]}
+                scatterPlotMaximumPoints={3000}
             />
             <Distribution
                 svgElement={sharedSVGElement}

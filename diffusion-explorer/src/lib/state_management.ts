@@ -6,12 +6,16 @@ import * as settings from '$lib/settings';
 import { base } from '$app/paths';
 import { get } from 'svelte/store';
 
+import { downloadJSON } from '$lib/utils'; 
+import * as tf from '@tensorflow/tfjs';
+
 // Explicit state imports
 import {
     datasetDict,
     datasetName,
     numSamples,
     sourceDistributionSamples,
+    currentDistributionSamples,
     targetDistributionSamples,
     intermediateTrainingSamples,
     trainingObjective,
@@ -23,11 +27,18 @@ import {
     allTimeSamples,
     currentTime,
     cachedModelPaths,
+    isTraining,
+    sampler,
+    allTimeGridSamples
 } from '$lib/state';
 
 // Helper functions
 import { sampleMultivariateNormal } from '$lib/diffusion/utils';
-import { callTrainingWorkerThread, callSamplingWorkerThread } from '$lib/diffusion/workers/utils';
+import { 
+    callTrainingWorkerThread, 
+    callSamplingWorkerThread,
+    callSamplingWorkerThreadGrid
+} from '$lib/diffusion/workers/utils';
 import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
 
 /*
@@ -91,6 +102,121 @@ export async function initializeDistributions() {
 }
 
 /*
+* Handle the event that the dataset has changed. 
+* NOTE: This function is also called on applicaiton load. 
+*/
+export async function handleDatasetChange() {
+    console.log("Dataset changed");
+    const trainingObjectiveVal = get(trainingObjective);
+    const datasetNameVal = get(datasetName);
+    const datasetDictVal = get(datasetDict);
+    const samplerVal = get(sampler);
+    const numberOfStepsVal = get(numberOfSteps);
+    const gridResolution = settings.meshPlotSettings.gridResolution;
+    // Pause the animation
+    isPlaying.set(false);
+    // Check that there is a trained model for the given dataset
+    if (!settings.pretrainedModelPaths[trainingObjectiveVal][datasetNameVal]) {
+        // If there is no model, switch pretreind to false
+        usePretrained.set(false);
+    }
+    // Check if the sampler is valid for $trainingObjective and if not set it to a valid default
+    // NOTE: This is done here to avoid conflicting with the training objective
+    if (!settings.trainingObjectiveToSamplers[trainingObjectiveVal].includes(samplerVal)) {
+        // Set the sampler to the first one in the list
+        sampler.set(settings.trainingObjectiveToSamplers[$trainingObjective][0]);
+    }
+    // Load the dataset
+    const pointsData = datasetDictVal[datasetNameVal];
+    // Convert the points to the correct coordinate frame
+    const translatedData = convertDataToDisplayCoordinateFrame(
+        pointsData,
+        1.0, // Time of target distribution
+        settings.interfaceSettings.distributionWidth,
+        settings.interfaceSettings.displayAreaWidth,
+        settings.domainRange
+    );
+    // Update the UI state with the training dataset
+    targetDistributionSamples.set(translatedData);
+    // Immediately remove the currentDistributionSamples
+    currentDistributionSamples.set([[]]);
+    // Check if there are cached samples for the given dataset and model
+    if (
+        settings.cachedSamplesPaths[trainingObjectiveVal] &&
+        settings.cachedSamplesPaths[trainingObjectiveVal][datasetNameVal]
+    ) {
+        // Load the cached samples
+        const cachedSamplesPath = base + settings.cachedSamplesPaths[trainingObjectiveVal][datasetNameVal];
+        fetch(cachedSamplesPath)
+            .then(response => response.json())
+            .then(data => {
+                // Update the UI state with the cached samples
+                allTimeSamples.set(data);
+                // Load the cached grid samples
+                const cachedGridSamplesPath = base + settings.cachedGridSamplesPaths[trainingObjectiveVal][datasetNameVal];
+                fetch(cachedGridSamplesPath)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update the UI state with the cached samples
+                        allTimeGridSamples.set(data);
+                        // Start playing
+                        isPlaying.set(true);
+                    });
+            });
+    } else {
+        // Load up the model corresponding to the dataset
+        const defaultTrainingObjective = trainingObjectiveVal;
+        const defaultModelPath = base + settings.pretrainedModelPaths[trainingObjectiveVal][datasetNameVal];
+        // Regenerate all of the samples 
+        callSamplingWorkerThread(
+            defaultModelPath,
+            defaultTrainingObjective,
+            settings.trainingObjectiveToModelConfig[defaultTrainingObjective],
+            get(numSamples),
+            get(numberOfSteps),
+            settings.domainRange,
+            settings.interfaceSettings.distributionWidth,
+            settings.interfaceSettings.displayAreaWidth,
+            // Callback for when the sampling is done
+            (allSamples) => {
+                // Update the UI state with the all time samples
+                allTimeSamples.set(allSamples);
+                // Make the UI state play
+                isPlaying.set(true);
+                // Download the samples as json 
+                if (settings.downloadSamplesIfNotCached) {
+                    downloadJSON(allSamples, `${datasetNameVal}_${trainingObjectiveVal}_samples.json`);
+                }
+            }
+        )
+        // Also do a sampling gird for PathPlot and MeshPlot
+        callSamplingWorkerThreadGrid(
+            defaultModelPath,
+            trainingObjectiveVal,
+            settings.trainingObjectiveToModelConfig[trainingObjectiveVal],
+            gridResolution,
+            numberOfStepsVal,
+            settings.domainRange,
+            settings.interfaceSettings.distributionWidth,
+            settings.interfaceSettings.displayAreaWidth,
+            (allSamples: number[][]) => {
+                let allSamplesTensor = tf.tensor(allSamples);
+                // Reshape the samples to be [time, x, y, 2]
+                allSamplesTensor = allSamplesTensor.reshape([numberOfStepsVal, gridResolution, gridResolution, 2]);
+                // Save the samples to the trajectory grid
+                const trajectoryGrid = allSamplesTensor.arraySync() as number[][][];
+                // Update the UI state with the trajectory grid
+                allTimeGridSamples.set(trajectoryGrid);
+                // Download the samples as json 
+                if (settings.downloadSamplesIfNotCached) {
+                    downloadJSON(trajectoryGrid, `${datasetNameVal}_${trainingObjectiveVal}_grid.json`);
+                }
+            }
+        )
+    }
+}
+
+/*
 * This function handles when model training is finished.
 */
 export async function finishTraining(
@@ -100,6 +226,9 @@ export async function finishTraining(
     modelConfig: object,
     jsonURL: string | null = null
 ) {
+    // Set training state to stop
+    // NOTE: This won't trigget another update because training_initialized is already set to false
+    isTraining.set(false);
     // Remove the dataset temp file if it exists
     if (jsonURL) URL.revokeObjectURL(jsonURL);
     // Save the model in the cache
@@ -130,6 +259,27 @@ export async function finishTraining(
             currentTime.set(0);
         }
     );
+    // Also do a sampling gird for PathPlot and MeshPlot
+    const gridResolution = settings.meshPlotSettings.gridResolution;
+    callSamplingWorkerThreadGrid(
+        tfModelPath,
+        trainingObjectiveVal,
+        settings.trainingObjectiveToModelConfig[trainingObjectiveVal],
+        gridResolution,
+        get(numberOfSteps),
+        settings.domainRange,
+        settings.interfaceSettings.distributionWidth,
+        settings.interfaceSettings.displayAreaWidth,
+        (allSamples: number[][]) => {
+            let allSamplesTensor = tf.tensor(allSamples);
+            // Reshape the samples to be [time, x, y, 2]
+            allSamplesTensor = allSamplesTensor.reshape([get(numberOfSteps), gridResolution, gridResolution, 2]);
+            // Save the samples to the trajectory grid
+            const trajectoryGrid = allSamplesTensor.arraySync() as number[][][];
+            // Update the UI state with the trajectory grid
+            allTimeGridSamples.set(trajectoryGrid);
+        }
+    )
 }
 
 /*
@@ -225,9 +375,13 @@ export async function stopTraining(trainingWorker: Worker) {
 */
 export function startEditing() {
     // Set the state to editing
-    distributionVisiblity.set({ current: false, source: true, training: false, target: true });
+    distributionVisiblity.set({ current: false, source: false, training: false, target: true });
     isPlaying.set(false);
     epochValue.set(0);
     // Empty the target distribution samples
     targetDistributionSamples.set([]);
+}
+
+export function stopEditing() {
+    // Do nothing for now. 
 }

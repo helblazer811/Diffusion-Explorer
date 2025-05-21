@@ -1,58 +1,28 @@
 <script lang="ts"> 
-    import * as tf from '@tensorflow/tfjs';
     import * as d3 from 'd3';
 
-    import { base } from '$app/paths';
     import { get } from 'svelte/store';
-
-    import { 
-        trainingObjective,
-        datasetName,
-        numberOfSteps,
-    } from '$lib/state';
-
-    import {
-        interfaceSettings,
-        pretrainedModelPaths,
-        trainingObjectiveToModelConfig,
-        domainRange, 
-    } from '$lib/settings';
-
-    import { callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/utils';
+    import { allTimeGridSamples } from '$lib/state';
 
     export let svgElement; // Shared SVG element for all distributions
     export let isActive: boolean = false; // Flag to indicate if the plot is active
     export let isEnabled: boolean = true; // Flag to indicate if the plot is enabled
     export let time: number = 0.0; // Default value for the time
-    export let gridResolution: number = 10; // Resolution of the grid
     export let distributionId: string = "target"; // ID for the distribution canvas
     export let strokeWidth: number = 3; // Stroke width for the mesh lines
     export let strokeColor: string = "#424242"; // Stroke color for the mesh lines
 
-    let lastDatasetName: string = ""; // Store the last dataset name to avoid unnecessary updates
-    let trajectoryGrid: number[][][] = []; // Array to hold the trajectories [time, x, y, 2]
-
     // Function to plot the mesh grid for the current timeimport * as d3 from 'd3';
     function plotMesh(time: number) {
+        const trajectoryGrid = get(allTimeGridSamples);
+        const gridResolution = trajectoryGrid[0].length;
+        const numberOfSteps = trajectoryGrid.length;
+        
         // Convert time to step index
-        const stepIndex = Math.floor(time * ($numberOfSteps - 1));
-        if (!svgElement || !trajectoryGrid[stepIndex]) return;
+        const stepIndex = Math.floor(time * (numberOfSteps - 1));
+        if (!svgElement || ![stepIndex]) return;
 
         let data = trajectoryGrid[stepIndex];
-        // Convert data to display coordinates
-        // NOTE: This is jancky af, but it works
-        // data = tf.tensor(data);
-        // data = data.reshape([gridResolution * gridResolution, 2]);
-        // // data = convertDataToDisplayCoordinateFrame(
-        // //     data, 
-        // //     time, 
-        // //     interfaceSettings.distributionWidth, 
-        // //     interfaceSettings.displayAreaWidth, 
-        // //     $domainRange
-        // // );
-        // data = tf.tensor(data);
-        // data = data.reshape([gridResolution, gridResolution, 2]);
-        // data = data.arraySync() as number[][][];
 
         const svg = d3.select(svgElement);
 
@@ -96,47 +66,7 @@
         }
     }
 
-    // If the dataset name changes, re-run the sampling
-    // Don't do anything if the dataset name changed to "brush", a reserved name
-    $ : if ($datasetName && $datasetName != "brush" && $datasetName != lastDatasetName && isActive) {
-        // Debouncing the dataset name change
-        lastDatasetName = $datasetName; // Update the last dataset name
-        // // Run sampling for a uniform grid of points
-        // // First uniformly sample the x and y coordinates
-        const width = domainRange.xMax - domainRange.xMin;
-        const height = domainRange.yMax - domainRange.yMin;
-        // // Make range of data bit wider
-        const xMin = domainRange.xMin + 0.1 * width;
-        const xMax = domainRange.xMax - 0.1 * width;
-        const yMin = domainRange.yMin + 0.1 * height;
-        const yMax = domainRange.yMax - 0.1 * height;
-        // const x = tf.linspace(xMin, xMax, gridResolution);
-        // const y = tf.linspace(yMin, yMax, gridResolution);
-        // let initialPoints: tf.Tensor = tf.stack(tf.meshgrid(x, y), 2);
-        // initialPoints = initialPoints.reshape([gridResolution * gridResolution, 2]); // Flatten the points to be [gridResolution * gridResolution, 2]
-        // // Sync the points, converting to a 2D array
-        // initialPoints = initialPoints.arraySync() as number[][];
-        // Now call the sampling web worker
-        callSamplingWorkerThreadGrid(
-            base + pretrainedModelPaths[$trainingObjective][$datasetName],
-            $trainingObjective,
-            trainingObjectiveToModelConfig[$trainingObjective],
-            gridResolution,
-            $numberOfSteps,
-            {xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax},
-            interfaceSettings.distributionWidth,
-            interfaceSettings.displayAreaWidth,
-            (allSamples: number[][]) => {
-                let allSamplesTensor = tf.tensor(allSamples);
-                // Reshape the samples to be [time, x, y, 2]
-                allSamplesTensor = allSamplesTensor.reshape([$numberOfSteps, gridResolution, gridResolution, 2]);
-                // Save the samples to the trajectory grid
-                trajectoryGrid = allSamplesTensor.arraySync() as number[][][];
-            }
-        )
-    }
-
-    $ : if (svgElement && trajectoryGrid.length > 0 && isActive && isEnabled) {
+    $ : if (svgElement && $allTimeGridSamples && $allTimeGridSamples.length > 0 && isActive && isEnabled) {
         // Plot the mesh grid for the current time
         plotMesh(time);
     }

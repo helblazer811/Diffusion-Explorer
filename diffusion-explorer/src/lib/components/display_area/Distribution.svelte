@@ -25,6 +25,8 @@
     export let showBorder: boolean = false; // Flag to indicate if the border should be shown
     export let fillColor: string = "#7b7b7b"; // Fill color for the contour
     export let borderColor: string = "#7b7b7b"; // Border color for the contour
+    // TODO figure out how to take default settings but override them if custom ones are provided
+    export let scatterPlotMaximumPoints: number = 300; // Maximum number of points to plot
 
     let groupElement: SVGGElement; // Group element for the distribution
 
@@ -62,6 +64,7 @@
         xLocation={xLocation}
         opacity={scatterPlotSettings.pointOpacity}
         pointColor={fillColor}
+        maximumPoints={scatterPlotMaximumPoints}
     />
     <MeshPlot
         svgElement={groupElement}

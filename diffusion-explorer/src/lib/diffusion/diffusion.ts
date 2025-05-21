@@ -52,22 +52,19 @@ export class DiffusionModel extends Model {
         stopTraining: () => boolean = () => { return false; },
         endEpochCallback: (epoch: number, intermediateSamples: number[][] | null) => void = () => { },
     ): Promise<void> {
-        const B = batchSize;
         const N = data.shape[0];
         const optimizer = tf.train.adam(1e-4);
         const mse = (a: tf.Tensor, b: tf.Tensor) => tf.losses.meanSquaredError(a, b);
         const losses: number[] = [];
 
         for (let epoch = 0; epoch < epochs; ++epoch) {
-            for (let i = 0; i < Math.floor(data.shape[0] / batchSize); i++) {
+            for (let i = 0; i < data.shape[0]; i += batchSize) {
                 tf.tidy(() => {// Clear memory 
-                    // Get random batch of data
-                    const idx = tf.randomUniform([B], 0, N, 'int32');
-                    const x0 = tf.gather(data, idx);
+                    const x0 = tf.gather(data, tf.range(i, Math.min(i + batchSize, N)).toInt());
                     // Sample random gaussian noise
                     const noise = tf.randomNormal(x0.shape as [number, number]);
                     // Sample a random timestep t
-                    const tInt = tf.randomUniform([B], 0, this.T, 'int32');
+                    const tInt = tf.randomUniform([x0.shape[0]], 0, this.T, 'int32');
                     // Add noise to x0
                     const x_t = this.addNoise(x0, noise, tInt);
                     // Run the optimizer

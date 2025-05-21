@@ -19,6 +19,7 @@ export const distributionVisiblity = writable({
     training: false,
 })
 export const allTimeSamples = writable(undefined);
+export const allTimeGridSamples = writable(undefined);
 export const model = writable(null);
 export const currentTime = writable(0);
 export const playbackSpeed = writable(30);

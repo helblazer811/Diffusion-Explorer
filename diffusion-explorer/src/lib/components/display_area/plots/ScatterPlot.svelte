@@ -15,6 +15,7 @@
     export let data: tf.Tensor; // Data to plot
     export let distributionId: string = "target"; // ID for the distribution canvas
     export let pointColor: string; // Point color for the scatter plot
+    export let maximumPoints: number = 300; // Maximum number of points to plot
 
     function plotScatterPlot(
         data: number[][],
@@ -52,7 +53,7 @@
 
     // If the data points change then replot
     $: if (data && svgElement && $screenWidth && isActive) {
-        plotScatterPlot(data, time, opacity, distributionId);
+        plotScatterPlot(data, time, opacity, distributionId, maximumPoints);
     }
 
     // If the plot is no longer active, remove the group

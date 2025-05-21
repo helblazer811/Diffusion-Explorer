@@ -38,15 +38,14 @@ export class FlowModel extends Model {
         for (let epoch = 0; epoch < epochs; epoch++) {
             // console.log(`Epoch ${epoch + 1} / ${epochs}`);
             // Iterate over the dataset
-            for (let i = 0; i < Math.floor(data.shape[0] / batchSize); i++) {
-                tf.tidy(() => { // Clear memory
+            for (let i = 0; i < data.shape[0]; i += batchSize) {
+                tf.tidy(() => {// Clear memory 
                     // Sample a batch of target distribution samples from `data`
-                    const indices = tf.randomUniform([batchSize], 0, data.shape[0], 'int32');
-                    const x_1 = tf.gather(data, indices); // sampled data
+                    const x_1 = tf.gather(data, tf.range(i, Math.min(i + batchSize, data.shape[0])).toInt());
                     // Sample a batch of `batch_size` timesteps in [0, 1]
-                    const t = tf.randomUniform([batchSize, 1]);
+                    const t = tf.randomUniform([x_1.shape[0], 1]);
                     // Sample a batch of `batch_size` random noise
-                    const x_0 = tf.randomNormal([batchSize, this.dim]);
+                    const x_0 = tf.randomNormal([x_1.shape[0], this.dim]);
                     // Compute the x_t interpolation x_t = (1 - t) * x_0 + t * x_1
                     const x_t = x_0.mul(tf.sub(1, t)).add(x_1.mul(t));
                     const dx_t = x_1.sub(x_0) // dx_t = x_1 - x_0
@@ -181,24 +180,3 @@ export class FlowModel extends Model {
         });
     }
 }
-
-// export function loadFlowModel(path: string) {
-//     let fileExists = false;
-//     // Check if the path exists
-//     async function checkFileExists() {
-// 		try {
-// 			const res = await fetch(path, { method: 'HEAD' });
-// 			fileExists = res.ok;
-// 		} catch (err) {
-// 			fileExists = false;
-// 		}
-// 	}
-//     // Check if the file exists
-//     checkFileExists();
-
-//     if (!fileExists) {
-//         return new Promise(() => false); // Return false if the file does not exist
-//     }
-//     // Load the model from the specified path
-//     return tf.loadLayersModel(path);
-// }
