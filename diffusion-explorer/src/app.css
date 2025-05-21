@@ -15,5 +15,5 @@ body, html {
     height: 100%;
     background-color: var(--light-gray);
     overflow-x: hidden;
-    overflow-y: hidden;
+    /* overflow-y: hidden; */
 }

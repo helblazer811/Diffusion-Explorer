@@ -108,32 +108,6 @@
         isTraining.set(true);
     }
 
-
-    // // Handle usePretrained turned off 
-    // $ : if (!$usePretrained) {
-    //     state_management.handleUsePretrainedOff();
-    // }
-
-    // // Switch to a non-pretrained model if usePretrained is set false, or back to pretrained if set true
-    // let lastPretrainedState = true;
-    // $ : if ($usePretrained && !lastPretrainedState && $datasetName !== "brush") { 
-    //     lastPretrainedState = true;
-    //     // Switch to using a pretrained model (if it exists)
-    //     console.log("Switching to pretrained model");
-    // } else if (!$usePretrained && lastPretrainedState && $datasetName !== "brush") {
-    //     lastPretrainedState = false;
-    //     console.log("Switching to non-pretrained model");
-    //     // Switch to using a non-pretrained model
-    //     // If the model does not exist, then create a random model, save it, and run sampling with it
-    //     // Check if the model exists
-    //     if ($cachedModelPaths[$trainingObjective] && $cachedModelPaths[$trainingObjective][$datasetName]) {
-    //         console.log("Found cached non-pretrained model. Loading it...");
-    //     } else {
-    //         // No model is found, so initialize a new one, save it, and run sampling with it
-    //         console.error(`No  model found for ${$trainingObjective} on ${$datasetName}`);
-    //     }
-    // }
-
 </script>
 
 <style>
