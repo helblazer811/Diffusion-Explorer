@@ -197,6 +197,12 @@
             padding: 10px 0;
         }
 
+        .training-section-container {
+            /* Make it float left */
+            width: 100%;
+            /* justify-content: flex-start; */
+        }
+
     }
     /* If width becomes below 400 then make the hyperparameter menu flex column */
     @media (max-width: 400px) {
