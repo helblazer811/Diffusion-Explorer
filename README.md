@@ -1,6 +1,7 @@
 # Diffusion Explorer: Interactive Visualizations of Diffusion and Flow Based Generative Models
 
-[<img src="ToolScreenshot.png"/>](https://alechelbling.com/Diffusion-Explorer)
+
+https://github.com/user-attachments/assets/07cb1f45-13c9-4cad-8709-ec95829e1d7e
 <!-- <video controls>
   <source src="DiffusionLabDemoVideo.mov">
   Your browser does not support the video tag.
