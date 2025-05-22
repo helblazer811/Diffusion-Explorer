@@ -15,7 +15,7 @@ Diffusion Explorer is an interactive tool (check out a beta version [here](https
 
 Diffusion Explorer is mainly an educaitonal tool with the following key functionality. It 
 
-1. Implements various trianing objectives like Flow Matching and Denoising Score Matching
+1. Implements various training objectives like Flow Matching and Denoising Score Matching
 2. Shows the dynamics of generated samples over time for pretrained models
 3. Allows a user to observe how generated samples change through training
 4. Enables training on custom hand drawn distributions
