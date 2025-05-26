@@ -1,6 +1,7 @@
 <script>
     import { currentTime, isTraining, isEditing } from '$lib/state';
     import PlayButton from '$lib/components/time_slider/PlayButton.svelte';
+    import LoopButton from './LoopButton.svelte';
 
     let disabled = false; // Whether the slider is disabled
 
@@ -118,6 +119,19 @@
         pointer-events: auto; /* Ensure button is clickable */
     }
 
+    .loop-button-container {
+        padding-left: 10px;
+        left: 0;
+        transform: translateY(-22%);
+        z-index: 1;      
+        width: 40px;
+        height: 40px;
+        display: block;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+    }
+
     /* If UI less than 900 then auto downscale the width of the time slider */
     @media (max-width: 900px) {
         .time-slider-inner-container {
@@ -164,6 +178,9 @@
                     t=1
                 </div>
             </div>
+        </div>
+        <div class="loop-button-container">
+            <LoopButton />
         </div>
     </div>
 </div>

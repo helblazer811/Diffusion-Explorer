@@ -1,6 +1,6 @@
 <script>
     import { onDestroy } from 'svelte';
-    import { isPlaying, playbackSpeed, currentTime, numberOfSteps } from '$lib/state';
+    import { isPlaying, playbackSpeed, currentTime, numberOfSteps, isLooping } from '$lib/state';
 
     export let disabled = false; // Whether the button is disabled
     let interval;
@@ -23,11 +23,14 @@
                 // Update currentTime based on playbackSpeed
                 let nextTime = $currentTime + 1 / $numberOfSteps;
                 // If nextTime is greater than 1, loop back to 0
-                if (nextTime > 1) {
+                if (nextTime > 1 && $isLooping) {
                     nextTime = 0;
-                }
-                // Update the curentTime state
-                currentTime.update(() => nextTime);
+                } else if(nextTime > 1 && !$isLooping ){
+                    // console.log(nextTime);
+                    togglePlay();
+                } 
+                    // Update the curentTime state
+                    currentTime.update(() => nextTime);
             } else {
                 clearInterval(interval);
             }
