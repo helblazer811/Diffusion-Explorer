@@ -32,3 +32,4 @@ export const usePretrained = writable(true);
 export const isPlaying = writable(false);
 export const isTraining = writable(false);
 export const isEditing = writable(false);
+export const isLooping = writable(false);
