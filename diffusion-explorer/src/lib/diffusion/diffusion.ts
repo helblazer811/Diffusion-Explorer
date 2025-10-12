@@ -166,7 +166,7 @@ export class DiffusionModel extends Model {
         return tf.tidy(() => {
             let x = initial_points;
             const traj: tf.Tensor2D[] = [];
-            const steps = [...Array(num_total_steps).keys()].reverse();
+            const steps = [...Array(num_total_steps - 1).keys()].reverse();
             for (const t of steps) {
                 traj.push(x);
                 const tInt = tf.fill([x.shape[0]], t, 'int32');

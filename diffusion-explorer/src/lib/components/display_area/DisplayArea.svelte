@@ -12,7 +12,7 @@
         distributionVisiblity,
         intermediateTrainingSamples,
         isEditing,
-    } from '$lib/state';
+    } from '$lib/state/main/state';
 
     import { interfaceSettings } from '$lib/settings';
 

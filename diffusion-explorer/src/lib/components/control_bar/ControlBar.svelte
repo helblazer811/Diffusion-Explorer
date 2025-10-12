@@ -16,7 +16,7 @@
         usePretrained,
         datasetName,
         datasetDict,
-    } from '$lib/state';
+    } from '$lib/state/main/state';
     
     const plotTypeIcons = {
         "Scatter": `${base}/StyleIcons/PointsIcon.svg`,

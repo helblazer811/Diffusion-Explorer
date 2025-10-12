@@ -4,7 +4,7 @@
     import { base } from '$app/paths';
     import { derived } from 'svelte/store';
     // Import state and settings
-    import { allTimeGridSamples } from '$lib/state';
+    import { allTimeGridSamples } from '$lib/state/main/state';
     import { interfaceSettings } from '$lib/settings';
     
     export let isActive: boolean = true; // Flag to indicate if the plot is active
@@ -21,14 +21,19 @@
     let initialCondition: number[] = undefined; // Initial condition for the trajectories
 
     // Make a derived store called trajectories that transposes allTimeGridSamples
-
     export const trajectories = derived(allTimeGridSamples, ($allTimeGridSamples) => {
         const allSamples = $allTimeGridSamples;
         if (!allSamples || allSamples.length === 0) return [];
 
+        const flatArray = allSamples.map(timestep => {
+            // timestep is [x][y][2]
+            return timestep.flatMap(row => row); // flattens [x][y][2] to [x*y][2]
+        });
+        console.log(flatArray)
+
         // Transpose allSamples: [time, x * y, 2] -> [time, 2, x * y]
-        const T = allSamples.length;
-        const N = allSamples[0].length;
+        const T = flatArray.length;
+        const N = flatArray[0].length;
 
         const result = Array.from({ length: N }, () =>
             Array.from({ length: T }, () => [0, 0])
@@ -36,9 +41,11 @@
 
         for (let t = 0; t < T; t++) {
             for (let n = 0; n < N; n++) {
-                result[n][t] = allSamples[t][n];
+                result[n][t] = flatArray[t][n];
             }
         }
+
+        console.log(result)
 
         return result; // Shape: [N, T, 2]
     });
@@ -142,14 +149,15 @@
         // Initialize the initial condition to the mean of the time = 0 points
         if (initialCondition === undefined) {
             const initialConditions = $trajectories.map(trajectory => trajectory[0]);
+            console.log(initialConditions)
             const xMean = d3.mean(initialConditions, d => d[0]);
             const yMean = d3.mean(initialConditions, d => d[1]);
+            console.log(`Mean initial condition: [${xMean}, ${yMean}]`);
             initialCondition = [xMean, yMean];
         }
         // Plot the trajectory closest to the given initial condition
         plotTrajectory(initialCondition, $trajectories, time, opacity, distributionId);
     }
-
 
     // Setup behavior for the drag handle, will run a single time
     $: if (!initialized && svgElement && initialCondition && isActive) {

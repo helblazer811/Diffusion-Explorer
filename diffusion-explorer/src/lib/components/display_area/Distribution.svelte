@@ -8,7 +8,7 @@
     import { contourPlotSettings, interfaceSettings, meshPlotSettings, scatterPlotSettings } from '$lib/settings';
     import { trainingObjectiveToDisplayOptions } from '$lib/settings';
     // Import state
-    import { trainingObjective } from '$lib/state';
+    import { trainingObjective } from '$lib/state/main/state';
     import { fill } from '@tensorflow/tfjs-core';
     // Props
     export let svgElement; // Shared SVG element for all distributions

@@ -1,5 +1,5 @@
 <script>
-    import { currentTime, isTraining, isEditing } from '$lib/state';
+    import { currentTime, isTraining, isEditing } from '$lib/state/main/state';
     import PlayButton from '$lib/components/time_slider/PlayButton.svelte';
 
     let disabled = false; // Whether the slider is disabled
