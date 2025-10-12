@@ -1,6 +1,6 @@
 <script>
     import { onDestroy } from 'svelte';
-    import { isPlaying, playbackSpeed, currentTime, numberOfSteps } from '$lib/state';
+    import { isPlaying, playbackSpeed, currentTime, numberOfSteps } from '$lib/state/main/state';
 
     export let disabled = false; // Whether the button is disabled
     let interval;

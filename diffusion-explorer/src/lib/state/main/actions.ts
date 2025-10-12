@@ -30,7 +30,7 @@ import {
     isTraining,
     sampler,
     allTimeGridSamples
-} from '$lib/state';
+} from '$lib/state/main/state';
 
 // Helper functions
 import { sampleMultivariateNormal } from '$lib/diffusion/utils';
@@ -226,6 +226,20 @@ export async function handleDatasetChange() {
 }
 
 /*
+* This function handles the logic for switching the training objective.
+*/
+export function handleTrainingObjectiveChange() {
+    console.log("Training objective changed to: ", get(trainingObjective));
+    // Set the default sampler for the new training objective
+    const trainingObjectiveVal = get(trainingObjective);
+    const defaultSampler = settings.trainingObjectiveToSamplers[trainingObjectiveVal][0];
+    // Update the sampler to the default for the new training objective
+    sampler.set(defaultSampler);
+    // Run handle dataset change
+    handleDatasetChange();
+}
+
+/*
 * This function handles when model training is finished.
 */
 export async function finishTraining(
@@ -266,13 +280,20 @@ export async function finishTraining(
             currentTime.set(0);
         }
     );
+    // Make domain range minus some margin
+    const squashedDomainRange = {
+        xMin: settings.domainRange.xMin + 0.6,
+        xMax: settings.domainRange.xMax - 0.6,
+        yMin: settings.domainRange.yMin + 0.6,
+        yMax: settings.domainRange.yMax - 0.6
+    }
     // Also do a sampling gird for PathPlot and MeshPlot
     const gridResolution = settings.meshPlotSettings.gridResolution;
     callSamplingWorkerThreadGrid(
         tfModelPath,
         trainingObjectiveVal,
         settings.trainingObjectiveToModelConfig[trainingObjectiveVal],
-        gridResolution,
+        squashedDomainRange,
         get(numberOfSteps),
         settings.domainRange,
         settings.interfaceSettings.distributionWidth,

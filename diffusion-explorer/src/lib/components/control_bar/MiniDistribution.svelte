@@ -10,7 +10,7 @@
         currentTime,
         isPlaying,
         isEditing
-    } from '$lib/state';
+    } from '$lib/state/main/state';
 
     import { miniDistributionSettings } from '$lib/settings';
 

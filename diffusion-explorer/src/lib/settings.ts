@@ -7,7 +7,7 @@ type PlotType = "Contour" | "Scatter" | "Mesh" | "Path";
 
 export const plotTypes: PlotType[] = ["Contour", "Scatter", "Mesh", "Path"];
 
-export const downloadSamplesIfNotCached: boolean = true;
+export const downloadSamplesIfNotCached: boolean = false;
 
 export interface DisplayOptions {
     "Plot Types": PlotType[];
@@ -16,12 +16,12 @@ export interface DisplayOptions {
 
 export const trainingObjectiveToDisplayOptions: Record<string, DisplayOptions> = {
     "Flow Matching": {
-        "Plot Types": ["Contour", "Scatter", "Mesh"],
-        "Default Plot Types": ["Contour", "Scatter"],
+        "Plot Types": ["Contour", "Scatter", "Mesh", "Path"],
+        "Default Plot Types": ["Contour", "Scatter", "Path"],
     }, 
     "Diffusion": {
-        "Plot Types": ["Contour", "Scatter"],
-        "Default Plot Types": ["Contour", "Scatter"],
+        "Plot Types": ["Contour", "Scatter", "Path"],
+        "Default Plot Types": ["Contour", "Scatter", "Path"],
     },
 };
 
@@ -32,7 +32,7 @@ export interface HyperparameterMenuEntry {
 
 export const trainingObjectives: string[] = [
     "Flow Matching",
-    // "Diffusion"
+    "Diffusion"
 ];
 
 export const trainingObjectiveToSamplers: Record<string, string[]> = {
@@ -57,17 +57,17 @@ export const pretrainedModelPaths: Record<string, Record<string, string>> = {
 };
 
 export const cachedSamplesPaths: Record<string, Record<string, string>> = {
-    "Flow Matching": {
-        "Three Modes": "/cached_samples/flow_matching_euler_three_modes.json",
-        "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face.json",
-    },
+    // "Flow Matching": {
+    //     "Three Modes": "/cached_samples/flow_matching_euler_three_modes.json",
+    //     "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face.json",
+    // },
 }
 
 export const cachedGridSamplesPaths: Record<string, Record<string, string>> = {
-    "Flow Matching": {
-        "Three Modes": "/cached_samples/flow_matching_euler_three_modes_grid.json",
-        "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face_grid.json",
-    },
+    // "Flow Matching": {
+        // "Three Modes": "/cached_samples/flow_matching_euler_three_modes_grid.json",
+        // "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face_grid.json",
+    // },
 }
 
 export const trainingObjectiveToModelClass: Record<string, any> = {
@@ -141,10 +141,10 @@ export const domainRange: {
     yMin: number;
     yMax: number;
 } = {
-    xMin: -3.5,
-    xMax: 3.5,
-    yMin: -3.5,
-    yMax: 3.5,
+    xMin: -3,
+    xMax: 3,
+    yMin: -3,
+    yMax: 3,
 };
 
 /* Styling for the various plots */
@@ -170,15 +170,15 @@ export const scatterPlotSettings: {
     pointColor: string;
     pointOpacity: number;
 } = {
-    pointRadius: 3,
+    pointRadius: 5,
     pointColor: "rgba(255, 100, 0, 1)",
-    pointOpacity: 0.4,
+    pointOpacity: 0.6,
 };
 
 export const meshPlotSettings: {
     gridResolution: number;
     gridColor: string;
 } = {
-    gridResolution: 7,
+    gridResolution: 15,
     gridColor: "rgba(35, 35, 35, 1.0)",
 };

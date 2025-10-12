@@ -2,7 +2,7 @@
     import * as d3 from 'd3';
 
     import { interfaceSettings, domainRange } from '$lib/settings';
-    import { targetDistributionSamples, isEditing } from '$lib/state';
+    import { targetDistributionSamples, isEditing } from '$lib/state/main/state';
 
     // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
     

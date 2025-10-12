@@ -20,7 +20,7 @@
     function plotScatterPlot(
         data: number[][],
         time: number = 0.0,
-        opacity: number = 0.5,
+        opacity: number = 0.7,
         distributionId: string = "target",
         maximumPoints: number = 300,
     ) {
