@@ -1,5 +1,6 @@
 <script>
     import { base } from '$app/paths';
+    import { getContext } from 'svelte';
     import { derived } from 'svelte/store';
     // Import components
     import ToggleButton from '$lib/components/primitives/ToggleButton.svelte';
@@ -7,7 +8,9 @@
     import MiniDistribution from '$lib/components/control_bar/MiniDistribution.svelte';
     // Import settings
     import *  as settings from '$lib/settings';
-    import { 
+    
+    const pageState = getContext("pageState");
+    const { 
         trainingObjective, 
         sampler, 
         epochValue, 
@@ -16,7 +19,7 @@
         usePretrained,
         datasetName,
         datasetDict,
-    } from '$lib/state/main/state';
+    } = pageState;
     
     const plotTypeIcons = {
         "Scatter": `${base}/StyleIcons/PointsIcon.svg`,

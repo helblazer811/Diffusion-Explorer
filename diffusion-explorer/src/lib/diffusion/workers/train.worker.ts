@@ -15,7 +15,10 @@ async function loadDataset(path: string) {
         .then(data => {
             // Convert the data to a tensor
             const pointsTensor = tf.tensor(data.points);
-            return pointsTensor;
+            // If there is classes then also convert it to a tensor
+            const classesTensor = data.classes ? tf.tensor(data.classes) : null;
+
+            return { pointsTensor, classesTensor };
         });
 }
 
@@ -51,24 +54,46 @@ self.onmessage = async (e) => {
             modelConfig.hidden,
         );
         // Load the dataset
-        const pointsTensor = await loadDataset(datasetPath);
-        // Run training
-        await ourModel.train(
-            pointsTensor,
-            trainingConfig["epochs"],
-            trainingConfig["batchSize"],
-            trainingConfig["updateInterval"],
-            // Stop training function that handles halting the training
-            () => { return trainingStopped; },
-            (epoch, intermediateSamples) => {
-                // Send the intermediate samples to the main thread
-                self.postMessage({ 
-                    type: 'epoch_chunk', 
-                    epoch: epoch, 
-                    intermediateSamples: intermediateSamples,
-                });
-            }
-        )
+        const { pointsTensor, classesTensor } = await loadDataset(datasetPath);
+        // If the model is a conditional diffusion model then we need to pass in the classes
+        if (trainingObjective === 'ConditionalDiffusion' && classesTensor) {
+            await ourModel.train(
+                pointsTensor,
+                classesTensor,
+                trainingConfig["epochs"],
+                trainingConfig["batchSize"],
+                trainingConfig["updateInterval"],
+                // Stop training function that handles halting the training
+                () => { return trainingStopped; },
+                (epoch, intermediateSamples) => {
+                    // Send the intermediate samples to the main thread
+                    self.postMessage({ 
+                        type: 'epoch_chunk', 
+                        epoch: epoch, 
+                        intermediateSamples: intermediateSamples,
+                    });
+                }
+            );
+        } else {
+            // Run training
+            await ourModel.train(
+                pointsTensor,
+                trainingConfig["epochs"],
+                trainingConfig["batchSize"],
+                trainingConfig["updateInterval"],
+                // Stop training function that handles halting the training
+                () => { return trainingStopped; },
+                (epoch, intermediateSamples) => {
+                    // Send the intermediate samples to the main thread
+                    self.postMessage({ 
+                        type: 'epoch_chunk', 
+                        epoch: epoch, 
+                        intermediateSamples: intermediateSamples,
+                    });
+                }
+            );
+        }
+
         const modelSaveName = await saveModel(ourModel.model, trainingObjective)
         console.log("Training worker thread posting result...");
         self.postMessage({ 

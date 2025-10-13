@@ -1,8 +1,14 @@
 <script lang="ts">
+    // Import components
+    import Distribution from '$lib/components/display_area/Distribution.svelte';
+    import DistributionEditWindow from '$lib/components/display_area/DistributionEditWindow.svelte';
+    import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
+    import MultiClassDistribution from './MultiClassDistribution.svelte';
     import { onMount, getContext } from 'svelte';
+    import { interfaceSettings } from '$lib/settings';
 
     const pageState = getContext("pageState");
-    const { 
+    const {
         currentTime, 
         sourceDistributionSamples,
         targetDistributionSamples,
@@ -13,18 +19,11 @@
         distributionVisiblity,
         intermediateTrainingSamples,
         isEditing,
+        allTimeGridSamples
     } = pageState;
 
-    import { interfaceSettings } from '$lib/settings';
-
     // Import components
-    import Distribution from '$lib/components/display_area/Distribution.svelte';
-    import DistributionEditWindow from '$lib/components/display_area/DistributionEditWindow.svelte';
-    import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
-
     let sharedSVGElement: SVGSVGElement; // Shared SVG element for all distributions
-
-    export let allTimeGridSamples; // All time grid samples for path plotting
 
     // If the currentTime changes then update the current distribution samples in the UI state
     $: if ($currentTime && $allTimeSamples) {
@@ -103,7 +102,7 @@
                 activePlotTypes={$isEditing ? ["Contour", "Scatter"] : ["Contour"]}
                 scatterPlotMaximumPoints={3000}
             />
-            <Distribution
+            <MultiClassDistribution
                 svgElement={sharedSVGElement}
                 visible={$distributionVisiblity.current}
                 time={$currentTime}
@@ -117,21 +116,6 @@
                 showBorder={false}
                 distributionId="current"
                 activePlotTypes={$activePlotTypes}
-            />
-            <Distribution
-                svgElement={sharedSVGElement}
-                visible={$distributionVisiblity.training}
-                time={1.0}
-                data={$intermediateTrainingSamples}
-                allTimeSamples={$allTimeSamples}
-                opacity={0.8}
-                label=""
-                fillColor="rgba(255, 100, 0, 0.5)"
-                borderColor="rgba(255, 100, 0, 1)"
-                labelIsLatex={true}
-                showBorder={false}
-                distributionId="training"
-                activePlotTypes={["Contour"]}
             />
         {/if}
     </svg>

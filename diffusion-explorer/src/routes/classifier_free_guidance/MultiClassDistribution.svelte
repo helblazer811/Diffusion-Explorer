@@ -8,8 +8,6 @@
     import { contourPlotSettings, interfaceSettings, meshPlotSettings, scatterPlotSettings, trainingObjectiveToDisplayOptions } from '$lib/settings';
     // Import state
     import { getContext } from 'svelte';
-    import { fill } from '@tensorflow/tfjs-core';
-    
     const pageState = getContext("pageState");
     const { trainingObjective } = pageState;
     
@@ -84,6 +82,5 @@
         isActive={activePlotTypes.includes("Path")}
         isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Path")}
         distributionId={distributionId}
-        allTimeGridSamples={allTimeSamples}
     />
 </g>

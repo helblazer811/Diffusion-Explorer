@@ -1,8 +1,11 @@
 <script lang="ts">
     import * as d3 from 'd3';
+    import { getContext } from 'svelte';
 
     import { interfaceSettings, domainRange } from '$lib/settings';
-    import { targetDistributionSamples, isEditing } from '$lib/state/main/state';
+    
+    const pageState = getContext("pageState");
+    const { targetDistributionSamples, isEditing } = pageState;
 
     // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
     

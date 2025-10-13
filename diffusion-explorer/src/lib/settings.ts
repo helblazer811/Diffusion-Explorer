@@ -1,5 +1,6 @@
 import { FlowModel } from '$lib/diffusion/flow_matching';
 import { DiffusionModel } from '$lib/diffusion/diffusion';
+import { ConditionalDiffusionModel } from '$lib/diffusion/conditional_diffusion';
 
 export const backend: "webgl" | "wasm" = "webgl";
 
@@ -32,7 +33,8 @@ export interface HyperparameterMenuEntry {
 
 export const trainingObjectives: string[] = [
     "Flow Matching",
-    "Diffusion"
+    "Diffusion",
+    "ConditionalDiffusion",
 ];
 
 export const trainingObjectiveToSamplers: Record<string, string[]> = {
@@ -42,7 +44,10 @@ export const trainingObjectiveToSamplers: Record<string, string[]> = {
     "Diffusion": [
         "DDPM",
         // "DDIM" // TODO: Implement DDIM
-    ]
+    ],
+    "ConditionalDiffusion": [
+        "DDPM",
+    ],
 };
 
 export const pretrainedModelPaths: Record<string, Record<string, string>> = {
@@ -53,6 +58,9 @@ export const pretrainedModelPaths: Record<string, Record<string, string>> = {
     },
     "Diffusion": {
         "Smiley Face": "/models/diffusion_smiley_face/model.json",
+    },
+    "ConditionalDiffusion": {
+        "Three Modes": "/models/conditional_diffusion_three_modes/model.json",
     }
 };
 
@@ -72,12 +80,14 @@ export const cachedGridSamplesPaths: Record<string, Record<string, string>> = {
 
 export const trainingObjectiveToModelClass: Record<string, any> = {
     "Flow Matching": FlowModel,
-    "Diffusion": DiffusionModel
+    "Diffusion": DiffusionModel,
+    "ConditionalDiffusion": ConditionalDiffusionModel,
 };
 
 export interface ModelConfig {
     dim: number;
     hidden: number;
+    condDim?: number;
 }
 
 export const trainingObjectiveToModelConfig: Record<string, ModelConfig> = {
@@ -88,7 +98,12 @@ export const trainingObjectiveToModelConfig: Record<string, ModelConfig> = {
     "Diffusion": {
         dim: 2,
         hidden: 64,
-    }
+    },
+    "ConditionalDiffusion": {
+        dim: 2,
+        condDim: 2,
+        hidden: 128,
+    },
 };
 
 export const trainingConfig: {
