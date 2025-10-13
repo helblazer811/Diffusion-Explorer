@@ -1,17 +1,8 @@
 <script lang="ts">
-    import * as actions from '$lib/state/main/actions';
-    import { onMount, onDestroy} from 'svelte';
+    import { createMainState  } from '$lib/state/main/state';
+    import { createMainStateHandlers } from '$lib/state/main/actions';
+    import { onMount, onDestroy, setContext} from 'svelte';
     // Load up the application config
-    import {
-        isPlaying,
-        datasetName,
-        trainingObjective,
-        isTraining,
-        cachedModelPaths,
-        isEditing,
-        usePretrained,
-        datasetDict,
-    } from '$lib/state/main/state';
     // Load up the components
     import TitleBar from '$lib/components/TitleBar.svelte';
     import TimeSlider from '$lib/components/time_slider/TimeSlider.svelte';
@@ -20,6 +11,15 @@
     // import Explanation from '$lib/components/Explanation.svelte';
 
     let trainingWorker: Worker; // Variable to hold the training worker
+
+    // Create the context
+    const pageState = createMainState();
+    setContext('pageState', pageState);
+
+    // Unpack the context needed for this component
+    const { isTraining, isEditing, isPlaying, currentTime, datasetName, datasetDict, usePretrained, trainingObjective } = pageState;
+    const state_handlers = createMainStateHandlers(pageState);
+
 
     function handleKeydown(event: KeyboardEvent) {
         if (event.code === 'Space') {
@@ -38,11 +38,11 @@
 
     onMount(async () => {
         // Load the datasets from the backend
-        await actions.loadDatasets()
+        await state_handlers.loadDatasets()
         // Set up keyboard interactions
         setupKeyboardInteractions();
         // Initialize the distributions 
-        actions.initializeDistributions()
+        state_handlers.initializeDistributions()
     });
 
     onDestroy(() => {
@@ -68,38 +68,38 @@
         if ($isEditing) {
             isEditing.set(false);
         }
-        trainingWorker = actions.startTraining();
+        trainingWorker = state_handlers.startTraining();
     }
     // If training stopped, then stop the training thread
     // Becuase it is stopped by default, we need to check if training was ever initiated by the user
     $: if (!$isTraining && trainingInitiated && trainingWorker) {
         trainingInitiated = false;
-        actions.stopTraining(trainingWorker);
+        state_handlers.stopTraining(trainingWorker);
     }
 
     // Handle the editing model logic
     let editingInitiated = false;
     $ : if ($isEditing && !editingInitiated) {
         editingInitiated = true;
-        actions.startEditing(); 
+        state_handlers.startEditing(); 
     }
 
     // If editing stopped, handle hiding the UI
     $ : if (!$isEditing && editingInitiated) {
         editingInitiated = false;
-        actions.stopEditing();
+        state_handlers.stopEditing();
     }
 
     // Handle dataset name change 
     $: if ($datasetName && $datasetDict[$datasetName] && typeof window !== 'undefined') { 
         // typof window ... makes sure this is not run on the server
-        actions.handleDatasetChange();
+        state_handlers.handleDatasetChange();
     }
 
     // Handle usePretrained change
     $ : if ($usePretrained && $datasetDict[$datasetName] && typeof window !== 'undefined') {
         // Jut start training the model 
-        actions.handleUsePretrained();
+        state_handlers.handleUsePretrained();
     }
 
     // Handle usePretrained is turned off
@@ -111,7 +111,7 @@
     // Handle training objective change
     $ : if ($trainingObjective && typeof window !== 'undefined') {
         // Just start training the model 
-        actions.handleTrainingObjectiveChange();
+        state_handlers.handleTrainingObjectiveChange();
     }
 
 </script>
@@ -154,6 +154,6 @@
         <DisplayArea/>
         <!-- </div> -->
     </div>
-    <TimeSlider /> 
+    <TimeSlider currentTime={$currentTime} isTraining={$isTraining} isEditing={$isEditing} /> 
     <div class="footer"></div>
 </div>

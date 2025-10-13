@@ -1,8 +1,10 @@
 <script lang="ts"> 
     import * as d3 from 'd3';
-
     import { get } from 'svelte/store';
-    import { allTimeGridSamples } from '$lib/state/main/state';
+    import { getContext } from 'svelte';
+
+    const pageState = getContext("pageState");
+    const { allTimeGridSamples } = pageState;
 
     export let svgElement; // Shared SVG element for all distributions
     export let isActive: boolean = false; // Flag to indicate if the plot is active

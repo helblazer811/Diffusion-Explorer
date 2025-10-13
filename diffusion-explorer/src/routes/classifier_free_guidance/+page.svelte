@@ -1,45 +1,36 @@
 <script lang="ts">
-    import * as actions from '$lib/state/classifier_free_guidance/actions';
-    import { onMount, onDestroy} from 'svelte';
-    // Load up the application config
-    import {
-        isPlaying,
-        isTraining,
-        isEditing,
-    } from '$lib/state/main/state';
-    // Load up the components
     import TimeSlider from '$lib/components/time_slider/TimeSlider.svelte';
-    import DisplayArea from '$lib/components/display_area/DisplayArea.svelte';
+    import CFGDisplayArea from './CFGDisplayArea.svelte';
+    
+    import { createCFGStateHandlers } from '$lib/state/classifier_free_guidance/actions';
+    import * as cfgState from '$lib/state/classifier_free_guidance/state';
+    import { onMount, onDestroy, setContext } from 'svelte';
+    // Load up the application config
+    // Load up the components
+ 
     // import Explanation from '$lib/components/Explanation.svelte';
 
-    function handleKeydown(event: KeyboardEvent) {
-        if (event.code === 'Space') {
-            event.preventDefault(); // Prevent page scrolling
-            // Toggle the play/pause state
-            if (!$isTraining && !$isEditing) {
-                isPlaying.update(state => !state);
-            }
-        }
-    }
+    // Set context for child components
+    setContext('pageState', cfgState);
 
-    function setupKeyboardInteractions() {
-        // Add a listener to the window to handle keydown events
-        window.addEventListener('keydown', handleKeydown);
+    const { isPlaying, currentTime, allTimeGridSamples } = cfgState;
+    const state_handlers = createCFGStateHandlers(cfgState);
+
+    // Hard coded train loop 
+    async function trainModel() {
+        // Load the model
+        // const model = await state_handlers.loadModel();
+        // Start training
+        // await state_handlers.trainModel(model);
     }
 
     onMount(async () => {
         // Load the datasets from the backend
-        await actions.loadDatasets()
-        // Set up keyboard interactions
-        setupKeyboardInteractions();
+        await state_handlers.loadDatasets();
+        // Handle dataset change
+        await state_handlers.handleDatasetChange();
         // Initialize the distributions 
-        actions.initializeDistributions()
-    });
-
-    onDestroy(() => {
-        if (typeof window !== 'undefined') {
-            window.removeEventListener('keydown', handleKeydown);
-        }
+        state_handlers.initializeDistributions()
     });
 
 </script>
@@ -59,12 +50,6 @@
         position: relative;
     }
 
-    .footer {
-        height: 10px;
-        position: relative;
-        box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2); /* upward shadow */
-    }
-
     @media (max-width: 1100px) {
         .main-area {
             height: auto;
@@ -72,14 +57,20 @@
         }
     }
 
+    .footer {
+        height: 10px;
+        position: relative;
+        box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2); /* upward shadow */
+    }
+
 </style>
 
 <div class="container">
     <div class="main-area">
         <!-- <DatasetMenu datasetDict={datasetDict}/> -->
-        <DisplayArea/>
+        <CFGDisplayArea allTimeGridSamples={$allTimeGridSamples} />
         <!-- </div> -->
     </div>
-    <TimeSlider /> 
+    <TimeSlider currentTime={currentTime} /> 
     <div class="footer"></div>
 </div>

@@ -85,6 +85,79 @@ export class Model {
     }
 }
 
+export class ConditionalModel {
+    protected model: tf.Sequential;
+    protected dim: number;
+    protected condDim: number; // dimension of the conditioning vector
+
+    constructor(dim: number = 2, condDim: number = 0, hidden: number = 64) {
+        if (new.target === ConditionalModel) {
+            throw new Error("Cannot instantiate abstract class ConditionalModel directly.");
+        }
+        this.dim = dim;
+        this.condDim = condDim;
+
+        this.model = tf.sequential();
+        // Input layer: x_t + time + conditioning
+        this.model.add(tf.layers.dense({
+            inputShape: [dim + 1 + condDim],
+            units: hidden,
+            activation: 'elu'
+        }));
+        this.model.add(tf.layers.dense({ units: hidden, activation: 'elu' }));
+        this.model.add(tf.layers.dense({ units: hidden, activation: 'elu' }));
+        this.model.add(tf.layers.dense({ units: dim })); // output matches x_t dimension
+    }
+
+    setModel(model: tf.Sequential) {
+        this.model = model;
+    }
+
+    async download() {
+        await this.model.save('downloads://conditional_model');
+    }
+
+    /**
+     * Train the model with conditional inputs
+     * @param data tf.Tensor2D of shape [num_samples, dim]
+     * @param cond tf.Tensor2D of shape [num_samples, condDim]
+     */
+    train(
+        data: tf.Tensor2D,
+        cond: tf.Tensor2D,
+        epochs: number = 1000,
+        batchSize: number = 32,
+        updateInterval: number = 50,
+        endEpochCallback: (epoch: number, intermediateSamples: number[][] | null) => void = () => { },
+        stopTraining: () => boolean | Promise<boolean> = () => false
+    ) {
+        throw new Error("Method 'train()' not implemented.");
+    }
+
+    /**
+     * Compute the vector field or noise prediction at (x_t, t) conditioned on c
+     * @param x_t tf.Tensor2D of shape [batch, dim]
+     * @param t tf.Tensor1D or tf.Tensor2D of shape [batch] or [batch,1]
+     * @param c tf.Tensor2D of shape [batch, condDim]
+     */
+    forward(x_t: tf.Tensor2D, t: tf.Tensor1D | tf.Tensor2D, c: tf.Tensor2D): tf.Tensor {
+        throw new Error("Method 'forward()' not implemented.");
+    }
+
+    step(x_t: tf.Tensor2D, t_start: tf.Tensor1D | tf.Tensor2D, t_end: tf.Tensor1D | tf.Tensor2D, c: tf.Tensor2D): tf.Tensor2D {
+        throw new Error("Method 'step()' not implemented.");
+    }
+
+    sample(num_samples: number, cond: tf.Tensor2D, num_total_steps: number = 100): tf.Tensor3D {
+        throw new Error("Method 'sample()' not implemented.");
+    }
+
+    sample_from_initial_points(initial_points: tf.Tensor2D, cond: tf.Tensor2D, num_total_steps: number = 100): tf.Tensor3D {
+        throw new Error("Method 'sample_from_initial_points()' not implemented.");
+    }
+}
+
+
 class Sampler {
 
     step() {

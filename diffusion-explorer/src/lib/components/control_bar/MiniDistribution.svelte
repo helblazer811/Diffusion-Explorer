@@ -3,14 +3,17 @@
     import * as d3 from 'd3';
     import * as tf from '@tensorflow/tfjs';
     import { base } from '$app/paths';
-    import {
+    import { getContext } from 'svelte';
+    
+    const pageState = getContext("pageState");
+    const {
         datasetName, 
         currentDistributionSamples, 
         allTimeSamples,
         currentTime,
         isPlaying,
         isEditing
-    } from '$lib/state/main/state';
+    } = pageState;
 
     import { miniDistributionSettings } from '$lib/settings';
 

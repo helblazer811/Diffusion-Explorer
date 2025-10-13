@@ -1,6 +1,9 @@
 <script>
-    import { currentTime, isTraining, isEditing } from '$lib/state/main/state';
     import PlayButton from '$lib/components/time_slider/PlayButton.svelte';
+
+    import { getContext } from 'svelte';
+    const pageState = getContext("pageState");
+    const { isTraining, isEditing, isPlaying, currentTime, numberOfSteps } = pageState;
 
     let disabled = false; // Whether the slider is disabled
 
