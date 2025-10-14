@@ -125,32 +125,11 @@ export class FlowModel extends Model {
      * @returns tf.Tensor2D of shape [num_total_steps, num_samples, dim]
      */
     sample(num_samples: number, num_total_steps: number = 100, return_guidance: boolean = false): tf.Tensor3D {
-        if (return_guidance) {
-            throw new Error("return_guidance not implemented yet for FlowModel");
-        }
-        return tf.tidy(() => {
-            // console.log("Number of samples: ", num_samples);
-            // Draw some initial samples from the source distribution 
-            const x_0 = tf.randomNormal([num_samples, this.dim]);
-            // Draw some linear spaced timesteps in [0, 1]
-            const t_steps = tf.linspace(0, 1, num_total_steps + 1);
-            // Simulate the ODE until timestep t for all samples
-            let all_step_data: tf.Tensor2D[] = [];
-            // Store the initial sample
-            let x_t: tf.Tensor2D = x_0;
-            for (let i = 0; i < num_total_steps; i++) {
-                const t_i = t_steps.slice([i], [1]); // current time
-                const t_i_repeated = tf.tile(t_i, [num_samples]);
-                const t_next = t_steps.slice([i + 1], [1]); // next time
-                const t_next_repeated = tf.tile(t_next, [num_samples]);
-                // Do the step using the midpoint method
-                x_t = this.step(x_t, t_i_repeated, t_next_repeated);
-                // Store the result in the all_step_data tensor
-                all_step_data.push(x_t)
-            }
-            // Return all samples
-            return tf.stack(all_step_data);
-        });
+        // Draw initial samples from a Gaussian distribution
+        const initial_points = tf.randomNormal([num_samples, this.dim]);
+        
+        // Delegate to sample_from_initial_points
+        return this.sample_from_initial_points(initial_points, num_total_steps, return_guidance);
     }
 
     /**

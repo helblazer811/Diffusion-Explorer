@@ -165,39 +165,11 @@ export class ConditionalDiffusionModel extends ConditionalModel {
 
     /** Full reverse diffusion sampling */
     sample(num_samples: number, cond: tf.Tensor1D | tf.Tensor2D, num_total_steps: number = 100, guidanceScale = 0, return_guidance = false): any {
-        return tf.tidy(() => {
-            // If cond is 1D then convert to one-hot
-            if (cond.rank === 1) {
-                const cond_expanded = cond as tf.Tensor1D;
-                const numClasses = this.condDim;
-                cond = this.convertToOneHot(cond_expanded, numClasses);
-            }
-
-            let x = tf.randomNormal([num_samples, this.dim]);
-            const traj: tf.Tensor2D[] = [];
-            const steps = [...Array(num_total_steps).keys()].reverse();
-            const epsConds: tf.Tensor2D[] = [];
-            const epsUnconds: tf.Tensor2D[] = [];
-            const epsHats: tf.Tensor2D[] = [];
-
-            for (const t of steps) {
-                const tInt = tf.fill([num_samples], t, 'int32');
-                const stepOutput = this.step(x, tInt, tInt, cond, guidanceScale);
-                console.log(stepOutput)
-                traj.push(stepOutput.mean);
-                if (return_guidance) {
-                    epsConds.push(stepOutput.epsCond!);
-                    epsUnconds.push(stepOutput.epsUncond!);
-                    epsHats.push(stepOutput.eps_hat);
-                }
-            }
-
-            if (return_guidance) {
-                return { traj: tf.stack(traj), epsCond: tf.stack(epsConds), epsUncond: tf.stack(epsUnconds), epsHat: tf.stack(epsHats) };
-            } else {
-                return tf.stack(traj);
-            }
-        });
+        // Draw initial samples from a Gaussian distribution
+        const initial_points = tf.randomNormal([num_samples, this.dim]);
+        
+        // Delegate to sample_from_initial_points
+        return this.sample_from_initial_points(initial_points, cond, num_total_steps, guidanceScale, return_guidance);
     }
 
     /** Sampling from initial points */
