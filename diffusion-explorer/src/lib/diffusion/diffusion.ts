@@ -1,5 +1,6 @@
 import * as tf from '@tensorflow/tfjs';
 import { Model } from './interfaces';
+import { sampleUniformGrid } from './utils';
 
 export class DiffusionModel extends Model {
     readonly T: number;
@@ -145,7 +146,10 @@ export class DiffusionModel extends Model {
         });
     }
 
-    sample(num_samples: number, num_total_steps: number = this.T): tf.Tensor3D {
+    sample(num_samples: number, num_total_steps: number = this.T, return_guidance: boolean = false): tf.Tensor3D {
+        if (return_guidance) {
+            throw new Error("return_guidance not implemented yet for DiffusionModel");
+        }
         return tf.tidy(() => {
             // Draw some initial samples from the source distribution
             let x = tf.randomNormal([num_samples, this.dim]);
@@ -162,7 +166,10 @@ export class DiffusionModel extends Model {
         });
     }
 
-    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = this.T): tf.Tensor3D {
+    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = this.T, return_guidance: boolean = false): tf.Tensor3D {
+        if (return_guidance) {
+            throw new Error("return_guidance not implemented yet for DiffusionModel");
+        }
         return tf.tidy(() => {
             let x = initial_points;
             const traj: tf.Tensor2D[] = [];
@@ -175,5 +182,26 @@ export class DiffusionModel extends Model {
             traj.push(x);
             return tf.stack(traj);
         });
+    }
+
+    /** 
+     * Sample from a uniform grid of initial points
+     * @param gridResolution Number of points along each axis
+     * @param domainRange The domain range for x and y coordinates
+     * @param num_total_steps Number of diffusion steps
+     * @param return_guidance Whether to return guidance info (not implemented for this model)
+     * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
+     */
+    sample_grid(
+        gridResolution: number,
+        domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
+        num_total_steps: number = this.T,
+        return_guidance: boolean = false
+    ): tf.Tensor3D {
+        // Generate uniform grid
+        const initialPoints = sampleUniformGrid(gridResolution, domainRange);
+        
+        // Sample from the initial points
+        return this.sample_from_initial_points(initialPoints, num_total_steps, return_guidance);
     }
 }

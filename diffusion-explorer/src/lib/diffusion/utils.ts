@@ -1,5 +1,28 @@
 import * as tf from '@tensorflow/tfjs';
 
+export function convertDataToDisplayCoordinateFrame(
+    data: tf.Tensor, // shape: [T, N, 2]
+    domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
+    distributionWidth: number,
+    displayAreaWidth: number,
+    numSteps: number,
+): tf.Tensor {
+    return tf.tidy(() => {
+        const min = tf.tensor([domainRange.xMin, domainRange.yMin]);
+        const range = tf.tensor([domainRange.xMax - domainRange.xMin, domainRange.yMax - domainRange.yMin]);
+        const offsetScale = tf.tensor([displayAreaWidth - distributionWidth, 0]);
+
+        const dataNorm = data.sub(min).div(range);           // [T, N, 2]
+        const dataScaled = dataNorm.mul(distributionWidth);  // [T, N, 2]
+
+        const time = tf.linspace(0, 1, numSteps).reshape([numSteps, 1, 1]); // [T, 1, 1]
+        const offset = time.mul(offsetScale);                // [T, 1, 2]
+        const result = dataScaled.add(offset);               // [T, N, 2]
+
+        return result;
+    });
+}
+
 // Generate a single standard normal sample using Box-Muller
 function standardNormal() {
     let u = 0, v = 0;
@@ -102,4 +125,29 @@ export function sampleGaussianMixture(
     const allSamples = tf.concat(samples, 0);
 
     return allSamples;
+}
+
+/**
+ * Generate a uniform grid of points for sampling.
+ * @param gridResolution Number of points along each axis
+ * @param domainRange The domain range for x and y coordinates
+ * @returns A tensor of shape [gridResolution * gridResolution, 2] containing the flattened grid points
+ */
+export function sampleUniformGrid(
+    gridResolution: number,
+    domainRange: { xMin: number, xMax: number, yMin: number, yMax: number }
+): tf.Tensor {
+    // First uniformly sample the x and y coordinates
+    const width = domainRange.xMax - domainRange.xMin;
+    const height = domainRange.yMax - domainRange.yMin;
+    // Make range of data bit wider (currently 0.0, so no expansion)
+    const xMin = domainRange.xMin + 0.0 * width;
+    const xMax = domainRange.xMax - 0.0 * width;
+    const yMin = domainRange.yMin + 0.0 * height;
+    const yMax = domainRange.yMax - 0.0 * height;
+    const x = tf.linspace(xMin, xMax, gridResolution);
+    const y = tf.linspace(yMin, yMax, gridResolution);
+    let initialPoints: tf.Tensor = tf.stack(tf.meshgrid(x, y), 2);
+    initialPoints = initialPoints.reshape([gridResolution * gridResolution, 2]); // Flatten the points to be [gridResolution * gridResolution, 2]
+    return initialPoints;
 }
