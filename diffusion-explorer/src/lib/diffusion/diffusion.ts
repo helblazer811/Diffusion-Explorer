@@ -147,23 +147,11 @@ export class DiffusionModel extends Model {
     }
 
     sample(num_samples: number, num_total_steps: number = this.T, return_guidance: boolean = false): tf.Tensor3D {
-        if (return_guidance) {
-            throw new Error("return_guidance not implemented yet for DiffusionModel");
-        }
-        return tf.tidy(() => {
-            // Draw some initial samples from the source distribution
-            let x = tf.randomNormal([num_samples, this.dim]);
-            const traj: tf.Tensor2D[] = [];
-            const steps = [...Array(num_total_steps).keys()].reverse();
-            // Iterate through the timesteps backwards
-            for (const t of steps) {
-                const tInt = tf.fill([num_samples], t, 'int32');
-                x = this.step(x, tInt);
-                traj.push(x);
-            }
-            // traj.push(x);
-            return tf.stack(traj);
-        });
+        // Draw initial samples from a Gaussian distribution
+        const initial_points = tf.randomNormal([num_samples, this.dim]);
+        
+        // Delegate to sample_from_initial_points
+        return this.sample_from_initial_points(initial_points, num_total_steps, return_guidance);
     }
 
     sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = this.T, return_guidance: boolean = false): tf.Tensor3D {
