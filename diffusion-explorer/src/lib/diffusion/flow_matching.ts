@@ -1,5 +1,6 @@
 import * as tf from '@tensorflow/tfjs'
 import { Model } from './interfaces';
+import { sampleUniformGrid } from './utils';
 
 export class FlowModel extends Model {
   
@@ -123,7 +124,10 @@ export class FlowModel extends Model {
      * @param num_total_steps number of total steps to simulate the ODE
      * @returns tf.Tensor2D of shape [num_total_steps, num_samples, dim]
      */
-    sample(num_samples: number, num_total_steps: number = 100): tf.Tensor3D {
+    sample(num_samples: number, num_total_steps: number = 100, return_guidance: boolean = false): tf.Tensor3D {
+        if (return_guidance) {
+            throw new Error("return_guidance not implemented yet for FlowModel");
+        }
         return tf.tidy(() => {
             // console.log("Number of samples: ", num_samples);
             // Draw some initial samples from the source distribution 
@@ -154,7 +158,10 @@ export class FlowModel extends Model {
     * @param initial_points tf.Tensor2D of shape [num_samples, dim]
     * @param num_total_steps 
     */
-    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = 100): tf.Tensor3D {
+    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = 100, return_guidance: boolean = false): tf.Tensor3D {
+        if (return_guidance) {
+            throw new Error("return_guidance not implemented yet for FlowModel");
+        }
         return tf.tidy(() => {
             // Draw some initial samples from the source distribution 
             const num_samples = initial_points.shape[0]; 
@@ -178,5 +185,26 @@ export class FlowModel extends Model {
             // Return all samples
             return tf.stack(all_step_data);
         });
+    }
+
+    /** 
+     * Sample from a uniform grid of initial points
+     * @param gridResolution Number of points along each axis
+     * @param domainRange The domain range for x and y coordinates
+     * @param num_total_steps Number of flow steps
+     * @param return_guidance Whether to return guidance info (not implemented for this model)
+     * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
+     */
+    sample_grid(
+        gridResolution: number,
+        domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
+        num_total_steps: number = 100,
+        return_guidance: boolean = false
+    ): tf.Tensor3D {
+        // Generate uniform grid
+        const initialPoints = sampleUniformGrid(gridResolution, domainRange);
+        
+        // Sample from the initial points
+        return this.sample_from_initial_points(initialPoints, num_total_steps, return_guidance);
     }
 }

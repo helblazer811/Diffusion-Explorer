@@ -1,5 +1,6 @@
 import * as tf from '@tensorflow/tfjs';
 import { ConditionalModel } from './interfaces';
+import { sampleUniformGrid } from './utils';
 
 export class ConditionalDiffusionModel extends ConditionalModel {
     readonly T: number;
@@ -33,6 +34,12 @@ export class ConditionalDiffusionModel extends ConditionalModel {
         this.posteriorCoef2 = tf.tidy(() => tf.sub(1, this.alphasCumprodPrev).mul(tf.sqrt(this.alphas)).div(tf.sub(1, this.alphasCumprod)));
     }
 
+    private convertToOneHot(labels: tf.Tensor1D, numClasses: number): tf.Tensor2D {
+        return tf.tidy(() => {
+            return tf.oneHot(labels.toInt(), numClasses).toFloat();
+        });
+    }
+
     /** Add noise to x0 at timestep t */
     private addNoise(x0: tf.Tensor2D, noise: tf.Tensor2D, t: tf.Tensor1D): tf.Tensor2D {
         return tf.tidy(() => {
@@ -43,8 +50,21 @@ export class ConditionalDiffusionModel extends ConditionalModel {
     }
 
     /** Forward pass: predict noise at (x_t, t) conditioned on c */
-    forward(x_t: tf.Tensor2D, t: tf.Tensor1D | tf.Tensor2D, c: tf.Tensor2D): tf.Tensor2D {
+    forward(x_t: tf.Tensor2D, t: tf.Tensor1D | tf.Tensor2D, c: tf.Tensor1D | tf.Tensor2D): tf.Tensor2D {
         return tf.tidy(() => {
+            // Check if c is undefined
+            if (c === undefined) {
+                // Create cond with all zeros for unconditional prediction
+                c = tf.zeros([x_t.shape[0], this.condDim]);
+            }
+            // If cond is 1D then convert to one-hot
+            if (c.rank === 1) {
+                const c_expanded = c as tf.Tensor1D;
+                const numClasses = this.condDim;
+                c = this.convertToOneHot(c_expanded, numClasses);
+            }
+            // Reshape t to be [batch, 1]
+            // Normalize time to [0, 1]
             const t_expanded = t.reshape([x_t.shape[0], 1]).div(this.T);
             const input = tf.concat([x_t, t_expanded, c], 1);
             return this.model.predict(input) as tf.Tensor2D;
@@ -52,13 +72,15 @@ export class ConditionalDiffusionModel extends ConditionalModel {
     }
 
     /** Single reverse diffusion step */
-    step(x_t: tf.Tensor2D, t_start: tf.Tensor1D, t_end: tf.Tensor1D, c: tf.Tensor2D, guidanceScale: number = 0): tf.Tensor2D {
+    step(x_t: tf.Tensor2D, t_start: tf.Tensor1D, t_end: tf.Tensor1D, c: tf.Tensor2D, guidanceScale: number = 0): any {
         return tf.tidy(() => {
             let eps_hat: tf.Tensor2D;
+            let epsUncond: tf.Tensor2D | null = null;
+            let epsCond: tf.Tensor2D | null = null;
             if (guidanceScale > 0) {
                 // classifier-free guidance
-                const epsUncond = this.forward(x_t, t_start, tf.zerosLike(c));
-                const epsCond = this.forward(x_t, t_start, c);
+                epsUncond = this.forward(x_t, t_start, tf.zerosLike(c));
+                epsCond = this.forward(x_t, t_start, c);
                 eps_hat = epsUncond.add(epsCond.sub(epsUncond).mul(guidanceScale));
             } else {
                 eps_hat = this.forward(x_t, t_start, c);
@@ -75,7 +97,15 @@ export class ConditionalDiffusionModel extends ConditionalModel {
             const noise = tf.randomNormal(x_t.shape as [number, number]);
             const varTerm = tf.gather(this.variance, t_start).sqrt().expandDims(1).mul(noise);
             const isZero = t_start.equal(tf.scalar(0, 'int32')).expandDims(1);
-            return mean.add(varTerm.mul(tf.cast(isZero.logicalNot(), 'float32')));
+            const finalMean = mean.add(varTerm.mul(tf.cast(isZero.logicalNot(), 'float32')));
+
+            // Return the epsUncond and epsCond as well as the updated x_t
+            return { 
+                mean: finalMean.arraySync(), 
+                epsUncond: epsUncond?.arraySync(), 
+                epsCond: epsCond?.arraySync(), 
+                eps_hat: eps_hat?.arraySync() 
+            };
         });
     }
 
@@ -95,6 +125,7 @@ export class ConditionalDiffusionModel extends ConditionalModel {
         const mse = (a: tf.Tensor, b: tf.Tensor) => tf.losses.meanSquaredError(a, b);
 
         for (let epoch = 0; epoch < epochs; epoch++) {
+            const losses: number[] = [];
             for (let i = 0; i < N; i += batchSize) {
                 tf.tidy(() => {
                     const x0 = tf.gather(data, tf.range(i, Math.min(i + batchSize, N)).toInt());
@@ -110,13 +141,20 @@ export class ConditionalDiffusionModel extends ConditionalModel {
 
                     optimizer.minimize(() => {
                         const eps_hat = this.forward(x_t, tInt, cInput);
+                        const mse_loss = mse(noise, eps_hat);
+                        losses.push(mse_loss.arraySync() as number);
                         return mse(noise, eps_hat);
                     });
                 });
             }
+            const meanLoss = losses.reduce((a, b) => a + b, 0) / losses.length;
+            console.log(`Epoch ${epoch + 1} / ${epochs}, Loss: ${meanLoss.toFixed(4)}`);
 
             if (epoch % updateInterval === 0) {
-                const samples = this.sample(16, cond.slice([0, 0], [16, this.condDim]));
+                // Randomly sample integers from 0 too condDim - 1
+                console.log("Epoch ", epoch);
+                const condIndices: tf.Tensor1D = tf.randomUniform([200], 0, this.condDim, 'int32');
+                const samples = this.sample(200, condIndices, 100, 5.0);
                 endEpochCallback(epoch, samples.arraySync().map((s: any) => s.flat()));
             }
 
@@ -126,36 +164,105 @@ export class ConditionalDiffusionModel extends ConditionalModel {
     }
 
     /** Full reverse diffusion sampling */
-    sample(num_samples: number, cond: tf.Tensor2D, num_total_steps: number = 100, guidanceScale = 0): tf.Tensor3D {
+    sample(num_samples: number, cond: tf.Tensor1D | tf.Tensor2D, num_total_steps: number = 100, guidanceScale = 0, return_guidance = false): any {
         return tf.tidy(() => {
+            // If cond is 1D then convert to one-hot
+            if (cond.rank === 1) {
+                const cond_expanded = cond as tf.Tensor1D;
+                const numClasses = this.condDim;
+                cond = this.convertToOneHot(cond_expanded, numClasses);
+            }
+
             let x = tf.randomNormal([num_samples, this.dim]);
             const traj: tf.Tensor2D[] = [];
             const steps = [...Array(num_total_steps).keys()].reverse();
+            const epsConds: tf.Tensor2D[] = [];
+            const epsUnconds: tf.Tensor2D[] = [];
+            const epsHats: tf.Tensor2D[] = [];
 
             for (const t of steps) {
                 const tInt = tf.fill([num_samples], t, 'int32');
-                x = this.step(x, tInt, tInt, cond, guidanceScale);
-                traj.push(x);
+                const stepOutput = this.step(x, tInt, tInt, cond, guidanceScale);
+                console.log(stepOutput)
+                traj.push(stepOutput.mean);
+                if (return_guidance) {
+                    epsConds.push(stepOutput.epsCond!);
+                    epsUnconds.push(stepOutput.epsUncond!);
+                    epsHats.push(stepOutput.eps_hat);
+                }
             }
 
-            return tf.stack(traj);
+            if (return_guidance) {
+                return { traj: tf.stack(traj), epsCond: tf.stack(epsConds), epsUncond: tf.stack(epsUnconds), epsHat: tf.stack(epsHats) };
+            } else {
+                return tf.stack(traj);
+            }
         });
     }
 
     /** Sampling from initial points */
-    sample_from_initial_points(initial_points: tf.Tensor2D, cond: tf.Tensor2D, num_total_steps: number = 100, guidanceScale = 0): tf.Tensor3D {
+    sample_from_initial_points(initial_points: tf.Tensor2D, cond: tf.Tensor2D | tf.Tensor1D, num_total_steps: number = 100, guidanceScale = 0, return_guidance = false): any {
         return tf.tidy(() => {
+            // If cond is 1D then convert to one-hot
+            if (cond.rank === 1) {
+                const cond_expanded = cond as tf.Tensor1D;
+                const numClasses = this.condDim;
+                cond = this.convertToOneHot(cond_expanded, numClasses);
+            }
+            // Make sure that initial points and cond have same number of samples
+            if (initial_points.shape[0] !== cond.shape[0]) {
+                throw new Error('Initial points and conditioning must have the same number of samples');
+            }
             let x = initial_points;
             const traj: tf.Tensor2D[] = [];
             const steps = [...Array(num_total_steps).keys()].reverse();
+            const epsConds: tf.Tensor2D[] = [];
+            const epsUnconds: tf.Tensor2D[] = [];
+            const epsHats: tf.Tensor2D[] = [];
 
             for (const t of steps) {
                 const tInt = tf.fill([x.shape[0]], t, 'int32');
-                x = this.step(x, tInt, tInt, cond, guidanceScale);
-                traj.push(x);
+                const stepOutput = this.step(x, tInt, tInt, cond, guidanceScale);
+                traj.push(stepOutput.mean);
+                if (return_guidance) {
+                    epsConds.push(stepOutput.epsCond!);
+                    epsUnconds.push(stepOutput.epsUncond!);
+                    epsHats.push(stepOutput.eps_hat);
+                }
+                x = stepOutput.mean;
             }
 
-            return tf.stack(traj);
+            if (return_guidance) {
+                return { traj: tf.stack(traj), epsCond: tf.stack(epsConds), epsUncond: tf.stack(epsUnconds), epsHat: tf.stack(epsHats) };
+            } else {
+                return tf.stack(traj);
+            }
         });
     }
+
+    /** 
+     * Sample from a uniform grid of initial points with conditioning
+     * @param gridResolution Number of points along each axis
+     * @param domainRange The domain range for x and y coordinates
+     * @param cond Conditioning tensor (1D class indices or 2D one-hot)
+     * @param num_total_steps Number of diffusion steps
+     * @param guidanceScale Guidance scale for classifier-free guidance
+     * @param return_guidance Whether to return guidance info
+     * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2] or object with guidance info
+     */
+    sample_grid(
+        gridResolution: number,
+        domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
+        cond: tf.Tensor2D | tf.Tensor1D,
+        num_total_steps: number = 100,
+        guidanceScale: number = 0,
+        return_guidance: boolean = false
+    ): any {
+        // Generate uniform grid
+        const initialPoints = sampleUniformGrid(gridResolution, domainRange);
+        
+        // Sample from the initial points
+        return this.sample_from_initial_points(initialPoints, cond, num_total_steps, guidanceScale, return_guidance);
+    }
 }
+
