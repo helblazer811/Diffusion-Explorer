@@ -10,7 +10,8 @@ import * as tf from '@tensorflow/tfjs';
 // Helper functions
 import { sampleMultivariateNormal } from '$lib/diffusion/utils';
 import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
-import { callTrainingWorkerThread, callSamplingWorkerThread, callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/utils';
+import { callTrainingWorkerThread} from '$lib/diffusion/workers/train_client';
+import { callSamplingWorkerThread, callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/sampling_client';
 import { downloadJSON } from '$lib/utils';
 
 /**
@@ -96,124 +97,6 @@ export function createCFGStateHandlers(cfgState: any) {
     }
 
     /*
-    * Handle the event that the dataset has changed. 
-    * NOTE: This function is also called on applicaiton load. 
-    */
-    async function handleDatasetChange() {
-        const trainingObjectiveVal = get(trainingObjective) as string;
-        const datasetNameVal = get(datasetName) as string;
-        const datasetDictVal = get(datasetDict) as Record<string, any>;
-        const samplerVal = get(sampler) as string;
-        const numberOfStepsVal = get(numberOfSteps) as number;
-        const gridResolution = settings.meshPlotSettings.gridResolution;
-        // Pause the animation
-        isPlaying.set(false);
-        // Check that there is a trained model for the given dataset
-        if (!settings.pretrainedModelPaths[trainingObjectiveVal][datasetNameVal]) {
-            // If there is no model, switch pretrained to false
-            console.error("No pretrained model available for the selected dataset and training objective: ", trainingObjectiveVal, datasetNameVal);
-        }
-        // Check if the sampler is valid for $trainingObjective and if not set it to a valid default
-        // NOTE: This is done here to avoid conflicting with the training objective
-        if (!settings.trainingObjectiveToSamplers[trainingObjectiveVal].includes(samplerVal)) {
-            // Set the sampler to the first one in the list
-            sampler.set(settings.trainingObjectiveToSamplers[trainingObjectiveVal][0]);
-        }
-        // Load the dataset
-        const pointsData = datasetDictVal[datasetNameVal];
-        // Convert the points to the correct coordinate frame
-        const translatedData = convertDataToDisplayCoordinateFrame(
-            pointsData,
-            1.0, // Time of target distribution
-            settings.interfaceSettings.distributionWidth,
-            settings.interfaceSettings.displayAreaWidth,
-            settings.domainRange
-        );
-        // Update the UI state with the training dataset
-        targetDistributionSamples.set(translatedData);
-        // Immediately remove the currentDistributionSamples
-        currentDistributionSamples.set([[]]);
-        // Check if there are cached samples for the given dataset and model
-        if (
-            settings.cachedSamplesPaths[trainingObjectiveVal] &&
-            settings.cachedSamplesPaths[trainingObjectiveVal][datasetNameVal]
-        ) {
-            // Load the cached samples
-            const cachedSamplesPath = base + settings.cachedSamplesPaths[trainingObjectiveVal][datasetNameVal];
-            fetch(cachedSamplesPath)
-                .then(response => response.json())
-                .then(data => {
-                    // Update the UI state with the cached samples
-                    allTimeSamples.set(data);
-                    // Load the cached grid samples
-                    const cachedGridSamplesPath = base + settings.cachedGridSamplesPaths[trainingObjectiveVal][datasetNameVal];
-                    fetch(cachedGridSamplesPath)
-                        .then(response => response.json())
-                        .then(data => {
-                            // Update the UI state with the cached samples
-                            allTimeGridSamples.set(data);
-                            // Start playing if not already training
-                            if (!get(isTraining)) {
-                                isPlaying.set(true);
-                            }
-                        });
-                });
-        } else {
-            // Load up the model corresponding to the dataset
-            const defaultTrainingObjective = trainingObjectiveVal;
-            const defaultModelPath = base + settings.pretrainedModelPaths[trainingObjectiveVal][datasetNameVal];
-            // Regenerate all of the samples 
-            callSamplingWorkerThread(
-                defaultModelPath,
-                defaultTrainingObjective,
-                settings.trainingObjectiveToModelConfig[defaultTrainingObjective],
-                get(numSamples),
-                get(numberOfSteps),
-                settings.domainRange,
-                settings.interfaceSettings.distributionWidth,
-                settings.interfaceSettings.displayAreaWidth,
-                // Callback for when the sampling is done
-                (allSamples: any) => {
-                    // Update the UI state with the all time samples
-                    allTimeSamples.set(allSamples);
-                    // Make the UI state play
-                    if (!get(isTraining)) {
-                        isPlaying.set(true);
-                    }
-                    // Download the samples as json 
-                    if (settings.downloadSamplesIfNotCached) {
-                        downloadJSON(allSamples, `${datasetNameVal}_${trainingObjectiveVal}_samples.json`);
-                    }
-                }
-            )
-            // Also do a sampling gird for PathPlot and MeshPlot
-            callSamplingWorkerThreadGrid(
-                defaultModelPath,
-                trainingObjectiveVal,
-                settings.trainingObjectiveToModelConfig[trainingObjectiveVal],
-                gridResolution,
-                numberOfStepsVal,
-                settings.domainRange,
-                settings.interfaceSettings.distributionWidth,
-                settings.interfaceSettings.displayAreaWidth,
-                (allSamples: number[][]) => {
-                    let allSamplesTensor = tf.tensor(allSamples);
-                    // Reshape the samples to be [time, x, y, 2]
-                    allSamplesTensor = allSamplesTensor.reshape([numberOfStepsVal, gridResolution, gridResolution, 2]);
-                    // Save the samples to the trajectory grid
-                    const trajectoryGrid = allSamplesTensor.arraySync() as number[][][];
-                    // Update the UI state with the trajectory grid
-                    allTimeGridSamples.set(trajectoryGrid);
-                    // Download the samples as json 
-                    if (settings.downloadSamplesIfNotCached) {
-                        downloadJSON(trajectoryGrid, `${datasetNameVal}_${trainingObjectiveVal}_grid.json`);
-                    }
-                }
-            )
-        }
-    }
-
-    /*
     * This function handles the logic for starting the training process.
     */
     function runTraining() {
@@ -224,19 +107,26 @@ export function createCFGStateHandlers(cfgState: any) {
         // Pull out the appropriate model config 
         const trainingObjectiveVal = get(trainingObjective) as string;
         const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
+        console.log("Calling training worker with config: ", modelConfig);
         // Call the training worker thread
         const trainingWorker: Worker = callTrainingWorkerThread(
             trainingObjectiveVal,
             modelConfig,
             jsonURL ? jsonURL : base + datasetNameToPath[datasetNameVal],
             settings.trainingConfig,
-            (tfModelPath: string) => {
+            async (tfModelPath: string) => {
                 // On model save callback
-                console.error("Not implemented yet: loading trained model from path ", tfModelPath);
-                // TODO: Save the model to a file. 
+                // console.error("Not implemented yet: loading trained model from path ", tfModelPath);
+                // // TODO: Save the model to a file. 
+                const model = await tf.loadLayersModel(tfModelPath);
+                await model.save("downloads://model");
+                // console.log(model)
+                // await model.save('downloads://trained_model');
             },
             // Update the intermediate training samples between epochs
-            (epoch: number, intermediateSamples: number[][]) => { /* Do nothing for now */}
+            (epoch: number, intermediateSamples: number[][]) => { 
+                console.log("Epoch: ", epoch);
+            }
         );
 
         // Return training worker to be used when stopping training
@@ -246,7 +136,6 @@ export function createCFGStateHandlers(cfgState: any) {
     return {
         loadDatasets,
         initializeDistributions,
-        handleDatasetChange,
         runTraining
     };
 }

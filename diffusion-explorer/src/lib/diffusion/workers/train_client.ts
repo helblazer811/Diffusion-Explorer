@@ -1,5 +1,3 @@
-t
-}
 
 export function callTrainingWorkerThread(
     trainingObjective: string,
