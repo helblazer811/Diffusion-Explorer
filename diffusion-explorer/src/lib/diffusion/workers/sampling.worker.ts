@@ -36,19 +36,8 @@ self.onmessage = async (e) => {
     }
     // Load up the model based on the passed model name
     const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-    let ourModel: any;
-    if (trainingObjective == 'Conditional Diffusion') {
-        ourModel = new ModelClass(
-            modelConfig.dim,
-            modelConfig.condDim,
-            modelConfig.hidden,
-        );
-    } else {
-        ourModel = new ModelClass(
-            modelConfig.dim,
-            modelConfig.hidden,
-        );
-    }
+    const ourModel = ModelClass.fromConfig(modelConfig);
+    
     // Load up a model from the given file path
     const tfModel = await tf.loadLayersModel(modelJSONPath);
     // Set the model in the model class

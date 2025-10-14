@@ -1,9 +1,18 @@
 import * as tf from '@tensorflow/tfjs';
 
+export interface BaseModelConfig {
+    dim: number;
+    hidden: number;
+}
+
+export interface ConditionalModelConfig extends BaseModelConfig {
+    condDim: number;
+}
+
 export class Model {
     protected model: tf.Sequential;
     protected dim: number;
-  
+
     constructor(dim: number = 2, hidden: number = 64) {
         if (new.target === Model) {
             throw new Error("Cannot instantiate abstract class Model directly.");
@@ -17,6 +26,21 @@ export class Model {
         this.model.add(tf.layers.dense({ units: hidden, activation: 'elu' }));
         this.model.add(tf.layers.dense({ units: dim }));
     }
+
+    /**
+     * Factory constructor for a Model subclass from a config object.
+     * This assumes the subclass implements the same constructor signature.
+     */
+    static fromConfig<T extends typeof Model>(
+        this: T,
+        config: Partial<BaseModelConfig>
+    ): InstanceType<T> {
+        const { dim, hidden } = config;
+        if (dim === undefined) throw new Error("Missing required field 'dim' in config");
+        if (hidden === undefined) throw new Error("Missing required field 'hidden' in config");
+        return new this(dim, hidden) as InstanceType<T>;
+    }
+
 
     setModel(model: tf.Sequential) {
         this.model = model;
@@ -109,6 +133,25 @@ export class ConditionalModel {
         this.model.add(tf.layers.dense({ units: dim })); // output matches x_t dimension
     }
 
+
+    /**
+     * Factory constructor for ConditionalModel subclasses from config.
+     */
+    static fromConfig<T extends typeof ConditionalModel>(
+        this: T,
+        config: Partial<ConditionalModelConfig>
+    ): InstanceType<T> {
+        const { dim, condDim, hidden } = config;
+        if (dim === undefined) throw new Error("Missing required field 'dim' in config");
+        if (condDim === undefined) throw new Error("Missing required field 'condDim' in config");
+        if (hidden === undefined) throw new Error("Missing required field 'hidden' in config");
+        return new this(dim, condDim, hidden) as InstanceType<T>;
+    }
+
+    async download() {
+        await this.model.save('downloads://conditional_model');
+    }
+
     setModel(model: tf.Sequential) {
         this.model = model;
     }
@@ -154,17 +197,5 @@ export class ConditionalModel {
 
     sample_from_initial_points(initial_points: tf.Tensor2D, cond: tf.Tensor2D, num_total_steps: number = 100): tf.Tensor3D {
         throw new Error("Method 'sample_from_initial_points()' not implemented.");
-    }
-}
-
-
-class Sampler {
-
-    step() {
-        throw new Error('Not implemented');
-    }
-
-    sample() {
-        throw new Error('Not implemented');
     }
 }
