@@ -1,4 +1,4 @@
-ype SamplingType = 'sample' | 'sample_from_initial_points' | 'sample_grid';
+type SamplingType = 'sample' | 'sample_from_initial_points' | 'sample_grid';
 
 interface SamplingMessageData {
     modelJSONPath: string;
@@ -118,3 +118,4 @@ export function callSamplingWorkerThreadGrid(
         classes,
         return_guidance
     }, callback);
+}

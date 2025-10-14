@@ -9,11 +9,8 @@ import { get } from 'svelte/store';
 import { downloadJSON } from '$lib/utils'; 
 import * as tf from '@tensorflow/tfjs';
 import { sampleMultivariateNormal } from '$lib/diffusion/utils';
-import { 
-    callTrainingWorkerThread, 
-    callSamplingWorkerThread,
-    callSamplingWorkerThreadGrid
-} from '$lib/diffusion/workers/utils';
+import { callTrainingWorkerThread } from '$lib/diffusion/workers/train_client';
+import { callSamplingWorkerThread, callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/sampling_client';
 import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
 
 /**
@@ -228,9 +225,9 @@ export function createMainStateHandlers(MainState: any) {
             tfModelPath,
             trainingObjectiveVal,
             settings.trainingObjectiveToModelConfig[trainingObjectiveVal],
-            squashedDomainRange,
+            gridResolution,
             get(numberOfSteps),
-            settings.domainRange,
+            squashedDomainRange,
             settings.interfaceSettings.distributionWidth,
             settings.interfaceSettings.displayAreaWidth,
             (allSamples: number[][]) => {
