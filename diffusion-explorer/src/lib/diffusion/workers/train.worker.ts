@@ -49,14 +49,20 @@ self.onmessage = async (e) => {
         }
         // Initialize the empty model 
         const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-        const ourModel = new ModelClass(
-            modelConfig.dim,
-            modelConfig.hidden,
-        );
+        let ourModel: any;
         // Load the dataset
         const { pointsTensor, classesTensor } = await loadDataset(datasetPath);
         // If the model is a conditional diffusion model then we need to pass in the classes
-        if (trainingObjective === 'ConditionalDiffusion' && classesTensor) {
+        if (trainingObjective === 'Conditional Diffusion') {
+            if (classesTensor === null) {
+                throw new Error('Classes tensor is null for conditional diffusion model');
+            }
+            console.log("Training conditional diffusion model...");
+            ourModel = new ModelClass(
+                modelConfig.dim,
+                modelConfig.condDim,
+                modelConfig.hidden,
+            );
             await ourModel.train(
                 pointsTensor,
                 classesTensor,
@@ -74,7 +80,11 @@ self.onmessage = async (e) => {
                     });
                 }
             );
-        } else {
+        } else if (trainingObjective === 'Flow Matching' || trainingObjective === 'Diffusion') {
+            ourModel = new ModelClass(
+                modelConfig.dim,
+                modelConfig.hidden,
+            );
             // Run training
             await ourModel.train(
                 pointsTensor,
@@ -92,9 +102,12 @@ self.onmessage = async (e) => {
                     });
                 }
             );
+        } else {
+            throw new Error('Invalid training objective');
         }
 
         const modelSaveName = await saveModel(ourModel.model, trainingObjective)
+        // ourModel.download();
         console.log("Training worker thread posting result...");
         self.postMessage({ 
             type: 'result', 
