@@ -8,7 +8,7 @@ import * as tf from '@tensorflow/tfjs';
 // import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
 
 import { backend, trainingObjectiveToModelClass } from '$lib/settings';
-import { convertDataToDisplayCoordinateFrame } from '$lib/diffusion/workers/utils';
+import { convertDataToDisplayCoordinateFrame } from '$lib/diffusion/utils';
 
 self.onmessage = async (e) => {
     const { type, data } = e.data;
@@ -20,6 +20,8 @@ self.onmessage = async (e) => {
     const domainRange = data.domainRange;
     const displayAreaWidth = data.displayAreaWidth;
     const distributionWidth = data.distributionWidth;
+    const classes = data.classes; // Optional: can be undefined
+    const return_guidance = data.return_guidance || false; // Optional: defaults to false
     // Set up the backend
     if (backend === 'wasm') {
         // Set up tf wasm backend
@@ -34,10 +36,19 @@ self.onmessage = async (e) => {
     }
     // Load up the model based on the passed model name
     const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-    const ourModel = new ModelClass(
-        modelConfig.dim,
-        modelConfig.hidden,
-    );
+    let ourModel: any;
+    if (trainingObjective == 'Conditional Diffusion') {
+        ourModel = new ModelClass(
+            modelConfig.dim,
+            modelConfig.condDim,
+            modelConfig.hidden,
+        );
+    } else {
+        ourModel = new ModelClass(
+            modelConfig.dim,
+            modelConfig.hidden,
+        );
+    }
     // Load up a model from the given file path
     const tfModel = await tf.loadLayersModel(modelJSONPath);
     // Set the model in the model class
@@ -46,10 +57,45 @@ self.onmessage = async (e) => {
     if (type === 'sample') {
         const numSamples = data.numSamples; 
         // Run sampling with the model based on data.numberOfSteps and data.numSamples
-        const allSamples = ourModel.sample(
-            numSamples,
-            numberOfSteps,
-        ); // shape [num_time_steps, num_samples, dim]
+        let samplingResult: any;
+        if (trainingObjective == 'Conditional Diffusion') {
+            console.log("Sampling with conditional diffusion model...");
+            // Use passed random classes or generate them
+            const numClasses = modelConfig.condDim;
+            const classesTensor = classes !== undefined 
+                ? tf.tensor(classes, undefined, 'int32')
+                : tf.randomUniform([numSamples], 0, numClasses, 'int32');
+            samplingResult = ourModel.sample(
+                numSamples,
+                classesTensor,
+                numberOfSteps,
+                0, // guidanceScale
+                return_guidance
+            );
+        } else {
+            samplingResult = ourModel.sample(
+                numSamples,
+                numberOfSteps,
+            );
+        }
+        
+        // Handle the result based on whether guidance is returned
+        let allSamples: tf.Tensor3D;
+        let guidanceData: any = null;
+        
+        if (return_guidance && typeof samplingResult === 'object' && samplingResult.traj) {
+            // Guidance info was returned
+            allSamples = samplingResult.traj;
+            guidanceData = {
+                epsCond: samplingResult.epsCond ? samplingResult.epsCond.arraySync() : null,
+                epsUncond: samplingResult.epsUncond ? samplingResult.epsUncond.arraySync() : null,
+                epsHat: samplingResult.epsHat ? samplingResult.epsHat.arraySync() : null,
+            };
+        } else {
+            // Just trajectory was returned
+            allSamples = samplingResult;
+        }
+        
         // Translate the data to the display coordinate frame
         const translatedData = convertDataToDisplayCoordinateFrame(
             allSamples,
@@ -61,19 +107,59 @@ self.onmessage = async (e) => {
         // Convert the tensor to a 2D array
         const allSamplesArray = translatedData.arraySync();
         // Return the result to the main thread
-        self.postMessage({ 
+        const resultMessage: any = { 
             type: 'result', 
             allSamples: allSamplesArray,
-        });
+        };
+        
+        if (guidanceData) {
+            resultMessage.guidance = guidanceData;
+        }
+        
+        self.postMessage(resultMessage);
     } else if (type === 'sample_from_initial_points') {
         const initialPoints = data.initialPoints;
         // Convert initial points to a tensor
         const initialPointsTensor = tf.tensor(initialPoints);
         // Run sampling with the model based on data.numberOfSteps and data.numSamples
-        const allSamples = ourModel.sample_from_initial_points(
-            initialPointsTensor,
-            numberOfSteps,
-        ); // shape [num_time_steps, num_samples, dim]
+        let samplingResult: any;
+        if (trainingObjective == 'Conditional Diffusion') {
+            // Use passed random classes or generate them
+            const numClasses = modelConfig.condDim;
+            const classesTensor = classes !== undefined 
+                ? tf.tensor(classes, undefined, 'int32')
+                : tf.randomUniform([initialPointsTensor.shape[0]], 0, numClasses, 'int32');
+            samplingResult = ourModel.sample_from_initial_points(
+                initialPointsTensor,
+                classesTensor,
+                numberOfSteps,
+                0, // guidanceScale
+                return_guidance
+            );
+        } else {
+            samplingResult = ourModel.sample_from_initial_points(
+                initialPointsTensor,
+                numberOfSteps,
+            );
+        }
+        
+        // Handle the result based on whether guidance is returned
+        let allSamples: tf.Tensor3D;
+        let guidanceData: any = null;
+        
+        if (return_guidance && typeof samplingResult === 'object' && samplingResult.traj) {
+            // Guidance info was returned
+            allSamples = samplingResult.traj;
+            guidanceData = {
+                epsCond: samplingResult.epsCond ? samplingResult.epsCond.arraySync() : null,
+                epsUncond: samplingResult.epsUncond ? samplingResult.epsUncond.arraySync() : null,
+                epsHat: samplingResult.epsHat ? samplingResult.epsHat.arraySync() : null,
+            };
+        } else {
+            // Just trajectory was returned
+            allSamples = samplingResult;
+        }
+        
         // Translate the data to the display coordinate frame
         const translatedData = convertDataToDisplayCoordinateFrame(
             allSamples,
@@ -85,31 +171,63 @@ self.onmessage = async (e) => {
         // Convert the tensor to a 2D array
         const allSamplesArray = translatedData.arraySync();
         // Return the result to the main thread
-        self.postMessage({ 
+        const resultMessage: any = { 
             type: 'result', 
             allSamples: allSamplesArray,
-        });
+        };
+        
+        if (guidanceData) {
+            resultMessage.guidance = guidanceData;
+        }
+        
+        self.postMessage(resultMessage);
     } else if (type === "sample_grid") {
         // Sample a uniform grid of the given gridResolution and then sample from those initial points
         const gridResolution = data.gridResolution;
         const domainRange = data.domainRange;
-        // First uniformly sample the x and y coordinates
-        const width = domainRange.xMax - domainRange.xMin;
-        const height = domainRange.yMax - domainRange.yMin;
-        // Make range of data bit wider
-        const xMin = domainRange.xMin + 0.0 * width;
-        const xMax = domainRange.xMax - 0.0 * width;
-        const yMin = domainRange.yMin + 0.0 * height;
-        const yMax = domainRange.yMax - 0.0 * height;
-        const x = tf.linspace(xMin, xMax, gridResolution);
-        const y = tf.linspace(yMin, yMax, gridResolution);
-        let initialPoints: tf.Tensor = tf.stack(tf.meshgrid(x, y), 2);
-        initialPoints = initialPoints.reshape([gridResolution * gridResolution, 2]); // Flatten the points to be [gridResolution * gridResolution, 2]
-        // Call the sample_from_initial_points function
-        const allSamples = ourModel.sample_from_initial_points(
-            initialPoints,
-            numberOfSteps,
-        ); // shape [num_time_steps, num_samples, dim]
+        
+        // Call the model's sample_grid function
+        let samplingResult: any;
+        if (trainingObjective == 'Conditional Diffusion') {
+            // Use passed random classes or generate them
+            const numClasses = modelConfig.condDim;
+            const classesTensor = classes !== undefined 
+                ? tf.tensor(classes, undefined, 'int32')
+                : tf.randomUniform([gridResolution * gridResolution], 0, numClasses, 'int32');
+            samplingResult = ourModel.sample_grid(
+                gridResolution,
+                domainRange,
+                classesTensor,
+                numberOfSteps,
+                0, // guidanceScale
+                return_guidance
+            );
+        } else {
+            samplingResult = ourModel.sample_grid(
+                gridResolution,
+                domainRange,
+                numberOfSteps,
+                return_guidance
+            );
+        }
+        
+        // Handle the result based on whether guidance is returned
+        let allSamples: tf.Tensor3D;
+        let guidanceData: any = null;
+        
+        if (return_guidance && typeof samplingResult === 'object' && samplingResult.traj) {
+            // Guidance info was returned
+            allSamples = samplingResult.traj;
+            guidanceData = {
+                epsCond: samplingResult.epsCond ? samplingResult.epsCond.arraySync() : null,
+                epsUncond: samplingResult.epsUncond ? samplingResult.epsUncond.arraySync() : null,
+                epsHat: samplingResult.epsHat ? samplingResult.epsHat.arraySync() : null,
+            };
+        } else {
+            // Just trajectory was returned
+            allSamples = samplingResult;
+        }
+        
         // Translate the data to the display coordinate frame
         const translatedData = convertDataToDisplayCoordinateFrame(
             allSamples,
@@ -121,9 +239,15 @@ self.onmessage = async (e) => {
         // Convert the tensor to a 2D array
         const allSamplesArray = translatedData.arraySync();
         // Return the result to the main thread
-        self.postMessage({ 
+        const resultMessage: any = { 
             type: 'result', 
             allSamples: allSamplesArray,
-        });
+        };
+        
+        if (guidanceData) {
+            resultMessage.guidance = guidanceData;
+        }
+        
+        self.postMessage(resultMessage);
     }
 };
