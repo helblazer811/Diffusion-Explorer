@@ -167,13 +167,18 @@ export class ConditionalDiffusionModel extends ConditionalModel {
     sample(
         num_samples: number, 
         num_total_steps: number = this.T,
-        options: { cond?: tf.Tensor1D | tf.Tensor2D, guidanceScale?: number, return_guidance?: boolean } = {}
+        options: { cond?: tf.Tensor1D | tf.Tensor2D | number[], guidanceScale?: number, return_guidance?: boolean } = {}
     ): any {
-        const { cond, guidanceScale = 0, return_guidance = false } = options;
+        let { cond, guidanceScale = 0, return_guidance = false } = options;
         
-        // If no condition is provided, throw an error (for conditional models, condition is required)
+        // Convert array-based cond to tensor if needed
+        if (Array.isArray(cond)) {
+            cond = tf.tensor(cond, undefined, 'int32') as tf.Tensor1D;
+        }
+        
+        // If no condition is provided, generate random classes
         if (!cond) {
-            throw new Error("Conditional diffusion model requires 'cond' parameter in options");
+            cond = tf.randomUniform([num_samples], 0, this.condDim, 'int32') as tf.Tensor1D;
         }
         
         // Draw initial samples from a Gaussian distribution
@@ -188,26 +193,33 @@ export class ConditionalDiffusionModel extends ConditionalModel {
         initial_points: tf.Tensor2D, 
         num_total_steps: number = 100,
         options: { 
-            cond?: tf.Tensor1D | tf.Tensor2D, 
+            cond?: tf.Tensor1D | tf.Tensor2D | number[], 
             guidanceScale?: number, 
             return_guidance?: boolean 
         } = {}
     ): any {
-        const { cond, guidanceScale = 0, return_guidance = false } = options;
+        let { cond, guidanceScale = 0, return_guidance = false } = options;
         
-        if (!cond) {
-            throw new Error('Conditional diffusion requires cond parameter in options');
-        }
-
         // If initial_points is an array convert it to tf.Tensor2D
         if (!(initial_points instanceof tf.Tensor)) {
             initial_points = tf.tensor2d(initial_points);
         }
         
+        // Convert array-based cond to tensor if needed
+        if (Array.isArray(cond)) {
+            cond = tf.tensor(cond, undefined, 'int32') as tf.Tensor1D;
+        }
+        
+        // If cond is not provided, generate random classes
+        if (!cond) {
+            const numSamples = initial_points.shape[0];
+            cond = tf.randomUniform([numSamples], 0, this.condDim, 'int32') as tf.Tensor1D;
+        }
+        
         return tf.tidy(() => {
             // If cond is 1D then convert to one-hot
-            let condTensor = cond;
-            if (cond.rank === 1) {
+            let condTensor = cond!;
+            if (cond!.rank === 1) {
                 const cond_expanded = cond as tf.Tensor1D;
                 const numClasses = this.condDim;
                 condTensor = this.convertToOneHot(cond_expanded, numClasses);
@@ -260,7 +272,7 @@ export class ConditionalDiffusionModel extends ConditionalModel {
         gridResolution: number,
         domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
         num_total_steps: number = 100,
-        options: { cond?: tf.Tensor1D | tf.Tensor2D, guidanceScale?: number, return_guidance?: boolean } = {}
+        options: { cond?: tf.Tensor1D | tf.Tensor2D | number[], guidanceScale?: number, return_guidance?: boolean } = {}
     ): any {
         // Generate uniform grid
         const initialPoints = sampleUniformGrid(gridResolution, domainRange);

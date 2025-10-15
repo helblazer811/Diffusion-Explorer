@@ -195,7 +195,7 @@ export class ConditionalModel {
     sample(
         num_samples: number, 
         num_total_steps: number = 100,
-        options?: { cond?: tf.Tensor1D | tf.Tensor2D, guidanceScale?: number, return_guidance?: boolean }
+        options?: { cond?: tf.Tensor1D | tf.Tensor2D | number[], guidanceScale?: number, return_guidance?: boolean }
     ): any {
         throw new Error("Method 'sample()' not implemented.");
     }
@@ -203,7 +203,7 @@ export class ConditionalModel {
     sample_from_initial_points(
         initial_points: tf.Tensor2D, 
         num_total_steps: number = 100,
-        options?: { cond?: tf.Tensor1D | tf.Tensor2D, guidanceScale?: number, return_guidance?: boolean }
+        options?: { cond?: tf.Tensor1D | tf.Tensor2D | number[], guidanceScale?: number, return_guidance?: boolean }
     ): any {
         throw new Error("Method 'sample_from_initial_points()' not implemented.");
     }
