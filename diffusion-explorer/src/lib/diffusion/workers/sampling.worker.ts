@@ -43,6 +43,9 @@ self.onmessage = async (e) => {
     // Set the model in the model class
     ourModel.setModel(tfModel);
 
+    let allSamples: tf.Tensor3D;
+    let guidanceData: any = null;
+
     if (type === 'sample') {
         const numSamples = data.numSamples; 
         // Run sampling with the model based on data.numberOfSteps and data.numSamples
@@ -56,21 +59,21 @@ self.onmessage = async (e) => {
                 : tf.randomUniform([numSamples], 0, numClasses, 'int32');
             samplingResult = ourModel.sample(
                 numSamples,
-                classesTensor,
                 numberOfSteps,
-                0, // guidanceScale
-                return_guidance
+                { 
+                    cond: classesTensor, 
+                    guidanceScale: 0,
+                    return_guidance 
+                }
             );
         } else {
             samplingResult = ourModel.sample(
                 numSamples,
-                numberOfSteps,
+                numberOfSteps
             );
         }
         
         // Handle the result based on whether guidance is returned
-        let allSamples: tf.Tensor3D;
-        let guidanceData: any = null;
         
         if (return_guidance && typeof samplingResult === 'object' && samplingResult.traj) {
             // Guidance info was returned
@@ -84,28 +87,6 @@ self.onmessage = async (e) => {
             // Just trajectory was returned
             allSamples = samplingResult;
         }
-        
-        // Translate the data to the display coordinate frame
-        const translatedData = convertDataToDisplayCoordinateFrame(
-            allSamples,
-            domainRange,
-            distributionWidth,
-            displayAreaWidth,
-            numberOfSteps
-        );
-        // Convert the tensor to a 2D array
-        const allSamplesArray = translatedData.arraySync();
-        // Return the result to the main thread
-        const resultMessage: any = { 
-            type: 'result', 
-            allSamples: allSamplesArray,
-        };
-        
-        if (guidanceData) {
-            resultMessage.guidance = guidanceData;
-        }
-        
-        self.postMessage(resultMessage);
     } else if (type === 'sample_from_initial_points') {
         const initialPoints = data.initialPoints;
         // Convert initial points to a tensor
@@ -133,7 +114,6 @@ self.onmessage = async (e) => {
         }
         
         // Handle the result based on whether guidance is returned
-        let allSamples: tf.Tensor3D;
         let guidanceData: any = null;
         
         if (return_guidance && typeof samplingResult === 'object' && samplingResult.traj) {
@@ -148,28 +128,6 @@ self.onmessage = async (e) => {
             // Just trajectory was returned
             allSamples = samplingResult;
         }
-        
-        // Translate the data to the display coordinate frame
-        const translatedData = convertDataToDisplayCoordinateFrame(
-            allSamples,
-            domainRange,
-            distributionWidth,
-            displayAreaWidth,
-            numberOfSteps
-        );
-        // Convert the tensor to a 2D array
-        const allSamplesArray = translatedData.arraySync();
-        // Return the result to the main thread
-        const resultMessage: any = { 
-            type: 'result', 
-            allSamples: allSamplesArray,
-        };
-        
-        if (guidanceData) {
-            resultMessage.guidance = guidanceData;
-        }
-        
-        self.postMessage(resultMessage);
     } else if (type === "sample_grid") {
         // Sample a uniform grid of the given gridResolution and then sample from those initial points
         const gridResolution = data.gridResolution;
@@ -186,22 +144,22 @@ self.onmessage = async (e) => {
             samplingResult = ourModel.sample_grid(
                 gridResolution,
                 domainRange,
-                classesTensor,
                 numberOfSteps,
-                0, // guidanceScale
-                return_guidance
+                {
+                    cond: classesTensor,
+                    guidanceScale: 0,
+                    return_guidance: return_guidance
+                }
             );
         } else {
             samplingResult = ourModel.sample_grid(
                 gridResolution,
                 domainRange,
-                numberOfSteps,
-                return_guidance
+                numberOfSteps
             );
         }
         
         // Handle the result based on whether guidance is returned
-        let allSamples: tf.Tensor3D;
         let guidanceData: any = null;
         
         if (return_guidance && typeof samplingResult === 'object' && samplingResult.traj) {
@@ -216,27 +174,29 @@ self.onmessage = async (e) => {
             // Just trajectory was returned
             allSamples = samplingResult;
         }
-        
-        // Translate the data to the display coordinate frame
-        const translatedData = convertDataToDisplayCoordinateFrame(
-            allSamples,
-            domainRange,
-            distributionWidth,
-            displayAreaWidth,
-            numberOfSteps
-        );
-        // Convert the tensor to a 2D array
-        const allSamplesArray = translatedData.arraySync();
-        // Return the result to the main thread
-        const resultMessage: any = { 
-            type: 'result', 
-            allSamples: allSamplesArray,
-        };
-        
-        if (guidanceData) {
-            resultMessage.guidance = guidanceData;
-        }
-        
-        self.postMessage(resultMessage);
+    } else {
+        throw new Error(`Unknown message type: ${type}`);
     }
+
+    // Translate the data to the display coordinate frame
+    const translatedData = convertDataToDisplayCoordinateFrame(
+        allSamples,
+        domainRange,
+        distributionWidth,
+        displayAreaWidth,
+        numberOfSteps
+    );
+    // Convert the tensor to a 2D array
+    const allSamplesArray = translatedData.arraySync();
+    // Return the result to the main thread
+    const resultMessage: any = { 
+        type: 'result', 
+        allSamples: allSamplesArray,
+    };
+    
+    if (guidanceData) {
+        resultMessage.guidance = guidanceData;
+    }
+    
+    self.postMessage(resultMessage);
 };

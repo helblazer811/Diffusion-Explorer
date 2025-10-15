@@ -101,10 +101,10 @@ export class ConditionalDiffusionModel extends ConditionalModel {
 
             // Return the epsUncond and epsCond as well as the updated x_t
             return { 
-                mean: finalMean.arraySync(), 
-                epsUncond: epsUncond?.arraySync(), 
-                epsCond: epsCond?.arraySync(), 
-                eps_hat: eps_hat?.arraySync() 
+                mean: finalMean, 
+                epsUncond: epsUncond, 
+                epsCond: epsCond, 
+                eps_hat: eps_hat
             };
         });
     }
@@ -154,7 +154,7 @@ export class ConditionalDiffusionModel extends ConditionalModel {
                 // Randomly sample integers from 0 too condDim - 1
                 console.log("Epoch ", epoch);
                 const condIndices: tf.Tensor1D = tf.randomUniform([200], 0, this.condDim, 'int32');
-                const samples = this.sample(200, condIndices, 100, 5.0);
+                const samples = this.sample(200, 100, { cond: condIndices, guidanceScale: 5.0 });
                 endEpochCallback(epoch, samples.arraySync().map((s: any) => s.flat()));
             }
 
@@ -164,25 +164,56 @@ export class ConditionalDiffusionModel extends ConditionalModel {
     }
 
     /** Full reverse diffusion sampling */
-    sample(num_samples: number, cond: tf.Tensor1D | tf.Tensor2D, num_total_steps: number = 100, guidanceScale = 0, return_guidance = false): any {
+    sample(
+        num_samples: number, 
+        num_total_steps: number = this.T,
+        options: { cond?: tf.Tensor1D | tf.Tensor2D, guidanceScale?: number, return_guidance?: boolean } = {}
+    ): any {
+        const { cond, guidanceScale = 0, return_guidance = false } = options;
+        
+        // If no condition is provided, throw an error (for conditional models, condition is required)
+        if (!cond) {
+            throw new Error("Conditional diffusion model requires 'cond' parameter in options");
+        }
+        
         // Draw initial samples from a Gaussian distribution
         const initial_points = tf.randomNormal([num_samples, this.dim]);
         
         // Delegate to sample_from_initial_points
-        return this.sample_from_initial_points(initial_points, cond, num_total_steps, guidanceScale, return_guidance);
+        return this.sample_from_initial_points(initial_points, num_total_steps, { cond, guidanceScale, return_guidance });
     }
 
     /** Sampling from initial points */
-    sample_from_initial_points(initial_points: tf.Tensor2D, cond: tf.Tensor2D | tf.Tensor1D, num_total_steps: number = 100, guidanceScale = 0, return_guidance = false): any {
+    sample_from_initial_points(
+        initial_points: tf.Tensor2D, 
+        num_total_steps: number = 100,
+        options: { 
+            cond?: tf.Tensor1D | tf.Tensor2D, 
+            guidanceScale?: number, 
+            return_guidance?: boolean 
+        } = {}
+    ): any {
+        const { cond, guidanceScale = 0, return_guidance = false } = options;
+        
+        if (!cond) {
+            throw new Error('Conditional diffusion requires cond parameter in options');
+        }
+
+        // If initial_points is an array convert it to tf.Tensor2D
+        if (!(initial_points instanceof tf.Tensor)) {
+            initial_points = tf.tensor2d(initial_points);
+        }
+        
         return tf.tidy(() => {
             // If cond is 1D then convert to one-hot
+            let condTensor = cond;
             if (cond.rank === 1) {
                 const cond_expanded = cond as tf.Tensor1D;
                 const numClasses = this.condDim;
-                cond = this.convertToOneHot(cond_expanded, numClasses);
+                condTensor = this.convertToOneHot(cond_expanded, numClasses);
             }
             // Make sure that initial points and cond have same number of samples
-            if (initial_points.shape[0] !== cond.shape[0]) {
+            if (initial_points.shape[0] !== condTensor.shape[0]) {
                 throw new Error('Initial points and conditioning must have the same number of samples');
             }
             let x = initial_points;
@@ -194,18 +225,23 @@ export class ConditionalDiffusionModel extends ConditionalModel {
 
             for (const t of steps) {
                 const tInt = tf.fill([x.shape[0]], t, 'int32');
-                const stepOutput = this.step(x, tInt, tInt, cond, guidanceScale);
+                const stepOutput = this.step(x, tInt, tInt, condTensor, guidanceScale);
                 traj.push(stepOutput.mean);
                 if (return_guidance) {
-                    epsConds.push(stepOutput.epsCond!);
-                    epsUnconds.push(stepOutput.epsUncond!);
+                    epsConds.push(stepOutput.epsCond);
+                    epsUnconds.push(stepOutput.epsUncond);
                     epsHats.push(stepOutput.eps_hat);
                 }
                 x = stepOutput.mean;
             }
 
             if (return_guidance) {
-                return { traj: tf.stack(traj), epsCond: tf.stack(epsConds), epsUncond: tf.stack(epsUnconds), epsHat: tf.stack(epsHats) };
+                return { 
+                    traj: tf.stack(traj),
+                    epsCond: guidanceScale > 0 ? tf.stack(epsConds) : null,
+                    epsUncond: guidanceScale > 0 ? tf.stack(epsUnconds) : null,
+                    epsHat: guidanceScale > 0 ? tf.stack(epsHats) : null
+                };
             } else {
                 return tf.stack(traj);
             }
@@ -216,25 +252,21 @@ export class ConditionalDiffusionModel extends ConditionalModel {
      * Sample from a uniform grid of initial points with conditioning
      * @param gridResolution Number of points along each axis
      * @param domainRange The domain range for x and y coordinates
-     * @param cond Conditioning tensor (1D class indices or 2D one-hot)
      * @param num_total_steps Number of diffusion steps
-     * @param guidanceScale Guidance scale for classifier-free guidance
-     * @param return_guidance Whether to return guidance info
+     * @param options Optional parameters including cond, guidanceScale, and return_guidance
      * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2] or object with guidance info
      */
     sample_grid(
         gridResolution: number,
         domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
-        cond: tf.Tensor2D | tf.Tensor1D,
         num_total_steps: number = 100,
-        guidanceScale: number = 0,
-        return_guidance: boolean = false
+        options: { cond?: tf.Tensor1D | tf.Tensor2D, guidanceScale?: number, return_guidance?: boolean } = {}
     ): any {
         // Generate uniform grid
         const initialPoints = sampleUniformGrid(gridResolution, domainRange);
         
         // Sample from the initial points
-        return this.sample_from_initial_points(initialPoints, cond, num_total_steps, guidanceScale, return_guidance);
+        return this.sample_from_initial_points(initialPoints, num_total_steps, options);
     }
 }
 

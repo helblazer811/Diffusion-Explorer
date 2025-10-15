@@ -95,7 +95,11 @@ export class Model {
      * @param num_total_steps number of total steps to simulate the ODE
      * @returns tf.Tensor2D of shape [num_total_steps, num_samples, dim]
      */
-    sample(num_samples: number, num_total_steps: number = 100): tf.Tensor3D {
+    sample(
+        num_samples: number, 
+        num_total_steps: number = 100,
+        options?: object
+    ): tf.Tensor3D {
         throw new Error("Method 'sample()' not implemented.");
     }
 
@@ -103,8 +107,9 @@ export class Model {
      * Draw samples from the model using the given initial points
      * @param initial_points tf.Tensor2D of shape [num_samples, dim]
      * @param num_total_steps 
+     * @param options Optional parameters for future extensibility
      */
-    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = 100): tf.Tensor3D {
+    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = 100, options: {} = {}): tf.Tensor3D {
         throw new Error("Method 'sample_from_initial_points()' not implemented.");
     }
 }
@@ -156,10 +161,6 @@ export class ConditionalModel {
         this.model = model;
     }
 
-    async download() {
-        await this.model.save('downloads://conditional_model');
-    }
-
     /**
      * Train the model with conditional inputs
      * @param data tf.Tensor2D of shape [num_samples, dim]
@@ -191,11 +192,19 @@ export class ConditionalModel {
         throw new Error("Method 'step()' not implemented.");
     }
 
-    sample(num_samples: number, cond: tf.Tensor2D, num_total_steps: number = 100): tf.Tensor3D {
+    sample(
+        num_samples: number, 
+        num_total_steps: number = 100,
+        options?: { cond?: tf.Tensor1D | tf.Tensor2D, guidanceScale?: number, return_guidance?: boolean }
+    ): any {
         throw new Error("Method 'sample()' not implemented.");
     }
 
-    sample_from_initial_points(initial_points: tf.Tensor2D, cond: tf.Tensor2D, num_total_steps: number = 100): tf.Tensor3D {
+    sample_from_initial_points(
+        initial_points: tf.Tensor2D, 
+        num_total_steps: number = 100,
+        options?: { cond?: tf.Tensor1D | tf.Tensor2D, guidanceScale?: number, return_guidance?: boolean }
+    ): any {
         throw new Error("Method 'sample_from_initial_points()' not implemented.");
     }
 }
