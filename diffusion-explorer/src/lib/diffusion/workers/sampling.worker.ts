@@ -20,8 +20,8 @@ self.onmessage = async (e) => {
     const domainRange = data.domainRange;
     const displayAreaWidth = data.displayAreaWidth;
     const distributionWidth = data.distributionWidth;
-    const classes = data.classes; // Optional: can be undefined
-    const return_guidance = data.return_guidance || false; // Optional: defaults to false
+    const options = data.options || {}; // Optional parameters object
+    
     // Set up the backend
     if (backend === 'wasm') {
         // Set up tf wasm backend
@@ -48,33 +48,20 @@ self.onmessage = async (e) => {
 
     if (type === 'sample') {
         const numSamples = data.numSamples; 
-        // Run sampling with the model based on data.numberOfSteps and data.numSamples
-        let samplingResult: any;
-        if (trainingObjective == 'Conditional Diffusion') {
-            console.log("Sampling with conditional diffusion model...");
-            // Use passed random classes or generate them
-            const numClasses = modelConfig.condDim;
-            const classesTensor = classes !== undefined 
-                ? tf.tensor(classes, undefined, 'int32')
-                : tf.randomUniform([numSamples], 0, numClasses, 'int32');
-            samplingResult = ourModel.sample(
-                numSamples,
-                numberOfSteps,
-                { 
-                    cond: classesTensor, 
-                    guidanceScale: 0,
-                    return_guidance 
-                }
-            );
-        } else {
-            samplingResult = ourModel.sample(
-                numSamples,
-                numberOfSteps
-            );
+        
+        // Prepare options for sampling
+        const samplingOptions: any = { ...options };
+        
+        // Convert array-based cond to tensor if needed
+        if (Array.isArray(samplingOptions.cond)) {
+            samplingOptions.cond = tf.tensor(samplingOptions.cond, undefined, 'int32');
         }
         
-        // Handle the result based on whether guidance is returned
+        // Run sampling with the model
+        const samplingResult = ourModel.sample(numSamples, numberOfSteps, samplingOptions);
         
+        // Handle the result based on whether guidance is returned
+        const return_guidance = options.return_guidance || false;
         if (return_guidance && typeof samplingResult === 'object' && samplingResult.traj) {
             // Guidance info was returned
             allSamples = samplingResult.traj;
@@ -91,31 +78,24 @@ self.onmessage = async (e) => {
         const initialPoints = data.initialPoints;
         // Convert initial points to a tensor
         const initialPointsTensor = tf.tensor(initialPoints);
-        // Run sampling with the model based on data.numberOfSteps and data.numSamples
-        let samplingResult: any;
-        if (trainingObjective == 'Conditional Diffusion') {
-            // Use passed random classes or generate them
-            const numClasses = modelConfig.condDim;
-            const classesTensor = classes !== undefined 
-                ? tf.tensor(classes, undefined, 'int32')
-                : tf.randomUniform([initialPointsTensor.shape[0]], 0, numClasses, 'int32');
-            samplingResult = ourModel.sample_from_initial_points(
-                initialPointsTensor,
-                classesTensor,
-                numberOfSteps,
-                0, // guidanceScale
-                return_guidance
-            );
-        } else {
-            samplingResult = ourModel.sample_from_initial_points(
-                initialPointsTensor,
-                numberOfSteps,
-            );
+        
+        // Prepare options for sampling
+        const samplingOptions: any = { ...options };
+        
+        // Convert array-based cond to tensor if needed
+        if (Array.isArray(samplingOptions.cond)) {
+            samplingOptions.cond = tf.tensor(samplingOptions.cond, undefined, 'int32');
         }
         
-        // Handle the result based on whether guidance is returned
-        let guidanceData: any = null;
+        // Run sampling with the model
+        const samplingResult = ourModel.sample_from_initial_points(
+            initialPointsTensor,
+            numberOfSteps,
+            samplingOptions
+        );
         
+        // Handle the result based on whether guidance is returned
+        const return_guidance = options.return_guidance || false;
         if (return_guidance && typeof samplingResult === 'object' && samplingResult.traj) {
             // Guidance info was returned
             allSamples = samplingResult.traj;
@@ -133,35 +113,24 @@ self.onmessage = async (e) => {
         const gridResolution = data.gridResolution;
         const domainRange = data.domainRange;
         
-        // Call the model's sample_grid function
-        let samplingResult: any;
-        if (trainingObjective == 'Conditional Diffusion') {
-            // Use passed random classes or generate them
-            const numClasses = modelConfig.condDim;
-            const classesTensor = classes !== undefined 
-                ? tf.tensor(classes, undefined, 'int32')
-                : tf.randomUniform([gridResolution * gridResolution], 0, numClasses, 'int32');
-            samplingResult = ourModel.sample_grid(
-                gridResolution,
-                domainRange,
-                numberOfSteps,
-                {
-                    cond: classesTensor,
-                    guidanceScale: 0,
-                    return_guidance: return_guidance
-                }
-            );
-        } else {
-            samplingResult = ourModel.sample_grid(
-                gridResolution,
-                domainRange,
-                numberOfSteps
-            );
+        // Prepare options for sampling
+        const samplingOptions: any = { ...options };
+        
+        // Convert array-based cond to tensor if needed
+        if (Array.isArray(samplingOptions.cond)) {
+            samplingOptions.cond = tf.tensor(samplingOptions.cond, undefined, 'int32');
         }
         
-        // Handle the result based on whether guidance is returned
-        let guidanceData: any = null;
+        // Call the model's sample_grid function
+        const samplingResult = ourModel.sample_grid(
+            gridResolution,
+            domainRange,
+            numberOfSteps,
+            samplingOptions
+        );
         
+        // Handle the result based on whether guidance is returned
+        const return_guidance = options.return_guidance || false;
         if (return_guidance && typeof samplingResult === 'object' && samplingResult.traj) {
             // Guidance info was returned
             allSamples = samplingResult.traj;

@@ -24,6 +24,10 @@ export const trainingObjectiveToDisplayOptions: Record<string, DisplayOptions> =
         "Plot Types": ["Contour", "Scatter", "Path"],
         "Default Plot Types": ["Contour", "Scatter", "Path"],
     },
+    "Conditional Diffusion": {
+        "Plot Types": ["Contour", "Scatter"],
+        "Default Plot Types": ["Contour", "Scatter"],
+    },
 };
 
 export interface HyperparameterMenuEntry {
@@ -34,7 +38,7 @@ export interface HyperparameterMenuEntry {
 export const trainingObjectives: string[] = [
     "Flow Matching",
     "Diffusion",
-    "ConditionalDiffusion",
+    "Conditional Diffusion",
 ];
 
 export const trainingObjectiveToSamplers: Record<string, string[]> = {
@@ -45,7 +49,7 @@ export const trainingObjectiveToSamplers: Record<string, string[]> = {
         "DDPM",
         // "DDIM" // TODO: Implement DDIM
     ],
-    "ConditionalDiffusion": [
+    "Conditional Diffusion": [
         "DDPM",
     ],
 };
@@ -59,7 +63,7 @@ export const pretrainedModelPaths: Record<string, Record<string, string>> = {
     "Diffusion": {
         "Smiley Face": "/models/diffusion_smiley_face/model.json",
     },
-    "ConditionalDiffusion": {
+    "Conditional Diffusion": {
         "Three Modes": "/models/conditional_diffusion_three_modes/model.json",
     }
 };
@@ -81,7 +85,7 @@ export const cachedGridSamplesPaths: Record<string, Record<string, string>> = {
 export const trainingObjectiveToModelClass: Record<string, any> = {
     "Flow Matching": FlowModel,
     "Diffusion": DiffusionModel,
-    "ConditionalDiffusion": ConditionalDiffusionModel,
+    "Conditional Diffusion": ConditionalDiffusionModel,
 };
 
 export interface ModelConfig {
@@ -99,10 +103,10 @@ export const trainingObjectiveToModelConfig: Record<string, ModelConfig> = {
         dim: 2,
         hidden: 64,
     },
-    "ConditionalDiffusion": {
+    "Conditional Diffusion": {
         dim: 2,
-        condDim: 2,
-        hidden: 128,
+        condDim: 3, // TODO: make this dynamic based on dataset
+        hidden: 64,
     },
 };
 
@@ -111,9 +115,9 @@ export const trainingConfig: {
     batchSize: number;
     updateInterval: number;
 } = {
-    epochs: 1000,
-    batchSize: 200,
-    updateInterval: 10,
+    epochs: 4000,
+    batchSize: 1000,
+    updateInterval: 50,
 };
 
 export const datasetNameToPath: Record<string, string> = {
