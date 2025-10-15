@@ -146,18 +146,19 @@ export class DiffusionModel extends Model {
         });
     }
 
-    sample(num_samples: number, num_total_steps: number = this.T, return_guidance: boolean = false): tf.Tensor3D {
+    sample(
+        num_samples: number, 
+        num_total_steps: number = this.T,
+        options: {} = {}
+    ): tf.Tensor3D {
         // Draw initial samples from a Gaussian distribution
         const initial_points = tf.randomNormal([num_samples, this.dim]);
         
         // Delegate to sample_from_initial_points
-        return this.sample_from_initial_points(initial_points, num_total_steps, return_guidance);
+        return this.sample_from_initial_points(initial_points, num_total_steps);
     }
 
-    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = this.T, return_guidance: boolean = false): tf.Tensor3D {
-        if (return_guidance) {
-            throw new Error("return_guidance not implemented yet for DiffusionModel");
-        }
+    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = this.T, options: {} = {}): tf.Tensor3D {
         return tf.tidy(() => {
             let x = initial_points;
             const traj: tf.Tensor2D[] = [];
@@ -177,19 +178,19 @@ export class DiffusionModel extends Model {
      * @param gridResolution Number of points along each axis
      * @param domainRange The domain range for x and y coordinates
      * @param num_total_steps Number of diffusion steps
-     * @param return_guidance Whether to return guidance info (not implemented for this model)
+     * @param options Optional parameters for future extensibility
      * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
      */
     sample_grid(
         gridResolution: number,
         domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
         num_total_steps: number = this.T,
-        return_guidance: boolean = false
+        options: {} = {}
     ): tf.Tensor3D {
         // Generate uniform grid
         const initialPoints = sampleUniformGrid(gridResolution, domainRange);
         
         // Sample from the initial points
-        return this.sample_from_initial_points(initialPoints, num_total_steps, return_guidance);
+        return this.sample_from_initial_points(initialPoints, num_total_steps, options);
     }
 }
