@@ -38,7 +38,6 @@ function callWorker(
             console.error('Worker error:', e.data.message);
         }
     };
-
     worker.postMessage({ type, data });
     return worker;
 }
@@ -56,7 +55,7 @@ export function callSamplingWorkerThread(
     callback: (allSamples: any, guidance?: any) => void,
     options: SamplingOptions = {}
 ) {
-    return callWorker('./sampling.worker.ts', 'sample', {
+    return callWorker('./sampling.worker.js', 'sample', {
         modelJSONPath,
         trainingObjective,
         modelConfig,
@@ -81,7 +80,7 @@ export function callSamplingWorkerThreadFromInitialPoints(
     callback: (allSamples: any, guidance?: any) => void,
     options: SamplingOptions = {}
 ) {
-    return callWorker('./sampling.worker.ts', 'sample_from_initial_points', {
+    return callWorker('./sampling.worker.js', 'sample_from_initial_points', {
         modelJSONPath,
         trainingObjective,
         modelConfig,
@@ -106,7 +105,7 @@ export function callSamplingWorkerThreadGrid(
     callback: (allSamples: any, guidance?: any) => void,
     options: SamplingOptions = {}
 ) {
-    return callWorker('./sampling.worker.ts', 'sample_grid', {
+    return callWorker('./sampling.worker.js', 'sample_grid', {
         modelJSONPath,
         trainingObjective,
         modelConfig,

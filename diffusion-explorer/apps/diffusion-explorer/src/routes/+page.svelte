@@ -20,7 +20,6 @@
     const { isTraining, isEditing, isPlaying, currentTime, datasetName, datasetDict, usePretrained, trainingObjective } = pageState;
     const state_handlers = createMainStateHandlers(pageState);
 
-
     function handleKeydown(event: KeyboardEvent) {
         if (event.code === 'Space') {
             event.preventDefault(); // Prevent page scrolling

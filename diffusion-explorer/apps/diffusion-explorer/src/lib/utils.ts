@@ -20,6 +20,9 @@ export function convertDataToDisplayCoordinateFrame(
     displayAreaWidth: number,
     domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
 ){
+    if (!data) {
+        throw new Error("No data provided for conversion to display coordinate frame.");
+    }
     // let data = tensorData.arraySync() as number[][]; // Convert to plain 2D array
     // 1. Scale from the abstract coordinate frame (~ -3 to 3) to the svg viewbox coordinate frame
     const xScale = d3.scaleLinear()

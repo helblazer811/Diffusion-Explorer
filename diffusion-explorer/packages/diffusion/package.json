@@ -1,0 +1,18 @@
+{
+  "name": "@diffusion-explorer/diffusion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@tensorflow/tfjs-core": "^4.22.0",
+    "multivariate-normal": "^0.1.2"
+    
+  }
+}

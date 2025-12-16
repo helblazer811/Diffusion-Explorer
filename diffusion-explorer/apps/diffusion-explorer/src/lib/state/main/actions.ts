@@ -8,10 +8,9 @@ import { base } from '$app/paths';
 import { get } from 'svelte/store';
 import { downloadJSON } from '$lib/utils'; 
 import * as tf from '@tensorflow/tfjs';
-import { sampleMultivariateNormal } from '$lib/diffusion/utils';
-import { callTrainingWorkerThread } from '$lib/diffusion/workers/train_client';
-import { callSamplingWorkerThread, callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/sampling_client';
 import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
+
+import {sampleMultivariateNormal, callTrainingWorkerThread, callSamplingWorkerThread, callSamplingWorkerThreadGrid} from '@diffusion-explorer/diffusion';
 
 /**
  * Factory function that takes a MainState object and returns handlers bound to that state.
@@ -65,7 +64,13 @@ export function createMainStateHandlers(MainState: any) {
         const interfaceSettings = settings.interfaceSettings;
         const domainRange = settings.domainRange;
 
+        if (!(datasetNameVal in datasetDictVal)) {
+            throw new Error(`Dataset name ${datasetNameVal} not found in dataset dictionary`);
+        }   
         const pointData = datasetDictVal[datasetNameVal];
+        if (!pointData) {
+            throw new Error(`No data found for dataset ${datasetNameVal}`);
+        }
         const translatedData = convertDataToDisplayCoordinateFrame(
             pointData,
             1.0,
@@ -111,7 +116,9 @@ export function createMainStateHandlers(MainState: any) {
         if (!settings.trainingObjectiveToSamplers[trainingObjectiveVal].includes(samplerVal)) {
             sampler.set(settings.trainingObjectiveToSamplers[trainingObjectiveVal][0]);
         }
-
+        if (!(datasetNameVal in datasetDictVal)) {
+            throw new Error(`Dataset name ${datasetNameVal} not found in dataset dictionary`);
+        }
         const pointsData = datasetDictVal[datasetNameVal];
         const translatedData = convertDataToDisplayCoordinateFrame(
             pointsData,
@@ -134,6 +141,7 @@ export function createMainStateHandlers(MainState: any) {
             allTimeGridSamples.set(gridSamples);
             if (!get(isTraining)) isPlaying.set(true);
         } else {
+            console.log("No cached samples found.");
             // Regenerate samples
             const defaultModelPath = base + settings.pretrainedModelPaths[trainingObjectiveVal][datasetNameVal];
             callSamplingWorkerThread(
