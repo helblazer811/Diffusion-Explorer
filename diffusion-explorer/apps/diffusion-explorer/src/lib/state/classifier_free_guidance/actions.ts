@@ -8,10 +8,8 @@ import { get } from 'svelte/store';
 import * as tf from '@tensorflow/tfjs';
 
 // Helper functions
-import { sampleMultivariateNormal } from '$lib/diffusion/utils';
 import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
-import { callTrainingWorkerThread} from '$lib/diffusion/workers/train_client';
-import { callSamplingWorkerThread, callSamplingWorkerThreadGrid } from '$lib/diffusion/workers/sampling_client';
+import { sampleMultivariateNormal, callTrainingWorkerThread, callSamplingWorkerThread, callSamplingWorkerThreadGrid } from '@diffusion-explorer/diffusion';
 import { downloadJSON } from '$lib/utils';
 
 /**

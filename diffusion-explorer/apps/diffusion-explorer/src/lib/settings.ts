@@ -1,6 +1,6 @@
-import { FlowModel } from '$lib/diffusion/flow_matching';
-import { DiffusionModel } from '$lib/diffusion/diffusion';
-import { ConditionalDiffusionModel } from '$lib/diffusion/conditional_diffusion';
+import { base } from '$app/paths';
+
+import { FlowModel, DiffusionModel, ConditionalDiffusionModel } from '@diffusion-explorer/diffusion';
 
 export const backend: "webgl" | "wasm" = "webgl";
 
@@ -56,15 +56,15 @@ export const trainingObjectiveToSamplers: Record<string, string[]> = {
 
 export const pretrainedModelPaths: Record<string, Record<string, string>> = {
     "Flow Matching": {
-        "Three Modes": "/models/flow_matching_three_modes/model.json",
+        "Three Modes": `/models/flow_matching_three_modes/model.json`,
         // "Concentric Circles": "/models/flow_matching_concentric_circles/model.json",
-        "Smiley Face": "/models/flow_matching_smiley_face/model.json",
+        "Smiley Face": `/models/flow_matching_smiley_face/model.json`,
     },
     "Diffusion": {
-        "Smiley Face": "/models/diffusion_smiley_face/model.json",
+        "Smiley Face": `/models/diffusion_smiley_face/model.json`,
     },
     "Conditional Diffusion": {
-        "Three Modes": "/models/conditional_diffusion_three_modes/model.json",
+        "Three Modes": `/models/conditional_diffusion_three_modes/model.json`,
     }
 };
 
@@ -121,8 +121,8 @@ export const trainingConfig: {
 };
 
 export const datasetNameToPath: Record<string, string> = {
-    "Smiley Face": "/datasets/smiley_face.json",
-    "Three Modes": "/datasets/three_modes.json",
+    "Smiley Face": `/datasets/smiley_face.json`,
+    "Three Modes": `/datasets/three_modes.json`,
     // "Concentric Circles": "/datasets/concentric_circles.json",
 };
 
