@@ -3,7 +3,7 @@ import json
 
 def generate_three_mode_gaussian_mixture(
     num_modes=3,
-    points_per_mode=200,
+    points_per_mode=400,
     radius=2.0,
     std=0.2,
     seed=42

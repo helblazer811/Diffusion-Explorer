@@ -54,13 +54,8 @@ export function callSamplingWorkerThread(
     distributionWidth: number,
     displayAreaWidth: number,
     callback: (allSamples: any, guidance?: any) => void,
-    classes?: number[],
-    return_guidance?: boolean
+    options: SamplingOptions = {}
 ) {
-    const options: SamplingOptions = {};
-    if (classes !== undefined) options.cond = classes;
-    if (return_guidance !== undefined) options.return_guidance = return_guidance;
-    
     return callWorker('./sampling.worker.ts', 'sample', {
         modelJSONPath,
         trainingObjective,
@@ -84,13 +79,8 @@ export function callSamplingWorkerThreadFromInitialPoints(
     distributionWidth: number,
     displayAreaWidth: number,
     callback: (allSamples: any, guidance?: any) => void,
-    classes?: number[],
-    return_guidance?: boolean
+    options: SamplingOptions = {}
 ) {
-    const options: SamplingOptions = {};
-    if (classes !== undefined) options.cond = classes;
-    if (return_guidance !== undefined) options.return_guidance = return_guidance;
-    
     return callWorker('./sampling.worker.ts', 'sample_from_initial_points', {
         modelJSONPath,
         trainingObjective,
@@ -114,13 +104,8 @@ export function callSamplingWorkerThreadGrid(
     distributionWidth: number,
     displayAreaWidth: number,
     callback: (allSamples: any, guidance?: any) => void,
-    classes?: number[],
-    return_guidance?: boolean
+    options: SamplingOptions = {}
 ) {
-    const options: SamplingOptions = {};
-    if (classes !== undefined) options.cond = classes;
-    if (return_guidance !== undefined) options.return_guidance = return_guidance;
-    
     return callWorker('./sampling.worker.ts', 'sample_grid', {
         modelJSONPath,
         trainingObjective,
