@@ -4,6 +4,7 @@
     import DistributionEditWindow from '$lib/components/display_area/DistributionEditWindow.svelte';
     import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
     import MultiClassDistribution from './MultiClassDistribution.svelte';
+    import CFGVectors from './CFGVectors.svelte';
     import { onMount, getContext } from 'svelte';
     import { interfaceSettings } from '$lib/settings';
 
@@ -17,9 +18,7 @@
         activePlotTypes,
         numberOfSteps,
         distributionVisiblity,
-        intermediateTrainingSamples,
         isEditing,
-        allTimeGridSamples
     } = pageState;
 
     // Import components
@@ -75,6 +74,7 @@
             svgElement={sharedSVGElement}
             active={$isEditing}
         />
+        <CFGVectors/>
         {#if sharedSVGElement}
             <Distribution
                 svgElement={sharedSVGElement}
