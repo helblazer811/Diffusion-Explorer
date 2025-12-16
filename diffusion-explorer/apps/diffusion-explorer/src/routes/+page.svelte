@@ -112,7 +112,6 @@
         // Just start training the model 
         state_handlers.handleTrainingObjectiveChange();
     }
-
 </script>
 
 <style>
