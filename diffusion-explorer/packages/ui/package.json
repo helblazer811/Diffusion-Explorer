@@ -1,0 +1,16 @@
+{
+  "name": "@diffusion-explorer/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "svelte": "./src/index.ts",
+  "exports": {
+    ".": {
+      "svelte": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+	"katex": "^0.16.22"
+  }
+}

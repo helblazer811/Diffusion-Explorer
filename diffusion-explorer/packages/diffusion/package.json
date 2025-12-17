@@ -13,6 +13,5 @@
     "@tensorflow/tfjs-backend-wasm": "^4.22.0",
     "@tensorflow/tfjs-core": "^4.22.0",
     "multivariate-normal": "^0.1.2"
-    
   }
 }
