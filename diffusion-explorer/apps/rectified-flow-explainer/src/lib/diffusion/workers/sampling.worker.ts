@@ -9,7 +9,6 @@ import * as tf from "@tensorflow/tfjs";
 import { DiffusionModel } from "../diffusion";
 import { FlowModel } from "../flow_matching";
 import { ConditionalDiffusionModel } from "../conditional_diffusion";
-import { convertDataToDisplayCoordinateFrame } from "../utils";
 
 const backend = "webgl";
 const trainingObjectiveToModelClass = {
@@ -26,9 +25,7 @@ self.onmessage = async (e) => {
   const trainingObjective = data.trainingObjective;
   const modelConfig = data.modelConfig;
   const numberOfSteps = data.numberOfSteps;
-  const domainRange = data.domainRange;
-  const displayAreaWidth = data.displayAreaWidth;
-  const distributionWidth = data.distributionWidth;
+  const domainRange = data.domainRange || null;
   const options = data.options || {}; // Optional parameters object
 
   // Set up the backend
@@ -202,16 +199,8 @@ self.onmessage = async (e) => {
     throw new Error(`Unknown message type: ${type}`);
   }
 
-  // Translate the data to the display coordinate frame
-  const translatedData = convertDataToDisplayCoordinateFrame(
-    allSamples,
-    domainRange,
-    distributionWidth,
-    displayAreaWidth,
-    numberOfSteps
-  );
   // Convert the tensor to a 2D array
-  const allSamplesArray = translatedData.arraySync();
+  const allSamplesArray = allSamples.arraySync();
   // Return the result to the main thread
   const resultMessage = {
     type: "result",

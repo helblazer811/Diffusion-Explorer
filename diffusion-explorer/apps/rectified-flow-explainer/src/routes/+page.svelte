@@ -88,9 +88,7 @@ fl
 
   <h2>The Limitations of an Independent Coupling</h2>
   <h3>What is a coupling? </h3>
-  <p>
-
-  </p>
+  <p></p>
 
   <Figure>
     <IndependentCoupling />

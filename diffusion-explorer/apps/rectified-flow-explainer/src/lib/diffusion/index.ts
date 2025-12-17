@@ -8,5 +8,5 @@ export * from './utils';
 // export * from './workers/sampling.worker';
 // export * from './workers/train.worker';
 // src/index.ts
-export const samplingWorkerUrl = new URL('./workers/sampling.worker.js', import.meta.url).href;
-export const trainWorkerUrl = new URL('./workers/train.worker.js', import.meta.url).href;
+export const samplingWorkerUrl = new URL('./workers/sampling.worker.ts', import.meta.url).href;
+export const trainWorkerUrl = new URL('./workers/train.worker.ts', import.meta.url).href;

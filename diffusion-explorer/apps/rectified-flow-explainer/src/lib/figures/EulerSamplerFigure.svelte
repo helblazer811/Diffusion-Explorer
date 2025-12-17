@@ -226,8 +226,25 @@
       ? (animationDuration / eulerPoints.length)
       : animationDuration / eulerPoints.length;
 
-    // Clear existing segments
+    // Clear existing segments and arrows
     svg.selectAll('.euler-segment').remove();
+    svg.selectAll('.euler-arrow').remove();
+
+    // Define arrow marker
+    const defs = svg.select('defs').empty() ? svg.append('defs') : svg.select('defs');
+    defs.selectAll('#arrow-marker').remove();
+
+    defs.append('marker')
+      .attr('id', 'arrow-marker')
+      .attr('viewBox', '0 0 10 10')
+      .attr('refX', 8)
+      .attr('refY', 5)
+      .attr('markerWidth', 6)
+      .attr('markerHeight', 6)
+      .attr('orient', 'auto-start-reverse')
+      .append('path')
+      .attr('d', 'M 0 0 L 10 5 L 0 10 z')
+      .attr('fill', eulerColor);
 
     for (let i = 0; i < eulerPoints.length - 1; i++) {
       const p1 = eulerPoints[i];
@@ -256,7 +273,30 @@
         .duration(segmentDuration)
         .ease(d3.easeLinear)
         .attr('x2', x2)
-        .attr('y2', y2);
+        .attr('y2', y2)
+        .on('start', function() {
+          // Remove previous arrow
+          svg.selectAll('.euler-arrow').remove();
+
+          // Add arrow to current segment
+          const arrow = svg.append('line')
+            .attr('x1', x1)
+            .attr('y1', y1)
+            .attr('x2', x1)
+            .attr('y2', y1)
+            .attr('stroke', eulerColor)
+            .attr('stroke-width', eulerLineWidth)
+            .attr('marker-end', 'url(#arrow-marker)')
+            .attr('class', 'euler-arrow');
+
+          // Animate arrow along with the segment
+          arrow
+            .transition()
+            .duration(segmentDuration)
+            .ease(d3.easeLinear)
+            .attr('x2', x2)
+            .attr('y2', y2);
+        });
 
       // On the last segment, trigger repeat if needed
       if (isLastSegment && repeatAnimation) {
@@ -338,19 +378,9 @@
     const lowCurvatureEuler = eulerMethod(lowCurvatureODE, t0, y0, tEnd, deltaT);
     const lowCurvatureGT = generateGroundTruthPoints(lowCurvatureGroundTruth, t0, tEnd, groundTruthDeltaT);
 
-    // Plot both with sequential animation delays
-    const leftDelay = animationDelay;
-
-    // Calculate total animation time for left plot considering per-edge delays
-    const numEdges = highCurvatureEuler.t.length - 1;
-    const totalLeftAnimTime = perEdgeAnimationDelay > 0
-      ? animationDuration + (numEdges - 1) * perEdgeAnimationDelay
-      : animationDuration;
-
-    const rightDelay = animationDelay + totalLeftAnimTime + pathPause;
-
-    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, 'left', highCurvatureYScaleFactor, highCurvatureLabel, leftDelay);
-    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, 'right', lowCurvatureYScaleFactor, lowCurvatureLabel, rightDelay);
+    // Plot both with same animation delay so they start in sync
+    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, 'left', highCurvatureYScaleFactor, highCurvatureLabel, animationDelay);
+    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, 'right', lowCurvatureYScaleFactor, lowCurvatureLabel, animationDelay);
   });
 </script>
 

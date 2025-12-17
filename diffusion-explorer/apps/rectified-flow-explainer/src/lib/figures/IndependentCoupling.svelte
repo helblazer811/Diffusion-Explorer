@@ -4,7 +4,7 @@
   import * as tf from '@tensorflow/tfjs';
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import { sampleMultivariateNormal } from '@diffusion-explorer/diffusion';
+  import { sampleMultivariateNormal } from '$lib/diffusion';
 
   export const numSamples = 100;
   export const height = 350;
@@ -27,6 +27,7 @@
   export const hoverEdgeWidth = 3;
   export const hoverEdgeOpacity = 0.8;
   export const hoverPointOpacity = 0.9;
+  export const dashed = false;
 
   let sourceDistributionPoints: tf.Tensor | null = null;
   let targetDistributionPoints: tf.Tensor | null = null;
@@ -64,12 +65,15 @@
       adjustedYRange = xRange * aspectRatio;
     }
 
+    // Shift y center down to accommodate labels at the top
+    const yCenterOffset = -adjustedYRange * 0.07;
+
     xScale = d3.scaleLinear()
       .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
       .range([margin, width - margin]);
 
     yScale = d3.scaleLinear()
-      .domain([yCenter - adjustedYRange / 2, yCenter + adjustedYRange / 2])
+      .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
       .range([height - margin, margin]);
   }
 
@@ -82,7 +86,7 @@
     const sourceYMax = Math.max(...sourcePoints.map(p => p[1]));
     const targetYMax = Math.max(...targetPoints.map(p => p[1]));
     const overallYMax = Math.max(sourceYMax, targetYMax);
-    const labelY = overallYMax + 0.3;
+    const labelY = overallYMax + 0.5;
 
     // Calculate x centers for each distribution
     const sourceXCenter = sourcePoints.reduce((sum, p) => sum + p[0], 0) / sourcePoints.length;
@@ -175,7 +179,7 @@
       .attr('stroke', edgeColor)
       .attr('stroke-width', edgeWidth)
       .attr('stroke-opacity', edgeOpacity)
-      .attr('stroke-dasharray', '4,4');
+      .attr('stroke-dasharray', dashed ? '4,4' : 'none');
 
     // Create a mapping from target points to their indices
     const targetIndexMap = new Map(targetPoints.map((point, i) => [point.toString(), i]));
