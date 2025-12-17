@@ -1,3 +1,6 @@
+
+import { samplingWorkerUrl } from '../index';
+
 type SamplingType = 'sample' | 'sample_from_initial_points' | 'sample_grid';
 
 interface SamplingOptions {
@@ -21,12 +24,12 @@ interface SamplingMessageData {
 }
 
 function callWorker(
-    workerUrl: string,
     type: SamplingType,
     data: SamplingMessageData,
     callback: (allSamples: any, guidance?: any) => void
 ) {
-    const worker = new Worker(new URL(workerUrl, import.meta.url), { type: 'module' });
+    const worker = new Worker(samplingWorkerUrl, { type: 'module' });
+    console.log(samplingWorkerUrl)
 
     worker.onmessage = (e) => {
         const { type: msgType } = e.data;
@@ -39,6 +42,7 @@ function callWorker(
         }
     };
     worker.postMessage({ type, data });
+    console.log(worker);
     return worker;
 }
 
@@ -55,17 +59,21 @@ export function callSamplingWorkerThread(
     callback: (allSamples: any, guidance?: any) => void,
     options: SamplingOptions = {}
 ) {
-    return callWorker('./sampling.worker.js', 'sample', {
-        modelJSONPath,
-        trainingObjective,
-        modelConfig,
-        numSamples,
-        numberOfSteps,
-        domainRange,
-        distributionWidth,
-        displayAreaWidth,
-        options
-    }, callback);
+    return callWorker(
+        'sample', 
+        {
+            modelJSONPath,
+            trainingObjective,
+            modelConfig,
+            numSamples,
+            numberOfSteps,
+            domainRange,
+            distributionWidth,
+            displayAreaWidth,
+            options
+        }, 
+        callback
+    );
 }
 
 export function callSamplingWorkerThreadFromInitialPoints(
@@ -80,17 +88,21 @@ export function callSamplingWorkerThreadFromInitialPoints(
     callback: (allSamples: any, guidance?: any) => void,
     options: SamplingOptions = {}
 ) {
-    return callWorker('./sampling.worker.js', 'sample_from_initial_points', {
-        modelJSONPath,
-        trainingObjective,
-        modelConfig,
-        initialPoints,
-        numberOfSteps,
-        domainRange,
-        distributionWidth,
-        displayAreaWidth,
-        options
-    }, callback);
+    return callWorker(
+        'sample_from_initial_points', 
+        {
+            modelJSONPath,
+            trainingObjective,
+            modelConfig,
+            initialPoints,
+            numberOfSteps,
+            domainRange,
+            distributionWidth,
+            displayAreaWidth,
+            options
+        }, 
+        callback
+    );
 }
 
 export function callSamplingWorkerThreadGrid(
@@ -105,15 +117,19 @@ export function callSamplingWorkerThreadGrid(
     callback: (allSamples: any, guidance?: any) => void,
     options: SamplingOptions = {}
 ) {
-    return callWorker('./sampling.worker.js', 'sample_grid', {
-        modelJSONPath,
-        trainingObjective,
-        modelConfig,
-        gridResolution,
-        numberOfSteps,
-        domainRange,
-        distributionWidth,
-        displayAreaWidth,
-        options
-    }, callback);
+    return callWorker(
+        'sample_grid', 
+        {
+            modelJSONPath,
+            trainingObjective,
+            modelConfig,
+            gridResolution,
+            numberOfSteps,
+            domainRange,
+            distributionWidth,
+            displayAreaWidth,
+            options
+        }, 
+        callback
+    );
 }

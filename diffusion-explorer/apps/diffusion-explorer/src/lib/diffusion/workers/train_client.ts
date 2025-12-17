@@ -1,3 +1,4 @@
+import { trainWorkerUrl } from '../index';
 
 export function callTrainingWorkerThread(
     trainingObjective: string,
@@ -9,7 +10,7 @@ export function callTrainingWorkerThread(
 ) {
     // Create the worker
     const trainingWorker = new Worker(
-        new URL('./train.worker.ts', import.meta.url), // NOTE: This needs to be a relative path
+        trainWorkerUrl,
         { type: 'module' }
     );
     // Add listeners that recieve messages from the worker thread on the main thread (client)
