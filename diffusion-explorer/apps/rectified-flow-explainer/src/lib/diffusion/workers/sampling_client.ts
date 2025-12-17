@@ -17,9 +17,7 @@ interface SamplingMessageData {
     initialPoints?: number[][];
     gridResolution?: number;
     numberOfSteps: number;
-    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number };
-    distributionWidth: number;
-    displayAreaWidth: number;
+    domainRange?: { xMin: number, xMax: number; yMin: number, yMax: number };
     options?: SamplingOptions;
 }
 
@@ -53,14 +51,12 @@ export function callSamplingWorkerThread(
     modelConfig: object,
     numSamples: number,
     numberOfSteps: number,
-    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number },
-    distributionWidth: number,
-    displayAreaWidth: number,
     callback: (allSamples: any, guidance?: any) => void,
+    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
     options: SamplingOptions = {}
 ) {
     return callWorker(
-        'sample', 
+        'sample',
         {
             modelJSONPath,
             trainingObjective,
@@ -68,10 +64,8 @@ export function callSamplingWorkerThread(
             numSamples,
             numberOfSteps,
             domainRange,
-            distributionWidth,
-            displayAreaWidth,
             options
-        }, 
+        },
         callback
     );
 }
@@ -82,14 +76,12 @@ export function callSamplingWorkerThreadFromInitialPoints(
     modelConfig: object,
     initialPoints: number[][],
     numberOfSteps: number,
-    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number },
-    distributionWidth: number,
-    displayAreaWidth: number,
     callback: (allSamples: any, guidance?: any) => void,
+    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
     options: SamplingOptions = {}
 ) {
     return callWorker(
-        'sample_from_initial_points', 
+        'sample_from_initial_points',
         {
             modelJSONPath,
             trainingObjective,
@@ -97,10 +89,8 @@ export function callSamplingWorkerThreadFromInitialPoints(
             initialPoints,
             numberOfSteps,
             domainRange,
-            distributionWidth,
-            displayAreaWidth,
             options
-        }, 
+        },
         callback
     );
 }
@@ -112,13 +102,11 @@ export function callSamplingWorkerThreadGrid(
     gridResolution: number,
     numberOfSteps: number,
     domainRange: { xMin: number, xMax: number; yMin: number, yMax: number },
-    distributionWidth: number,
-    displayAreaWidth: number,
     callback: (allSamples: any, guidance?: any) => void,
     options: SamplingOptions = {}
 ) {
     return callWorker(
-        'sample_grid', 
+        'sample_grid',
         {
             modelJSONPath,
             trainingObjective,
@@ -126,10 +114,8 @@ export function callSamplingWorkerThreadGrid(
             gridResolution,
             numberOfSteps,
             domainRange,
-            distributionWidth,
-            displayAreaWidth,
             options
-        }, 
+        },
         callback
     );
 }

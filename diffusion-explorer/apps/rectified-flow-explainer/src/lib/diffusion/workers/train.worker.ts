@@ -7,7 +7,7 @@ import { setWasmPaths } from "@tensorflow/tfjs-backend-wasm";
 setWasmPaths("/tfjs-backend-wasm/");
 import "@tensorflow/tfjs-backend-wasm"; // Import the WebGL backend for TensorFlow.js
 
-import { DiffusionModel } from "../diffusion";
+// import { DiffusionModel } from "../diffusion";
 import { FlowModel } from "../flow_matching";
 import { ConditionalDiffusionModel } from "../conditional_diffusion";
 
@@ -44,11 +44,11 @@ let trainingStopped = false;
 
 self.onmessage = async (e) => {
   const { type, data } = e.data;
+  console.log("Training worker received message of type:", type);
 
   if (type === "train") {
     // Destructure the data
-    const { trainingObjective, modelConfig, datasetPath, trainingConfig } =
-      data;
+    const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
     // Set up tf wasm backend
     if (backend === "wasm") {
       await tf.setBackend("wasm");
@@ -121,7 +121,7 @@ self.onmessage = async (e) => {
         }
       );
     } else {
-      throw new Error("Invalid training objective");
+      throw new Error("Invalid training objective" + trainingObjective);
     }
 
     const modelSaveName = await saveModel(ourModel.model, trainingObjective);
