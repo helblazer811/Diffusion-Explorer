@@ -9,7 +9,7 @@ import * as tf from '@tensorflow/tfjs';
 
 // Helper functions
 import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
-import { sampleMultivariateNormal, callTrainingWorkerThread, callSamplingWorkerThread, callSamplingWorkerThreadGrid } from '@diffusion-explorer/diffusion';
+import { sampleMultivariateNormal, callTrainingWorkerThread, callSamplingWorkerThread, callSamplingWorkerThreadGrid } from '$lib/diffusion';
 import { downloadJSON } from '$lib/utils';
 
 /**

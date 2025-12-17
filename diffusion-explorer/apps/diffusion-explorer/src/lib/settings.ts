@@ -1,6 +1,6 @@
 import { base } from '$app/paths';
 
-import { FlowModel, DiffusionModel, ConditionalDiffusionModel } from '@diffusion-explorer/diffusion';
+import { FlowModel, DiffusionModel, ConditionalDiffusionModel } from '$lib/diffusion';
 
 export const backend: "webgl" | "wasm" = "webgl";
 

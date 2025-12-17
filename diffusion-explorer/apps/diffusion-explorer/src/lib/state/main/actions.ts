@@ -10,7 +10,7 @@ import { downloadJSON } from '$lib/utils';
 import * as tf from '@tensorflow/tfjs';
 import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
 
-import {sampleMultivariateNormal, callTrainingWorkerThread, callSamplingWorkerThread, callSamplingWorkerThreadGrid} from '@diffusion-explorer/diffusion';
+import {sampleMultivariateNormal, callTrainingWorkerThread, callSamplingWorkerThread, callSamplingWorkerThreadGrid} from '$lib/diffusion';
 
 /**
  * Factory function that takes a MainState object and returns handlers bound to that state.
