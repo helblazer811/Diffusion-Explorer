@@ -5,40 +5,53 @@
   import { writable, get } from 'svelte/store';
   import * as tf from '@tensorflow/tfjs';
   import * as d3 from 'd3';
-  import { callTrainingWorkerThread, callSamplingWorkerThread, sampleMultivariateNormal } from '$lib/diffusion';
+  import { callTrainingWorkerThread, callSamplingWorkerThreadFromInitialPoints, sampleMultivariateNormal } from '$lib/diffusion';
   import { downloadJSON } from '$lib/utils';
 
   // Props/Configuration
   export let width = 800;
   export let height = 300;
-  export let cachedTrajectoriesPath: string | null = null;
+  export let cachedTrajectoriesPath: string | null = "cached_samples/smiley_face_trajectories.json";
   export let numSamples = 100;
+  export let numSteps = 300;
 
   // Styling props for visualization
-  export let sourcePointColor = '#3b82f6';
-  export let targetPointColor = '#f17720';
-  export let margin = 20;
+  export let sourcePointColor = '#3b82f6'; // Blue
+  export let targetPointColor = '#3b82f6'; // Blue
+  export let marginWidth = 60;
+  export let marginHeight = 20;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
   export let labelFontSize = 22;
   export let labelColor = '#666';
   export let pointRadius = 5;
-  export let pointOpacity = 0.4;
+  export let pointOpacity = 0.25;
   export let flowWidth = 10; // Gap between source and target in data units
+  export let yShiftFactor = -0.35; // Vertical shift for distributions (positive shifts down)
 
   // Animation settings
-  export let animationDuration = 3000; // Duration in milliseconds
+  export let animationDuration = 8000; // Duration in milliseconds
   export let animationPauseTime = 1000; // Pause time between loops in milliseconds
 
   // Contour plot settings
   export let showContours = true;
   export let contourBandwidth = 0.3;
   export let contourLevels = 5;
-  export let contourOpacity = 0.5;
-  export let sourceContourColor = '#3b82f6';
-  export let targetContourColor = '#f17720';
-  export let intermediateContourColor = '#888888';
+  export let contourOpacity = 0.25;
+  export let sourceContourColor = '#3b82f6'; // Blue
+  export let targetContourColor = '#3b82f6'; // Blue
+  export let intermediateContourColor = '#f17720'; // Orange
+  export let intermediateContourOpacity = 0.25; // Higher opacity for intermediate contours
+  export let intermediatePointOpacity = 0.5; // Higher opacity for intermediate scatter points
   export let trainingObjective = 'Flow Matching';
+
+  // Visibility controls for each visualization element
+  export let showSourceScatter = true;
+  export let showTargetScatter = true;
+  export let showSourceContour = false;
+  export let showTargetContour = false;
+  export let showIntermediateScatter = true;
+  export let showIntermediateContour = true;
 
   // Stores for training state
   const isTraining = writable(false);
@@ -51,6 +64,11 @@
   let sourceDistributionSamples: number[][] = [];
   let targetDistributionSamples: number[][] = [];
   let currentSamples: number[][] = [];
+
+  // Precomputed contours for performance
+  let precomputedSourceContours: any[] = [];
+  let precomputedTargetContours: any[] = [];
+  let precomputedIntermediateContours: any[][] = []; // Array of contours for each timestep
 
   // Default settings (can be customized)
   const settings = {
@@ -79,6 +97,56 @@
   let time = 0; // Animation time parameter (0 to 1)
   let animationFrameId: number | null = null;
 
+  /**
+   * Generate samples from 2D standard normal and clip outliers beyond 3 sigma
+   * @param numSamples - Number of samples to generate
+   * @returns Array of [x, y] points within 3 standard deviations
+   */
+  function generateClippedGaussianSamples(numSamples: number): number[][] {
+    return tf.tidy(() => {
+      const mean = [0, 0];
+      const cov = [[1, 0], [0, 1]]; // Identity covariance matrix
+      const maxStdDev = 2.0;
+      const threshold = maxStdDev * Math.sqrt(2); // For 2D
+
+      let allClippedSamples: number[][] = [];
+
+      // Generate samples in batches until we have enough
+      let attempts = 0;
+      const maxAttempts = 10;
+      const batchSize = Math.ceil(numSamples * 1.5);
+
+      while (allClippedSamples.length < numSamples && attempts < maxAttempts) {
+        attempts++;
+
+        // Generate a batch of samples
+        const rawSamplesTensor = sampleMultivariateNormal(
+          mean,
+          cov,
+          batchSize
+        ) as tf.Tensor2D;
+
+        // Convert to array to filter in JavaScript (simpler and more reliable)
+        const rawSamplesArray = rawSamplesTensor.arraySync() as number[][];
+
+        // Filter samples: keep only those within threshold distance from origin
+        for (const sample of rawSamplesArray) {
+          const [x, y] = sample;
+          const distance = Math.sqrt(x * x + y * y);
+
+          if (distance <= threshold) {
+            allClippedSamples.push(sample);
+            if (allClippedSamples.length >= numSamples) {
+              break;
+            }
+          }
+        }
+      }
+
+      // Take exactly numSamples
+      return allClippedSamples.slice(0, numSamples);
+    });
+  }
 
   /**
    * Generate samples from a trained model for a set of initial points
@@ -96,25 +164,24 @@
     const trainingObjectiveVal = trainingObjective;
     const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
 
-    // Generate samples using the sampling worker
+    // Generate clipped Gaussian samples as initial points
+    const initialPoints = generateClippedGaussianSamples(numSamples);
+
+    // Use worker thread to sample from these initial points
     return new Promise((resolve) => {
-      callSamplingWorkerThread(
+      callSamplingWorkerThreadFromInitialPoints(
         modelPath,
         trainingObjectiveVal,
         modelConfig,
-        numSamples,
+        initialPoints,  // Pass generated Gaussian samples
         numberOfSteps,
         (allSamples) => {
           allTimeSamples.set(allSamples);
-          // Extract initial and final timesteps as source and target distributions
-          if (allSamples.length > 0) {
-            sourceDistributionSamples = allSamples[0];
-            targetDistributionSamples = allSamples[allSamples.length - 1];
-            // Initialize current samples with first timestep if not already set
-            if (currentSamples.length === 0 && allSamples[0]) {
-              currentSamples = allSamples[0];
-            }
-          }
+
+          // Extract source (timestep 0)
+          sourceDistributionSamples = allSamples[0];
+          currentSamples = sourceDistributionSamples;
+
           if (!get(isTraining)) {
             isPlaying.set(true);
           }
@@ -124,6 +191,43 @@
         settings.domainRange
       );
     });
+  }
+
+  /**
+   * Load target distribution from smiley_face.json
+   */
+  async function loadTargetDistribution() {
+    try {
+      const response = await fetch('/data/smiley_face.json');
+      const data = await response.json();
+      const allPoints = data.points as number[][];
+
+      // Randomly sample numSamples points
+      const shuffled = [...allPoints].sort(() => Math.random() - 0.5);
+      targetDistributionSamples = shuffled.slice(0, numSamples);
+
+      console.log('Loaded target distribution samples:', targetDistributionSamples.length);
+      return true;
+    } catch (error) {
+      console.error('Failed to load target distribution:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Download the current sample trajectories as a JSON file
+   */
+  function downloadTrajectories() {
+    const trajectories = get(allTimeSamples);
+
+    if (!trajectories || trajectories.length === 0) {
+      console.error('No trajectories to download');
+      return;
+    }
+
+    const filename = `flow_matching_trajectories_${Date.now()}.json`;
+    downloadJSON(trajectories, filename);
+    console.log('Trajectories downloaded:', filename, trajectories.length, 'timesteps');
   }
 
   /**
@@ -151,10 +255,8 @@
       allTimeSamples.set(cachedData);
 
       // Extract initial points (first timestep) as source distribution
-      // Extract final points (last timestep) as target distribution
       if (cachedData.length > 0 && cachedData[0]) {
         sourceDistributionSamples = cachedData[0];
-        targetDistributionSamples = cachedData[cachedData.length - 1];
         currentSamples = cachedData[0]; // Initialize current samples with source
         console.log('Loaded cached trajectories:', cachedData.length, 'timesteps');
         isPlaying.set(true);
@@ -173,8 +275,8 @@
    * Create D3 scales for plotting
    */
   function createScales(sourcePoints: number[][], targetPoints: number[][]) {
-    const drawableWidth = width - 2 * margin;
-    const drawableHeight = height - 2 * margin;
+    const drawableWidth = width - 2 * marginWidth;
+    const drawableHeight = height - 2 * marginHeight;
     const aspectRatio = drawableHeight / drawableWidth;
 
     // Shift target points by flowWidth for extent calculation
@@ -202,89 +304,131 @@
       adjustedYRange = xRange * aspectRatio;
     }
 
-    // Shift y center down to accommodate labels at the top
-    const yCenterOffset = -adjustedYRange * 0.07;
+    // Shift y center down to accommodate labels at the top and apply yShiftFactor
+    const yCenterOffset = -adjustedYRange * 0.07 - yShiftFactor;
 
     xScale = d3.scaleLinear()
       .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
-      .range([margin, width - margin]);
+      .range([marginWidth, width - marginWidth]);
 
     yScale = d3.scaleLinear()
       .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
-      .range([margin, height - margin]);
+      .range([marginHeight, height - marginHeight]);
   }
 
   /**
-   * Generic function to plot scatter plot
-   * @param points - Array of 2D points
-   * @param color - Color for the points
-   * @param groupId - SVG group ID
-   * @param time - Time parameter (0 to 1) that controls horizontal shift
+   * Initialize persistent SVG layers (called once)
    */
-  function plotScatter(points: number[][], color: string, groupId: string, time: number) {
+  function initializeLayers() {
+    const svg = d3.select(svgElement);
+
+    // Create persistent layers in correct z-order (bottom to top)
+    // Intermediate elements are on top for better visibility
+    svg.append('g').attr('id', 'sourceContour');
+    svg.append('g').attr('id', 'targetContour');
+    svg.append('g').attr('id', 'sourceScatter');
+    svg.append('g').attr('id', 'targetScatter');
+    svg.append('g').attr('id', 'intermediateContour');
+    svg.append('g').attr('id', 'intermediateScatter');
+    svg.append('g').attr('id', 'labels');
+  }
+
+  /**
+   * Initialize scatter plot (called once per distribution)
+   */
+  function initScatter(points: number[][], color: string, groupId: string, opacity: number = pointOpacity) {
     if (!svgElement || !xScale || !yScale || points.length === 0) return;
 
     const svg = d3.select(svgElement);
+    const group = svg.select(`#${groupId}`);
 
-    // Remove existing group if it exists
-    svg.select(`#${groupId}`).remove();
-
-    // Create a group for this scatter plot
-    const group = svg.append('g').attr('id', groupId);
-
-    // Calculate x-shift based on time
-    const xShift = time * flowWidth;
-
-    // Plot points with shift applied in data space
     group.selectAll('circle')
       .data(points)
       .enter()
       .append('circle')
-      .attr('class', (d, i) => `${groupId}-point point-${i}`)
-      .attr('cx', d => xScale(d[0] + xShift))
-      .attr('cy', d => yScale(d[1]))
       .attr('r', pointRadius)
       .attr('fill', color)
-      .attr('opacity', pointOpacity);
+      .attr('opacity', opacity);
   }
 
   /**
-   * Plot contour map for a distribution
+   * Update scatter plot positions (called every frame)
    */
-  function plotContourMap(points: number[][], color: string, opacity: number, groupId: string, time: number = 0) {
+  function updateScatter(points: number[][], groupId: string, time: number) {
     if (!svgElement || !xScale || !yScale || points.length === 0) return;
 
-    const svg = d3.select(svgElement);
-
-    // Remove existing group if it exists
-    svg.select(`#${groupId}`).remove();
-
-    // Calculate x-shift based on time
     const xShift = time * flowWidth;
+    const svg = d3.select(svgElement);
+    const group = svg.select(`#${groupId}`);
 
-    // Apply shift in data space
+    group.selectAll('circle')
+      .data(points)
+      .attr('cx', d => xScale(d[0] + xShift))
+      .attr('cy', d => yScale(d[1]));
+  }
+
+  /**
+   * Compute contour density (pure computation, returns GeoJSON)
+   */
+  function computeContours(points: number[][], time: number) {
+    if (!xScale || !yScale || points.length === 0) return [];
+
+    const xShift = time * flowWidth;
     const shiftedPoints = points.map(p => [p[0] + xShift, p[1]]);
-
-    // Transform points to SVG coordinate space
     const transformedPoints = shiftedPoints.map(p => [xScale(p[0]), yScale(p[1])]);
 
-    // Create contour density
-    const contours = d3.contourDensity()
+    return d3.contourDensity()
       .x(d => d[0])
       .y(d => d[1])
       .size([width, height])
       .bandwidth(contourBandwidth * width / 10)
       .thresholds(contourLevels)
       (transformedPoints);
+  }
 
-    // Create a group for this contour plot
-    const group = svg.append('g').attr('id', groupId);
+  /**
+   * Precompute all contours for all timesteps
+   */
+  function precomputeAllContours() {
+    if (!xScale || !yScale) return;
+    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
-    // Draw contours
+    console.log('Precomputing contours...');
+
+    // Precompute source and target contours (static)
+    precomputedSourceContours = computeContours(sourceDistributionSamples, 0);
+    precomputedTargetContours = computeContours(targetDistributionSamples, 1);
+
+    // Precompute intermediate contours for all timesteps
+    const allSamples = get(allTimeSamples);
+    precomputedIntermediateContours = [];
+
+    for (let i = 0; i < allSamples.length; i++) {
+      const samples = allSamples[i];
+      const timeValue = i / (allSamples.length - 1); // 0 to 1
+      const contours = computeContours(samples, timeValue);
+      precomputedIntermediateContours.push(contours);
+    }
+
+    console.log('Precomputed contours:', {
+      source: precomputedSourceContours.length,
+      target: precomputedTargetContours.length,
+      intermediate: precomputedIntermediateContours.length
+    });
+  }
+
+  /**
+   * Update contour paths (DOM update only, called every frame)
+   */
+  function updateContour(groupId: string, contours: any[], color: string, opacity: number = contourOpacity) {
+    if (!svgElement) return;
+
+    const svg = d3.select(svgElement);
+    const group = svg.select(`#${groupId}`);
+
     group.selectAll('path')
       .data(contours)
-      .enter()
-      .append('path')
+      .join('path')  // ✅ Efficiently handles enter/update/exit
       .attr('d', d3.geoPath())
       .attr('fill', color)
       .attr('stroke', 'none')
@@ -292,80 +436,136 @@
   }
 
   /**
-   * Plot labels for source and target distributions
+   * Plot distribution labels above source and target
    */
-  function plotLabels(sourcePoints: number[][], targetPoints: number[][]) {
+  function plotLabels() {
     if (!svgElement || !xScale || !yScale) return;
+    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     const svg = d3.select(svgElement);
+    const labelsGroup = svg.select('#labels');
 
-    // Find the maximum y-value across both distributions
-    const sourceYMax = Math.max(...sourcePoints.map(p => p[1]));
-    const targetYMax = Math.max(...targetPoints.map(p => p[1]));
-    const overallYMax = Math.max(sourceYMax, targetYMax);
-    const labelY = overallYMax + 0.5;
+    // Clear existing labels
+    labelsGroup.selectAll('*').remove();
 
-    // Calculate x centers for each distribution
-    const sourceXCenter = sourcePoints.reduce((sum, p) => sum + p[0], 0) / sourcePoints.length;
-    const targetXCenter = targetPoints.reduce((sum, p) => sum + p[0], 0) / targetPoints.length;
+    // Calculate positions for labels
+    // Source label: above source distribution (centered at x=0 in data space)
+    const sourceLabelX = xScale(0);
 
-    // Remove existing labels if they exist
-    svg.select('#sourceLabel').remove();
-    svg.select('#targetLabel').remove();
+    // Target label: above target distribution (centered at x=flowWidth in data space)
+    const targetLabelX = xScale(flowWidth);
 
-    // Add source label (time = 0, no shift)
-    svg.append('text')
-      .attr('id', 'sourceLabel')
-      .attr('x', xScale(sourceXCenter))
-      .attr('y', yScale(labelY))
+    // Get the y position from the top of the data domain
+    const yDomain = yScale.domain();
+    const yTop = yDomain[0]; // Min value maps to top of screen with this scale
+    const labelY = yScale(yTop) + labelFontSize; // Position above the top (subtract to move up in SVG)
+
+    // Add source distribution label with white outline
+    labelsGroup.append('text')
+      .attr('x', sourceLabelX)
+      .attr('y', labelY)
       .attr('text-anchor', 'middle')
       .attr('font-size', `${labelFontSize}px`)
       .attr('fill', labelColor)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', '4')
+      .attr('paint-order', 'stroke')
       .text(sourceLabelText);
 
-    // Add target label (time = 1, shift by flowWidth)
-    svg.append('text')
-      .attr('id', 'targetLabel')
-      .attr('x', xScale(targetXCenter + flowWidth))
-      .attr('y', yScale(labelY))
+    // Add target distribution label with white outline
+    labelsGroup.append('text')
+      .attr('x', targetLabelX)
+      .attr('y', labelY)
       .attr('text-anchor', 'middle')
       .attr('font-size', `${labelFontSize}px`)
       .attr('fill', labelColor)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', '4')
+      .attr('paint-order', 'stroke')
       .text(targetLabelText);
   }
 
   /**
-   * Plot source and target distributions
+   * Central drawing function - updates all visualizations (called every frame)
    */
-  function plotDistributions() {
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) {
-      return;
+  function draw() {
+    if (!svgElement || !xScale || !yScale) return;
+    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+
+    // Update static distributions scatter plots
+    if (showSourceScatter) {
+      updateScatter(sourceDistributionSamples, 'sourceScatter', 0);
+    }
+    if (showTargetScatter) {
+      updateScatter(targetDistributionSamples, 'targetScatter', 1);
     }
 
-    // Create scales using both source and target samples
-    createScales(sourceDistributionSamples, targetDistributionSamples);
+    // Update source and target contours (use precomputed)
+    if (showSourceContour && showContours && precomputedSourceContours.length > 0) {
+      updateContour('sourceContour', precomputedSourceContours, sourceContourColor);
+    }
 
-    // Plot contour maps for source and target distributions
-    plotContourMap(sourceDistributionSamples, sourceContourColor, contourOpacity, 'sourceContour', 0);
-    plotContourMap(targetDistributionSamples, targetContourColor, contourOpacity, 'targetContour', 1);
+    if (showTargetContour && showContours && precomputedTargetContours.length > 0) {
+      updateContour('targetContour', precomputedTargetContours, targetContourColor);
+    }
 
-    // Plot scatter plots for both distributions
-    plotScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter', 0);
-    plotScatter(targetDistributionSamples, targetPointColor, 'targetScatter', 1);
-
-    // Plot contour map and scatter for intermediate samples at current time
+    // Update animated intermediate samples
     const allSamples = get(allTimeSamples);
     if (allSamples.length > 0) {
       const numSteps = allSamples.length;
-      // Convert time (0-1) to step index
       const currentStep = Math.round(time * (numSteps - 1));
       const intermediateSamples = allSamples[currentStep];
 
       if (intermediateSamples && intermediateSamples.length > 0) {
-        plotContourMap(intermediateSamples, intermediateContourColor, contourOpacity, 'intermediateContour', time);
-        plotScatter(intermediateSamples, intermediateContourColor, 'intermediateScatter', time);
+        if (showIntermediateScatter) {
+          updateScatter(intermediateSamples, 'intermediateScatter', time);
+        }
+
+        // Use precomputed intermediate contours
+        if (showIntermediateContour && showContours && precomputedIntermediateContours.length > 0) {
+          const intermediateContours = precomputedIntermediateContours[currentStep];
+          if (intermediateContours) {
+            updateContour('intermediateContour', intermediateContours, intermediateContourColor, intermediateContourOpacity);
+          }
+        }
       }
     }
+  }
+
+  /**
+   * Initialize visualization (called once after data loads)
+   */
+  function initializeVisualization() {
+    if (!svgElement) return;
+    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+
+    // 1. Initialize layers
+    initializeLayers();
+
+    // 2. Create scales once
+    createScales(sourceDistributionSamples, targetDistributionSamples);
+
+    // 3. Initialize scatter plots (creates DOM nodes)
+    if (showSourceScatter) {
+      initScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter');
+    }
+    if (showTargetScatter) {
+      initScatter(targetDistributionSamples, targetPointColor, 'targetScatter');
+    }
+
+    const allSamples = get(allTimeSamples);
+    if (allSamples.length > 0 && allSamples[0] && showIntermediateScatter) {
+      initScatter(allSamples[0], intermediateContourColor, 'intermediateScatter', intermediatePointOpacity);
+    }
+
+    // 4. Precompute all contours for performance
+    precomputeAllContours();
+
+    // 5. Initial draw
+    draw();
+
+    // 6. Plot labels (after draw so they appear on top)
+    plotLabels();
   }
 
   /**
@@ -389,7 +589,7 @@
           isPaused = true;
           pauseStartTime = currentTime;
           time = 1; // Ensure we end at 1
-          plotDistributions();
+          draw();  // ✅ Only updates attributes, no DOM creation
         }
 
         if (pauseStartTime && currentTime - pauseStartTime >= animationPauseTime) {
@@ -402,7 +602,7 @@
       } else {
         // Update time during animation
         time = Math.min(elapsed / animationDuration, 1);
-        plotDistributions();
+        draw();  // ✅ Only updates attributes, no DOM creation
       }
 
       animationFrameId = requestAnimationFrame(animate);
@@ -445,21 +645,6 @@
           console.log('Training finished!', tfModelPath);
           isTraining.set(false);
 
-          // Download the trained model metadata
-          const modelMetadata = {
-            modelPath: tfModelPath,
-            trainingObjective: trainingObjectiveVal,
-            dataset: 'smiley_face',
-            modelConfig: modelConfig,
-            trainingConfig: trainingConfig,
-            timestamp: new Date().toISOString(),
-            domainRange: settings.domainRange
-          };
-
-          const filename = `flow_matching_model_smiley_face_${Date.now()}.json`;
-          downloadJSON(modelMetadata, filename);
-          console.log('Model metadata downloaded:', filename);
-
           resolve(tfModelPath);
         },
         () => {
@@ -471,43 +656,43 @@
 
   // Initialize component on mount
   onMount(async () => {
-    // Load target distribution (smiley face) and use as source
-    const response = await fetch('/data/smiley_face.json');
-    const data = await response.json();
-    const allPoints = data.points as number[][];
-
-    // Randomly subsample numSamples points
-    const shuffled = [...allPoints].sort(() => Math.random() - 0.5);
-    sourceDistributionSamples = shuffled.slice(0, numSamples);
-    currentSamples = sourceDistributionSamples;
-
-    console.log('Loaded source distribution samples:', sourceDistributionSamples.length);
+    // Load target distribution first (always from smiley_face.json)
+    await loadTargetDistribution();
 
     // Try to load cached trajectories if path is provided
-    let cachedLoaded = false;
     if (cachedTrajectoriesPath) {
-      cachedLoaded = await loadCachedTrajectories(cachedTrajectoriesPath);
+      const cachedLoaded = await loadCachedTrajectories(cachedTrajectoriesPath);
 
-      // Plot cached distributions
+      // Initialize visualization once cached data is loaded
       if (cachedLoaded) {
-        plotDistributions();
+        console.log('Loaded cached trajectories');
+        initializeVisualization();
         startAnimation();
+        return () => {
+          stopAnimation();
+          if (trainingWorker) {
+            trainingWorker.terminate();
+          }
+        };
       }
     }
 
     // If cached trajectories were not loaded, train and sample automatically
-    if (!cachedLoaded) {
-      console.log("Failed to load cached trajectories, training new model...");
-      // Train the model
-      const modelPath = await trainModel();
+    console.log("Training new model...");
 
-      // Generate samples from the trained model
-      await generateSamples(modelPath, numSamples, 50);
+    // Train the model (internally uses smiley_face.json as target distribution)
+    const modelPath = await trainModel();
 
-      // Plot the distributions after samples are generated
-      plotDistributions();
-      startAnimation();
-    }
+    // Generate samples from Gaussian initial points via worker thread
+    // This will set sourceDistributionSamples
+    await generateSamples(modelPath, numSamples, numSteps);
+
+    // Download trajectories for future use
+    downloadTrajectories();
+
+    // Initialize visualization once after samples are generated
+    initializeVisualization();
+    startAnimation();
 
     // Clean up worker on component destroy
     return () => {
