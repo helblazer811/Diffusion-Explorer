@@ -85,9 +85,31 @@ button:focus {
   border-color: #666;
 }
 
+.title-header-wrapper {
+  width: fit-content;
+}
+
 .article-title {
   font-size: 3em;
   margin-bottom: 0;
+}
+
+.byline-dateline-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 0.5em;
+  margin-bottom: 2em;
+}
+
+.byline {
+  margin: 0;
+}
+
+.dateline {
+  margin: 0;
+  color: #777;
+  font-weight: normal;
 }
 
 .acknowledgements p {
