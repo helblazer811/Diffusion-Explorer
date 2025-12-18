@@ -87,38 +87,43 @@
 
     const svg = d3.select(svgElement);
 
-    // Find the maximum y-value across both distributions
-    const sourceYMax = Math.max(...sourcePoints.map(p => p[1]));
-    const targetYMax = Math.max(...targetPoints.map(p => p[1]));
-    const overallYMax = Math.max(sourceYMax, targetYMax);
-    const labelY = overallYMax + 0.5;
+    // Remove existing labels group if it exists
+    svg.select('#labels').remove();
 
-    // Calculate x centers for each distribution
-    const sourceXCenter = sourcePoints.reduce((sum, p) => sum + p[0], 0) / sourcePoints.length;
-    const targetXCenter = targetPoints.reduce((sum, p) => sum + p[0], 0) / targetPoints.length;
+    // Create labels group
+    const labelsGroup = svg.append('g').attr('id', 'labels');
 
-    // Remove existing labels if they exist
-    svg.select('#sourceLabel').remove();
-    svg.select('#targetLabel').remove();
+    // Calculate x positions for labels (centered on each distribution)
+    const sourceLabelX = xScale(0);
+    const targetLabelX = xScale(targetShiftFactor);
 
-    // Add source label
-    svg.append('text')
-      .attr('id', 'sourceLabel')
-      .attr('x', xScale(sourceXCenter))
-      .attr('y', yScale(labelY))
+    // Position labels relative to the top of the SVG
+    const yDomain = yScale.domain();
+    const yTop = yDomain[0]; // Min value maps to top of screen
+    const labelY = yScale(yTop) + 0.5 * labelFontSize;
+
+    // Add source distribution label with white outline
+    labelsGroup.append('text')
+      .attr('x', sourceLabelX)
+      .attr('y', labelY)
       .attr('text-anchor', 'middle')
       .attr('font-size', `${labelFontSize}px`)
       .attr('fill', labelColor)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', '4')
+      .attr('paint-order', 'stroke')
       .text(sourceLabelText);
 
-    // Add target label
-    svg.append('text')
-      .attr('id', 'targetLabel')
-      .attr('x', xScale(targetXCenter))
-      .attr('y', yScale(labelY))
+    // Add target distribution label with white outline
+    labelsGroup.append('text')
+      .attr('x', targetLabelX)
+      .attr('y', labelY)
       .attr('text-anchor', 'middle')
       .attr('font-size', `${labelFontSize}px`)
       .attr('fill', labelColor)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', '4')
+      .attr('paint-order', 'stroke')
       .text(targetLabelText);
   }
 

@@ -1,7 +1,7 @@
 
 import { samplingWorkerUrl } from '../index';
 
-type SamplingType = 'sample' | 'sample_from_initial_points' | 'sample_grid';
+type SamplingType = 'sample' | 'sample_from_initial_points' | 'sample_grid' | 'vector_field_grid';
 
 interface SamplingOptions {
     cond?: number[] | any;
@@ -16,7 +16,8 @@ interface SamplingMessageData {
     numSamples?: number;
     initialPoints?: number[][];
     gridResolution?: number;
-    numberOfSteps: number;
+    numberOfSteps?: number;
+    timeValue?: number;
     domainRange?: { xMin: number, xMax: number; yMin: number, yMax: number };
     options?: SamplingOptions;
 }
@@ -113,6 +114,47 @@ export function callSamplingWorkerThreadGrid(
             modelConfig,
             gridResolution,
             numberOfSteps,
+            domainRange,
+            options
+        },
+        callback
+    );
+}
+
+/**
+ * Sample vector field values on a uniform grid
+ *
+ * This evaluates the model's forward function (velocity field) at each point
+ * on a uniform grid, without performing any ODE integration. Useful for
+ * visualizing flow fields.
+ *
+ * @param modelJSONPath - Path to the saved model in IndexedDB
+ * @param trainingObjective - Training objective ('Flow Matching', etc.)
+ * @param modelConfig - Model configuration object
+ * @param gridResolution - Number of points along each axis
+ * @param domainRange - Spatial domain to sample
+ * @param callback - Callback receiving velocity vectors [gridRes*gridRes, dim]
+ * @param timeValue - Time value at which to evaluate the field (default: 0.5)
+ * @param options - Optional sampling parameters
+ */
+export function callSamplingWorkerThreadVectorFieldGrid(
+    modelJSONPath: string,
+    trainingObjective: string,
+    modelConfig: object,
+    gridResolution: number,
+    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number },
+    callback: (velocities: number[][][]) => void,
+    timeValue: number = 0.5,
+    options: SamplingOptions = {}
+) {
+    return callWorker(
+        'vector_field_grid',
+        {
+            modelJSONPath,
+            trainingObjective,
+            modelConfig,
+            gridResolution,
+            timeValue,
             domainRange,
             options
         },

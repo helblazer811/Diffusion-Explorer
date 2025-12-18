@@ -2,11 +2,8 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { writable, get } from 'svelte/store';
-  import * as tf from '@tensorflow/tfjs';
+  import { type Writable } from 'svelte/store';
   import * as d3 from 'd3';
-  import { callTrainingWorkerThread, callSamplingWorkerThreadFromInitialPoints, sampleMultivariateNormal } from '$lib/diffusion';
-  import { downloadJSON } from '$lib/utils';
   import Figure from '$lib/components/Figure.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
 
@@ -14,12 +11,15 @@
   export let figureNumber = '1';
   export let captionText = 'Flow matching model training and sampling visualization.';
 
+  // Data props (from parent +page.svelte)
+  export let sourceDistributionSamples: number[][] = [];
+  export let targetDistributionSamples: number[][] = [];
+  export let allTimeSamples: Writable<number[][][]>;
+  export let isTraining: Writable<boolean>;
+
   // Props/Configuration
   export let width = 800;
   export let height = 300;
-  export let cachedTrajectoriesPath: string | null = "cached_samples/smiley_face_trajectories.json";
-  export let numSamples = 100;
-  export let numSteps = 300;
 
   // Styling props for visualization
   export let sourcePointColor = '#3b82f6'; // Blue
@@ -59,43 +59,11 @@
   export let showIntermediateScatter = true;
   export let showIntermediateContour = true;
 
-  // Stores for training state
-  const isTraining = writable(false);
-
-  // Stores for sampling state
-  const allTimeSamples = writable<number[][][]>([]);
-
-  // Distribution samples
-  let sourceDistributionSamples: number[][] = [];
-  let targetDistributionSamples: number[][] = [];
-  let currentSamples: number[][] = [];
-
   // Precomputed contours for performance
   let precomputedSourceContours: any[] = [];
   let precomputedTargetContours: any[] = [];
   let precomputedIntermediateContours: any[][] = []; // Array of contours for each timestep
 
-  // Default settings (can be customized)
-  const settings = {
-    trainingObjectiveToModelConfig: {
-      "Flow Matching": {
-          dim: 2,
-          hidden: 64,
-      },
-    },
-    datasetNameToPath: {
-      smiley_face: '/data/smiley_face.json',
-    },
-    trainingConfig: {
-      epochs: 500,
-      batchSize: 1024,
-      verbose: true,
-      displayInterval: 100
-    },
-    domainRange: null
-  };
-
-  let trainingWorker: Worker | null = null;
   let svgElement: SVGSVGElement;
   let xScale = null;
   let yScale = null;
@@ -113,174 +81,6 @@
     isPlaying = !isPlaying;
   }
 
-  /**
-   * Generate samples from 2D standard normal and clip outliers beyond 3 sigma
-   * @param numSamples - Number of samples to generate
-   * @returns Array of [x, y] points within 3 standard deviations
-   */
-  function generateClippedGaussianSamples(numSamples: number): number[][] {
-    return tf.tidy(() => {
-      const mean = [0, 0];
-      const cov = [[1, 0], [0, 1]]; // Identity covariance matrix
-      const maxStdDev = 2.0;
-      const threshold = maxStdDev * Math.sqrt(2); // For 2D
-
-      let allClippedSamples: number[][] = [];
-
-      // Generate samples in batches until we have enough
-      let attempts = 0;
-      const maxAttempts = 10;
-      const batchSize = Math.ceil(numSamples * 1.5);
-
-      while (allClippedSamples.length < numSamples && attempts < maxAttempts) {
-        attempts++;
-
-        // Generate a batch of samples
-        const rawSamplesTensor = sampleMultivariateNormal(
-          mean,
-          cov,
-          batchSize
-        ) as tf.Tensor2D;
-
-        // Convert to array to filter in JavaScript (simpler and more reliable)
-        const rawSamplesArray = rawSamplesTensor.arraySync() as number[][];
-
-        // Filter samples: keep only those within threshold distance from origin
-        for (const sample of rawSamplesArray) {
-          const [x, y] = sample;
-          const distance = Math.sqrt(x * x + y * y);
-
-          if (distance <= threshold) {
-            allClippedSamples.push(sample);
-            if (allClippedSamples.length >= numSamples) {
-              break;
-            }
-          }
-        }
-      }
-
-      // Take exactly numSamples
-      return allClippedSamples.slice(0, numSamples);
-    });
-  }
-
-  /**
-   * Generate samples from a trained model for a set of initial points
-   * @param modelPath - Path to the trained model
-   * @param initialPoints - Optional initial points to sample from (if not provided, uses random Gaussian)
-   * @param numSamples - Number of samples to generate (default: 100)
-   * @param numberOfSteps - Number of steps for the sampling process (default: 50)
-   * @param cachedSamplesPath - Optional path to cached samples
-   */
-  async function generateSamples(
-    modelPath,
-    numSamples = 100,
-    numberOfSteps = 200
-  ) {
-    const trainingObjectiveVal = trainingObjective;
-    const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
-
-    // Generate clipped Gaussian samples as initial points
-    const initialPoints = generateClippedGaussianSamples(numSamples);
-
-    // Use worker thread to sample from these initial points
-    return new Promise((resolve) => {
-      callSamplingWorkerThreadFromInitialPoints(
-        modelPath,
-        trainingObjectiveVal,
-        modelConfig,
-        initialPoints,  // Pass generated Gaussian samples
-        numberOfSteps,
-        (allSamples) => {
-          allTimeSamples.set(allSamples);
-
-          // Extract source (timestep 0)
-          sourceDistributionSamples = allSamples[0];
-          currentSamples = sourceDistributionSamples;
-
-          if (!get(isTraining)) {
-            isPlaying.set(true);
-          }
-          resolve(allSamples);
-        },
-        settings.domainRange
-      );
-    });
-  }
-
-  /**
-   * Load target distribution from smiley_face.json
-   */
-  async function loadTargetDistribution() {
-    try {
-      const response = await fetch('/data/smiley_face.json');
-      const data = await response.json();
-      const allPoints = data.points as number[][];
-
-      // Randomly sample numSamples points
-      const shuffled = [...allPoints].sort(() => Math.random() - 0.5);
-      targetDistributionSamples = shuffled.slice(0, numSamples);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Download the current sample trajectories as a JSON file
-   */
-  function downloadTrajectories() {
-    const trajectories = get(allTimeSamples);
-
-    if (!trajectories || trajectories.length === 0) {
-      console.error('No trajectories to download');
-      return;
-    }
-
-    const filename = `flow_matching_trajectories_${Date.now()}.json`;
-    downloadJSON(trajectories, filename);
-    console.log('Trajectories downloaded:', filename, trajectories.length, 'timesteps');
-  }
-
-  /**
-   * Load cached trajectories from a file path
-   * @param path - Path to the cached trajectories JSON file
-   * @returns true if successfully loaded, false otherwise
-   */
-  async function loadCachedTrajectories(path) {
-    try {
-      const response = await fetch(path);
-      if (!response.ok) {
-        console.log('Cached trajectories file not found:', path);
-        return false;
-      }
-
-      const cachedData = await response.json();
-
-      // Validate that cached data is an array
-      if (!cachedData || !Array.isArray(cachedData)) {
-        console.error('Invalid cached trajectories format');
-        return false;
-      }
-
-      // Set the trajectories
-      allTimeSamples.set(cachedData);
-
-      // Extract initial points (first timestep) as source distribution
-      if (cachedData.length > 0 && cachedData[0]) {
-        sourceDistributionSamples = cachedData[0];
-        currentSamples = cachedData[0]; // Initialize current samples with source
-        console.log('Loaded cached trajectories:', cachedData.length, 'timesteps');
-        return true;
-      }
-
-      console.error('Cached trajectories array is empty');
-      return false;
-    } catch (error) {
-      console.log('Could not load cached trajectories:', error);
-      return false;
-    }
-  }
 
   /**
    * Create D3 scales for plotting
@@ -411,7 +211,7 @@
     precomputedTargetContours = computeContours(targetDistributionSamples, 1);
 
     // Precompute intermediate contours for all timesteps
-    const allSamples = get(allTimeSamples);
+    const allSamples = $allTimeSamples;
     precomputedIntermediateContours = [];
 
     for (let i = 0; i < allSamples.length; i++) {
@@ -521,7 +321,7 @@
     }
 
     // Update animated intermediate samples
-    const allSamples = get(allTimeSamples);
+    const allSamples = $allTimeSamples;
     if (allSamples.length > 0) {
       const numSteps = allSamples.length;
       const currentStep = Math.round(time * (numSteps - 1));
@@ -564,7 +364,7 @@
       initScatter(targetDistributionSamples, targetPointColor, 'targetScatter');
     }
 
-    const allSamples = get(allTimeSamples);
+    const allSamples = $allTimeSamples;
     if (allSamples.length > 0 && allSamples[0] && showIntermediateScatter) {
       initScatter(allSamples[0], intermediateContourColor, 'intermediateScatter', intermediatePointOpacity);
     }
@@ -650,85 +450,23 @@
     }
   }
 
-  /**
-   * Train a flow matching model
-   */
-  async function trainModel() {
-    console.log('Starting model training...');
-    const trainingObjectiveVal = trainingObjective;
-    const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
-    const trainingConfig = settings.trainingConfig;
-    const datasetPath = settings.datasetNameToPath['smiley_face'];
+  // Reactive initialization flag
+  let isInitialized = false;
 
-    isTraining.set(true);
-
-    // Start training worker thread
-    return new Promise((resolve) => {
-      console.log("Starting training worker thread...");
-      trainingWorker = callTrainingWorkerThread(
-        trainingObjectiveVal,
-        modelConfig,
-        datasetPath,
-        trainingConfig,
-        (tfModelPath) => {
-          console.log('Training finished!', tfModelPath);
-          isTraining.set(false);
-
-          resolve(tfModelPath);
-        },
-        () => {
-          console.log("Intermediate epoch callback");
-        } // Empty callback for intermediate epochs
-      );
-    });
-  }
-
-  // Initialize component on mount
-  onMount(async () => {
-    // Load target distribution first (always from smiley_face.json)
-    await loadTargetDistribution();
-
-    // Try to load cached trajectories if path is provided
-    if (cachedTrajectoriesPath) {
-      const cachedLoaded = await loadCachedTrajectories(cachedTrajectoriesPath);
-
-      // Initialize visualization once cached data is loaded
-      if (cachedLoaded) {
-        console.log('Loaded cached trajectories');
-        initializeVisualization();
-        startAnimation();
-        return () => {
-          stopAnimation();
-          if (trainingWorker) {
-            trainingWorker.terminate();
-          }
-        };
-      }
-    }
-
-    // If cached trajectories were not loaded, train and sample automatically
-    console.log("Training new model...");
-
-    // Train the model (internally uses smiley_face.json as target distribution)
-    const modelPath = await trainModel();
-
-    // Generate samples from Gaussian initial points via worker thread
-    // This will set sourceDistributionSamples
-    await generateSamples(modelPath, numSamples, numSteps);
-
-    // Download trajectories for future use
-    downloadTrajectories();
-
-    // Initialize visualization once after samples are generated
+  // React to data changes and initialize visualization once
+  $: if (!isInitialized &&
+         sourceDistributionSamples.length > 0 &&
+         targetDistributionSamples.length > 0 &&
+         $allTimeSamples.length > 0) {
     initializeVisualization();
     startAnimation();
+    isInitialized = true;
+  }
 
-    // Clean up worker on component destroy
+  // Cleanup on component destroy
+  onMount(() => {
     return () => {
       stopAnimation();
-      if (trainingWorker) {
-        trainingWorker.terminate();
-      }
     };
   });
 </script>
