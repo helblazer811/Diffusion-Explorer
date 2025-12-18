@@ -9,6 +9,7 @@ import * as tf from "@tensorflow/tfjs";
 import { DiffusionModel } from "../diffusion";
 import { FlowModel } from "../flow_matching";
 import { ConditionalDiffusionModel } from "../conditional_diffusion";
+import { sampleUniformGrid } from "../utils";
 
 const backend = "webgl";
 const trainingObjectiveToModelClass = {
@@ -25,6 +26,7 @@ self.onmessage = async (e) => {
   const trainingObjective = data.trainingObjective;
   const modelConfig = data.modelConfig;
   const numberOfSteps = data.numberOfSteps;
+  const timeValue = data.timeValue;
   const domainRange = data.domainRange || null;
   const options = data.options || {}; // Optional parameters object
 
@@ -195,6 +197,34 @@ self.onmessage = async (e) => {
       // Just trajectory was returned
       allSamples = samplingResult;
     }
+  } else if (type === "vector_field_grid") {
+    // Sample vector field on a grid (no ODE integration, just forward evaluation)
+    const gridResolution = data.gridResolution;
+    const domainRange = data.domainRange;
+
+    // Generate uniform grid of points
+    const gridPoints = sampleUniformGrid(gridResolution, domainRange) as tf.Tensor2D;
+    const numPoints = gridPoints.shape[0];
+
+    // Create time tensor filled with the specified time value
+    const t = tf.fill([numPoints, 1], timeValue || 0.5);
+
+    // Evaluate the vector field at all grid points
+    const velocities = ourModel.forward(gridPoints, t);
+
+    // Convert to array and return
+    const velocitiesArray = velocities.arraySync();
+
+    // Clean up
+    gridPoints.dispose();
+    t.dispose();
+    velocities.dispose();
+
+    self.postMessage({
+      type: "result",
+      allSamples: velocitiesArray
+    });
+    return;
   } else {
     throw new Error(`Unknown message type: ${type}`);
   }
