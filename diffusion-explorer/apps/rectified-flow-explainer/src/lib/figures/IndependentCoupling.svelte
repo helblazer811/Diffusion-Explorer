@@ -5,6 +5,11 @@
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
   import { sampleMultivariateNormal } from '$lib/diffusion';
+  import Figure from '$lib/components/Figure.svelte';
+
+  // Caption props
+  export let figureNumber = '3';
+  export let captionText = 'Independent coupling visualization showing the source distribution.';
 
   export const numSamples = 100;
   export const height = 350;
@@ -391,5 +396,14 @@
   });
 </script>
 
-<svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
-</svg>
+<Figure>
+  {#snippet children()}
+    <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
+    </svg>
+  {/snippet}
+  {#snippet caption()}
+    <div class="caption">
+      <span class="figure-number">Figure {figureNumber}:</span> {captionText}
+    </div>
+  {/snippet}
+</Figure>

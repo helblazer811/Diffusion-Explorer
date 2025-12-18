@@ -1,10 +1,5 @@
 <script lang="ts">
-  interface Props {
-    children?: import('svelte').Snippet;
-    caption?: import('svelte').Snippet;
-  }
-
-  let { children, caption }: Props = $props();
+  let { children, caption } = $props();
 </script>
 
 <figure class="figure">
@@ -18,6 +13,7 @@
 
 <style>
   .figure {
+    position: relative; /* Required for absolute positioning of PlayButton */
     width: 100%;
     margin: 2rem 0;
     display: flex;

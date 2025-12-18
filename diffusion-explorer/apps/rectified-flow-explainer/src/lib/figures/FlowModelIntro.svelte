@@ -7,6 +7,12 @@
   import * as d3 from 'd3';
   import { callTrainingWorkerThread, callSamplingWorkerThreadFromInitialPoints, sampleMultivariateNormal } from '$lib/diffusion';
   import { downloadJSON } from '$lib/utils';
+  import Figure from '$lib/components/Figure.svelte';
+  import PlayButton from '$lib/components/PlayButton.svelte';
+
+  // Caption props
+  export let figureNumber = '1';
+  export let captionText = 'Flow matching model training and sampling visualization.';
 
   // Props/Configuration
   export let width = 800;
@@ -27,7 +33,7 @@
   export let pointRadius = 5;
   export let pointOpacity = 0.25;
   export let flowWidth = 10; // Gap between source and target in data units
-  export let yShiftFactor = -0.35; // Vertical shift for distributions (positive shifts down)
+  export let yShiftFactor = -0.5; // Vertical shift for distributions (positive shifts down)
 
   // Animation settings
   export let animationDuration = 8000; // Duration in milliseconds
@@ -41,8 +47,8 @@
   export let sourceContourColor = '#3b82f6'; // Blue
   export let targetContourColor = '#3b82f6'; // Blue
   export let intermediateContourColor = '#f17720'; // Orange
-  export let intermediateContourOpacity = 0.25; // Higher opacity for intermediate contours
-  export let intermediatePointOpacity = 0.5; // Higher opacity for intermediate scatter points
+  export let intermediateContourOpacity = 0.2; // Higher opacity for intermediate contours
+  export let intermediatePointOpacity = 0.7; // Higher opacity for intermediate scatter points
   export let trainingObjective = 'Flow Matching';
 
   // Visibility controls for each visualization element
@@ -58,7 +64,6 @@
 
   // Stores for sampling state
   const allTimeSamples = writable<number[][][]>([]);
-  const isPlaying = writable(false);
 
   // Distribution samples
   let sourceDistributionSamples: number[][] = [];
@@ -96,6 +101,17 @@
   let yScale = null;
   let time = 0; // Animation time parameter (0 to 1)
   let animationFrameId: number | null = null;
+
+  // Local animation control state
+  let isPlaying = true;
+  let isPausedByFigure = false;
+
+  // Update isPausedByFigure when isPlaying changes
+  $: isPausedByFigure = !isPlaying;
+
+  function toggleAnimation() {
+    isPlaying = !isPlaying;
+  }
 
   /**
    * Generate samples from 2D standard normal and clip outliers beyond 3 sigma
@@ -259,7 +275,6 @@
         sourceDistributionSamples = cachedData[0];
         currentSamples = cachedData[0]; // Initialize current samples with source
         console.log('Loaded cached trajectories:', cachedData.length, 'timesteps');
-        isPlaying.set(true);
         return true;
       }
 
@@ -458,7 +473,7 @@
     // Get the y position from the top of the data domain
     const yDomain = yScale.domain();
     const yTop = yDomain[0]; // Min value maps to top of screen with this scale
-    const labelY = yScale(yTop) + labelFontSize; // Position above the top (subtract to move up in SVG)
+    const labelY = yScale(yTop) + 0.5 * labelFontSize; // Position above the top (subtract to move up in SVG)
 
     // Add source distribution label with white outline
     labelsGroup.append('text')
@@ -575,15 +590,33 @@
     let startTime: number | null = null;
     let isPaused = false;
     let pauseStartTime: number | null = null;
+    let pausedElapsedTime = 0; // Track time when paused by figure button
 
     function animate(currentTime: number) {
+      // Check if paused by figure button
+      if (isPausedByFigure) {
+        // Store the elapsed time when paused
+        if (startTime !== null && pausedElapsedTime === 0) {
+          pausedElapsedTime = currentTime - startTime;
+        }
+        // Keep requesting frames but don't update time
+        animationFrameId = requestAnimationFrame(animate);
+        return;
+      }
+
+      // Resume from pause: adjust startTime to account for paused duration
+      if (pausedElapsedTime > 0) {
+        startTime = currentTime - pausedElapsedTime;
+        pausedElapsedTime = 0;
+      }
+
       if (startTime === null) {
         startTime = currentTime;
       }
 
       const elapsed = currentTime - startTime;
 
-      // Check if we're in pause period
+      // Check if we're in pause period (between animation loops)
       if (elapsed >= animationDuration) {
         if (!isPaused) {
           isPaused = true;
@@ -704,5 +737,15 @@
   });
 </script>
 
-<svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
-</svg>
+<Figure>
+  {#snippet children()}
+    <PlayButton {isPlaying} onclick={toggleAnimation} />
+    <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
+    </svg>
+  {/snippet}
+  {#snippet caption()}
+    <div class="caption">
+      <span class="figure-number">Figure {figureNumber}:</span> {captionText}
+    </div>
+  {/snippet}
+</Figure>

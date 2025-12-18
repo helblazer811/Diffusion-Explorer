@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Figure from '$lib/components/Figure.svelte';
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import IndependentCoupling from '$lib/figures/IndependentCoupling.svelte';
   import FlowModelIntro from '$lib/figures/FlowModelIntro.svelte';
@@ -7,9 +6,13 @@
   import { Katex } from '@diffusion-explorer/ui';
 </script>
 <div class="page-container">
-  <h1 class="article-title">A Visual Explanation of Rectified Flows</h1>
-  <h3 class="byline">By <a href="alechelbling.com">Alec Helbling</a></h3>
-  <h3 class="dateline">December 24, 2025</h3>
+  <div class="title-header-wrapper">
+    <h1 class="article-title">A Visual Explanation of Rectified Flows</h1>
+    <div class="byline-dateline-container">
+      <h3 class="byline">By <a href="alechelbling.com">Alec Helbling</a></h3>
+      <h3 class="dateline">December 24, 2025</h3>
+    </div>
+  </div>
 <!-- 
 
   <h2>Typography</h2>
@@ -66,14 +69,7 @@ fl
   </div> -->
   <p>Introduction content. </p>
   <h2>Brief Background on Flow Matching</h2>
-  <Figure>
-    <FlowModelIntro />
-    {#snippet caption()}
-      <div class="caption">
-        <span class="figure-number">Figure 1:</span> Flow matching model training and sampling visualization.
-      </div>
-    {/snippet}
-  </Figure>
+  <FlowModelIntro />
   <p></p>
   <h2>Curvature is the Enemy of Speed </h2>
   <p>Curved sampling trajectories are difficult to accurately simulate in a few steps. </p>
@@ -90,14 +86,7 @@ fl
   <h3>What is a coupling? </h3>
   <p></p>
 
-  <Figure>
-    <IndependentCoupling />
-    {#snippet caption()}
-      <div class="caption">
-        <span class="figure-number">Figure 3:</span> Independent coupling visualization showing the source distribution.
-      </div>
-    {/snippet}
-  </Figure>
+  <IndependentCoupling />
 
   <DoubleFigure>
     {#snippet left()}
