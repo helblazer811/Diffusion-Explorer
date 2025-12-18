@@ -2,6 +2,7 @@
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import IndependentCoupling from '$lib/figures/IndependentCoupling.svelte';
   import FlowModelIntro from '$lib/figures/FlowModelIntro.svelte';
+  import CurvedTrajectoryIntro from '$lib/figures/CurvedTrajectoryIntro.svelte';
   import EulerSamplerFigure from '$lib/figures/EulerSamplerFigure.svelte';
   import { Katex } from '@diffusion-explorer/ui';
 </script>
@@ -70,6 +71,8 @@ fl
   <p>Introduction content. </p>
   <h2>Brief Background on Flow Matching</h2>
   <FlowModelIntro />
+  <p></p>
+  <CurvedTrajectoryIntro />
   <p></p>
   <h2>Curvature is the Enemy of Speed </h2>
   <p>Curved sampling trajectories are difficult to accurately simulate in a few steps. </p>

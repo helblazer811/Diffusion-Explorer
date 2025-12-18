@@ -201,7 +201,6 @@
           if (!get(isTraining)) {
             isPlaying.set(true);
           }
-          console.log('Generated samples:', allSamples.length);
           resolve(allSamples);
         },
         settings.domainRange
@@ -221,11 +220,8 @@
       // Randomly sample numSamples points
       const shuffled = [...allPoints].sort(() => Math.random() - 0.5);
       targetDistributionSamples = shuffled.slice(0, numSamples);
-
-      console.log('Loaded target distribution samples:', targetDistributionSamples.length);
       return true;
     } catch (error) {
-      console.error('Failed to load target distribution:', error);
       return false;
     }
   }
