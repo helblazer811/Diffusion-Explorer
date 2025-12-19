@@ -29,8 +29,7 @@
     background-color: #f9f9f9;
     border: 1px solid #e0e0e0;
     border-radius: 4px;
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
+    padding: 1rem;
   }
 
   .figure-caption {

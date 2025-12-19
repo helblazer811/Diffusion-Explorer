@@ -212,7 +212,8 @@ self.onmessage = async (e) => {
     // Evaluate the vector field at all grid points
     const velocities = ourModel.forward(gridPoints, t);
 
-    // Convert to array and return
+    // Convert to arrays and return both grid points and velocities
+    const gridPointsArray = gridPoints.arraySync();
     const velocitiesArray = velocities.arraySync();
 
     // Clean up
@@ -222,7 +223,8 @@ self.onmessage = async (e) => {
 
     self.postMessage({
       type: "result",
-      allSamples: velocitiesArray
+      velocities: velocitiesArray,
+      gridPoints: gridPointsArray
     });
     return;
   } else {

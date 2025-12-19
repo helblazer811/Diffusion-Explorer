@@ -2,10 +2,10 @@
   import { onMount } from 'svelte';
   import { writable, type Writable } from 'svelte/store';
   import * as tf from '@tensorflow/tfjs';
-  import { 
-    callTrainingWorkerThread, 
-    callSamplingWorkerThreadFromInitialPoints, 
-    callSamplingWorkerThreadVectorFieldGrid, 
+  import {
+    callTrainingWorkerThread,
+    callSamplingWorkerThreadFromInitialPoints,
+    callSamplingWorkerThreadVectorFieldGrid,
     sampleMultivariateNormal
   } from '@diffusion-explorer/diffusion';
   import { downloadJSON } from '$lib/utils';
@@ -15,6 +15,7 @@
   import FlowModelIntro from '$lib/figures/FlowModelIntro.svelte';
   import CurvedTrajectoryIntro from '$lib/figures/CurvedTrajectoryIntro.svelte';
   import EulerSamplerFigure from '$lib/figures/EulerSamplerFigure.svelte';
+  import VectorField from '$lib/figures/VectorField.svelte';
   import { Katex } from '@diffusion-explorer/ui';
 
   // ========== DATA MANAGEMENT STATE ==========
@@ -31,6 +32,7 @@
     timeSteps: number[];
     domainRange: { xMin: number; xMax: number; yMin: number; yMax: number };
     velocities: number[][][];
+    gridPoints: number[][];
   }
 
   const vectorFieldData: Writable<VectorFieldData | null> = writable(null);
@@ -41,12 +43,12 @@
   // Configuration
   const numSamples = 100;
   const numSteps = 300;
-  const cachedTrajectoriesPath = null; // "cached_samples/smiley_face_trajectories.json";
+  const cachedTrajectoriesPath = "cached_samples/smiley_face_trajectories.json";
 
   // Vector field configuration
-  const cachedVectorFieldPath = null; // "cached_samples/smiley_face_vector_field.json";
-  const vectorFieldGridResolution = 20;
-  const vectorFieldTimeSteps = 10;
+  const cachedVectorFieldPath = "cached_samples/smiley_face_vector_field.json";
+  const vectorFieldGridResolution = 12;
+  const vectorFieldTimeSteps = 200;
 
   const trainWorkerUrl = 'src/lib/flow_matching_workers/train.worker.js';
   const samplingWorkerUrl = 'src/lib/flow_matching_workers/sampling.worker.js';
@@ -183,10 +185,10 @@
     return new Promise((resolve) => {
       callSamplingWorkerThreadFromInitialPoints(
         samplingWorkerUrl,
-        modelPath, 
-        trainingObjectiveVal, 
-        modelConfig, 
-        initialPoints, 
+        modelPath,
+        trainingObjectiveVal,
+        modelConfig,
+        initialPoints,
         numberOfSteps,
         (allSamples) => {
           allTimeSamples.set(allSamples);
@@ -208,21 +210,12 @@
     const trainingObjectiveVal = trainingObjective;
     const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
 
-    // Determine domain range from target distribution
-    const targetSamples = $targetDistributionSamples;
-    if (targetSamples.length === 0) {
-      console.error('No target distribution loaded');
-      return;
-    }
-
-    const xValues = targetSamples.map(p => p[0]);
-    const yValues = targetSamples.map(p => p[1]);
-    const padding = 1.0;
+    // Use hardcoded domain range
     const domainRange = {
-      xMin: Math.min(...xValues) - padding,
-      xMax: Math.max(...xValues) + padding,
-      yMin: Math.min(...yValues) - padding,
-      yMax: Math.max(...yValues) + padding
+      xMin: -2.5,
+      xMax: 2.5,
+      yMin: -2.5,
+      yMax: 2.5
     };
 
     // Generate time steps
@@ -231,30 +224,47 @@
       timeSteps.push(i / (numTimeSteps - 1));
     }
 
-    // Collect velocities for all time steps
+    // Collect velocities and grid points for all time steps
     const allVelocities: number[][][] = [];
+    let gridPoints: number[][] = [];
 
     for (let i = 0; i < timeSteps.length; i++) {
       const t = timeSteps[i];
       console.log(`Sampling vector field at t=${t.toFixed(2)}...`);
 
       // Use promise to wait for worker callback
-      const velocities = await new Promise<number[][]>((resolve) => {
-        callSamplingWorkerThreadVectorFieldGrid(
+      const result = await new Promise<{velocities: number[][], gridPoints?: number[][]}>((resolve) => {
+        const worker = callSamplingWorkerThreadVectorFieldGrid(
           samplingWorkerUrl,
           modelPath,
           trainingObjectiveVal,
           modelConfig,
           gridResolution,
           domainRange,
-          (result) => {
-            resolve(result as number[][]);
+          (velocities) => {
+            // Worker callback - need to access the raw message
+            resolve({ velocities: velocities as number[][] });
           },
           t
         );
+
+        // Override the worker message handler to capture gridPoints
+        worker.onmessage = (e) => {
+          if (e.data.type === 'result') {
+            resolve({
+              velocities: e.data.velocities,
+              gridPoints: e.data.gridPoints
+            });
+          }
+        };
       });
 
-      allVelocities.push(velocities);
+      allVelocities.push(result.velocities);
+
+      // Capture grid points from first call (same for all time steps)
+      if (i === 0 && result.gridPoints) {
+        gridPoints = result.gridPoints;
+      }
     }
 
     // Store complete vector field data
@@ -262,7 +272,8 @@
       gridResolution,
       timeSteps,
       domainRange,
-      velocities: allVelocities
+      velocities: allVelocities,
+      gridPoints
     };
 
     vectorFieldData.set(fieldData);
@@ -327,45 +338,30 @@
     await loadTargetDistribution();
 
     // Try to load cached trajectories
-    if (cachedTrajectoriesPath) {
-      const cachedLoaded = await loadCachedTrajectories(cachedTrajectoriesPath);
+    if (cachedTrajectoriesPath && cachedVectorFieldPath) {
+      const trajectoriesLoaded = await loadCachedTrajectories(cachedTrajectoriesPath);
+      const vectorFieldLoaded = await loadCachedVectorField(cachedVectorFieldPath);
 
-      if (cachedLoaded) {
-        console.log('Using cached trajectories');
-
-        // Try to load vector field even if trajectories cached
-        if (cachedVectorFieldPath) {
-          const vectorFieldLoaded = await loadCachedVectorField(cachedVectorFieldPath);
-          if (!vectorFieldLoaded) {
-            console.log('Cached vector field not found, generation skipped (no model available)');
-          }
-        }
+      if (trajectoriesLoaded && vectorFieldLoaded) {
+        console.log('Using cached trajectories and vector field');
 
         return () => {
           if (trainingWorker) trainingWorker.terminate();
         };
       }
-    }
-
-    // If no cached data, train and sample
-    console.log("Training new model...");
-    const modelPath = await trainModel();
-    await generateSamples(modelPath, numSamples, numSteps);
-    downloadTrajectories();
-
-    // Generate and download vector field
-    if (cachedVectorFieldPath !== null) {
-      const vectorFieldLoaded = await loadCachedVectorField(cachedVectorFieldPath);
-
-      if (!vectorFieldLoaded) {
-        console.log('Generating vector field...');
-        await generateVectorField(
-          modelPath,
-          vectorFieldGridResolution,
-          vectorFieldTimeSteps
-        );
-        downloadVectorField();
-      }
+    } else {
+      // If no cached data, train and sample
+      console.log("Training new model...");
+      const modelPath = await trainModel();
+      await generateSamples(modelPath, numSamples, numSteps);
+      downloadTrajectories();
+      // Generate the vector field
+      await generateVectorField(
+        modelPath,
+        vectorFieldGridResolution,
+        vectorFieldTimeSteps
+      );
+      downloadVectorField();
     }
 
     return () => {
@@ -468,21 +464,15 @@ fl
 
   <IndependentCoupling />
 
-  <DoubleFigure>
-    {#snippet left()}
-      <!-- Left figure content -->
-    {/snippet}
+  <h2>Vector Field Visualization</h2>
+  <p>Below we visualize the learned velocity field and how sample trajectories flow through it.</p>
 
-    {#snippet right()}
-      <!-- Right figure content -->
-    {/snippet}
-
-    {#snippet caption()}
-      <div class="caption">
-        <span class="figure-number">Figure 4:</span> Double figure example.
-      </div>
-    {/snippet}
-  </DoubleFigure>
+  <VectorField
+    vectorFieldData={$vectorFieldData}
+    allTimeSamples={$allTimeSamples}
+    figureNumber="4"
+    captionText="Left: Animated vector field showing the learned velocity at each point over time. Right: A sample trajectory (red) flowing through the vector field toward the target distribution (blue points)."
+  />
 <!--
   <h2>Material Icons</h2>
 
