@@ -23,7 +23,7 @@
   export let perEdgeAnimationDelay = 250; // Pause between animating each Euler edge segment
   export let repeatAnimation = true; // Whether to repeat the animation
   export let repeatDelay = 1000; // Delay before repeating the animation
-  export let labelFontSize = 18;
+  export let labelFontSize = 22;
   export let labelColor = '#666';
   export let highCurvatureLabel = 'Highly Curved Function';
   export let lowCurvatureLabel = 'Approximately Straight Function';
