@@ -98,8 +98,8 @@
 
     // Position labels relative to the top of the SVG
     const yDomain = yScale.domain();
-    const yTop = yDomain[0]; // Min value maps to top of screen
-    const labelY = yScale(yTop) + 0.5 * labelFontSize;
+    const yTop = yDomain[1]; // Max value maps to top of screen
+    const labelY = yScale(yTop) + 1.5 * labelFontSize;
 
     // Add source distribution label with white outline
     labelsGroup.append('text')

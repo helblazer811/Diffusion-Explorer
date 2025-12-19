@@ -132,6 +132,82 @@ self.onmessage = async (e) => {
       tfModelPath: modelSaveName,
       // allSamples: allSamplesArray,
     });
+  } else if (type === "train_rectified") {
+    // Destructure the data for rectified flow training
+    const { trainingObjective, modelConfig, datasetPath, rectifiedConfig } = data;
+
+    // Set up tf backend
+    if (backend === "wasm") {
+      await tf.setBackend("wasm");
+      await tf.ready();
+    } else if (backend === "webgl") {
+      await tf.setBackend("webgl");
+      await tf.ready();
+    } else {
+      throw new Error("Invalid backend specified");
+    }
+
+    // Initialize the model
+    const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+    const ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
+
+    // Load the dataset (target distribution)
+    const { pointsTensor } = await loadDataset(datasetPath);
+
+    // Generate or load source distribution
+    let sourceDistribution: tf.Tensor2D | null = null;
+    if (rectifiedConfig.sourceDistributionPath) {
+      const { pointsTensor: sourceTensor } = await loadDataset(rectifiedConfig.sourceDistributionPath);
+      sourceDistribution = sourceTensor as tf.Tensor2D;
+    }
+    // If no source path provided, sourceDistribution remains null (will generate Gaussian)
+
+    // Store trajectories from each rectified step
+    const allRectifiedTrajectories: number[][][][] = [];
+
+    // Run rectified flow training
+    await ourModel.train_rectified(
+      pointsTensor as tf.Tensor2D,
+      sourceDistribution,
+      rectifiedConfig.num_rectified_steps,
+      rectifiedConfig.epochs_per_rectified_step,
+      rectifiedConfig.batchSize,
+      rectifiedConfig.num_simulation_steps,
+      // Stop training function
+      () => trainingStopped,
+      // End epoch callback
+      (epoch, rectifiedStep, intermediateSamples) => {
+        self.postMessage({
+          type: "epoch_chunk",
+          epoch: epoch,
+          rectifiedStep: rectifiedStep,
+          intermediateSamples: intermediateSamples,
+        });
+      },
+      // End rectified step callback
+      (rectifiedStep, trajectories) => {
+        // Store the trajectories for this rectified step
+        if (trajectories) {
+          allRectifiedTrajectories.push(trajectories);
+        }
+
+        self.postMessage({
+          type: "rectified_step_complete",
+          rectifiedStep: rectifiedStep,
+          trajectories: trajectories,
+        });
+      }
+    );
+
+    // Save the trained model
+    const modelSaveName = await saveModel(ourModel.model, trainingObjective);
+
+    // Send final result with all trajectories
+    self.postMessage({
+      type: "result",
+      tfModelPath: modelSaveName,
+      allRectifiedTrajectories: allRectifiedTrajectories,
+    });
   } else if (type === "stop_training") {
     // Figure out how to stop the training
     trainingStopped = true;

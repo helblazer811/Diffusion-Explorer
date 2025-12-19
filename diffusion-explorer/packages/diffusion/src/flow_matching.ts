@@ -9,13 +9,14 @@ export class FlowModel extends Model {
     }
 
     /**
-     * Train the flow model using the flow matching objective 
-     * @param data tf.Tensor2D of shape [num_samples, dim]
+     * Train the flow model using the flow matching objective
+     * @param data tf.Tensor2D of shape [num_samples, dim] - target distribution
      * @param epochs number of epochs to train the model
      * @param batchSize number of samples to use in each batch
      * @param updateInterval number of epochs to wait before updating the model
      * @param stopTraining function to check if training should stop
      * @param endEpochCallback function to call at the end of each epoch
+     * @param source_distribution tf.Tensor2D | null - source distribution. If null, generates random noise each batch
      * @returns Promise<void>
      */
     async train(
@@ -25,6 +26,7 @@ export class FlowModel extends Model {
         updateInterval: number = 50,
         stopTraining: () => boolean = () => { return false; },
         endEpochCallback: (epoch: number, intermediateSamples: number[][] | null) => void = () => { },
+        source_distribution: tf.Tensor2D | null = null,
     ): Promise<void> {
         // Run training
         console.log("Training started in worker thread...");
@@ -35,21 +37,46 @@ export class FlowModel extends Model {
         };
         // Set up optimizer
         const optimizer = tf.train.adam(0.01);
+
+        const numSamples = data.shape[0];
+        const numBatches = Math.ceil(numSamples / batchSize);
+
         // Run the training loop
         for (let epoch = 0; epoch < epochs; epoch++) {
-            // console.log(`Epoch ${epoch + 1} / ${epochs}`);
-            // Iterate over the dataset
-            for (let i = 0; i < data.shape[0]; i += batchSize) {
-                tf.tidy(() => {// Clear memory 
+            // Shuffle indices for each epoch
+            const indices = tf.util.createShuffledIndices(numSamples);
+
+            // Iterate over batches
+            for (let batchIdx = 0; batchIdx < numBatches; batchIdx++) {
+                tf.tidy(() => {
+                    // Get batch indices
+                    const batchIndicesArray = indices.slice(
+                        batchIdx * batchSize,
+                        Math.min((batchIdx + 1) * batchSize, numSamples)
+                    );
+                    const batchIndices = tf.tensor1d(Array.from(batchIndicesArray), 'int32');
+
                     // Sample a batch of target distribution samples from `data`
-                    const x_1 = tf.gather(data, tf.range(i, Math.min(i + batchSize, data.shape[0])).toInt());
-                    // Sample a batch of `batch_size` timesteps in [0, 1]
-                    const t = tf.randomUniform([x_1.shape[0], 1]);
-                    // Sample a batch of `batch_size` random noise
-                    const x_0 = tf.randomNormal([x_1.shape[0], this.dim]);
+                    const x_1 = tf.gather(data, batchIndices);
+                    const actualBatchSize = x_1.shape[0];
+
+                    // Sample a batch of timesteps in [0, 1]
+                    const t = tf.randomUniform([actualBatchSize, 1]);
+
+                    // Sample or gather source distribution samples
+                    let x_0: tf.Tensor2D;
+                    if (source_distribution === null) {
+                        // Standard flow matching: random noise for each batch
+                        x_0 = tf.randomNormal([actualBatchSize, this.dim]);
+                    } else {
+                        // Rectified flow style: use provided source distribution
+                        x_0 = tf.gather(source_distribution, batchIndices);
+                    }
+
                     // Compute the x_t interpolation x_t = (1 - t) * x_0 + t * x_1
                     const x_t = x_0.mul(tf.sub(1, t)).add(x_1.mul(t));
                     const dx_t = x_1.sub(x_0) // dx_t = x_1 - x_0
+
                     // Run the optimizer with the mse loss
                     optimizer.minimize(() => {
                         const pred = this.forward(x_t, t);
@@ -58,6 +85,7 @@ export class FlowModel extends Model {
                     });
                 });
             }
+
             // Run intermediate sampling
             let intermediateSamples = null;
             if (epoch % updateInterval === 0) {
@@ -81,6 +109,132 @@ export class FlowModel extends Model {
                 console.log("Training stopped by user.");
                 break;
             }
+        }
+    }
+
+
+    /**
+     * Train the flow model using rectified flow algorithm
+     * @param data Target distribution dataset [num_samples, dim]
+     * @param source_distribution Initial source distribution [num_samples, dim]. If null, generates N(0, I)
+     * @param num_rectified_steps Number of rectification iterations
+     * @param epochs_per_rectified_step Training epochs per rectification step
+     * @param batchSize Mini-batch size for training
+     * @param num_simulation_steps ODE integration steps for sampling
+     * @param stopTraining Function to check if training should halt
+     * @param endEpochCallback Called after each epoch
+     * @param endRectifiedStepCallback Called after each rectification step
+     * @returns Promise<void>
+     */
+    async train_rectified(
+        data: tf.Tensor2D,
+        source_distribution: tf.Tensor2D | null,
+        num_rectified_steps: number,
+        epochs_per_rectified_step: number,
+        batchSize: number = 32,
+        num_simulation_steps: number = 200,
+        stopTraining: () => boolean = () => false,
+        endEpochCallback: (epoch: number, rectifiedStep: number, intermediateSamples: number[][] | null) => void = () => {},
+        endRectifiedStepCallback: (rectifiedStep: number, intermediateSamples: number[][] | null) => void = () => {}
+    ): Promise<void> {
+        const numSamples = data.shape[0];
+        const dim = data.shape[1];
+
+        // Step 1: Initialize coupling
+        // If source_distribution is provided, use it; otherwise generate Gaussian noise
+        let x0_coupling: tf.Tensor2D;
+        let shouldDisposeX0 = false;
+
+        if (source_distribution === null) {
+            x0_coupling = tf.randomNormal([numSamples, dim]);
+            shouldDisposeX0 = true; // We created it, so we should dispose it
+        } else {
+            x0_coupling = source_distribution;
+            shouldDisposeX0 = false; // User provided it, don't dispose
+        }
+
+        let x1_coupling = data;
+
+        // Main rectification loop
+        for (let rectifiedStep = 0; rectifiedStep < num_rectified_steps; rectifiedStep++) {
+            // Check if training should stop
+            if (stopTraining()) {
+                console.log(`Training stopped at rectified step ${rectifiedStep}`);
+                break;
+            }
+
+            console.log(`=== Rectified Step ${rectifiedStep + 1}/${num_rectified_steps} ===`);
+
+            // Train flow matching with current coupling using the standard train method
+            // Wrap the endEpochCallback to include the rectifiedStep parameter
+            const wrappedCallback = (epoch: number, intermediateSamples: number[][] | null) => {
+                endEpochCallback(epoch, rectifiedStep, intermediateSamples);
+            };
+
+            // Call the train method with the coupling
+            // Set updateInterval very high to avoid intermediate sampling during rectified training
+            await this.train(
+                x1_coupling,  // target distribution
+                epochs_per_rectified_step,
+                batchSize,
+                epochs_per_rectified_step + 1,  // updateInterval - effectively disables intermediate sampling
+                stopTraining,
+                wrappedCallback,
+                x0_coupling  // source distribution
+            );
+
+            // Sample to get new coupling (except on last step)
+            if (rectifiedStep < num_rectified_steps - 1) {
+                // Generate trajectories from x0_coupling
+                const trajectories = this.sample_from_initial_points(
+                    x0_coupling,
+                    num_simulation_steps
+                );
+
+                // Extract final timestep (t=1) as new x1
+                const finalStep = trajectories.shape[0] - 1;
+                const newX1 = trajectories.slice([finalStep, 0, 0], [1, numSamples, dim])
+                                          .squeeze([0]);
+
+                // Update coupling: keep same x0, pair with generated x1
+                // Dispose old x1_coupling if it's not the original data
+                if (rectifiedStep > 0) {
+                    x1_coupling.dispose();
+                }
+                x1_coupling = newX1;
+
+                // Dispose trajectories tensor
+                trajectories.dispose();
+
+                // Sample intermediate trajectories for visualization
+                const intermediateSamples = await this.sampleForVisualization(
+                    x0_coupling,
+                    num_simulation_steps,
+                    100,  // numVisualizationSamples
+                    true  // returnFullTrajectories
+                );
+
+                // Callback with rectified step results
+                endRectifiedStepCallback(rectifiedStep, intermediateSamples);
+            } else {
+                // Final step - just callback with final samples
+                const finalSamples = await this.sampleForVisualization(
+                    x0_coupling,
+                    num_simulation_steps,
+                    100,  // numVisualizationSamples
+                    true  // returnFullTrajectories
+                );
+                endRectifiedStepCallback(rectifiedStep, finalSamples);
+            }
+        }
+
+        // Cleanup - only dispose x0 if we created it
+        if (shouldDisposeX0) {
+            x0_coupling.dispose();
+        }
+        // Dispose x1_coupling if it's not the original data
+        if (num_rectified_steps > 0) {
+            x1_coupling.dispose();
         }
     }
   
@@ -184,8 +338,46 @@ export class FlowModel extends Model {
     ): tf.Tensor3D {
         // Generate uniform grid
         const initialPoints = sampleUniformGrid(gridResolution, domainRange);
-        
+
         // Sample from the initial points
         return this.sample_from_initial_points(initialPoints, num_total_steps, options);
+    }
+
+    /**
+     * Private helper: Sample trajectories for visualization
+     * @param initialPoints Initial points to sample from
+     * @param numSteps Number of ODE integration steps
+     * @param numVisualizationSamples Maximum number of samples to visualize
+     * @param returnFullTrajectories If true, returns full trajectories; if false, returns only final timestep
+     * @returns Full trajectories as 3D array or final timestep samples as 2D array
+     */
+    private async sampleForVisualization(
+        initialPoints: tf.Tensor2D,
+        numSteps: number,
+        numVisualizationSamples: number = 100,
+        returnFullTrajectories: boolean = false
+    ): Promise<number[][] | number[][][] | null> {
+        return tf.tidy(() => {
+            const numSamples = initialPoints.shape[0];
+            const sampleCount = Math.min(numVisualizationSamples, numSamples);
+
+            // Take subset of samples for visualization
+            const subset = initialPoints.slice([0, 0], [sampleCount, -1]);
+
+            // Generate trajectories
+            const trajectories = this.sample_from_initial_points(subset, numSteps);
+
+            if (returnFullTrajectories) {
+                // Return full trajectories: [num_timesteps, num_samples, dim]
+                return trajectories.arraySync() as number[][][];
+            } else {
+                // Return only final timestep (backward compatible)
+                const finalStep = trajectories.shape[0] - 1;
+                const finalSamples = trajectories.slice([finalStep, 0, 0], [1, -1, -1])
+                                                .squeeze([0]);
+
+                return finalSamples.arraySync() as number[][];
+            }
+        });
     }
 }
