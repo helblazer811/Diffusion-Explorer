@@ -166,14 +166,16 @@ export class FlowModel extends Model {
             // Return all samples
             return tf.stack(all_step_data);
         });
-    }    /** 
-     * Sample from a uniform grid of initial points
-     * @param gridResolution Number of points along each axis
-     * @param domainRange The domain range for x and y coordinates
-     * @param num_total_steps Number of flow steps
-     * @param options Optional parameters for future extensibility
-     * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
-     */
+    }    
+    
+    /** 
+    * Sample from a uniform grid of initial points
+    * @param gridResolution Number of points along each axis
+    * @param domainRange The domain range for x and y coordinates
+    * @param num_total_steps Number of flow steps
+    * @param options Optional parameters for future extensibility
+    * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
+    */
     sample_grid(
         gridResolution: number,
         domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
