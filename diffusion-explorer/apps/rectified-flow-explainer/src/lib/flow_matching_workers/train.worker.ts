@@ -8,7 +8,7 @@ setWasmPaths("/tfjs-backend-wasm/");
 import "@tensorflow/tfjs-backend-wasm"; // Import the WebGL backend for TensorFlow.js
 
 // import { DiffusionModel } from "../diffusion";
-import { FlowModel } from "../flow_matching";
+import { FlowModel } from "../../../../../packages/diffusion/src/flow_matching";
 import { ConditionalDiffusionModel } from "../conditional_diffusion";
 
 const backend = "webgl";
