@@ -4,7 +4,7 @@
   import * as tf from '@tensorflow/tfjs';
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import { sampleMultivariateNormal } from '$lib/diffusion';
+  import { sampleMultivariateNormal } from '@diffusion-explorer/diffusion';
   import Figure from '$lib/components/Figure.svelte';
 
   // Caption props

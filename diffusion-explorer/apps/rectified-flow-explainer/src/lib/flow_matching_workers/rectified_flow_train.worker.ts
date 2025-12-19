@@ -12,7 +12,8 @@ import * as tf from '@tensorflow/tfjs';
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
 setWasmPaths('/tfjs-backend-wasm/');
 import '@tensorflow/tfjs-backend-wasm';
-import { FlowModel } from '../flow_matching';
+
+import { FlowModel } from '@diffusion-explorer/diffusion';
 
 const backend = 'webgl';
 

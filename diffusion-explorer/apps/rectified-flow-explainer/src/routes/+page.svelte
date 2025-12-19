@@ -2,7 +2,12 @@
   import { onMount } from 'svelte';
   import { writable, type Writable } from 'svelte/store';
   import * as tf from '@tensorflow/tfjs';
-  import { callTrainingWorkerThread, callSamplingWorkerThreadFromInitialPoints, callSamplingWorkerThreadVectorFieldGrid, sampleMultivariateNormal } from '$lib/diffusion';
+  import { 
+    callTrainingWorkerThread, 
+    callSamplingWorkerThreadFromInitialPoints, 
+    callSamplingWorkerThreadVectorFieldGrid, 
+  } from '$lib/flow_matching_workers/worker_helpers';
+  import { sampleMultivariateNormal } from '@diffusion-explorer/diffusion';
   import { downloadJSON } from '$lib/utils';
 
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';

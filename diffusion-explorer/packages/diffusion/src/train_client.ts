@@ -1,4 +1,4 @@
-import { trainWorkerUrl } from '../index';
+import { trainWorkerUrl } from './index';
 
 export function callTrainingWorkerThread(
     trainingObjective: string,

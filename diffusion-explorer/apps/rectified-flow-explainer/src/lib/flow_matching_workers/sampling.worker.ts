@@ -6,16 +6,16 @@ import * as tf from "@tensorflow/tfjs";
 // import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
 // setWasmPaths('tfjs-backend-wasm/');
 // import '@tensorflow/tfjs-backend-wasm'; // Import the WebGL backend for TensorFlow.js
-import { DiffusionModel } from "../diffusion";
-import { FlowModel } from "../flow_matching";
-import { ConditionalDiffusionModel } from "../conditional_diffusion";
-import { sampleUniformGrid } from "../utils";
+// import { DiffusionModel } from "../diffusion";
+import { FlowModel, sampleUniformGrid } from "@diffusion-explorer/diffusion";
+// import { ConditionalDiffusionModel } from "../conditional_diffusion";
+// import { sampleUniformGrid } from "../../../../../packages/diffusion/src/utils";
 
 const backend = "webgl";
 const trainingObjectiveToModelClass = {
   "Flow Matching": FlowModel,
-  Diffusion: DiffusionModel,
-  "Conditional Diffusion": ConditionalDiffusionModel,
+  // Diffusion: DiffusionModel,
+  // "Conditional Diffusion": ConditionalDiffusionModel,
 };
 
 self.onmessage = async (e) => {
