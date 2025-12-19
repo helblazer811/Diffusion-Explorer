@@ -1,6 +1,6 @@
-import { trainWorkerUrl } from './index';
 
 export function callTrainingWorkerThread(
+    trainWorkerUrl: string,
     trainingObjective: string,
     modelConfig: object,
     datasetPath: string,

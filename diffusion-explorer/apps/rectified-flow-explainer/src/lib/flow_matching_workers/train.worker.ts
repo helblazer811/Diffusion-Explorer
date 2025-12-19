@@ -8,13 +8,13 @@ setWasmPaths("/tfjs-backend-wasm/");
 import "@tensorflow/tfjs-backend-wasm"; // Import the WebGL backend for TensorFlow.js
 
 // import { DiffusionModel } from "../diffusion";
-import { FlowModel } from "../../../../../packages/diffusion/src/flow_matching";
-import { ConditionalDiffusionModel } from "../conditional_diffusion";
+import { FlowModel } from "@diffusion-explorer/diffusion";
+// import { ConditionalDiffusionModel } from "../conditional_diffusion";
 
 const backend = "webgl";
 const trainingObjectiveToModelClass = {
   "Flow Matching": FlowModel,
-  "Conditional Diffusion": ConditionalDiffusionModel,
+  // "Conditional Diffusion": ConditionalDiffusionModel,
 };
 
 async function loadDataset(path: string) {

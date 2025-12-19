@@ -16,7 +16,6 @@
   export const width = 800;
   export const sourcePointColor = '#3b82f6';
   export const targetPointColor = '#f17720';
-
   export const targetShiftFactor = 8;
   export const margin = 20;
   export const sourceLabelText = 'Source Distribution';
