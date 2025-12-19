@@ -7,7 +7,7 @@
     import { get } from 'svelte/store';
     import { base } from '$app/paths';
     import * as settings from '$lib/settings';
-    import { callSamplingWorkerThread } from '$lib/diffusion/workers/sampling_client';
+    import { callSamplingWorkerThread } from '$lib/flow_matching_workers/worker_helpers';
     import 'katex/dist/katex.min.css';
     import katex from 'katex';
 

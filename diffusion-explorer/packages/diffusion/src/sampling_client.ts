@@ -1,6 +1,4 @@
 
-import { samplingWorkerUrl } from './index';
-
 type SamplingType = 'sample' | 'sample_from_initial_points' | 'sample_grid' | 'vector_field_grid';
 
 interface SamplingOptions {
@@ -22,7 +20,8 @@ interface SamplingMessageData {
     options?: SamplingOptions;
 }
 
-function callWorker(
+function callSamplingWorker(
+    samplingWorkerUrl: string,
     type: SamplingType,
     data: SamplingMessageData,
     callback: (allSamples: any, guidance?: any) => void
@@ -47,6 +46,7 @@ function callWorker(
 
 // Lightweight wrappers
 export function callSamplingWorkerThread(
+    samplingWorkerUrl: string,
     modelJSONPath: string,
     trainingObjective: string,
     modelConfig: object,
@@ -56,7 +56,8 @@ export function callSamplingWorkerThread(
     domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
     options: SamplingOptions = {}
 ) {
-    return callWorker(
+    return callSamplingWorker(
+        samplingWorkerUrl,
         'sample',
         {
             modelJSONPath,
@@ -72,6 +73,7 @@ export function callSamplingWorkerThread(
 }
 
 export function callSamplingWorkerThreadFromInitialPoints(
+    samplingWorkerUrl: string,
     modelJSONPath: string,
     trainingObjective: string,
     modelConfig: object,
@@ -81,7 +83,8 @@ export function callSamplingWorkerThreadFromInitialPoints(
     domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
     options: SamplingOptions = {}
 ) {
-    return callWorker(
+    return callSamplingWorker(
+        samplingWorkerUrl,
         'sample_from_initial_points',
         {
             modelJSONPath,
@@ -97,6 +100,7 @@ export function callSamplingWorkerThreadFromInitialPoints(
 }
 
 export function callSamplingWorkerThreadGrid(
+    samplingWorkerUrl: string,
     modelJSONPath: string,
     trainingObjective: string,
     modelConfig: object,
@@ -106,7 +110,8 @@ export function callSamplingWorkerThreadGrid(
     callback: (allSamples: any, guidance?: any) => void,
     options: SamplingOptions = {}
 ) {
-    return callWorker(
+    return callSamplingWorker(
+        samplingWorkerUrl,
         'sample_grid',
         {
             modelJSONPath,
@@ -138,6 +143,7 @@ export function callSamplingWorkerThreadGrid(
  * @param options - Optional sampling parameters
  */
 export function callSamplingWorkerThreadVectorFieldGrid(
+    samplingWorkerUrl: string,
     modelJSONPath: string,
     trainingObjective: string,
     modelConfig: object,
@@ -147,7 +153,8 @@ export function callSamplingWorkerThreadVectorFieldGrid(
     timeValue: number = 0.5,
     options: SamplingOptions = {}
 ) {
-    return callWorker(
+    return callSamplingWorker(
+        samplingWorkerUrl,
         'vector_field_grid',
         {
             modelJSONPath,

@@ -6,8 +6,8 @@
     callTrainingWorkerThread, 
     callSamplingWorkerThreadFromInitialPoints, 
     callSamplingWorkerThreadVectorFieldGrid, 
-  } from '$lib/flow_matching_workers/worker_helpers';
-  import { sampleMultivariateNormal } from '@diffusion-explorer/diffusion';
+    sampleMultivariateNormal
+  } from '@diffusion-explorer/diffusion';
   import { downloadJSON } from '$lib/utils';
 
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
@@ -41,12 +41,15 @@
   // Configuration
   const numSamples = 100;
   const numSteps = 300;
-  const cachedTrajectoriesPath = "cached_samples/smiley_face_trajectories.json";
+  const cachedTrajectoriesPath = null; // "cached_samples/smiley_face_trajectories.json";
 
   // Vector field configuration
-  const cachedVectorFieldPath = "cached_samples/smiley_face_vector_field.json";
+  const cachedVectorFieldPath = null; // "cached_samples/smiley_face_vector_field.json";
   const vectorFieldGridResolution = 20;
   const vectorFieldTimeSteps = 10;
+
+  const trainWorkerUrl = 'src/lib/flow_matching_workers/train.worker.js';
+  const samplingWorkerUrl = 'src/lib/flow_matching_workers/sampling.worker.js';
 
   const settings = {
     trainingObjectiveToModelConfig: {
@@ -179,7 +182,12 @@
 
     return new Promise((resolve) => {
       callSamplingWorkerThreadFromInitialPoints(
-        modelPath, trainingObjectiveVal, modelConfig, initialPoints, numberOfSteps,
+        samplingWorkerUrl,
+        modelPath, 
+        trainingObjectiveVal, 
+        modelConfig, 
+        initialPoints, 
+        numberOfSteps,
         (allSamples) => {
           allTimeSamples.set(allSamples);
           sourceDistributionSamples.set(allSamples[0]);
@@ -233,6 +241,7 @@
       // Use promise to wait for worker callback
       const velocities = await new Promise<number[][]>((resolve) => {
         callSamplingWorkerThreadVectorFieldGrid(
+          samplingWorkerUrl,
           modelPath,
           trainingObjectiveVal,
           modelConfig,
@@ -272,7 +281,11 @@
     return new Promise((resolve) => {
       console.log("Starting training worker thread...");
       trainingWorker = callTrainingWorkerThread(
-        trainingObjectiveVal, modelConfig, datasetPath, trainingConfig,
+        trainWorkerUrl,
+        trainingObjectiveVal, 
+        modelConfig, 
+        datasetPath, 
+        trainingConfig,
         (tfModelPath) => {
           console.log('Training finished!', tfModelPath);
           isTraining.set(false);
