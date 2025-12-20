@@ -61,7 +61,7 @@
   const vectorFieldTimeSteps = 200;
 
   // Rectified flow configuration
-  const cachedRectifiedFlowPath: string | null = null; // Set to null to always train
+  const cachedRectifiedFlowPath: string | null = "cached_samples/smiley_face_rectified_flow_trajectories.json"; // Set to null to always train
   const rectifiedFlowConfig = {
     num_rectified_steps: 3,
     epochs_per_rectified_step: 100,
@@ -513,6 +513,28 @@
       <h3 class="dateline">December 24, 2025</h3>
     </div>
   </div>
+
+  {#if $rectifiedFlowData}
+    <RectifiedFlowVisualization
+      allRectifiedTrajectories={$rectifiedFlowData.allRectifiedTrajectories}
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+      numTrajectoriesToShow={10}
+      animationDuration={3000}
+      pauseBetweenSteps={1000}
+      pauseBeforeRestart={2000}
+    >
+      {#snippet caption()}
+        <div class="caption">
+          <span class="figure-number">Figure 1:</span> 
+          <strong>A rectified flow is a flow-based generative model that learns straighter paths.</strong>
+          Watch how paths become straighter
+          with each rectification step. Each step retrains the model using trajectories
+          from the previous step, progressively reducing curvature.
+        </div>
+      {/snippet}
+    </RectifiedFlowVisualization>
+  {/if}
 <!-- 
 
   <h2>Typography</h2>
@@ -628,26 +650,6 @@ fl
     figureNumber="4"
     captionText="Left: Animated vector field showing the learned velocity at each point over time. Right: A sample trajectory (red) flowing through the vector field toward the target distribution (blue points)."
   />
-
-  {#if $rectifiedFlowData}
-    <RectifiedFlowVisualization
-      allRectifiedTrajectories={$rectifiedFlowData.allRectifiedTrajectories}
-      sourceDistributionSamples={$sourceDistributionSamples}
-      targetDistributionSamples={$targetDistributionSamples}
-      numTrajectoriesToShow={10}
-      animationDuration={3000}
-      pauseBetweenSteps={1000}
-      pauseBeforeRestart={2000}
-    >
-      {#snippet caption()}
-        <div class="caption">
-          <span class="figure-number">Figure 6:</span> Watch how paths become straighter
-          with each rectification step. Each step retrains the model using trajectories
-          from the previous step, progressively reducing curvature.
-        </div>
-      {/snippet}
-    </RectifiedFlowVisualization>
-  {/if}
 
   <h2>Acknowledgements</h2>
   <div class="acknowledgements">
