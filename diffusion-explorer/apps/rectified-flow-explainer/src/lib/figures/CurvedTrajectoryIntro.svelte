@@ -61,6 +61,8 @@
   let yScale = null;
   let time = 0; // Animation time parameter (0 to 1)
   let animationFrameId: number | null = null;
+  let trajectoryLengths: Map<number, number> = new Map(); // Cache total path lengths
+  let trajectoryArcLengths: Map<number, number[]> = new Map(); // Cache arc lengths per timestep
 
   // Local animation control state
   let isPlaying = true;
@@ -140,10 +142,14 @@
 
     // Create full path (background) and progress path (foreground) for each trajectory
     selectedTrajectoryIndices.forEach(idx => {
+      // Generate the full trajectory path once
+      const fullPath = generateTrajectoryPath(idx, null);
+
       // Full trajectory path (lighter, always complete)
       trajectoryGroup
         .append('path')
         .attr('class', `trajectory-full-${idx}`)
+        .attr('d', fullPath)
         .attr('stroke', trajectoryColor)
         .attr('stroke-width', trajectoryStrokeWidth)
         .attr('stroke-opacity', trajectoryFullOpacity)
@@ -151,16 +157,51 @@
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round');
 
-      // Progress path (darker, animated to current time)
-      trajectoryGroup
+      // Animated progress path using stroke-dasharray
+      const progressPath = trajectoryGroup
         .append('path')
         .attr('class', `trajectory-progress-${idx}`)
+        .attr('d', fullPath)  // Same path as background
         .attr('stroke', trajectoryColor)
         .attr('stroke-width', trajectoryStrokeWidth)
         .attr('stroke-opacity', trajectoryProgressOpacity)
         .attr('fill', 'none')
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round');
+
+      // Get the total path length for dasharray animation
+      const totalLength = progressPath.node().getTotalLength();
+
+      // Cache the path length for performance
+      trajectoryLengths.set(idx, totalLength);
+
+      // Pre-compute cumulative arc lengths at each timestep
+      const allSamples = $allTimeSamples;
+      const numSteps = allSamples.length;
+      const arcLengths: number[] = new Array(numSteps);
+
+      for (let step = 0; step < numSteps; step++) {
+        // Generate path up to this step
+        const partialPath = generateTrajectoryPath(idx, step);
+
+        // Create temporary path element to measure its length
+        const tempPath = trajectoryGroup.append('path')
+          .attr('d', partialPath);
+
+        // Get cumulative length at this step
+        arcLengths[step] = tempPath.node().getTotalLength();
+
+        // Remove temporary path
+        tempPath.remove();
+      }
+
+      // Cache arc lengths for this trajectory
+      trajectoryArcLengths.set(idx, arcLengths);
+
+      // Set up stroke-dasharray animation
+      progressPath
+        .attr('stroke-dasharray', totalLength)
+        .attr('stroke-dashoffset', totalLength);  // Start hidden
 
       // Current position marker
       trajectoryGroup
@@ -187,15 +228,19 @@
     const currentStep = Math.round(time * (allSamples.length - 1));
 
     selectedTrajectoryIndices.forEach(idx => {
-      // Update full path (always complete, doesn't change after first render)
-      const fullPath = generateTrajectoryPath(idx, null);
-      svg.select(`.trajectory-full-${idx}`)
-        .attr('d', fullPath);
+      // Get the total path length and arc lengths for this trajectory
+      const totalLength = trajectoryLengths.get(idx) || 0;
+      const arcLengths = trajectoryArcLengths.get(idx);
 
-      // Update progress path (up to current time)
-      const progressPath = generateTrajectoryPath(idx, currentStep);
-      svg.select(`.trajectory-progress-${idx}`)
-        .attr('d', progressPath);
+      if (arcLengths && currentStep < arcLengths.length) {
+        // Get the actual arc length at the current timestep
+        const arcLengthAtStep = arcLengths[currentStep];
+
+        // Set dashoffset to reveal path up to this arc length
+        // dashoffset = totalLength - arcLength reveals the path from start to arcLength
+        svg.select(`.trajectory-progress-${idx}`)
+          .attr('stroke-dashoffset', totalLength - arcLengthAtStep);
+      }
 
       // Update current position marker
       const currentSamples = allSamples[currentStep];
