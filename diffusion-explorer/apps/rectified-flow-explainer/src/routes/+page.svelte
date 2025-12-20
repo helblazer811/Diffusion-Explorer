@@ -514,27 +514,23 @@
     </div>
   </div>
 
-  {#if $rectifiedFlowData}
-    <RectifiedFlowVisualization
-      allRectifiedTrajectories={$rectifiedFlowData.allRectifiedTrajectories}
-      sourceDistributionSamples={$sourceDistributionSamples}
-      targetDistributionSamples={$targetDistributionSamples}
-      numTrajectoriesToShow={10}
-      animationDuration={3000}
-      pauseBetweenSteps={1000}
-      pauseBeforeRestart={2000}
-    >
-      {#snippet caption()}
-        <div class="caption">
-          <span class="figure-number">Figure 1:</span> 
-          <strong>A rectified flow is a flow-based generative model that learns straighter paths.</strong>
-          Watch how paths become straighter
-          with each rectification step. Each step retrains the model using trajectories
-          from the previous step, progressively reducing curvature.
-        </div>
-      {/snippet}
-    </RectifiedFlowVisualization>
-  {/if}
+  <RectifiedFlowVisualization
+    allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
+    numTrajectoriesToShow={10}
+    animationDuration={3000}
+    pauseBetweenSteps={1000}
+    pauseBeforeRestart={2000}
+  >
+    {#snippet caption()}
+      <div class="caption">
+        <span class="figure-number">Figure 1:</span>
+        <strong>A rectified flow is a flow-based generative model that learns straighter paths.</strong>
+        Watch how paths become straighter
+        with each rectification step. Each step retrains the model using trajectories
+        from the previous step, progressively reducing curvature.
+      </div>
+    {/snippet}
+  </RectifiedFlowVisualization>
 <!-- 
 
   <h2>Typography</h2>

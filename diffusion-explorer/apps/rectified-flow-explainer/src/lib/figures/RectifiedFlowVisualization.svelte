@@ -5,9 +5,26 @@
   import PlayButton from '$lib/components/PlayButton.svelte';
 
   // Data props
-  export let allRectifiedTrajectories: number[][][][]; // [step][timestep][sample][dim]
-  export let sourceDistributionSamples: number[][] = [];
-  export let targetDistributionSamples: number[][] = [];
+  export let allRectifiedTrajectories: number[][][][] = []; // [step][timestep][sample][dim]
+
+  // Data validation
+  $: isDataValid = allRectifiedTrajectories &&
+                    allRectifiedTrajectories.length > 0 &&
+                    allRectifiedTrajectories[0] &&
+                    allRectifiedTrajectories[0].length > 0;
+
+  // Derived source and target distributions from trajectory endpoints
+  $: sourceDistributionSamples = isDataValid
+    ? allRectifiedTrajectories[0][0] // First timestep of first rectified step
+    : [];
+  $: targetDistributionSamples = isDataValid
+    ? allRectifiedTrajectories[0][allRectifiedTrajectories[0].length - 1] // Last timestep of first rectified step
+    : [];
+
+  // Ready to animate only when all data is computed
+  $: isReadyToAnimate = isDataValid &&
+                        sourceDistributionSamples.length > 0 &&
+                        targetDistributionSamples.length > 0;
 
   // Animation props
   export let animationDuration = 3000; // Duration per rectified step (ms)
@@ -51,6 +68,7 @@
 
   // Animation state
   let currentRectifiedStep = 0;
+  let previousRectifiedStep = -1; // Track when rectified step changes
   let time = 0; // Normalized time (0-1) within current step
   let isPlaying = true;
   let selectedTrajectoryIndices: number[] = [];
@@ -65,11 +83,11 @@
   let xScale: d3.ScaleLinear<number, number>;
   let yScale: d3.ScaleLinear<number, number>;
 
-  // Data validation
-  $: isDataValid = allRectifiedTrajectories &&
-                    allRectifiedTrajectories.length > 0 &&
-                    allRectifiedTrajectories[0] &&
-                    allRectifiedTrajectories[0].length > 0;
+  // Cache for trajectory lengths and arc lengths
+  // Map structure: Map<rectifiedStep, Map<trajectoryIdx, totalLength>>
+  let trajectoryLengths: Map<number, Map<number, number>> = new Map();
+  // Map structure: Map<rectifiedStep, Map<trajectoryIdx, arcLengths[]>>
+  let trajectoryArcLengths: Map<number, Map<number, number[]>> = new Map();
 
   /**
    * Toggle animation play/pause
@@ -161,20 +179,20 @@
   }
 
   /**
-   * Generate SVG path for a trajectory up to endTime
+   * Generate SVG path for a trajectory up to endStep
    * Applies x-shift transformation to create source-to-target flow effect
    */
   function generateTrajectoryPath(
     rectifiedStep: number,
     trajectoryIndex: number,
-    endTime: number  // 0 to 1
+    endStep: number | null = null  // timestep index, null for full path
   ): string {
     const trajectoryData = getTrajectoryData(rectifiedStep, selectedTrajectoryIndices[trajectoryIndex]);
     const numPoints = trajectoryData.length;
-    const endIndex = Math.floor(endTime * (numPoints - 1));
+    const maxStep = endStep !== null ? endStep : numPoints - 1;
 
     let path = '';
-    for (let i = 0; i <= endIndex; i++) {
+    for (let i = 0; i <= maxStep; i++) {
       const [x, y] = trajectoryData[i];
 
       // Apply x-shift based on progress through trajectory
@@ -234,7 +252,41 @@
       .attr('fill', targetPointColor)
       .attr('opacity', pointOpacity);
 
-    // Initialize trajectories (full paths + progress paths + markers)
+    // Pre-compute arc lengths for all rectified steps and trajectories
+    for (let rectStep = 0; rectStep < allRectifiedTrajectories.length; rectStep++) {
+      const lengthsForStep = new Map<number, number>();
+      const arcLengthsForStep = new Map<number, number[]>();
+
+      for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
+        // Generate full path for this rectified step
+        const fullPath = generateTrajectoryPath(rectStep, idx, null);
+
+        // Create temporary path to measure total length
+        const tempFullPath = trajectoriesGroup.append('path').attr('d', fullPath);
+        const totalLength = tempFullPath.node().getTotalLength();
+        lengthsForStep.set(idx, totalLength);
+
+        // Pre-compute arc lengths at each timestep
+        const stepData = allRectifiedTrajectories[rectStep];
+        const numTimeSteps = stepData.length;
+        const arcLengths: number[] = new Array(numTimeSteps);
+
+        for (let step = 0; step < numTimeSteps; step++) {
+          const partialPath = generateTrajectoryPath(rectStep, idx, step);
+          const tempPath = trajectoriesGroup.append('path').attr('d', partialPath);
+          arcLengths[step] = tempPath.node().getTotalLength();
+          tempPath.remove();
+        }
+
+        arcLengthsForStep.set(idx, arcLengths);
+        tempFullPath.remove();
+      }
+
+      trajectoryLengths.set(rectStep, lengthsForStep);
+      trajectoryArcLengths.set(rectStep, arcLengthsForStep);
+    }
+
+    // Initialize trajectory SVG elements (full paths + progress paths + markers)
     for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
       // Full path (background)
       trajectoriesGroup.append('path')
@@ -244,8 +296,8 @@
         .attr('stroke-width', trajectoryStrokeWidth)
         .attr('opacity', trajectoryFullOpacity);
 
-      // Progress path (animated)
-      trajectoriesGroup.append('path')
+      // Progress path (animated) with stroke-dasharray
+      const progressPath = trajectoriesGroup.append('path')
         .attr('class', `trajectory-progress-${idx}`)
         .attr('fill', 'none')
         .attr('stroke', trajectoryColor)
@@ -326,24 +378,50 @@
 
     const d3Svg = d3.select(svg);
 
+    // Check if rectified step changed
+    const stepChanged = currentRectifiedStep !== previousRectifiedStep;
+
+    // Get cached lengths for current rectified step
+    const lengthsForStep = trajectoryLengths.get(currentRectifiedStep);
+    const arcLengthsForStep = trajectoryArcLengths.get(currentRectifiedStep);
+
     // Update trajectories
     for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
-      // Full path
-      const fullPath = generateTrajectoryPath(currentRectifiedStep, idx, 1.0);
-      d3Svg.select(`.trajectory-full-${idx}`)
-        .attr('d', fullPath);
+      const fullPathElement = d3Svg.select(`.trajectory-full-${idx}`);
+      const progressPathElement = d3Svg.select(`.trajectory-progress-${idx}`);
 
-      // Progress path
-      const progressPath = generateTrajectoryPath(currentRectifiedStep, idx, time);
-      d3Svg.select(`.trajectory-progress-${idx}`)
-        .attr('d', progressPath);
+      // Only regenerate paths when rectified step changes
+      if (stepChanged) {
+        const fullPath = generateTrajectoryPath(currentRectifiedStep, idx, null);
+        fullPathElement.attr('d', fullPath);
+        progressPathElement.attr('d', fullPath); // Same path as full
 
-      // Circle marker
+        // Get total length for this trajectory at current rectified step
+        const totalLength = lengthsForStep?.get(idx) || 0;
+
+        // Set up dasharray for this rectified step
+        progressPathElement
+          .attr('stroke-dasharray', totalLength)
+          .attr('stroke-dashoffset', totalLength);
+      }
+
+      // Always update dashoffset based on current time
+      const totalLength = lengthsForStep?.get(idx) || 0;
+      const arcLengths = arcLengthsForStep?.get(idx);
+
+      // Calculate current timestep and arc length
       const trajectoryData = getTrajectoryData(currentRectifiedStep, selectedTrajectoryIndices[idx]);
       const numPoints = trajectoryData.length;
-      const currentIndex = Math.floor(time * (numPoints - 1));
-      if (currentIndex < numPoints) {
-        const [x, y] = trajectoryData[currentIndex];
+      const currentStep = Math.floor(time * (numPoints - 1));
+
+      if (arcLengths && currentStep < arcLengths.length) {
+        const arcLengthAtStep = arcLengths[currentStep];
+        progressPathElement.attr('stroke-dashoffset', totalLength - arcLengthAtStep);
+      }
+
+      // Circle marker
+      if (currentStep < numPoints) {
+        const [x, y] = trajectoryData[currentStep];
         const xShifted = x + time * flowWidth;
         d3Svg.select(`.trajectory-point-${idx}`)
           .attr('cx', xScale(xShifted))
@@ -354,6 +432,9 @@
     // Update label
     d3Svg.select('.rectified-step-label')
       .text(`Rectified Step ${currentRectifiedStep + 1} / ${allRectifiedTrajectories.length}`);
+
+    // Track previous step
+    previousRectifiedStep = currentRectifiedStep;
   }
 
   /**
@@ -445,8 +526,8 @@
     }
   }
 
-  // Reactive statements
-  $: if (isDataValid && svg) {
+  // Reactive statements - only initialize and animate when fully ready
+  $: if (isReadyToAnimate && svg) {
     selectTrajectoryIndices();
     initializeVisualization();
     if (isPlaying) {
@@ -454,7 +535,7 @@
     }
   }
 
-  $: if (isPlaying && !animationFrameId && svg && selectedTrajectoryIndices.length > 0) {
+  $: if (isPlaying && !animationFrameId && svg && isReadyToAnimate && selectedTrajectoryIndices.length > 0) {
     startAnimation();
   }
 
@@ -463,11 +544,7 @@
   }
 
   onMount(() => {
-    if (isDataValid) {
-      selectTrajectoryIndices();
-      initializeVisualization();
-      startAnimation();
-    }
+    // Animation will be started by the reactive statement once isReadyToAnimate becomes true
   });
 
   onDestroy(() => {
@@ -475,10 +552,10 @@
   });
 </script>
 
-<Figure {width} {height} {caption}>
+<Figure {caption}>
   {#snippet children()}
     <PlayButton {isPlaying} onclick={toggleAnimation} />
-    <svg bind:this={svg} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
+    <svg bind:this={svg} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px; aspect-ratio: {width} / {height};">
     </svg>
   {/snippet}
 </Figure>
