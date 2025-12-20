@@ -1,8 +1,70 @@
 <script lang="ts">
+  import { onMount, onDestroy, setContext } from 'svelte';
+  import { writable } from 'svelte/store';
+
   let { children, caption } = $props();
+
+  // Visibility state
+  const isActive = writable(false);
+  let figureElement: HTMLElement;
+  let observer: IntersectionObserver | null = null;
+
+  // Track both scroll visibility and tab visibility
+  let isInViewport = false;
+  let isTabVisible = true;
+
+  // Expose isActive to children via context
+  setContext('figureIsActive', isActive);
+
+  // Update isActive when either visibility state changes
+  function updateActiveState() {
+    isActive.set(isInViewport && isTabVisible);
+  }
+
+  onMount(() => {
+    // Create IntersectionObserver to track scrolling visibility
+    observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isInViewport = entry.isIntersecting;
+          updateActiveState();
+        });
+      },
+      {
+        // Trigger when any part of the figure is visible
+        threshold: 0,
+        // Optional: add rootMargin to trigger slightly before/after viewport
+        rootMargin: '50px'
+      }
+    );
+
+    // Observe the figure element
+    if (figureElement) {
+      observer.observe(figureElement);
+    }
+
+    // Handle tab visibility changes
+    const handleVisibilityChange = () => {
+      isTabVisible = !document.hidden;
+      updateActiveState();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup function
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  });
+
+  onDestroy(() => {
+    if (observer) {
+      observer.disconnect();
+    }
+  });
 </script>
 
-<figure class="figure">
+<figure class="figure" bind:this={figureElement}>
   <div class="figure-content">
     {@render children?.()}
   </div>
