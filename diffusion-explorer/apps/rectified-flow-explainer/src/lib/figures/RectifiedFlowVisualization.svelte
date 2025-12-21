@@ -594,6 +594,7 @@
   ) {
     selectTrajectoryIndices();
     initializeVisualization(); // Lightweight: scatter plots + labels
+    // TODO: fix this, this is super jank but makes the rendering order work
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         initializeTrajectories(); // Heavy: arc length computation
