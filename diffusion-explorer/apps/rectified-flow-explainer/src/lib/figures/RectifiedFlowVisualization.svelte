@@ -27,7 +27,8 @@
                         targetDistributionSamples.length > 0;
 
   // Animation props
-  export let animationDuration = 3000; // Duration per rectified step (ms)
+  export let animationDuration = 6000; // Duration per rectified step (ms)
+  export let playingByDefault = true;
   export let pauseBetweenSteps = 1000; // Pause between rectified steps (ms)
   export let pauseBeforeRestart = 2000; // Pause before looping animation (ms)
 
@@ -70,7 +71,7 @@
   let currentRectifiedStep = 0;
   let previousRectifiedStep = -1; // Track when rectified step changes
   let time = 0; // Normalized time (0-1) within current step
-  let isPlaying = true;
+  let isPlaying = playingByDefault;
   let selectedTrajectoryIndices: number[] = [];
   let animationFrameId: number | null = null;
   let lastTimestamp: number | null = null;

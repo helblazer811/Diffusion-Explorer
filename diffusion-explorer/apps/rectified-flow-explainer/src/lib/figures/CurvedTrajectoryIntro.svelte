@@ -40,6 +40,7 @@
 
   // Animation settings
   export let animationDuration = 8000; // Duration in milliseconds
+  export let playingByDefault = true;
   export let animationPauseTime = 1000; // Pause time between loops in milliseconds
 
   // Trajectory styling props
@@ -65,7 +66,7 @@
   let trajectoryArcLengths: Map<number, number[]> = new Map(); // Cache arc lengths per timestep
 
   // Local animation control state
-  let isPlaying = true;
+  let isPlaying = playingByDefault;
   let isPausedByFigure = false;
 
   // Update isPausedByFigure when isPlaying changes

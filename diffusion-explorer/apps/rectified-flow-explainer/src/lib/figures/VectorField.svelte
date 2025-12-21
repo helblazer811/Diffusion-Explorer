@@ -28,6 +28,7 @@
   export let targetPointRadius = 5;
   export let trajectoryIndex = 1;
   export let animationDuration = 5000; // ms per full loop
+  export let playingByDefault = true;
   export let pauseDuration = 1000; // ms pause at end of animation
   export let figureNumber = '5';
   export let captionText = 'Sample trajectory (red) flowing through the animated vector field toward the target distribution (blue points).';
@@ -45,7 +46,7 @@
 
   // Animation state
   let currentTimeIndex = 0;
-  let isPlaying = true;
+  let isPlaying = playingByDefault;
   let animationFrameId: number | null = null;
   let isInitialized = false;
 

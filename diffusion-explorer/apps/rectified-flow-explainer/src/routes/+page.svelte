@@ -1,17 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { writable, type Writable } from 'svelte/store';
-  import * as tf from '@tensorflow/tfjs';
-  import {
-    callTrainingWorkerThread,
-    callRectifiedFlowTrainingWorker,
-    callSamplingWorkerThreadFromInitialPoints,
-    callSamplingWorkerThreadVectorFieldGrid,
-    sampleMultivariateNormal
-  } from '@diffusion-explorer/diffusion';
   import { downloadJSON } from '$lib/utils';
+  import { settings, type VectorFieldData, type RectifiedFlowData } from '$lib/settings';
+  import * as trainAndSample from '$lib/train_and_sample';
 
-  import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import IndependentCoupling from '$lib/figures/IndependentCoupling.svelte';
   import FlowModelIntro from '$lib/figures/FlowModelIntro.svelte';
   import CurvedTrajectoryIntro from '$lib/figures/CurvedTrajectoryIntro.svelte';
@@ -29,303 +22,109 @@
   const isTraining: Writable<boolean> = writable(false);
 
   // Vector field data store
-  interface VectorFieldData {
-    gridResolution: number;
-    timeSteps: number[];
-    domainRange: { xMin: number; xMax: number; yMin: number; yMax: number };
-    velocities: number[][][];
-    gridPoints: number[][];
-  }
-
   const vectorFieldData: Writable<VectorFieldData | null> = writable(null);
 
   // Rectified flow data store
-  interface RectifiedFlowData {
-    allRectifiedTrajectories: number[][][][]; // [rectified_step][num_timesteps][num_samples][dim]
-    modelPath: string;
-  }
   const rectifiedFlowData: Writable<RectifiedFlowData | null> = writable(null);
 
-  // Worker reference
+  // Worker references
   let trainingWorker: Worker | null = null;
   let rectifiedTrainingWorker: Worker | null = null;
 
-  // Configuration
-  const numSamples = 100;
-  const numSteps = 300;
-  const cachedTrajectoriesPath = "cached_samples/smiley_face_trajectories.json";
+  // Defer other figures until first frame renders
+  let showOtherFigures = false;
 
-  // Vector field configuration
-  const cachedVectorFieldPath = "cached_samples/smiley_face_vector_field.json";
-  const vectorFieldGridResolution = 12;
-  const vectorFieldTimeSteps = 200;
-
-  // Rectified flow configuration
-  const cachedRectifiedFlowPath: string | null = "cached_samples/smiley_face_rectified_flow_trajectories.json"; // Set to null to always train
-  const rectifiedFlowConfig = {
-    num_rectified_steps: 3,
-    epochs_per_rectified_step: 100,
-    batchSize: 32,
-    num_simulation_steps: 200,
-    sourceDistributionPath: null // null means generate Gaussian
-  };
-
-  const trainWorkerUrl = 'src/lib/flow_matching_workers/train.worker.js';
-  const samplingWorkerUrl = 'src/lib/flow_matching_workers/sampling.worker.js';
-
-  const settings = {
-    trainingObjectiveToModelConfig: {
-      "Flow Matching": { dim: 2, hidden: 64 }
-    },
-    datasetNameToPath: {
-      smiley_face: '/data/smiley_face.json'
-    },
-    trainingConfig: {
-      epochs: 500,
-      batchSize: 1024,
-      verbose: true,
-      displayInterval: 100
-    },
-    domainRange: null
-  };
-  const trainingObjective = 'Flow Matching';
-
-  // ========== DATA LOADING FUNCTIONS ==========
-
-  function generateClippedGaussianSamples(numSamples: number): number[][] {
-    return tf.tidy(() => {
-      const mean = [0, 0];
-      const cov = [[1, 0], [0, 1]];
-      const maxStdDev = 2.0;
-      const threshold = maxStdDev * Math.sqrt(2);
-
-      let allClippedSamples: number[][] = [];
-      let attempts = 0;
-      const maxAttempts = 10;
-      const batchSize = Math.ceil(numSamples * 1.5);
-
-      while (allClippedSamples.length < numSamples && attempts < maxAttempts) {
-        attempts++;
-        const rawSamplesTensor = sampleMultivariateNormal(mean, cov, batchSize) as tf.Tensor2D;
-        const rawSamplesArray = rawSamplesTensor.arraySync() as number[][];
-
-        for (const sample of rawSamplesArray) {
-          const [x, y] = sample;
-          const distance = Math.sqrt(x * x + y * y);
-          if (distance <= threshold) {
-            allClippedSamples.push(sample);
-            if (allClippedSamples.length >= numSamples) break;
-          }
-        }
-      }
-      return allClippedSamples.slice(0, numSamples);
-    });
-  }
+  // ========== WRAPPER FUNCTIONS ==========
 
   async function loadTargetDistribution() {
-    try {
-      const response = await fetch('/data/smiley_face.json');
-      const data = await response.json();
-      const allPoints = data.points as number[][];
-      const shuffled = [...allPoints].sort(() => Math.random() - 0.5);
-      targetDistributionSamples.set(shuffled.slice(0, numSamples));
-      console.log('Loaded target distribution samples:', numSamples);
+    const samples = await trainAndSample.loadTargetDistribution(settings.targetDistributionPointsPath, settings.numSamples);
+    if (samples) {
+      targetDistributionSamples.set(samples);
       return true;
-    } catch (error) {
-      console.error('Failed to load target distribution:', error);
-      return false;
     }
+    return false;
   }
 
   async function loadCachedTrajectories(path: string) {
-    try {
-      const response = await fetch(path);
-      if (!response.ok) {
-        console.log('Cached trajectories file not found:', path);
-        return false;
-      }
-
-      const cachedData = await response.json();
-      if (!cachedData || !Array.isArray(cachedData)) {
-        console.error('Invalid cached trajectories format');
-        return false;
-      }
-
-      allTimeSamples.set(cachedData);
-
-      if (cachedData.length > 0 && cachedData[0]) {
-        sourceDistributionSamples.set(cachedData[0]);
-        console.log('Loaded cached trajectories:', cachedData.length, 'timesteps');
-        return true;
-      }
-
-      console.error('Cached trajectories array is empty');
-      return false;
-    } catch (error) {
-      console.log('Could not load cached trajectories:', error);
-      return false;
+    const result = await trainAndSample.loadCachedTrajectories(path);
+    if (result) {
+      allTimeSamples.set(result.trajectories);
+      sourceDistributionSamples.set(result.sourceDistribution);
+      return true;
     }
+    return false;
   }
 
   async function loadCachedVectorField(path: string) {
-    try {
-      const response = await fetch(path);
-      if (!response.ok) {
-        console.log('Cached vector field file not found:', path);
-        return false;
-      }
-
-      const cachedData = await response.json();
-
-      // Validate format
-      if (!cachedData ||
-          typeof cachedData.gridResolution !== 'number' ||
-          !Array.isArray(cachedData.timeSteps) ||
-          !Array.isArray(cachedData.velocities)) {
-        console.error('Invalid cached vector field format');
-        return false;
-      }
-
-      vectorFieldData.set(cachedData);
-      console.log('Loaded cached vector field:',
-                  cachedData.timeSteps.length, 'timesteps,',
-                  cachedData.gridResolution, 'x', cachedData.gridResolution, 'grid');
+    const result = await trainAndSample.loadCachedVectorField(path);
+    if (result) {
+      vectorFieldData.set(result);
       return true;
-    } catch (error) {
-      console.log('Could not load cached vector field:', error);
-      return false;
     }
+    return false;
   }
 
-  async function generateSamples(modelPath: any, numSamples: number, numberOfSteps: number) {
-    const trainingObjectiveVal = trainingObjective;
-    const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
-    const initialPoints = generateClippedGaussianSamples(numSamples);
-
-    return new Promise((resolve) => {
-      callSamplingWorkerThreadFromInitialPoints(
-        samplingWorkerUrl,
-        modelPath,
-        trainingObjectiveVal,
-        modelConfig,
-        initialPoints,
-        numberOfSteps,
-        (allSamples) => {
-          allTimeSamples.set(allSamples);
-          sourceDistributionSamples.set(allSamples[0]);
-          console.log('Generated samples:', allSamples.length);
-          resolve(allSamples);
-        },
-        settings.domainRange
-      );
-    });
-  }
-
-  async function generateVectorField(
-    modelPath: any,
-    gridResolution: number,
-    numTimeSteps: number
-  ) {
-    console.log('Generating vector field...');
-    const trainingObjectiveVal = trainingObjective;
-    const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
-
-    // Use hardcoded domain range
-    const domainRange = {
-      xMin: -2.5,
-      xMax: 2.5,
-      yMin: -2.5,
-      yMax: 2.5
-    };
-
-    // Generate time steps
-    const timeSteps: number[] = [];
-    for (let i = 0; i < numTimeSteps; i++) {
-      timeSteps.push(i / (numTimeSteps - 1));
+  async function loadCachedRectifiedFlow(path: string) {
+    const result = await trainAndSample.loadCachedRectifiedFlow(path);
+    if (result) {
+      rectifiedFlowData.set(result);
+      return true;
     }
-
-    // Collect velocities and grid points for all time steps
-    const allVelocities: number[][][] = [];
-    let gridPoints: number[][] = [];
-
-    for (let i = 0; i < timeSteps.length; i++) {
-      const t = timeSteps[i];
-      console.log(`Sampling vector field at t=${t.toFixed(2)}...`);
-
-      // Use promise to wait for worker callback
-      const result = await new Promise<{velocities: number[][], gridPoints?: number[][]}>((resolve) => {
-        const worker = callSamplingWorkerThreadVectorFieldGrid(
-          samplingWorkerUrl,
-          modelPath,
-          trainingObjectiveVal,
-          modelConfig,
-          gridResolution,
-          domainRange,
-          (velocities) => {
-            // Worker callback - need to access the raw message
-            resolve({ velocities: velocities as number[][] });
-          },
-          t
-        );
-
-        // Override the worker message handler to capture gridPoints
-        worker.onmessage = (e) => {
-          if (e.data.type === 'result') {
-            resolve({
-              velocities: e.data.velocities,
-              gridPoints: e.data.gridPoints
-            });
-          }
-        };
-      });
-
-      allVelocities.push(result.velocities);
-
-      // Capture grid points from first call (same for all time steps)
-      if (i === 0 && result.gridPoints) {
-        gridPoints = result.gridPoints;
-      }
-    }
-
-    // Store complete vector field data
-    const fieldData: VectorFieldData = {
-      gridResolution,
-      timeSteps,
-      domainRange,
-      velocities: allVelocities,
-      gridPoints
-    };
-
-    vectorFieldData.set(fieldData);
-    console.log('Vector field generation complete:',
-                allVelocities.length, 'timesteps');
+    return false;
   }
 
   async function trainModel() {
-    console.log('Starting model training...');
-    const trainingObjectiveVal = trainingObjective;
-    const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
-    const trainingConfig = settings.trainingConfig;
-    const datasetPath = settings.datasetNameToPath['smiley_face'];
-    isTraining.set(true);
-
-    return new Promise((resolve) => {
-      console.log("Starting training worker thread...");
-      trainingWorker = callTrainingWorkerThread(
-        trainWorkerUrl,
-        trainingObjectiveVal, 
-        modelConfig, 
-        datasetPath, 
-        trainingConfig,
-        (tfModelPath) => {
-          console.log('Training finished!', tfModelPath);
-          isTraining.set(false);
-          resolve(tfModelPath);
-        },
-        () => console.log("Intermediate epoch callback")
-      );
-    });
+    const result = await trainAndSample.trainModel(
+      settings.trainingObjective,
+      settings.training,
+      settings.trainWorkerUrl,
+      () => isTraining.set(true),
+      () => isTraining.set(false)
+    );
+    trainingWorker = result.worker;
+    return result.modelPath;
   }
+
+  async function generateSamples(modelPath: string) {
+    const result = await trainAndSample.generateSamples(
+      modelPath,
+      settings.numSamples,
+      settings.numSteps,
+      settings.trainingObjective,
+      settings.training,
+      settings.samplingWorkerUrl
+    );
+    allTimeSamples.set(result.allTimeSamples);
+    sourceDistributionSamples.set(result.sourceDistribution);
+    return result.allTimeSamples;
+  }
+
+  async function generateVectorField(modelPath: string) {
+    const result = await trainAndSample.generateVectorField(
+      modelPath,
+      settings.vectorFieldGridResolution,
+      settings.vectorFieldTimeSteps,
+      settings.trainingObjective,
+      settings.training,
+      settings.samplingWorkerUrl
+    );
+    vectorFieldData.set(result);
+  }
+
+  async function trainRectifiedFlow() {
+    const result = await trainAndSample.trainRectifiedFlow(
+      settings.trainingObjective,
+      settings.training,
+      settings.rectifiedFlowConfig,
+      settings.trainWorkerUrl
+    );
+    rectifiedTrainingWorker = result.worker;
+    rectifiedFlowData.set(result.data);
+    downloadRectifiedFlowData();
+    return result.data.modelPath;
+  }
+
+  // ========== DOWNLOAD FUNCTIONS ==========
 
   function downloadTrajectories() {
     const trajectories = $allTimeSamples;
@@ -363,100 +162,27 @@
                 data.allRectifiedTrajectories.length, 'rectified steps');
   }
 
-  async function loadCachedRectifiedFlow(path: string) {
-    try {
-      const response = await fetch(path);
-      if (!response.ok) {
-        console.log('Cached rectified flow file not found:', path);
-        return false;
-      }
-
-      const cachedData = await response.json();
-
-      // Validate format
-      if (!cachedData ||
-          !Array.isArray(cachedData.allRectifiedTrajectories) ||
-          typeof cachedData.modelPath !== 'string') {
-        console.error('Invalid cached rectified flow format');
-        return false;
-      }
-
-      rectifiedFlowData.set(cachedData);
-      console.log('Loaded cached rectified flow:',
-                  cachedData.allRectifiedTrajectories.length, 'rectified steps');
-      return true;
-    } catch (error) {
-      console.log('Could not load cached rectified flow:', error);
-      return false;
-    }
-  }
-
-  async function trainRectifiedFlow() {
-    console.log('Starting rectified flow training...');
-    const trainingObjectiveVal = trainingObjective;
-    const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
-    const datasetPath = settings.datasetNameToPath['smiley_face'];
-
-    return new Promise((resolve) => {
-      const allTrajectories: number[][][][] = [];
-
-      console.log("Starting rectified flow training worker thread...");
-      rectifiedTrainingWorker = callRectifiedFlowTrainingWorker(
-        trainWorkerUrl,
-        trainingObjectiveVal,
-        modelConfig,
-        datasetPath,
-        rectifiedFlowConfig,
-        // Finish callback
-        (tfModelPath: string, allRectifiedTrajectories: number[][][][]) => {
-          console.log('Rectified flow training finished!', tfModelPath);
-          console.log('Collected', allRectifiedTrajectories.length, 'rectified steps');
-
-          // Store in state
-          const data: RectifiedFlowData = {
-            allRectifiedTrajectories,
-            modelPath: tfModelPath
-          };
-          rectifiedFlowData.set(data);
-
-          // Download to JSON
-          downloadRectifiedFlowData();
-
-          resolve(tfModelPath);
-        },
-        // Epoch callback
-        (epoch: number, rectifiedStep: number, intermediateSamples: number[][] | null) => {
-          console.log(`Rectified step ${rectifiedStep}, epoch ${epoch}`);
-        },
-        // Rectified step callback
-        (rectifiedStep: number, trajectories: number[][] | null) => {
-          console.log(`Completed rectified step ${rectifiedStep}`);
-          if (trajectories) {
-            allTrajectories.push(trajectories);
-            console.log('  Trajectories shape:', trajectories.length, 'samples');
-          }
-        }
-      );
-    });
-  }
-
   // ========== LIFECYCLE ==========
 
   onMount(async () => {
+    // Let first frame render before heavy computation
+    await new Promise(requestAnimationFrame);
+    showOtherFigures = true;
+
     // Load target distribution first
     await loadTargetDistribution();
 
     // Try to load cached trajectories
-    if (cachedTrajectoriesPath && cachedVectorFieldPath) {
-      const trajectoriesLoaded = await loadCachedTrajectories(cachedTrajectoriesPath);
-      const vectorFieldLoaded = await loadCachedVectorField(cachedVectorFieldPath);
+    if (settings.cachedTrajectoriesPath && settings.cachedVectorFieldPath) {
+      const trajectoriesLoaded = await loadCachedTrajectories(settings.cachedTrajectoriesPath);
+      const vectorFieldLoaded = await loadCachedVectorField(settings.cachedVectorFieldPath);
 
       if (trajectoriesLoaded && vectorFieldLoaded) {
         console.log('Using cached trajectories and vector field');
 
         // Try to load cached rectified flow if path is provided
-        if (cachedRectifiedFlowPath) {
-          const rectifiedFlowLoaded = await loadCachedRectifiedFlow(cachedRectifiedFlowPath);
+        if (settings.cachedRectifiedFlowPath) {
+          const rectifiedFlowLoaded = await loadCachedRectifiedFlow(settings.cachedRectifiedFlowPath);
           if (!rectifiedFlowLoaded) {
             console.log('Training rectified flow...');
             await trainRectifiedFlow();
@@ -477,19 +203,15 @@
     // If no cached data, train and sample
     console.log("Training new model...");
     const modelPath = await trainModel();
-    await generateSamples(modelPath, numSamples, numSteps);
+    await generateSamples(modelPath);
     downloadTrajectories();
     // Generate the vector field
-    await generateVectorField(
-      modelPath,
-      vectorFieldGridResolution,
-      vectorFieldTimeSteps
-    );
+    await generateVectorField(modelPath);
     downloadVectorField();
 
     // Train rectified flow
-    if (cachedRectifiedFlowPath) {
-      const rectifiedFlowLoaded = await loadCachedRectifiedFlow(cachedRectifiedFlowPath);
+    if (settings.cachedRectifiedFlowPath) {
+      const rectifiedFlowLoaded = await loadCachedRectifiedFlow(settings.cachedRectifiedFlowPath);
       if (!rectifiedFlowLoaded) {
         console.log('Training rectified flow...');
         await trainRectifiedFlow();
@@ -516,10 +238,6 @@
 
   <RectifiedFlowVisualization
     allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
-    numTrajectoriesToShow={10}
-    animationDuration={3000}
-    pauseBetweenSteps={1000}
-    pauseBeforeRestart={2000}
   >
     {#snippet caption()}
       <div class="caption">
@@ -606,46 +324,59 @@ fl
   <p>These equations state that the time derivative of the flow must match the velocity of the particle at each point in time, starting from its initial position at <Katex math={"t = 0"} />. Solving this ordinary differential equation yields the flow <Katex math={"\\psi_t(x)"} />, which transports samples from the source distribution to the target distribution. Sampling from a flow-based generative model therefore amounts to numerically simulating this differential equation, tracing each sample's trajectory from the source to the target distribution.</p>
 
   <h2>Visualizing Flow Matching</h2>
-  <FlowModelIntro
-    sourceDistributionSamples={$sourceDistributionSamples}
-    targetDistributionSamples={$targetDistributionSamples}
-    {allTimeSamples}
-    {isTraining}
-  />
+  {#if showOtherFigures}
+    <FlowModelIntro
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+      {allTimeSamples}
+      {isTraining}
+      playingByDefault={false}
+    />
+  {/if}
   <p></p>
-  <CurvedTrajectoryIntro
-    sourceDistributionSamples={$sourceDistributionSamples}
-    targetDistributionSamples={$targetDistributionSamples}
-    {allTimeSamples}
-    {isTraining}
-  />
+  {#if showOtherFigures}
+    <CurvedTrajectoryIntro
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+      {allTimeSamples}
+      {isTraining}
+      playingByDefault={false}
+    />
+  {/if}
   <p></p>
   <h2>Curvature is the Enemy of Speed </h2>
   <p>Curved sampling trajectories are difficult to accurately simulate in a few steps. </p>
 
-  <EulerSamplerFigure>
-    {#snippet caption()}
-      <div class="caption">
-        <span class="figure-number">Figure 2:</span> Comparison of Euler method approximations for high-curvature (left) and low-curvature (right) functions. Ground truth shown in black, Euler approximation in orange.
-      </div>
-    {/snippet}
-  </EulerSamplerFigure>
+  {#if showOtherFigures}
+    <EulerSamplerFigure>
+      {#snippet caption()}
+        <div class="caption">
+          <span class="figure-number">Figure 2:</span> Comparison of Euler method approximations for high-curvature (left) and low-curvature (right) functions. Ground truth shown in black, Euler approximation in orange.
+        </div>
+      {/snippet}
+    </EulerSamplerFigure>
+  {/if}
 
   <h2>The Limitations of an Independent Coupling</h2>
   <h3>What is a coupling? </h3>
   <p></p>
 
-  <IndependentCoupling />
+  {#if showOtherFigures}
+    <IndependentCoupling />
+  {/if}
 
   <h2>Vector Field Visualization</h2>
   <p>Below we visualize the learned velocity field and how sample trajectories flow through it.</p>
 
-  <VectorField
-    vectorFieldData={$vectorFieldData}
-    allTimeSamples={$allTimeSamples}
-    figureNumber="4"
-    captionText="Left: Animated vector field showing the learned velocity at each point over time. Right: A sample trajectory (red) flowing through the vector field toward the target distribution (blue points)."
-  />
+  {#if showOtherFigures}
+    <VectorField
+      vectorFieldData={$vectorFieldData}
+      allTimeSamples={$allTimeSamples}
+      figureNumber="4"
+      captionText="Left: Animated vector field showing the learned velocity at each point over time. Right: A sample trajectory (red) flowing through the vector field toward the target distribution (blue points)."
+      playingByDefault={false}
+    />
+  {/if}
 
   <h2>Acknowledgements</h2>
   <div class="acknowledgements">
