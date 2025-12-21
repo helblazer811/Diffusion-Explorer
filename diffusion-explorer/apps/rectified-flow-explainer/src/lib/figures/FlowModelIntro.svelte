@@ -345,12 +345,11 @@
   }
 
   /**
-   * Initialize visualization (called once after data loads)
+   * Initialize visualization (lightweight: scatter plots + labels)
    */
   function initializeVisualization() {
     if (!svgElement) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
-
 
     // 1. Initialize layers
     initializeLayers();
@@ -371,14 +370,19 @@
       initScatter(allSamples[0], intermediateContourColor, 'intermediateScatter', intermediatePointOpacity);
     }
 
-    // 4. Precompute all contours for performance
+    // 4. Plot labels
+    plotLabels();
+  }
+
+  /**
+   * Initialize contours (heavy: precompute all contours)
+   */
+  function initializeContours() {
+    // Precompute all contours for performance
     precomputeAllContours();
 
-    // 5. Initial draw
+    // Initial draw
     draw();
-
-    // 6. Plot labels (after draw so they appear on top)
-    plotLabels();
   }
 
   /**
@@ -460,12 +464,15 @@
          sourceDistributionSamples.length > 0 &&
          targetDistributionSamples.length > 0 &&
          $allTimeSamples.length > 0 &&
-        svgElement) {
-    console.log("Initializing FlowModelIntro visualization...");
-    initializeVisualization();
-    isInitialized = true;
-    console.log("Starting animation...");
-    startAnimation();
+         svgElement) {
+    initializeVisualization(); // Lightweight: scatter + labels
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        initializeContours(); // Heavy: precompute contours
+        isInitialized = true;
+        startAnimation();
+      });
+    });
   }
 
   // Cleanup on component destroy
