@@ -1,17 +1,18 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import * as d3 from 'd3';
-  import Figure from '$lib/components/Figure.svelte';
-  import PlayButton from '$lib/components/PlayButton.svelte';
+  import { onMount, onDestroy } from "svelte";
+  import * as d3 from "d3";
+  import Figure from "$lib/components/Figure.svelte";
+  import PlayButton from "$lib/components/PlayButton.svelte";
 
   // Data props
   export let allRectifiedTrajectories: number[][][][] = []; // [step][timestep][sample][dim]
 
   // Data validation
-  $: isDataValid = allRectifiedTrajectories &&
-                    allRectifiedTrajectories.length > 0 &&
-                    allRectifiedTrajectories[0] &&
-                    allRectifiedTrajectories[0].length > 0;
+  $: isDataValid =
+    allRectifiedTrajectories &&
+    allRectifiedTrajectories.length > 0 &&
+    allRectifiedTrajectories[0] &&
+    allRectifiedTrajectories[0].length > 0;
 
   // Derived source and target distributions from trajectory endpoints
   $: sourceDistributionSamples = isDataValid
@@ -20,11 +21,6 @@
   $: targetDistributionSamples = isDataValid
     ? allRectifiedTrajectories[0][allRectifiedTrajectories[0].length - 1] // Last timestep of first rectified step
     : [];
-
-  // Ready to animate only when all data is computed
-  $: isReadyToAnimate = isDataValid &&
-                        sourceDistributionSamples.length > 0 &&
-                        targetDistributionSamples.length > 0;
 
   // Animation props
   export let animationDuration = 6000; // Duration per rectified step (ms)
@@ -36,9 +32,9 @@
   export let numTrajectoriesToShow = 10; // Number of trajectories to visualize
 
   // Styling props (colors)
-  export let trajectoryColor = '#f17720'; // Orange
-  export let sourcePointColor = '#3b82f6'; // Blue
-  export let targetPointColor = '#3b82f6'; // Blue
+  export let trajectoryColor = "#f17720"; // Orange
+  export let sourcePointColor = "#3b82f6"; // Blue
+  export let targetPointColor = "#3b82f6"; // Blue
 
   // Styling props (opacity)
   export let trajectoryFullOpacity = 0.3; // Background paths
@@ -59,15 +55,19 @@
   export let flowWidth = 10; // Horizontal gap between source and target in data units
 
   // Label props
-  export let sourceLabelText = 'Source Distribution';
-  export let targetLabelText = 'Target Distribution';
+  export let sourceLabelText = "Source Distribution";
+  export let targetLabelText = "Target Distribution";
   export let labelFontSize = 18;
-  export let labelColor = '#666';
+  export let labelColor = "#666";
 
   // Caption
-  export let caption: import('svelte').Snippet | undefined = undefined;
+  export let caption: import("svelte").Snippet | undefined = undefined;
+
+  // Callback when visualization is initialized
+  export let onInitialized: (() => void) | undefined = undefined;
 
   // Animation state
+  let initialized = false;
   let currentRectifiedStep = 0;
   let previousRectifiedStep = -1; // Track when rectified step changes
   let time = 0; // Normalized time (0-1) within current step
@@ -121,9 +121,12 @@
   /**
    * Get trajectory data for a specific rectified step and sample index
    */
-  function getTrajectoryData(rectifiedStep: number, sampleIndex: number): number[][] {
+  function getTrajectoryData(
+    rectifiedStep: number,
+    sampleIndex: number
+  ): number[][] {
     const stepData = allRectifiedTrajectories[rectifiedStep]; // [timestep][sample][dim]
-    return stepData.map(timestep => timestep[sampleIndex]); // [timestep][dim]
+    return stepData.map((timestep) => timestep[sampleIndex]); // [timestep][dim]
   }
 
   /**
@@ -160,7 +163,8 @@
     }
 
     // Calculate x-scale using marginWidth
-    xScale = d3.scaleLinear()
+    xScale = d3
+      .scaleLinear()
       .domain([Math.min(...allX), Math.max(...allX)])
       .range([marginWidth, width - marginWidth]);
 
@@ -174,8 +178,12 @@
     // Reserve space at top for labels (7% of range) and apply shift factor
     const yCenterOffset = -yRange * 0.07 - yShiftFactor;
 
-    yScale = d3.scaleLinear()
-      .domain([yCenter - yRange / 2 - yCenterOffset, yCenter + yRange / 2 - yCenterOffset])
+    yScale = d3
+      .scaleLinear()
+      .domain([
+        yCenter - yRange / 2 - yCenterOffset,
+        yCenter + yRange / 2 - yCenterOffset,
+      ])
       .range([marginHeight, height - marginHeight]); // Flipped: smaller y values at top
   }
 
@@ -186,13 +194,16 @@
   function generateTrajectoryPath(
     rectifiedStep: number,
     trajectoryIndex: number,
-    endStep: number | null = null  // timestep index, null for full path
+    endStep: number | null = null // timestep index, null for full path
   ): string {
-    const trajectoryData = getTrajectoryData(rectifiedStep, selectedTrajectoryIndices[trajectoryIndex]);
+    const trajectoryData = getTrajectoryData(
+      rectifiedStep,
+      selectedTrajectoryIndices[trajectoryIndex]
+    );
     const numPoints = trajectoryData.length;
     const maxStep = endStep !== null ? endStep : numPoints - 1;
 
-    let path = '';
+    let path = "";
     for (let i = 0; i <= maxStep; i++) {
       const [x, y] = trajectoryData[i];
 
@@ -214,7 +225,7 @@
   }
 
   /**
-   * Initialize the visualization
+   * Initialize the visualization (lightweight: scatter plots + labels)
    */
   function initializeVisualization() {
     if (!svg || !isDataValid || selectedTrajectoryIndices.length === 0) return;
@@ -222,39 +233,118 @@
     const d3Svg = d3.select(svg);
 
     // Clear existing content
-    d3Svg.selectAll('*').remove();
+    d3Svg.selectAll("*").remove();
 
     // Create scale
     createScales();
 
     // Create groups
-    const sourceScatter = d3Svg.append('g').attr('class', 'source-scatter');
-    const targetScatter = d3Svg.append('g').attr('class', 'target-scatter');
-    const trajectoriesGroup = d3Svg.append('g').attr('class', 'trajectories');
-    const labelsGroup = d3Svg.append('g').attr('class', 'labels');
+    d3Svg.append("g").attr("class", "source-scatter");
+    d3Svg.append("g").attr("class", "target-scatter");
+    d3Svg.append("g").attr("class", "trajectories");
+    d3Svg.append("g").attr("class", "labels");
+
+    const sourceScatter = d3Svg.select(".source-scatter");
+    const targetScatter = d3Svg.select(".target-scatter");
+    const labelsGroup = d3Svg.select(".labels");
 
     // Draw source distribution (fixed on the left)
-    sourceScatter.selectAll('circle')
+    sourceScatter
+      .selectAll("circle")
       .data(sourceDistributionSamples)
-      .join('circle')
-      .attr('cx', d => xScale(d[0]))
-      .attr('cy', d => yScale(d[1]))
-      .attr('r', pointRadius)
-      .attr('fill', sourcePointColor)
-      .attr('opacity', pointOpacity);
+      .join("circle")
+      .attr("cx", (d) => xScale(d[0]))
+      .attr("cy", (d) => yScale(d[1]))
+      .attr("r", pointRadius)
+      .attr("fill", sourcePointColor)
+      .attr("opacity", pointOpacity);
 
     // Draw target distribution (fixed on the right)
-    targetScatter.selectAll('circle')
+    targetScatter
+      .selectAll("circle")
       .data(targetDistributionSamples)
-      .join('circle')
-      .attr('cx', d => xScale(d[0] + flowWidth))
-      .attr('cy', d => yScale(d[1]))
-      .attr('r', pointRadius)
-      .attr('fill', targetPointColor)
-      .attr('opacity', pointOpacity);
+      .join("circle")
+      .attr("cx", (d) => xScale(d[0] + flowWidth))
+      .attr("cy", (d) => yScale(d[1]))
+      .attr("r", pointRadius)
+      .attr("fill", targetPointColor)
+      .attr("opacity", pointOpacity);
+
+    // Add rectified step label
+    labelsGroup
+      .append("text")
+      .attr("class", "rectified-step-label")
+      .attr("x", width / 2)
+      .attr("y", 30)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "18px")
+      .attr("font-weight", "bold")
+      .attr("fill", "#333");
+
+    // Add source distribution label (positioned relative to top of SVG)
+    if (sourceDistributionSamples.length > 0) {
+      const sourceX = d3.mean(sourceDistributionSamples, (d) => xScale(d[0]));
+
+      // Get y position from top of data domain
+      const yDomain = yScale.domain();
+      const yTop = yDomain[0]; // Min value maps to top (since we flipped the y-axis)
+      const labelY = yScale(yTop) + 0.5 * labelFontSize;
+
+      labelsGroup
+        .append("text")
+        .attr("class", "source-label")
+        .attr("x", sourceX)
+        .attr("y", labelY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", `${labelFontSize}px`)
+        .attr("fill", labelColor)
+        .attr("stroke", "#ffffff")
+        .attr("stroke-width", "4")
+        .attr("paint-order", "stroke")
+        .text(sourceLabelText);
+    }
+
+    // Add target distribution label (positioned relative to top of SVG)
+    if (targetDistributionSamples.length > 0) {
+      const targetX = d3.mean(targetDistributionSamples, (d) =>
+        xScale(d[0] + flowWidth)
+      );
+
+      // Get y position from top of data domain
+      const yDomain = yScale.domain();
+      const yTop = yDomain[0];
+      const labelY = yScale(yTop) + 0.5 * labelFontSize;
+
+      labelsGroup
+        .append("text")
+        .attr("class", "target-label")
+        .attr("x", targetX)
+        .attr("y", labelY)
+        .attr("text-anchor", "middle")
+        .attr("font-size", `${labelFontSize}px`)
+        .attr("fill", labelColor)
+        .attr("stroke", "#ffffff")
+        .attr("stroke-width", "4")
+        .attr("paint-order", "stroke")
+        .text(targetLabelText);
+    }
+  }
+
+  /**
+   * Initialize trajectories (heavy: arc length computation + trajectory elements)
+   */
+  function initializeTrajectories() {
+    if (!svg || !isDataValid || selectedTrajectoryIndices.length === 0) return;
+
+    const d3Svg = d3.select(svg);
+    const trajectoriesGroup = d3Svg.select(".trajectories");
 
     // Pre-compute arc lengths for all rectified steps and trajectories
-    for (let rectStep = 0; rectStep < allRectifiedTrajectories.length; rectStep++) {
+    for (
+      let rectStep = 0;
+      rectStep < allRectifiedTrajectories.length;
+      rectStep++
+    ) {
       const lengthsForStep = new Map<number, number>();
       const arcLengthsForStep = new Map<number, number[]>();
 
@@ -263,7 +353,9 @@
         const fullPath = generateTrajectoryPath(rectStep, idx, null);
 
         // Create temporary path to measure total length
-        const tempFullPath = trajectoriesGroup.append('path').attr('d', fullPath);
+        const tempFullPath = trajectoriesGroup
+          .append("path")
+          .attr("d", fullPath);
         const totalLength = tempFullPath.node().getTotalLength();
         lengthsForStep.set(idx, totalLength);
 
@@ -274,7 +366,9 @@
 
         for (let step = 0; step < numTimeSteps; step++) {
           const partialPath = generateTrajectoryPath(rectStep, idx, step);
-          const tempPath = trajectoriesGroup.append('path').attr('d', partialPath);
+          const tempPath = trajectoriesGroup
+            .append("path")
+            .attr("d", partialPath);
           arcLengths[step] = tempPath.node().getTotalLength();
           tempPath.remove();
         }
@@ -290,81 +384,30 @@
     // Initialize trajectory SVG elements (full paths + progress paths + markers)
     for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
       // Full path (background)
-      trajectoriesGroup.append('path')
-        .attr('class', `trajectory-full-${idx}`)
-        .attr('fill', 'none')
-        .attr('stroke', trajectoryColor)
-        .attr('stroke-width', trajectoryStrokeWidth)
-        .attr('opacity', trajectoryFullOpacity);
+      trajectoriesGroup
+        .append("path")
+        .attr("class", `trajectory-full-${idx}`)
+        .attr("fill", "none")
+        .attr("stroke", trajectoryColor)
+        .attr("stroke-width", trajectoryStrokeWidth)
+        .attr("opacity", trajectoryFullOpacity);
 
       // Progress path (animated) with stroke-dasharray
-      const progressPath = trajectoriesGroup.append('path')
-        .attr('class', `trajectory-progress-${idx}`)
-        .attr('fill', 'none')
-        .attr('stroke', trajectoryColor)
-        .attr('stroke-width', trajectoryStrokeWidth)
-        .attr('opacity', trajectoryProgressOpacity);
+      trajectoriesGroup
+        .append("path")
+        .attr("class", `trajectory-progress-${idx}`)
+        .attr("fill", "none")
+        .attr("stroke", trajectoryColor)
+        .attr("stroke-width", trajectoryStrokeWidth)
+        .attr("opacity", trajectoryProgressOpacity);
 
       // Circle marker
-      trajectoriesGroup.append('circle')
-        .attr('class', `trajectory-point-${idx}`)
-        .attr('r', trajectoryPointRadius)
-        .attr('fill', trajectoryColor)
-        .attr('opacity', trajectoryProgressOpacity);
-    }
-
-    // Add rectified step label
-    labelsGroup.append('text')
-      .attr('class', 'rectified-step-label')
-      .attr('x', width / 2)
-      .attr('y', 30)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '18px')
-      .attr('font-weight', 'bold')
-      .attr('fill', '#333');
-
-    // Add source distribution label (positioned relative to top of SVG)
-    if (sourceDistributionSamples.length > 0) {
-      const sourceX = d3.mean(sourceDistributionSamples, d => xScale(d[0]));
-
-      // Get y position from top of data domain
-      const yDomain = yScale.domain();
-      const yTop = yDomain[0]; // Min value maps to top (since we flipped the y-axis)
-      const labelY = yScale(yTop) + 0.5 * labelFontSize;
-
-      labelsGroup.append('text')
-        .attr('class', 'source-label')
-        .attr('x', sourceX)
-        .attr('y', labelY)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', `${labelFontSize}px`)
-        .attr('fill', labelColor)
-        .attr('stroke', '#ffffff')
-        .attr('stroke-width', '4')
-        .attr('paint-order', 'stroke')
-        .text(sourceLabelText);
-    }
-
-    // Add target distribution label (positioned relative to top of SVG)
-    if (targetDistributionSamples.length > 0) {
-      const targetX = d3.mean(targetDistributionSamples, d => xScale(d[0] + flowWidth));
-
-      // Get y position from top of data domain
-      const yDomain = yScale.domain();
-      const yTop = yDomain[0];
-      const labelY = yScale(yTop) + 0.5 * labelFontSize;
-
-      labelsGroup.append('text')
-        .attr('class', 'target-label')
-        .attr('x', targetX)
-        .attr('y', labelY)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', `${labelFontSize}px`)
-        .attr('fill', labelColor)
-        .attr('stroke', '#ffffff')
-        .attr('stroke-width', '4')
-        .attr('paint-order', 'stroke')
-        .text(targetLabelText);
+      trajectoriesGroup
+        .append("circle")
+        .attr("class", `trajectory-point-${idx}`)
+        .attr("r", trajectoryPointRadius)
+        .attr("fill", trajectoryColor)
+        .attr("opacity", trajectoryProgressOpacity);
     }
 
     // Initial update
@@ -393,17 +436,21 @@
 
       // Only regenerate paths when rectified step changes
       if (stepChanged) {
-        const fullPath = generateTrajectoryPath(currentRectifiedStep, idx, null);
-        fullPathElement.attr('d', fullPath);
-        progressPathElement.attr('d', fullPath); // Same path as full
+        const fullPath = generateTrajectoryPath(
+          currentRectifiedStep,
+          idx,
+          null
+        );
+        fullPathElement.attr("d", fullPath);
+        progressPathElement.attr("d", fullPath); // Same path as full
 
         // Get total length for this trajectory at current rectified step
         const totalLength = lengthsForStep?.get(idx) || 0;
 
         // Set up dasharray for this rectified step
         progressPathElement
-          .attr('stroke-dasharray', totalLength)
-          .attr('stroke-dashoffset', totalLength);
+          .attr("stroke-dasharray", totalLength)
+          .attr("stroke-dashoffset", totalLength);
       }
 
       // Always update dashoffset based on current time
@@ -411,28 +458,38 @@
       const arcLengths = arcLengthsForStep?.get(idx);
 
       // Calculate current timestep and arc length
-      const trajectoryData = getTrajectoryData(currentRectifiedStep, selectedTrajectoryIndices[idx]);
+      const trajectoryData = getTrajectoryData(
+        currentRectifiedStep,
+        selectedTrajectoryIndices[idx]
+      );
       const numPoints = trajectoryData.length;
       const currentStep = Math.floor(time * (numPoints - 1));
 
       if (arcLengths && currentStep < arcLengths.length) {
         const arcLengthAtStep = arcLengths[currentStep];
-        progressPathElement.attr('stroke-dashoffset', totalLength - arcLengthAtStep);
+        progressPathElement.attr(
+          "stroke-dashoffset",
+          totalLength - arcLengthAtStep
+        );
       }
 
       // Circle marker
       if (currentStep < numPoints) {
         const [x, y] = trajectoryData[currentStep];
         const xShifted = x + time * flowWidth;
-        d3Svg.select(`.trajectory-point-${idx}`)
-          .attr('cx', xScale(xShifted))
-          .attr('cy', yScale(y));
+        d3Svg
+          .select(`.trajectory-point-${idx}`)
+          .attr("cx", xScale(xShifted))
+          .attr("cy", yScale(y));
       }
     }
 
     // Update label
-    d3Svg.select('.rectified-step-label')
-      .text(`Rectified Step ${currentRectifiedStep + 1} / ${allRectifiedTrajectories.length}`);
+    d3Svg
+      .select(".rectified-step-label")
+      .text(
+        `Rectified Step ${currentRectifiedStep + 1} / ${allRectifiedTrajectories.length}`
+      );
 
     // Track previous step
     previousRectifiedStep = currentRectifiedStep;
@@ -456,7 +513,8 @@
     // Handle pause states
     if (isPaused && pauseStartTime !== null) {
       const pauseElapsed = timestamp - pauseStartTime;
-      const currentPauseDuration = pauseDuration === 1 ? pauseBetweenSteps : pauseBeforeRestart;
+      const currentPauseDuration =
+        pauseDuration === 1 ? pauseBetweenSteps : pauseBeforeRestart;
 
       if (pauseElapsed >= currentPauseDuration) {
         // Pause complete
@@ -528,15 +586,35 @@
   }
 
   // Reactive statements - only initialize and animate when fully ready
-  $: if (isReadyToAnimate && svg) {
+  $: if (
+    isDataValid &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples.length > 0 &&
+    svg
+  ) {
     selectTrajectoryIndices();
-    initializeVisualization();
-    if (isPlaying) {
-      startAnimation();
-    }
+    initializeVisualization(); // Lightweight: scatter plots + labels
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        initializeTrajectories(); // Heavy: arc length computation
+        requestAnimationFrame(() => {
+          initialized = true;
+          onInitialized?.(); // Yield control to other figures
+        });
+      });
+    });
   }
 
-  $: if (isPlaying && !animationFrameId && svg && isReadyToAnimate && selectedTrajectoryIndices.length > 0) {
+  $: if (
+    isPlaying &&
+    !animationFrameId &&
+    svg &&
+    isDataValid &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples.length > 0 &&
+    selectedTrajectoryIndices.length > 0 && 
+    initialized
+  ) {
     startAnimation();
   }
 
@@ -556,7 +634,12 @@
 <Figure {caption}>
   {#snippet children()}
     <PlayButton {isPlaying} onclick={toggleAnimation} />
-    <svg bind:this={svg} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px; aspect-ratio: {width} / {height};">
+    <svg
+      bind:this={svg}
+      viewBox="0 0 {width} {height}"
+      preserveAspectRatio="xMidYMid meet"
+      style="width: 100%; height: auto; max-width: {width}px; aspect-ratio: {width} / {height};"
+    >
     </svg>
   {/snippet}
 </Figure>

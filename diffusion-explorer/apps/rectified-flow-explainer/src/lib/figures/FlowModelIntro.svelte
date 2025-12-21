@@ -351,6 +351,7 @@
     if (!svgElement) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
+
     // 1. Initialize layers
     initializeLayers();
 
@@ -458,10 +459,13 @@
   $: if (!isInitialized &&
          sourceDistributionSamples.length > 0 &&
          targetDistributionSamples.length > 0 &&
-         $allTimeSamples.length > 0) {
+         $allTimeSamples.length > 0 &&
+        svgElement) {
+    console.log("Initializing FlowModelIntro visualization...");
     initializeVisualization();
-    startAnimation();
     isInitialized = true;
+    console.log("Starting animation...");
+    startAnimation();
   }
 
   // Cleanup on component destroy
