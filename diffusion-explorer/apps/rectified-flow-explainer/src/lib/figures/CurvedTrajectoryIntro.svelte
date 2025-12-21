@@ -430,7 +430,8 @@
   $: if (!isInitialized &&
          sourceDistributionSamples.length > 0 &&
          targetDistributionSamples.length > 0 &&
-         $allTimeSamples.length > 0) {
+         $allTimeSamples.length > 0 &&
+         svgElement) {
     initializeVisualization();
     startAnimation();
     isInitialized = true;
