@@ -64,8 +64,8 @@
     return false;
   }
 
-  async function loadCachedRectifiedFlow(path: string) {
-    const result = await trainAndSample.loadCachedRectifiedFlow(path);
+  async function loadCachedRectifiedFlowTrajectories(path: string) {
+    const result = await trainAndSample.loadCachedRectifiedFlowTrajectories(path);
     if (result) {
       rectifiedFlowData.set(result);
       return true;
@@ -96,6 +96,7 @@
     );
     allTimeSamples.set(result.allTimeSamples);
     sourceDistributionSamples.set(result.sourceDistribution);
+    downloadTrajectories();
     return result.allTimeSamples;
   }
 
@@ -109,6 +110,7 @@
       settings.samplingWorkerUrl
     );
     vectorFieldData.set(result);
+    downloadVectorField();
   }
 
   async function trainRectifiedFlow() {
@@ -165,59 +167,49 @@
   // ========== LIFECYCLE ==========
 
   onMount(async () => {
+    // Load target distribution first
+    await loadTargetDistribution();
+
+    // Try to load each cached resource independently
+    let trajectoriesLoaded = false;
+    let vectorFieldLoaded = false;
+    let rectifiedFlowLoaded = false;
+
+    if (settings.cachedTrajectoriesPath) {
+      trajectoriesLoaded = await loadCachedTrajectories(settings.cachedTrajectoriesPath);
+    }
+
+    if (settings.cachedVectorFieldPath) {
+      vectorFieldLoaded = await loadCachedVectorField(settings.cachedVectorFieldPath);
+    }
+
+    if (settings.cachedRectifiedFlowTrajectoriesPath) {
+      rectifiedFlowLoaded = await loadCachedRectifiedFlowTrajectories(settings.cachedRectifiedFlowTrajectoriesPath);
+    }
+
     // Let first frame render before heavy computation
     await new Promise(requestAnimationFrame);
     showOtherFigures = true;
 
-    // Load target distribution first
-    await loadTargetDistribution();
+    // Train and generate any missing data
+    let modelPath: string | null = null;
 
-    // Try to load cached trajectories
-    if (settings.cachedTrajectoriesPath && settings.cachedVectorFieldPath) {
-      const trajectoriesLoaded = await loadCachedTrajectories(settings.cachedTrajectoriesPath);
-      const vectorFieldLoaded = await loadCachedVectorField(settings.cachedVectorFieldPath);
-
-      if (trajectoriesLoaded && vectorFieldLoaded) {
-        console.log('Using cached trajectories and vector field');
-
-        // Try to load cached rectified flow if path is provided
-        if (settings.cachedRectifiedFlowPath) {
-          const rectifiedFlowLoaded = await loadCachedRectifiedFlow(settings.cachedRectifiedFlowPath);
-          if (!rectifiedFlowLoaded) {
-            console.log('Training rectified flow...');
-            await trainRectifiedFlow();
-          }
-        } else {
-          // No cached path, train rectified flow
-          console.log('Training rectified flow (no cache)...');
-          await trainRectifiedFlow();
-        }
-
-        return () => {
-          if (trainingWorker) trainingWorker.terminate();
-          if (rectifiedTrainingWorker) rectifiedTrainingWorker.terminate();
-        };
-      }
+    if (!trajectoriesLoaded) {
+      console.log("Training new model...");
+      modelPath = await trainModel();
+      await generateSamples(modelPath);
     }
 
-    // If no cached data, train and sample
-    console.log("Training new model...");
-    const modelPath = await trainModel();
-    await generateSamples(modelPath);
-    downloadTrajectories();
-    // Generate the vector field
-    await generateVectorField(modelPath);
-    downloadVectorField();
-
-    // Train rectified flow
-    if (settings.cachedRectifiedFlowPath) {
-      const rectifiedFlowLoaded = await loadCachedRectifiedFlow(settings.cachedRectifiedFlowPath);
-      if (!rectifiedFlowLoaded) {
-        console.log('Training rectified flow...');
-        await trainRectifiedFlow();
+    if (!vectorFieldLoaded) {
+      if (!modelPath) {
+        console.log("Training model for vector field generation...");
+        modelPath = await trainModel();
       }
-    } else {
-      console.log('Training rectified flow (no cache)...');
+      await generateVectorField(modelPath);
+    }
+
+    if (!rectifiedFlowLoaded) {
+      console.log('Training rectified flow...');
       await trainRectifiedFlow();
     }
 

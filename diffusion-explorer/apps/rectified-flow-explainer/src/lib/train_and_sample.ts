@@ -130,7 +130,7 @@ export async function loadCachedVectorField(
   }
 }
 
-export async function loadCachedRectifiedFlow(
+export async function loadCachedRectifiedFlowTrajectories(
   path: string
 ): Promise<RectifiedFlowData | null> {
   try {
