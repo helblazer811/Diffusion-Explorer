@@ -50,7 +50,7 @@ export const settings = {
   // Cached data paths
   cachedTrajectoriesPath: "cached_samples/smiley_face_trajectories.json",
   cachedVectorFieldPath: "cached_samples/smiley_face_vector_field.json",
-  cachedRectifiedFlowPath: "cached_samples/smiley_face_rectified_flow_trajectories.json",
+  cachedRectifiedFlowTrajectoriesPath: "cached_samples/smiley_face_rectified_flow_trajectories.json",
 
   // Vector field configuration
   vectorFieldGridResolution: 12,
