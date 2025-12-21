@@ -37,6 +37,7 @@
 
   // Animation settings
   export let animationDuration = 8000; // Duration in milliseconds
+  export let playingByDefault = true;
   export let animationPauseTime = 1000; // Pause time between loops in milliseconds
 
   // Contour plot settings
@@ -71,7 +72,7 @@
   let animationFrameId: number | null = null;
 
   // Local animation control state
-  let isPlaying = true;
+  let isPlaying = playingByDefault;
   let isPausedByFigure = false;
 
   // Update isPausedByFigure when isPlaying changes
