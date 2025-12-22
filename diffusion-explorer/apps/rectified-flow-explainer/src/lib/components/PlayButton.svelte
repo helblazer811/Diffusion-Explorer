@@ -1,5 +1,6 @@
-<script lang="ts">
-  let { isPlaying = true, onclick = () => {} } = $props();
+<script>
+  export let isPlaying = true;
+  export let onclick = () => {};
 </script>
 
 <button

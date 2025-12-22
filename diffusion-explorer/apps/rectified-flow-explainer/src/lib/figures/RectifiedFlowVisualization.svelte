@@ -1,12 +1,12 @@
-<script lang="ts">
+<script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
   import Figure from "$lib/components/Figure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
 
   // Data props
-  export let allRectifiedTrajectories: number[][][][] = []; // [step][timestep][sample][dim]
-  export let targetDistribution: number[][] = []; // The actual target distribution points
+  export let allRectifiedTrajectories = []; // [step][timestep][sample][dim]
+  export let targetDistribution = []; // The actual target distribution points
 
   // Data validation
   $: isDataValid =
@@ -63,11 +63,11 @@
   export let labelColor = "#666";
 
   // Caption slot (passed as default children)
-  export let children: import("svelte").Snippet | undefined = undefined;
+  export let children = undefined;
   $: caption = children;
 
   // Callback when visualization is initialized
-  export let onInitialized: (() => void) | undefined = undefined;
+  export let onInitialized = undefined;
 
   // Animation state
   let initialized = false;
@@ -76,22 +76,22 @@
   let previousRectifiedStep = -1; // Track when rectified step changes
   let time = 0; // Normalized time (0-1) within current step
   let isPlaying = playingByDefault;
-  let selectedTrajectoryIndices: number[] = [];
-  let animationFrameId: number | null = null;
-  let lastTimestamp: number | null = null;
+  let selectedTrajectoryIndices = [];
+  let animationFrameId = null;
+  let lastTimestamp = null;
   let isPaused = false;
-  let pauseStartTime: number | null = null;
+  let pauseStartTime = null;
 
   // SVG elements
-  let svg: SVGSVGElement;
-  let xScale: d3.ScaleLinear<number, number>;
-  let yScale: d3.ScaleLinear<number, number>;
+  let svg;
+  let xScale;
+  let yScale;
 
   // Cache for trajectory lengths and arc lengths
   // Map structure: Map<rectifiedStep, Map<trajectoryIdx, totalLength>>
-  let trajectoryLengths: Map<number, Map<number, number>> = new Map();
+  let trajectoryLengths = new Map();
   // Map structure: Map<rectifiedStep, Map<trajectoryIdx, arcLengths[]>>
-  let trajectoryArcLengths: Map<number, Map<number, number[]>> = new Map();
+  let trajectoryArcLengths = new Map();
 
   /**
    * Toggle animation play/pause
@@ -110,7 +110,7 @@
     const numToSelect = Math.min(numTrajectoriesToShow, numAvailable);
 
     // Random selection, but same for all steps
-    const indices: number[] = [];
+    const indices = [];
     const availableIndices = Array.from({ length: numAvailable }, (_, i) => i);
 
     for (let i = 0; i < numToSelect; i++) {
@@ -124,10 +124,7 @@
   /**
    * Get trajectory data for a specific rectified step and sample index
    */
-  function getTrajectoryData(
-    rectifiedStep: number,
-    sampleIndex: number
-  ): number[][] {
+  function getTrajectoryData(rectifiedStep, sampleIndex) {
     const stepData = allRectifiedTrajectories[rectifiedStep]; // [timestep][sample][dim]
     return stepData.map((timestep) => timestep[sampleIndex]); // [timestep][dim]
   }
@@ -139,8 +136,8 @@
   function createScales() {
     if (!isDataValid) return;
 
-    let allX: number[] = [];
-    let allY: number[] = [];
+    let allX = [];
+    let allY = [];
 
     // Include source points (at original x position)
     for (const pt of sourceDistributionSamples) {
@@ -194,11 +191,7 @@
    * Generate SVG path for a trajectory up to endStep
    * Applies x-shift transformation to create source-to-target flow effect
    */
-  function generateTrajectoryPath(
-    rectifiedStep: number,
-    trajectoryIndex: number,
-    endStep: number | null = null // timestep index, null for full path
-  ): string {
+  function generateTrajectoryPath(rectifiedStep, trajectoryIndex, endStep = null) {
     const trajectoryData = getTrajectoryData(
       rectifiedStep,
       selectedTrajectoryIndices[trajectoryIndex]
@@ -347,8 +340,8 @@
       rectStep < allRectifiedTrajectories.length;
       rectStep++
     ) {
-      const lengthsForStep = new Map<number, number>();
-      const arcLengthsForStep = new Map<number, number[]>();
+      const lengthsForStep = new Map();
+      const arcLengthsForStep = new Map();
 
       for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
         // Generate full path for this rectified step
@@ -364,7 +357,7 @@
         // Pre-compute arc lengths at each timestep
         const stepData = allRectifiedTrajectories[rectStep];
         const numTimeSteps = stepData.length;
-        const arcLengths: number[] = new Array(numTimeSteps);
+        const arcLengths = new Array(numTimeSteps);
 
         for (let step = 0; step < numTimeSteps; step++) {
           const partialPath = generateTrajectoryPath(rectStep, idx, step);
@@ -499,7 +492,7 @@
   /**
    * Animation loop
    */
-  function animate(timestamp: number) {
+  function animate(timestamp) {
     if (!isPlaying) {
       animationFrameId = null;
       return;

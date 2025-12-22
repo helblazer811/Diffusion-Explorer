@@ -1,4 +1,4 @@
-<script lang="ts">
+<script>
   import * as tf from '@tensorflow/tfjs';
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
@@ -15,9 +15,9 @@
   export let margin = 40;
   export let deltaT = 2.5;
   export let groundTruthDeltaT = 0.05;
-  export let domain: [number, number] = [0, 4 * Math.PI];
+  export let domain = [0, 4 * Math.PI];
   // Caption slot (passed as default children)
-  export let children: import('svelte').Snippet | undefined = undefined;
+  export let children = undefined;
   $: caption = children;
   export let animationDuration = 2000; // Duration in milliseconds for the animation
   export let animationDelay = 500; // Delay before animation starts
@@ -33,11 +33,11 @@
   const highCurvatureYScaleFactor = 1;
   const lowCurvatureYScaleFactor = 5;
 
-  let leftSvg: SVGSVGElement;
-  let rightSvg: SVGSVGElement;
+  let leftSvg;
+  let rightSvg;
 
   // ODE Functions
-  function highCurvatureODE(t: number, y: number): number {
+  function highCurvatureODE(t, y) {
     return tf.tidy(() => {
       const tTensor = tf.scalar(t);
 
@@ -51,13 +51,13 @@
     });
   }
 
-  function highCurvatureGroundTruth(t: number): number {
+  function highCurvatureGroundTruth(t) {
     // y(t) = -cos(t) + 0.05*sin(2*t) + C
     // With y(0) = 0, C = 1
     return -Math.cos(t) + 0.05 * Math.sin(2 * t) + 1;
   }
 
-  function lowCurvatureODE(t: number, y: number): number {
+  function lowCurvatureODE(t, y) {
     return tf.tidy(() => {
       const tTensor = tf.scalar(t);
 
@@ -68,19 +68,13 @@
     });
   }
 
-  function lowCurvatureGroundTruth(t: number): number {
+  function lowCurvatureGroundTruth(t) {
     // y(t) = 0.05 * t^2
     return 0.01 * t * t;
   }
 
   // Euler Method
-  function eulerMethod(
-    odeFunc: (t: number, y: number) => number,
-    t0: number,
-    y0: number,
-    tEnd: number,
-    dt: number
-  ): { t: number[], y: number[] } {
+  function eulerMethod(odeFunc, t0, y0, tEnd, dt) {
     const tValues = [];
     const yValues = [];
 
@@ -100,13 +94,7 @@
   }
 
   // Create Scales
-  function createScales(
-    data: { t: number[], y: number[] },
-    groundTruth: { t: number, y: number }[],
-    svgWidth: number,
-    svgHeight: number,
-    yScaleFactor: number = 1
-  ): { xScale: d3.ScaleLinear<number, number>, yScale: d3.ScaleLinear<number, number> } {
+  function createScales(data, groundTruth, svgWidth, svgHeight, yScaleFactor = 1) {
     const allT = [...data.t, ...groundTruth.map(d => d.t)];
     const allY = [...data.y, ...groundTruth.map(d => d.y)];
 
@@ -130,12 +118,7 @@
   }
 
   // Generate Ground Truth Points
-  function generateGroundTruthPoints(
-    groundTruthFunc: (t: number) => number,
-    t0: number,
-    tEnd: number,
-    dt: number
-  ): { t: number, y: number }[] {
+  function generateGroundTruthPoints(groundTruthFunc, t0, tEnd, dt) {
     const points = [];
     let t = t0;
     while (t <= tEnd) {
@@ -146,12 +129,7 @@
   }
 
   // Plot Labels
-  function plotLabels(
-    svg: SVGSVGElement,
-    label: string,
-    xScale: d3.ScaleLinear<number, number>,
-    yScale: d3.ScaleLinear<number, number>
-  ) {
+  function plotLabels(svg, label, xScale, yScale) {
     if (!svg) return;
 
     const d3Svg = d3.select(svg);
@@ -179,7 +157,7 @@
   }
 
   // Animate Euler Curve (single path)
-  function animateEulerCurve(path: d3.Selection<SVGPathElement, any, any, any>, delay: number = animationDelay) {
+  function animateEulerCurve(path, delay = animationDelay) {
     const totalLength = path.node()?.getTotalLength() || 0;
 
     path
@@ -217,13 +195,7 @@
   }
 
   // Animate individual Euler line segments
-  function animateEulerSegments(
-    svg: d3.Selection<any, any, any, any>,
-    eulerPoints: { t: number, y: number }[],
-    xScale: d3.ScaleLinear<number, number>,
-    yScale: d3.ScaleLinear<number, number>,
-    delay: number = animationDelay
-  ) {
+  function animateEulerSegments(svg, eulerPoints, xScale, yScale, delay = animationDelay) {
     const segmentDuration = perEdgeAnimationDelay > 0
       ? (animationDuration / eulerPoints.length)
       : animationDuration / eulerPoints.length;
@@ -312,15 +284,7 @@
   }
 
   // Plot Curves
-  function plotCurves(
-    svg: SVGSVGElement,
-    groundTruth: { t: number, y: number }[],
-    eulerData: { t: number[], y: number[] },
-    groupId: string,
-    yScaleFactor: number = 1,
-    label: string = '',
-    animDelay: number = animationDelay
-  ) {
+  function plotCurves(svg, groundTruth, eulerData, groupId, yScaleFactor = 1, label = '', animDelay = animationDelay) {
     if (!svg) return;
 
     const d3Svg = d3.select(svg);
@@ -333,7 +297,7 @@
     d3Svg.selectAll('*').remove();
 
     // Create line generator
-    const line = d3.line<{ t: number, y: number }>()
+    const line = d3.line()
       .x(d => xScale(d.t))
       .y(d => yScale(d.y));
 

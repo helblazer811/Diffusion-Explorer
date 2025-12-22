@@ -1,21 +1,20 @@
 <!-- This figure shows a source distribution mapped to a target distribution. Also shows the trajectory of an individual sample. -->
 
-<script lang="ts">
+<script>
   import { onMount } from "svelte";
-  import { type Writable } from "svelte/store";
   import * as d3 from "d3";
   import Figure from "$lib/components/Figure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
 
   // Caption slot (passed as default children)
-  export let children: import("svelte").Snippet | undefined = undefined;
+  export let children = undefined;
   $: caption = children;
 
   // Data props (from parent +page.svelte)
-  export let sourceDistributionSamples: number[][] = [];
-  export let targetDistributionSamples: number[][] = [];
-  export let allTimeSamples: Writable<number[][][]>;
-  export let isTraining: Writable<boolean>;
+  export let sourceDistributionSamples = [];
+  export let targetDistributionSamples = [];
+  export let allTimeSamples;
+  export let isTraining;
 
   // Props/Configuration
   export let width = 800;
@@ -61,15 +60,15 @@
   export let showIntermediateContour = true;
 
   // Precomputed contours for performance
-  let precomputedSourceContours: any[] = [];
-  let precomputedTargetContours: any[] = [];
-  let precomputedIntermediateContours: any[][] = []; // Array of contours for each timestep
+  let precomputedSourceContours = [];
+  let precomputedTargetContours = [];
+  let precomputedIntermediateContours = []; // Array of contours for each timestep
 
-  let svgElement: SVGSVGElement;
+  let svgElement;
   let xScale = null;
   let yScale = null;
   let time = 0; // Animation time parameter (0 to 1)
-  let animationFrameId: number | null = null;
+  let animationFrameId = null;
 
   // Local animation control state
   let isPlaying = playingByDefault;
@@ -85,7 +84,7 @@
   /**
    * Create D3 scales for plotting
    */
-  function createScales(sourcePoints: number[][], targetPoints: number[][]) {
+  function createScales(sourcePoints, targetPoints) {
     const drawableWidth = width - 2 * marginWidth;
     const drawableHeight = height - 2 * marginHeight;
     const aspectRatio = drawableHeight / drawableWidth;
@@ -156,10 +155,10 @@
    * Initialize scatter plot (called once per distribution)
    */
   function initScatter(
-    points: number[][],
-    color: string,
-    groupId: string,
-    opacity: number = pointOpacity
+    points,
+    color,
+    groupId,
+    opacity = pointOpacity
   ) {
     if (!svgElement || !xScale || !yScale || points.length === 0) return;
 
@@ -179,7 +178,7 @@
   /**
    * Update scatter plot positions (called every frame)
    */
-  function updateScatter(points: number[][], groupId: string, time: number) {
+  function updateScatter(points, groupId, time) {
     if (!svgElement || !xScale || !yScale || points.length === 0) return;
 
     const xShift = time * flowWidth;
@@ -196,7 +195,7 @@
   /**
    * Compute contour density (pure computation, returns GeoJSON)
    */
-  function computeContours(points: number[][], time: number) {
+  function computeContours(points, time) {
     if (!xScale || !yScale || points.length === 0) return [];
 
     const xShift = time * flowWidth;
@@ -254,10 +253,10 @@
    * Update contour paths (DOM update only, called every frame)
    */
   function updateContour(
-    groupId: string,
-    contours: any[],
-    color: string,
-    opacity: number = contourOpacity
+    groupId,
+    contours,
+    color,
+    opacity = contourOpacity
   ) {
     if (!svgElement) return;
 
@@ -461,12 +460,12 @@
    * Start the animation loop
    */
   function startAnimation() {
-    let startTime: number | null = null;
+    let startTime = null;
     let isPaused = false;
-    let pauseStartTime: number | null = null;
+    let pauseStartTime = null;
     let pausedElapsedTime = 0; // Track time when paused by figure button
 
-    function animate(currentTime: number) {
+    function animate(currentTime) {
       // Check if paused by figure button
       if (isPausedByFigure) {
         // Store the elapsed time when paused

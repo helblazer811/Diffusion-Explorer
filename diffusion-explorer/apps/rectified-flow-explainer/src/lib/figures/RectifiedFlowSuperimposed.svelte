@@ -1,12 +1,16 @@
-<script lang="ts">
+<script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
   import DoubleFigure from "$lib/components/DoubleFigure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
 
+  // Caption slot (passed as default children)
+  export let children = undefined;
+  $: caption = children;
+
   // Data props
-  export let allRectifiedTrajectories: number[][][][] = []; // [rectifiedStep][timestep][sample][dim]
-  export let targetDistribution: number[][] = []; // The actual target distribution points
+  export let allRectifiedTrajectories = []; // [rectifiedStep][timestep][sample][dim]
+  export let targetDistribution = []; // The actual target distribution points
 
   // Data validation
   $: isDataValid =
@@ -28,41 +32,39 @@
   export let targetOpacity = 0.35;
   export let targetPointRadius = 5;
   export let numTrajectoriesToShow = 10;
+
+  // Trajectory styling (matching RectifiedFlowVisualization)
+  export let trajectoryFullOpacity = 0.3; // Background paths
+  export let trajectoryProgressOpacity = 0.8; // Animated paths
+  export let trajectoryStrokeWidth = 3;
+  export let trajectoryPointRadius = 5;
   export let animationDuration = 5000; // ms per full loop
   export let playingByDefault = true;
   export let pauseDuration = 1000; // ms pause at end of animation
-  // Caption slot (passed as default children)
-  export let children: import("svelte").Snippet | undefined = undefined;
-  $: caption = children;
   export let leftLabel = "Before Rectification";
   export let rightLabel = "After Rectification";
   export let labelFontSize = 22;
   export let labelColor = "#666";
   export let gap = 50;
-  export let domainRange: {
-    xMin: number;
-    xMax: number;
-    yMin: number;
-    yMax: number;
-  } = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
+  export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
 
   // Callback when visualization is initialized
-  export let onInitialized: (() => void) | undefined = undefined;
+  export let onInitialized = undefined;
 
   // SVG references
-  let leftSvgElement: SVGSVGElement;
-  let rightSvgElement: SVGSVGElement;
+  let leftSvgElement;
+  let rightSvgElement;
 
   // Scales
-  let xScale: d3.ScaleLinear<number, number>;
-  let yScale: d3.ScaleLinear<number, number>;
+  let xScale;
+  let yScale;
 
   // Animation state
   let currentTimeIndex = 0;
   let isPlaying = playingByDefault;
-  let animationFrameId: number | null = null;
+  let animationFrameId = null;
   let isInitialized = false;
-  let selectedTrajectoryIndices: number[] = [];
+  let selectedTrajectoryIndices = [];
 
   /**
    * Select random trajectory indices (same for both panels)
@@ -73,7 +75,7 @@
     const numAvailable = allRectifiedTrajectories[0]?.[0]?.length || 0;
     const numToSelect = Math.min(numTrajectoriesToShow, numAvailable);
 
-    const indices: number[] = [];
+    const indices = [];
     const availableIndices = Array.from({ length: numAvailable }, (_, i) => i);
 
     for (let i = 0; i < numToSelect; i++) {
@@ -101,11 +103,7 @@
       .range([margin, svgHeight - margin]);
   }
 
-  function initializeSvg(
-    svgElement: SVGSVGElement,
-    targetDistribution: number[][],
-    label: string
-  ) {
+  function initializeSvg(svgElement, targetDistribution, label) {
     if (!svgElement || !xScale || !yScale) return;
 
     const svg = d3.select(svgElement);
@@ -119,8 +117,8 @@
       .data(targetDistribution)
       .enter()
       .append("circle")
-      .attr("cx", (d: number[]) => xScale(d[0]))
-      .attr("cy", (d: number[]) => yScale(d[1]))
+      .attr("cx", d => xScale(d[0]))
+      .attr("cy", d => yScale(d[1]))
       .attr("r", targetPointRadius)
       .attr("fill", targetColor)
       .attr("opacity", targetOpacity);
@@ -134,20 +132,39 @@
       markersGroup
         .append("circle")
         .attr("class", `current-position-${i}`)
-        .attr("r", 6)
-        .attr("fill", trajectoryColor);
+        .attr("r", trajectoryPointRadius)
+        .attr("fill", trajectoryColor)
+        .attr("opacity", trajectoryProgressOpacity);
     }
 
-    // Add label at top center
-    svg
+    // Add label at top center with background rectangle
+    const labelGroup = svg.append("g").attr("class", "label-group");
+    const labelX = svgWidth / 2;
+    const labelY = margin / 2 + labelFontSize / 2;
+    const labelPaddingX = 10;
+    const labelPaddingY = 4;
+
+    // Add text first to measure it
+    const textElement = labelGroup
       .append("text")
       .attr("class", "panel-label")
-      .attr("x", svgWidth / 2)
-      .attr("y", margin / 2 + labelFontSize / 2)
+      .attr("x", labelX)
+      .attr("y", labelY)
       .attr("text-anchor", "middle")
       .attr("font-size", `${labelFontSize}px`)
       .attr("fill", labelColor)
       .text(label);
+
+    // Get text bounding box and add background rect
+    const bbox = textElement.node().getBBox();
+    labelGroup
+      .insert("rect", "text")
+      .attr("x", bbox.x - labelPaddingX)
+      .attr("y", bbox.y - labelPaddingY)
+      .attr("width", bbox.width + 2 * labelPaddingX)
+      .attr("height", bbox.height + 2 * labelPaddingY)
+      .attr("fill", "#f9f9f9")
+      .attr("opacity", 0.9);
   }
 
   function initializeVisualization() {
@@ -162,11 +179,7 @@
     onInitialized?.();
   }
 
-  function updatePanel(
-    svgElement: SVGSVGElement,
-    rectifiedStep: number,
-    timeIndex: number
-  ) {
+  function updatePanel(svgElement, rectifiedStep, timeIndex) {
     if (!svgElement || !isDataValid || !xScale || !yScale) return;
 
     const svg = d3.select(svgElement);
@@ -199,9 +212,9 @@
         .append("path")
         .attr("d", fullPath)
         .attr("fill", "none")
-        .attr("stroke", "#ddd")
-        .attr("stroke-width", 2)
-        .attr("opacity", 0.5);
+        .attr("stroke", trajectoryColor)
+        .attr("stroke-width", trajectoryStrokeWidth)
+        .attr("opacity", trajectoryFullOpacity);
 
       // Draw animated trajectory path (up to current time)
       const animatedPath = trajectoryPoints
@@ -218,7 +231,8 @@
           .attr("d", animatedPath)
           .attr("fill", "none")
           .attr("stroke", trajectoryColor)
-          .attr("stroke-width", 3);
+          .attr("stroke-width", trajectoryStrokeWidth)
+          .attr("opacity", trajectoryProgressOpacity);
       }
 
       // Update current position marker
@@ -232,7 +246,7 @@
     }
   }
 
-  function updateVisualization(timeIndex: number) {
+  function updateVisualization(timeIndex) {
     if (!isDataValid) return;
 
     const numTimeSteps = allRectifiedTrajectories[0].length;
@@ -261,15 +275,16 @@
 
       // Move to next frame
       const nextTimeIndex = (currentTimeIndex + 1) % numSteps;
-
-      // When animation completes, pick new random trajectories
-      if (isLastFrame) {
-        selectTrajectoryIndices();
-      }
-
       currentTimeIndex = nextTimeIndex;
 
       setTimeout(() => {
+        // When animation completes (after pause), pick new random trajectories
+        // and reinitialize SVG with new markers
+        if (isLastFrame) {
+          selectTrajectoryIndices();
+          initializeSvg(leftSvgElement, targetDistribution, leftLabel);
+          initializeSvg(rightSvgElement, targetDistribution, rightLabel);
+        }
         animationFrameId = requestAnimationFrame(animate);
       }, delay);
     }

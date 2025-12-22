@@ -1,21 +1,20 @@
 <!-- This figure shows curved trajectories from flow matching, demonstrating non-straight paths. -->
 
-<script lang="ts">
+<script>
   import { onMount } from 'svelte';
-  import { type Writable } from 'svelte/store';
   import * as d3 from 'd3';
   import Figure from '$lib/components/Figure.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
 
   // Caption slot (passed as default children)
-  export let children: import("svelte").Snippet | undefined = undefined;
+  export let children = undefined;
   $: caption = children;
 
   // Data props (from parent +page.svelte)
-  export let sourceDistributionSamples: number[][] = [];
-  export let targetDistributionSamples: number[][] = [];
-  export let allTimeSamples: Writable<number[][][]>;
-  export let isTraining: Writable<boolean>;
+  export let sourceDistributionSamples = [];
+  export let targetDistributionSamples = [];
+  export let allTimeSamples;
+  export let isTraining;
 
   // Props/Configuration
   export let width = 800;
@@ -56,14 +55,14 @@
   export let showTargetScatter = true;
 
   // Selected trajectory indices (visualization-specific state)
-  let selectedTrajectoryIndices: number[] = [];
-  let svgElement: SVGSVGElement;
+  let selectedTrajectoryIndices = [];
+  let svgElement;
   let xScale = null;
   let yScale = null;
   let time = 0; // Animation time parameter (0 to 1)
-  let animationFrameId: number | null = null;
-  let trajectoryLengths: Map<number, number> = new Map(); // Cache total path lengths
-  let trajectoryArcLengths: Map<number, number[]> = new Map(); // Cache arc lengths per timestep
+  let animationFrameId = null;
+  let trajectoryLengths = new Map(); // Cache total path lengths
+  let trajectoryArcLengths = new Map(); // Cache arc lengths per timestep
 
   // Local animation control state
   let isPlaying = playingByDefault;
@@ -82,7 +81,7 @@
    * @param numToSelect - Number of trajectories to display
    * @returns Array of selected indices
    */
-  function selectTrajectoryIndices(numSamples: number, numToSelect: number): number[] {
+  function selectTrajectoryIndices(numSamples, numToSelect) {
     // If requesting more than available, return all indices
     if (numToSelect >= numSamples) {
       return Array.from({ length: numSamples }, (_, i) => i);
@@ -90,7 +89,7 @@
 
     // Use uniform spacing for better coverage
     const step = numSamples / numToSelect;
-    const indices: number[] = [];
+    const indices = [];
     for (let i = 0; i < numToSelect; i++) {
       indices.push(Math.floor(i * step));
     }
@@ -104,12 +103,12 @@
    * @param endStep - Final timestep to include (for progress path)
    * @returns SVG path data string ("M x,y L x,y L x,y ...")
    */
-  function generateTrajectoryPath(trajectoryIndex: number, endStep: number | null = null): string {
+  function generateTrajectoryPath(trajectoryIndex, endStep = null) {
     const allSamples = $allTimeSamples;
     if (!allSamples || allSamples.length === 0) return '';
 
     const maxStep = endStep !== null ? endStep : allSamples.length - 1;
-    const pathData: string[] = [];
+    const pathData = [];
 
     for (let step = 0; step <= maxStep; step++) {
       const samples = allSamples[step];
@@ -179,7 +178,7 @@
       // Pre-compute cumulative arc lengths at each timestep
       const allSamples = $allTimeSamples;
       const numSteps = allSamples.length;
-      const arcLengths: number[] = new Array(numSteps);
+      const arcLengths = new Array(numSteps);
 
       for (let step = 0; step < numSteps; step++) {
         // Generate path up to this step
@@ -221,7 +220,7 @@
    * Update trajectory visualization for current animation time
    * @param time - Normalized time from 0 to 1
    */
-  function updateTrajectories(time: number) {
+  function updateTrajectories(time) {
     const svg = d3.select(svgElement);
     const allSamples = $allTimeSamples;
     if (!allSamples || allSamples.length === 0) return;
@@ -256,7 +255,7 @@
   }
 
 
-  function createScales(sourcePoints: number[][], targetPoints: number[][]) {
+  function createScales(sourcePoints, targetPoints) {
     const drawableWidth = width - 2 * marginWidth;
     const drawableHeight = height - 2 * marginHeight;
     const aspectRatio = drawableHeight / drawableWidth;
@@ -300,7 +299,7 @@
     svg.append('g').attr('id', 'labels');
   }
 
-  function initScatter(points: number[][], color: string, groupId: string, opacity: number = pointOpacity) {
+  function initScatter(points, color, groupId, opacity = pointOpacity) {
     if (!svgElement || !xScale || !yScale || points.length === 0) return;
     const svg = d3.select(svgElement);
     const group = svg.select(`#${groupId}`);
@@ -308,7 +307,7 @@
       .attr('r', pointRadius).attr('fill', color).attr('opacity', opacity);
   }
 
-  function updateScatter(points: number[][], groupId: string, time: number) {
+  function updateScatter(points, groupId, time) {
     if (!svgElement || !xScale || !yScale || points.length === 0) return;
     const xShift = time * flowWidth;
     const svg = d3.select(svgElement);
@@ -372,12 +371,12 @@
   }
 
   function startAnimation() {
-    let startTime: number | null = null;
+    let startTime = null;
     let isPaused = false;
-    let pauseStartTime: number | null = null;
+    let pauseStartTime = null;
     let pausedElapsedTime = 0;
 
-    function animate(currentTime: number) {
+    function animate(currentTime) {
       if (isPausedByFigure) {
         if (startTime !== null && pausedElapsedTime === 0) {
           pausedElapsedTime = currentTime - startTime;

@@ -1,13 +1,15 @@
-<script lang="ts">
+<script>
   import { onMount, onDestroy, setContext } from 'svelte';
   import { writable } from 'svelte/store';
 
-  let { children, caption, inline = false } = $props();
+  export let children = undefined;
+  export let caption = undefined;
+  export let inline = false;
 
   // Visibility state
   const isActive = writable(false);
-  let figureElement: HTMLElement;
-  let observer: IntersectionObserver | null = null;
+  let figureElement;
+  let observer = null;
 
   // Track both scroll visibility and tab visibility
   let isInViewport = false;

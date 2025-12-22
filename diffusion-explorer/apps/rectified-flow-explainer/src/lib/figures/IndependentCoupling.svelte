@@ -1,6 +1,6 @@
 <!-- The goal here is to visualize a naive independent coupling (X_0, X_1) such that X_0 \sim \pi_0 and X_1 \sim \pi_1 which are independently distributed. -->
 
-<script lang="ts">
+<script>
   import * as tf from '@tensorflow/tfjs';
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
@@ -8,7 +8,7 @@
   import Figure from '$lib/components/Figure.svelte';
 
   // Caption slot (passed as default children)
-  export let children: import("svelte").Snippet | undefined = undefined;
+  export let children = undefined;
   $: caption = children;
 
   export const numSamples = 100;
@@ -33,14 +33,14 @@
   export const hoverPointOpacity = 0.9;
   export const dashed = false;
 
-  let sourceDistributionPoints: tf.Tensor | null = null;
-  let targetDistributionPoints: tf.Tensor | null = null;
-  let svgElement: SVGSVGElement;
-  let xScale: d3.ScaleLinear<number, number> | null = null;
-  let yScale: d3.ScaleLinear<number, number> | null = null;
-  let highlightEdgeIndex: number = Math.floor(Math.random() * numSamples);
+  let sourceDistributionPoints = null;
+  let targetDistributionPoints = null;
+  let svgElement;
+  let xScale = null;
+  let yScale = null;
+  let highlightEdgeIndex = Math.floor(Math.random() * numSamples);
 
-  function createScales(sourcePoints: number[][], targetPoints: number[][]) {
+  function createScales(sourcePoints, targetPoints) {
     const drawableWidth = width - 2 * margin;
     const drawableHeight = height - 2 * margin;
     const aspectRatio = drawableHeight / drawableWidth;
@@ -48,8 +48,8 @@
     // Combine both point sets to get overall extent
     const allPoints = [...sourcePoints, ...targetPoints];
 
-    const xExtent = d3.extent(allPoints, d => d[0]) as [number, number];
-    const yExtent = d3.extent(allPoints, d => d[1]) as [number, number];
+    const xExtent = d3.extent(allPoints, d => d[0]);
+    const yExtent = d3.extent(allPoints, d => d[1]);
 
     const xRange = xExtent[1] - xExtent[0];
     const yRange = yExtent[1] - yExtent[0];
@@ -81,7 +81,7 @@
       .range([height - margin, margin]);
   }
 
-  function plotLabels(sourcePoints: number[][], targetPoints: number[][]) {
+  function plotLabels(sourcePoints, targetPoints) {
     if (!svgElement || !xScale || !yScale) return;
 
     const svg = d3.select(svgElement);
@@ -126,10 +126,10 @@
       .text(targetLabelText);
   }
 
-  function plotScatter(data: tf.Tensor, color: string, opacity: number, groupId: string) {
+  function plotScatter(data, color, opacity, groupId) {
     if (!data || !svgElement || !xScale || !yScale) return;
 
-    const points = data.arraySync() as number[][];
+    const points = data.arraySync();
 
     // Select SVG
     const svg = d3.select(svgElement);
@@ -155,7 +155,7 @@
       .style('cursor', 'pointer');
   }
 
-  function plotCoupling(sourcePoints: number[][], targetPoints: number[][]) {
+  function plotCoupling(sourcePoints, targetPoints) {
     if (!svgElement || !xScale || !yScale) return { couplingData: [], shuffledTargets: [] };
 
     const svg = d3.select(svgElement);
@@ -245,7 +245,7 @@
     return { couplingData, shuffledTargets };
   }
 
-  function setupPointHoverHandlers(sourcePoints: number[][], targetPoints: number[][], shuffledTargets: number[][]) {
+  function setupPointHoverHandlers(sourcePoints, targetPoints, shuffledTargets) {
     if (!svgElement) return;
 
     const svg = d3.select(svgElement);
@@ -329,11 +329,11 @@
       });
   }
 
-  async function loadTargetDataset(numSamples: number): Promise<tf.Tensor> {
+  async function loadTargetDataset(numSamples) {
     // Load smiley face data
     const response = await fetch('/data/smiley_face.json');
     const data = await response.json();
-    const allPoints = data.points as number[][];
+    const allPoints = data.points;
 
     // Randomly subsample numSamples points
     const shuffled = [...allPoints].sort(() => Math.random() - 0.5);
@@ -359,10 +359,10 @@
     const truncationThreshold = 3 * std;
 
     // Generate samples until we have enough within 3 std
-    const acceptedSamples: number[][] = [];
+    const acceptedSamples = [];
     while (acceptedSamples.length < numSamples) {
-      const samples = sampleMultivariateNormal(mean, cov, numSamples * 2) as tf.Tensor;
-      const samplesArray = samples.arraySync() as number[][];
+      const samples = sampleMultivariateNormal(mean, cov, numSamples * 2);
+      const samplesArray = samples.arraySync();
 
       // Filter samples within 3 std
       const validSamples = samplesArray.filter(([x, y]) =>
@@ -379,8 +379,8 @@
 
     console.log('Generated source distribution points:', sourceDistributionPoints.shape);
 
-    const sourcePoints = sourceDistributionPoints.arraySync() as number[][];
-    let targetPointsArray = targetDistributionPoints.arraySync() as number[][];
+    const sourcePoints = sourceDistributionPoints.arraySync();
+    let targetPointsArray = targetDistributionPoints.arraySync();
 
     // Align the vertical centers of source and target distributions
     const sourceYCenter = sourcePoints.reduce((sum, p) => sum + p[1], 0) / sourcePoints.length;

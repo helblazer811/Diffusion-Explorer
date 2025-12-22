@@ -1,13 +1,9 @@
-<script lang="ts">
-  interface Props {
-    left?: import('svelte').Snippet;
-    right?: import('svelte').Snippet;
-    caption?: import('svelte').Snippet;
-    gap?: number;
-    inline?: boolean;
-  }
-
-  let { left, right, caption, gap = 20, inline = false }: Props = $props();
+<script>
+  export let left = undefined;
+  export let right = undefined;
+  export let caption = undefined;
+  export let gap = 20;
+  export let inline = false;
 </script>
 
 <figure class="double-figure">

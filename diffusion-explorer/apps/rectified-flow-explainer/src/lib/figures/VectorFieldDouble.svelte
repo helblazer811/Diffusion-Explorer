@@ -1,19 +1,13 @@
-<script lang="ts">
+<script>
   import { onMount, onDestroy } from 'svelte';
   import * as d3 from 'd3';
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
 
   // Data props
-  export let vectorFieldData: {
-    gridResolution: number;
-    timeSteps: number[];
-    domainRange: { xMin: number; xMax: number; yMin: number; yMax: number };
-    velocities: number[][][];
-    gridPoints: number[][];
-  } | null = null;
+  export let vectorFieldData = null;
 
-  export let allTimeSamples: number[][][] = [];
+  export let allTimeSamples = [];
 
   // Configuration props
   export let margin = 0;
@@ -31,34 +25,29 @@
   export let playingByDefault = true;
   export let pauseDuration = 1000; // ms pause at end of animation
   // Caption slot (passed as default children)
-  export let children: import("svelte").Snippet | undefined = undefined;
+  export let children = undefined;
   $: caption = children;
 
   // SVG references and dimensions
-  let leftSvgElement: SVGSVGElement;
-  let rightSvgElement: SVGSVGElement;
+  let leftSvgElement;
+  let rightSvgElement;
   const svgWidth = 400;
   const svgHeight = 400;
 
   // Scales
-  let xScale: d3.ScaleLinear<number, number>;
-  let yScale: d3.ScaleLinear<number, number>;
-  let xScaleGrid: d3.ScaleLinear<number, number>;
-  let yScaleGrid: d3.ScaleLinear<number, number>;
+  let xScale;
+  let yScale;
+  let xScaleGrid;
+  let yScaleGrid;
 
   // Animation state
   let currentTimeIndex = 0;
   let isPlaying = playingByDefault;
-  let animationFrameId: number | null = null;
+  let animationFrameId = null;
   let isInitialized = false;
 
   // Pre-calculated grid positions
-  interface GridPoint {
-    x: number;      // SVG coordinate
-    y: number;      // SVG coordinate
-    dataIndex: number; // Index in velocities array
-  }
-  let gridPositions: GridPoint[] = [];
+  let gridPositions = [];
 
   function initializeScales() {
     if (!vectorFieldData) return;
@@ -84,10 +73,10 @@
       .range([gridMargin, svgHeight - gridMargin]);
   }
 
-  function calculateGridPositions(): GridPoint[] {
+  function calculateGridPositions() {
     if (!vectorFieldData || !vectorFieldData.gridPoints) return [];
 
-    const positions: GridPoint[] = [];
+    const positions = [];
 
     // Use the loaded grid points from the cached data with grid scales
     vectorFieldData.gridPoints.forEach((point, index) => {
@@ -101,7 +90,7 @@
     return positions;
   }
 
-  function calculateMaxVelocity(velocities: number[][]): number {
+  function calculateMaxVelocity(velocities) {
     let max = 0;
     for (const [vx, vy] of velocities) {
       const magnitude = Math.sqrt(vx * vx + vy * vy);
@@ -153,8 +142,8 @@
         .data(finalTimeStep)
         .enter()
         .append('circle')
-        .attr('cx', (d: number[]) => xScale(d[0]))
-        .attr('cy', (d: number[]) => yScale(d[1]))
+        .attr('cx', d => xScale(d[0]))
+        .attr('cy', d => yScale(d[1]))
         .attr('r', targetPointRadius)
         .attr('fill', targetColor)
         .attr('opacity', targetOpacity);
@@ -176,8 +165,8 @@
         .data(finalTimeStep)
         .enter()
         .append('circle')
-        .attr('cx', (d: number[]) => xScale(d[0]))
-        .attr('cy', (d: number[]) => yScale(d[1]))
+        .attr('cx', d => xScale(d[0]))
+        .attr('cy', d => yScale(d[1]))
         .attr('r', targetPointRadius)
         .attr('fill', targetColor)
         .attr('opacity', targetOpacity);
@@ -202,7 +191,7 @@
     isInitialized = true;
   }
 
-  function updateVisualization(timeIndex: number) {
+  function updateVisualization(timeIndex) {
     if (!vectorFieldData || !leftSvgElement || !rightSvgElement || allTimeSamples.length === 0) return;
 
     const leftSvg = d3.select(leftSvgElement);
@@ -214,13 +203,13 @@
 
     leftSvg.select('#arrows').selectAll('line')
       .data(gridPositions)
-      .attr('x1', (d: GridPoint) => d.x)
-      .attr('y1', (d: GridPoint) => d.y)
-      .attr('x2', (d: GridPoint) => {
+      .attr('x1', d => d.x)
+      .attr('y1', d => d.y)
+      .attr('x2', d => {
         const [vx] = velocities[d.dataIndex];
         return d.x + (vx / maxVelocity) * arrowScale;
       })
-      .attr('y2', (d: GridPoint) => {
+      .attr('y2', d => {
         const [, vy] = velocities[d.dataIndex];
         return d.y + (vy / maxVelocity) * arrowScale;
       });
