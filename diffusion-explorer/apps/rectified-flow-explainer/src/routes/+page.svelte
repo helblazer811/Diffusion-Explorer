@@ -401,7 +401,7 @@ fl
       targetDistributionSamples={$targetDistributionSamples}
       {allTimeSamples}
       {isTraining}
-      playingByDefault={true}
+      playingByDefault={false}
     >
       <div class="caption">
         <span class="figure-number">Figure 2:</span>
@@ -488,7 +488,7 @@ fl
       targetDistributionSamples={$targetDistributionSamples}
       {allTimeSamples}
       {isTraining}
-      playingByDefault={true}
+      playingByDefault={false}
     >
       <div class="caption">
         <span class="figure-number">Figure 3:</span>
@@ -532,7 +532,7 @@ fl
       targetDistributionSamples={$targetDistributionSamples}
       sourcePointIndex={5}
       targetPointIndex={10}
-      playingByDefault={true}
+      playingByDefault={false}
     />
   {/if}
 
@@ -546,7 +546,7 @@ fl
     <VectorFieldDouble
       vectorFieldData={$vectorFieldData}
       allTimeSamples={$allTimeSamples}
-      playingByDefault={true}
+      playingByDefault={false}
     >
       <div class="caption">
         <span class="figure-number">Figure 6:</span>

@@ -87,11 +87,9 @@
   let xScale;
   let yScale;
 
-  // Cache for trajectory lengths and arc lengths
+  // Cache for trajectory lengths
   // Map structure: Map<rectifiedStep, Map<trajectoryIdx, totalLength>>
   let trajectoryLengths = new Map();
-  // Map structure: Map<rectifiedStep, Map<trajectoryIdx, arcLengths[]>>
-  let trajectoryArcLengths = new Map();
 
   /**
    * Toggle animation play/pause
@@ -326,7 +324,7 @@
   }
 
   /**
-   * Initialize trajectories (heavy: arc length computation + trajectory elements)
+   * Initialize trajectories (trajectory elements + total path length)
    */
   function initializeTrajectories() {
     if (!svg || !isDataValid || selectedTrajectoryIndices.length === 0) return;
@@ -334,14 +332,13 @@
     const d3Svg = d3.select(svg);
     const trajectoriesGroup = d3Svg.select(".trajectories");
 
-    // Pre-compute arc lengths for all rectified steps and trajectories
+    // Pre-compute total path lengths for all rectified steps and trajectories
     for (
       let rectStep = 0;
       rectStep < allRectifiedTrajectories.length;
       rectStep++
     ) {
       const lengthsForStep = new Map();
-      const arcLengthsForStep = new Map();
 
       for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
         // Generate full path for this rectified step
@@ -353,27 +350,10 @@
           .attr("d", fullPath);
         const totalLength = tempFullPath.node().getTotalLength();
         lengthsForStep.set(idx, totalLength);
-
-        // Pre-compute arc lengths at each timestep
-        const stepData = allRectifiedTrajectories[rectStep];
-        const numTimeSteps = stepData.length;
-        const arcLengths = new Array(numTimeSteps);
-
-        for (let step = 0; step < numTimeSteps; step++) {
-          const partialPath = generateTrajectoryPath(rectStep, idx, step);
-          const tempPath = trajectoriesGroup
-            .append("path")
-            .attr("d", partialPath);
-          arcLengths[step] = tempPath.node().getTotalLength();
-          tempPath.remove();
-        }
-
-        arcLengthsForStep.set(idx, arcLengths);
         tempFullPath.remove();
       }
 
       trajectoryLengths.set(rectStep, lengthsForStep);
-      trajectoryArcLengths.set(rectStep, arcLengthsForStep);
     }
 
     // Initialize trajectory SVG elements (full paths + progress paths + markers)
@@ -422,7 +402,6 @@
 
     // Get cached lengths for current rectified step
     const lengthsForStep = trajectoryLengths.get(currentRectifiedStep);
-    const arcLengthsForStep = trajectoryArcLengths.get(currentRectifiedStep);
 
     // Update trajectories
     for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
@@ -448,34 +427,21 @@
           .attr("stroke-dashoffset", totalLength);
       }
 
-      // Always update dashoffset based on current time
+      // Always update dashoffset based on current time using linear interpolation
       const totalLength = lengthsForStep?.get(idx) || 0;
-      const arcLengths = arcLengthsForStep?.get(idx);
+      const visibleLength = totalLength * time;
 
-      // Calculate current timestep and arc length
-      const trajectoryData = getTrajectoryData(
-        currentRectifiedStep,
-        selectedTrajectoryIndices[idx]
-      );
-      const numPoints = trajectoryData.length;
-      const currentStep = Math.floor(time * (numPoints - 1));
+      // Reveal path proportional to time
+      progressPathElement.attr("stroke-dashoffset", totalLength - visibleLength);
 
-      if (arcLengths && currentStep < arcLengths.length) {
-        const arcLengthAtStep = arcLengths[currentStep];
-        progressPathElement.attr(
-          "stroke-dashoffset",
-          totalLength - arcLengthAtStep
-        );
-      }
-
-      // Circle marker
-      if (currentStep < numPoints) {
-        const [x, y] = trajectoryData[currentStep];
-        const xShifted = x + time * flowWidth;
+      // Update circle marker at the end of the visible path
+      const pathNode = progressPathElement.node();
+      if (pathNode && totalLength > 0) {
+        const point = pathNode.getPointAtLength(visibleLength);
         d3Svg
           .select(`.trajectory-point-${idx}`)
-          .attr("cx", xScale(xShifted))
-          .attr("cy", yScale(y));
+          .attr("cx", point.x)
+          .attr("cy", point.y);
       }
     }
 

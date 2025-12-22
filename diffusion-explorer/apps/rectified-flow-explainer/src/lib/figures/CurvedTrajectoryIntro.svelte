@@ -62,7 +62,6 @@
   let time = 0; // Animation time parameter (0 to 1)
   let animationFrameId = null;
   let trajectoryLengths = new Map(); // Cache total path lengths
-  let trajectoryArcLengths = new Map(); // Cache arc lengths per timestep
 
   // Local animation control state
   let isPlaying = playingByDefault;
@@ -175,29 +174,6 @@
       // Cache the path length for performance
       trajectoryLengths.set(idx, totalLength);
 
-      // Pre-compute cumulative arc lengths at each timestep
-      const allSamples = $allTimeSamples;
-      const numSteps = allSamples.length;
-      const arcLengths = new Array(numSteps);
-
-      for (let step = 0; step < numSteps; step++) {
-        // Generate path up to this step
-        const partialPath = generateTrajectoryPath(idx, step);
-
-        // Create temporary path element to measure its length
-        const tempPath = trajectoryGroup.append('path')
-          .attr('d', partialPath);
-
-        // Get cumulative length at this step
-        arcLengths[step] = tempPath.node().getTotalLength();
-
-        // Remove temporary path
-        tempPath.remove();
-      }
-
-      // Cache arc lengths for this trajectory
-      trajectoryArcLengths.set(idx, arcLengths);
-
       // Set up stroke-dasharray animation
       progressPath
         .attr('stroke-dasharray', totalLength)
@@ -225,31 +201,24 @@
     const allSamples = $allTimeSamples;
     if (!allSamples || allSamples.length === 0) return;
 
-    const currentStep = Math.round(time * (allSamples.length - 1));
-
     selectedTrajectoryIndices.forEach(idx => {
-      // Get the total path length and arc lengths for this trajectory
+      // Get the total path length for this trajectory
       const totalLength = trajectoryLengths.get(idx) || 0;
-      const arcLengths = trajectoryArcLengths.get(idx);
 
-      if (arcLengths && currentStep < arcLengths.length) {
-        // Get the actual arc length at the current timestep
-        const arcLengthAtStep = arcLengths[currentStep];
+      // Linear interpolation: reveal path proportional to time
+      const visibleLength = totalLength * time;
 
-        // Set dashoffset to reveal path up to this arc length
-        // dashoffset = totalLength - arcLength reveals the path from start to arcLength
-        svg.select(`.trajectory-progress-${idx}`)
-          .attr('stroke-dashoffset', totalLength - arcLengthAtStep);
-      }
+      // dashoffset = totalLength - visibleLength reveals visibleLength of the path
+      svg.select(`.trajectory-progress-${idx}`)
+        .attr('stroke-dashoffset', totalLength - visibleLength);
 
-      // Update current position marker
-      const currentSamples = allSamples[currentStep];
-      if (currentSamples && currentSamples[idx]) {
-        const [x, y] = currentSamples[idx];
-        const xShifted = x + time * flowWidth;
+      // Update current position marker at the end of the visible path
+      const pathElement = svg.select(`.trajectory-progress-${idx}`).node();
+      if (pathElement && totalLength > 0) {
+        const point = pathElement.getPointAtLength(visibleLength);
         svg.select(`.trajectory-point-${idx}`)
-          .attr('cx', xScale(xShifted))
-          .attr('cy', yScale(y));
+          .attr('cx', point.x)
+          .attr('cy', point.y);
       }
     });
   }
