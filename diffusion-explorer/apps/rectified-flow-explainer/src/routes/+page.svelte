@@ -16,6 +16,7 @@
   import VectorFieldDouble from "$lib/figures/VectorFieldDouble.svelte";
   import RectifiedFlowVisualization from "$lib/figures/RectifiedFlowVisualization.svelte";
   import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
+  import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
   import { Katex } from "@diffusion-explorer/ui";
 
   // ========== DATA MANAGEMENT STATE ==========
@@ -276,6 +277,8 @@
     </div>
   </RectifiedFlowSuperimposed>
 
+  <hr />
+
   <RectifiedFlowVisualization
     allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
     targetDistribution={$targetDistributionSamples}
@@ -398,7 +401,7 @@ fl
       targetDistributionSamples={$targetDistributionSamples}
       {allTimeSamples}
       {isTraining}
-      playingByDefault={false}
+      playingByDefault={true}
     >
       <div class="caption">
         <span class="figure-number">Figure 2:</span>
@@ -485,7 +488,7 @@ fl
       targetDistributionSamples={$targetDistributionSamples}
       {allTimeSamples}
       {isTraining}
-      playingByDefault={false}
+      playingByDefault={true}
     >
       <div class="caption">
         <span class="figure-number">Figure 3:</span>
@@ -523,6 +526,16 @@ fl
     </IndependentCoupling>
   {/if}
 
+  {#if showOtherFigures}
+    <LinearInterpolation
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+      sourcePointIndex={5}
+      targetPointIndex={10}
+      playingByDefault={true}
+    />
+  {/if}
+
   <h2>Vector Field Visualization</h2>
   <p>
     Below we visualize the learned velocity field and how sample trajectories
@@ -533,7 +546,7 @@ fl
     <VectorFieldDouble
       vectorFieldData={$vectorFieldData}
       allTimeSamples={$allTimeSamples}
-      playingByDefault={false}
+      playingByDefault={true}
     >
       <div class="caption">
         <span class="figure-number">Figure 6:</span>
@@ -555,3 +568,10 @@ fl
     <span class="material-icons">settings</span>
   </p> -->
 </div>
+
+<style>
+  hr {
+    border: none;
+    border-top: 1px solid #e0e0e0;
+  }
+</style>
