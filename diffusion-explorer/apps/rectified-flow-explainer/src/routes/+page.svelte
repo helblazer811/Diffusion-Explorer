@@ -13,8 +13,9 @@
   import FlowModelIntro from "$lib/figures/FlowModelIntro.svelte";
   import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
-  import VectorField from "$lib/figures/VectorField.svelte";
+  import VectorFieldDouble from "$lib/figures/VectorFieldDouble.svelte";
   import RectifiedFlowVisualization from "$lib/figures/RectifiedFlowVisualization.svelte";
+  import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
   import { Katex } from "@diffusion-explorer/ui";
 
   // ========== DATA MANAGEMENT STATE ==========
@@ -260,7 +261,34 @@
     </div>
   </div>
 
+  <RectifiedFlowSuperimposed
+    allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
+    targetDistribution={$targetDistributionSamples}
+    playingByDefault={true}
+    onInitialized={() => {
+      showOtherFigures = true;
+      console.log("RectifiedFlowSuperimposed initialized, showing other figures.");
+    }}
+  >
+    <div class="caption">
+      <span class="figure-number">Figure 1:</span>
+      A rectified flow learns straighter paths. Left: Before rectification - curved trajectories. Right: After rectification - straighter trajectories superimposed on target distribution.
+    </div>
+  </RectifiedFlowSuperimposed>
+
   <RectifiedFlowVisualization
+    allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
+    targetDistribution={$targetDistributionSamples}
+    playingByDefault={true}
+  >
+    <div class="caption">
+      <span class="figure-number">Figure 2:</span>
+      A rectified flow learns straighter paths. Left: Before rectification - curved trajectories. Right: After rectification - straighter trajectories superimposed on target distribution.
+    </div>
+  </RectifiedFlowVisualization>
+
+
+  <!-- <RectifiedFlowVisualization
     allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ??
       []}
     onInitialized={() => {
@@ -282,7 +310,7 @@
         reducing curvature.
       </div>
     {/snippet}
-  </RectifiedFlowVisualization>
+  </RectifiedFlowVisualization> -->
   <!-- 
 
   <h2>Typography</h2>
@@ -371,7 +399,12 @@ fl
       {allTimeSamples}
       {isTraining}
       playingByDefault={false}
-    />
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 2:</span>
+        Flow matching model training and sampling visualization.
+      </div>
+    </FlowModelIntro>
   {/if}
   <p>
     To provide context, the broad goal of generative modeling is to draw samples
@@ -453,7 +486,12 @@ fl
       {allTimeSamples}
       {isTraining}
       playingByDefault={false}
-    />
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 3:</span>
+        Curved trajectories produced by flow matching visualization.
+      </div>
+    </CurvedTrajectoryIntro>
   {/if}
   <p></p>
   <h2>Curvature is the Enemy of Speed</h2>
@@ -464,13 +502,11 @@ fl
 
   {#if showOtherFigures}
     <EulerSamplerFigure>
-      {#snippet caption()}
-        <div class="caption">
-          <span class="figure-number">Figure 2:</span> Comparison of Euler method
-          approximations for high-curvature (left) and low-curvature (right) functions.
-          Ground truth shown in black, Euler approximation in orange.
-        </div>
-      {/snippet}
+      <div class="caption">
+        <span class="figure-number">Figure 4:</span> Comparison of Euler method
+        approximations for high-curvature (left) and low-curvature (right) functions.
+        Ground truth shown in black, Euler approximation in orange.
+      </div>
     </EulerSamplerFigure>
   {/if}
 
@@ -479,7 +515,12 @@ fl
   <p></p>
 
   {#if showOtherFigures}
-    <IndependentCoupling />
+    <IndependentCoupling>
+      <div class="caption">
+        <span class="figure-number">Figure 5:</span>
+        Independent coupling visualization showing the source distribution.
+      </div>
+    </IndependentCoupling>
   {/if}
 
   <h2>Vector Field Visualization</h2>
@@ -489,13 +530,16 @@ fl
   </p>
 
   {#if showOtherFigures}
-    <VectorField
+    <VectorFieldDouble
       vectorFieldData={$vectorFieldData}
       allTimeSamples={$allTimeSamples}
-      figureNumber="4"
-      captionText="Left: Animated vector field showing the learned velocity at each point over time. Right: A sample trajectory (red) flowing through the vector field toward the target distribution (blue points)."
       playingByDefault={false}
-    />
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 6:</span>
+        Left: Animated vector field showing the learned velocity at each point over time. Right: A sample trajectory (red) flowing through the vector field toward the target distribution (blue points).
+      </div>
+    </VectorFieldDouble>
   {/if}
 
   <h2>Acknowledgements</h2>

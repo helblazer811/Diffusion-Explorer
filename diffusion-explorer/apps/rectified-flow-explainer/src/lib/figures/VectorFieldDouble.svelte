@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import * as d3 from 'd3';
-  import Figure from '$lib/components/Figure.svelte';
+  import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
 
   // Data props
@@ -22,7 +22,7 @@
   export let arrowWidth = 2;
   export let arrowColor = '#333';
   export let arrowOpacity = 0.5;
-  export let trajectoryColor = '#ef4444';
+  export let trajectoryColor = '#f17720'; // Orange
   export let targetColor = '#3b82f6';
   export let targetOpacity = 0.35;
   export let targetPointRadius = 5;
@@ -35,9 +35,10 @@
   $: caption = children;
 
   // SVG references and dimensions
-  let svgElement: SVGSVGElement;
-  const svgWidth = 500;
-  const svgHeight = 500;
+  let leftSvgElement: SVGSVGElement;
+  let rightSvgElement: SVGSVGElement;
+  const svgWidth = 400;
+  const svgHeight = 400;
 
   // Scales
   let xScale: d3.ScaleLinear<number, number>;
@@ -109,16 +110,16 @@
     return max || 1;
   }
 
-  function initializeVisualization() {
-    if (!svgElement || !vectorFieldData) return;
+  function initializeLeftSvg() {
+    if (!leftSvgElement || !vectorFieldData) return;
 
-    const svg = d3.select(svgElement);
+    const svg = d3.select(leftSvgElement);
     svg.selectAll('*').remove();
 
-    // Create arrow marker (lighter for background)
+    // Create arrow marker
     const defs = svg.append('defs');
     defs.append('marker')
-      .attr('id', 'vector-arrow')
+      .attr('id', 'vector-arrow-left')
       .attr('viewBox', '0 0 10 10')
       .attr('refX', 8)
       .attr('refY', 5)
@@ -130,7 +131,7 @@
       .attr('fill', arrowColor)
       .attr('opacity', arrowOpacity);
 
-    // Create arrows group (background)
+    // Create arrows group
     const arrowsGroup = svg.append('g').attr('id', 'arrows');
 
     arrowsGroup.selectAll('line')
@@ -141,19 +142,42 @@
       .attr('stroke', arrowColor)
       .attr('stroke-width', arrowWidth)
       .attr('stroke-opacity', arrowOpacity)
-      .attr('marker-end', 'url(#vector-arrow)');
+      .attr('marker-end', 'url(#vector-arrow-left)');
 
-    // Add target distribution scatter (final time step of all trajectories)
+    // Add target distribution scatter
     if (allTimeSamples.length > 0) {
       const finalTimeStep = allTimeSamples[allTimeSamples.length - 1];
-      const targetGroup = svg.append('g').attr('id', 'target-scatter');
+      const targetGroup = svg.append('g').attr('id', 'target-scatter-left');
 
       targetGroup.selectAll('circle')
         .data(finalTimeStep)
         .enter()
         .append('circle')
-        .attr('cx', d => xScale(d[0]))
-        .attr('cy', d => yScale(d[1]))
+        .attr('cx', (d: number[]) => xScale(d[0]))
+        .attr('cy', (d: number[]) => yScale(d[1]))
+        .attr('r', targetPointRadius)
+        .attr('fill', targetColor)
+        .attr('opacity', targetOpacity);
+    }
+  }
+
+  function initializeRightSvg() {
+    if (!rightSvgElement || !vectorFieldData) return;
+
+    const svg = d3.select(rightSvgElement);
+    svg.selectAll('*').remove();
+
+    // Add target distribution scatter
+    if (allTimeSamples.length > 0) {
+      const finalTimeStep = allTimeSamples[allTimeSamples.length - 1];
+      const targetGroup = svg.append('g').attr('id', 'target-scatter-right');
+
+      targetGroup.selectAll('circle')
+        .data(finalTimeStep)
+        .enter()
+        .append('circle')
+        .attr('cx', (d: number[]) => xScale(d[0]))
+        .attr('cy', (d: number[]) => yScale(d[1]))
         .attr('r', targetPointRadius)
         .attr('fill', targetColor)
         .attr('opacity', targetOpacity);
@@ -167,38 +191,45 @@
       .attr('id', 'current-position')
       .attr('r', 6)
       .attr('fill', trajectoryColor);
+  }
 
+  function initializeVisualization() {
+    if (!leftSvgElement || !rightSvgElement || !vectorFieldData) return;
+
+    initializeLeftSvg();
+    initializeRightSvg();
     updateVisualization(currentTimeIndex);
     isInitialized = true;
   }
 
   function updateVisualization(timeIndex: number) {
-    if (!vectorFieldData || !svgElement || allTimeSamples.length === 0) return;
+    if (!vectorFieldData || !leftSvgElement || !rightSvgElement || allTimeSamples.length === 0) return;
 
-    const svg = d3.select(svgElement);
+    const leftSvg = d3.select(leftSvgElement);
+    const rightSvg = d3.select(rightSvgElement);
 
-    // Update arrows
+    // Update arrows on left SVG
     const velocities = vectorFieldData.velocities[timeIndex];
     const maxVelocity = calculateMaxVelocity(velocities);
 
-    svg.select('#arrows').selectAll('line')
+    leftSvg.select('#arrows').selectAll('line')
       .data(gridPositions)
-      .attr('x1', d => d.x)
-      .attr('y1', d => d.y)
-      .attr('x2', d => {
-        const [vx, vy] = velocities[d.dataIndex];
+      .attr('x1', (d: GridPoint) => d.x)
+      .attr('y1', (d: GridPoint) => d.y)
+      .attr('x2', (d: GridPoint) => {
+        const [vx] = velocities[d.dataIndex];
         return d.x + (vx / maxVelocity) * arrowScale;
       })
-      .attr('y2', d => {
-        const [vx, vy] = velocities[d.dataIndex];
+      .attr('y2', (d: GridPoint) => {
+        const [, vy] = velocities[d.dataIndex];
         return d.y + (vy / maxVelocity) * arrowScale;
       });
 
-    // Update trajectory path
-    const trajectoryGroup = svg.select('#trajectory-group');
+    // Update trajectory on right SVG
+    const trajectoryGroup = rightSvg.select('#trajectory-group');
     trajectoryGroup.selectAll('*').remove();
 
-    // Map timeIndex (0 to vectorFieldData.timeSteps.length-1) to allTimeSamples index
+    // Map timeIndex to allTimeSamples index
     const numVectorFieldSteps = vectorFieldData.timeSteps.length;
     const numTrajectorySteps = allTimeSamples.length;
     const trajectoryTimeIndex = Math.floor((timeIndex / (numVectorFieldSteps - 1)) * (numTrajectorySteps - 1));
@@ -233,7 +264,7 @@
     // Update current position marker
     if (trajectoryTimeIndex < allTimeSamples.length) {
       const [currentX, currentY] = allTimeSamples[trajectoryTimeIndex][trajectoryIndex];
-      svg.select('#current-position')
+      rightSvg.select('#current-position')
         .attr('cx', xScale(currentX))
         .attr('cy', yScale(currentY));
     }
@@ -255,7 +286,7 @@
 
       const isLastFrame = currentTimeIndex === numSteps - 1;
 
-      // Add pause at the end of animation cycle, otherwise use normal step duration
+      // Add pause at the end of animation cycle
       const delay = isLastFrame ? stepDuration + pauseDuration : stepDuration;
 
       // Move to next frame
@@ -287,7 +318,7 @@
     }
   }
 
-  $: if (vectorFieldData && svgElement && !isInitialized) {
+  $: if (vectorFieldData && leftSvgElement && rightSvgElement && !isInitialized) {
     initializeScales();
     gridPositions = calculateGridPositions();
     initializeVisualization();
@@ -310,19 +341,26 @@
 </script>
 
 {#if vectorFieldData && allTimeSamples.length > 0}
-  <Figure {caption}>
-    {#snippet children()}
-      <div style="position: relative; width: 100%; display: flex; flex-direction: column; align-items: center;">
-        <PlayButton {isPlaying} onclick={togglePlayPause} />
-        <svg
-          bind:this={svgElement}
-          width={svgWidth}
-          height={svgHeight}
-          viewBox="0 0 {svgWidth} {svgHeight}">
-        </svg>
-      </div>
+  <DoubleFigure {caption}>
+    {#snippet left()}
+      <PlayButton {isPlaying} onclick={togglePlayPause} />
+      <svg
+        bind:this={leftSvgElement}
+        viewBox="0 0 {svgWidth} {svgHeight}"
+        preserveAspectRatio="xMidYMid meet"
+        style="width: 100%; height: auto; max-width: {svgWidth}px;">
+      </svg>
     {/snippet}
-  </Figure>
+
+    {#snippet right()}
+      <svg
+        bind:this={rightSvgElement}
+        viewBox="0 0 {svgWidth} {svgHeight}"
+        preserveAspectRatio="xMidYMid meet"
+        style="width: 100%; height: auto; max-width: {svgWidth}px;">
+      </svg>
+    {/snippet}
+  </DoubleFigure>
 {:else}
   <div class="placeholder">
     <p>Vector field visualization requires:</p>

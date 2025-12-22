@@ -7,9 +7,9 @@
   import { sampleMultivariateNormal } from '@diffusion-explorer/diffusion';
   import Figure from '$lib/components/Figure.svelte';
 
-  // Caption props
-  export let figureNumber = '3';
-  export let captionText = 'Independent coupling visualization showing the source distribution.';
+  // Caption slot (passed as default children)
+  export let children: import("svelte").Snippet | undefined = undefined;
+  $: caption = children;
 
   export const numSamples = 100;
   export const height = 350;
@@ -400,14 +400,9 @@
   });
 </script>
 
-<Figure>
+<Figure {caption}>
   {#snippet children()}
     <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
     </svg>
-  {/snippet}
-  {#snippet caption()}
-    <div class="caption">
-      <span class="figure-number">Figure {figureNumber}:</span> {captionText}
-    </div>
   {/snippet}
 </Figure>

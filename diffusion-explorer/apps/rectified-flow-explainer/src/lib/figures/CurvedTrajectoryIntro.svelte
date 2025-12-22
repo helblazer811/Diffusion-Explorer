@@ -7,9 +7,9 @@
   import Figure from '$lib/components/Figure.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
 
-  // Caption props
-  export let figureNumber = '2';
-  export let captionText = 'Curved trajectories produced by flow matching visualization.';
+  // Caption slot (passed as default children)
+  export let children: import("svelte").Snippet | undefined = undefined;
+  $: caption = children;
 
   // Data props (from parent +page.svelte)
   export let sourceDistributionSamples: number[][] = [];
@@ -445,15 +445,10 @@
   });
 </script>
 
-<Figure>
+<Figure {caption}>
   {#snippet children()}
     <PlayButton {isPlaying} onclick={toggleAnimation} />
     <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
     </svg>
-  {/snippet}
-  {#snippet caption()}
-    <div class="caption">
-      <span class="figure-number">Figure {figureNumber}:</span> {captionText}
-    </div>
   {/snippet}
 </Figure>
