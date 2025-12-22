@@ -2,7 +2,7 @@
   import { onMount, onDestroy, setContext } from 'svelte';
   import { writable } from 'svelte/store';
 
-  let { children, caption } = $props();
+  let { children, caption, inline = false } = $props();
 
   // Visibility state
   const isActive = writable(false);
@@ -65,12 +65,14 @@
 </script>
 
 <figure class="figure" bind:this={figureElement}>
-  <div class="figure-content">
+  <div class="figure-content" class:inline>
     {@render children?.()}
   </div>
-  <figcaption class="figure-caption">
-    {@render caption?.()}
-  </figcaption>
+  {#if !inline}
+    <figcaption class="figure-caption">
+      {@render caption?.()}
+    </figcaption>
+  {/if}
 </figure>
 
 <style>
@@ -93,6 +95,11 @@
     border: 1px solid #e0e0e0;
     border-radius: 4px;
     padding: 1rem;
+  }
+
+  .figure-content.inline {
+    background-color: transparent;
+    border: none;
   }
 
   .figure-caption {

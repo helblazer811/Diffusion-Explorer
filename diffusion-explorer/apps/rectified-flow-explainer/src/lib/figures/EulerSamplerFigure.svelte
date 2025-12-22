@@ -16,7 +16,9 @@
   export let deltaT = 2.5;
   export let groundTruthDeltaT = 0.05;
   export let domain: [number, number] = [0, 4 * Math.PI];
-  export let caption: import('svelte').Snippet | undefined = undefined;
+  // Caption slot (passed as default children)
+  export let children: import('svelte').Snippet | undefined = undefined;
+  $: caption = children;
   export let animationDuration = 2000; // Duration in milliseconds for the animation
   export let animationDelay = 500; // Delay before animation starts
   export let pathPause = 0; // Pause between animating each path

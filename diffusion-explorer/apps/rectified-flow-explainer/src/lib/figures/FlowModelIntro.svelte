@@ -1,15 +1,15 @@
 <!-- This figure shows a source distribution mapped to a target distribution. Also shows the trajectory of an individual sample. -->
 
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { type Writable } from 'svelte/store';
-  import * as d3 from 'd3';
-  import Figure from '$lib/components/Figure.svelte';
-  import PlayButton from '$lib/components/PlayButton.svelte';
+  import { onMount } from "svelte";
+  import { type Writable } from "svelte/store";
+  import * as d3 from "d3";
+  import Figure from "$lib/components/Figure.svelte";
+  import PlayButton from "$lib/components/PlayButton.svelte";
 
-  // Caption props
-  export let figureNumber = '1';
-  export let captionText = 'Flow matching model training and sampling visualization.';
+  // Caption slot (passed as default children)
+  export let children: import("svelte").Snippet | undefined = undefined;
+  $: caption = children;
 
   // Data props (from parent +page.svelte)
   export let sourceDistributionSamples: number[][] = [];
@@ -22,14 +22,14 @@
   export let height = 300;
 
   // Styling props for visualization
-  export let sourcePointColor = '#3b82f6'; // Blue
-  export let targetPointColor = '#3b82f6'; // Blue
-  export let marginWidth = 60;
+  export let sourcePointColor = "#3b82f6"; // Blue
+  export let targetPointColor = "#3b82f6"; // Blue
+  export let marginWidth = 20;
   export let marginHeight = 20;
-  export let sourceLabelText = 'Source Distribution';
-  export let targetLabelText = 'Target Distribution';
+  export let sourceLabelText = "Source Distribution";
+  export let targetLabelText = "Target Distribution";
   export let labelFontSize = 22;
-  export let labelColor = '#666';
+  export let labelColor = "#666";
   export let pointRadius = 5;
   export let pointOpacity = 0.25;
   export let flowWidth = 10; // Gap between source and target in data units
@@ -45,12 +45,12 @@
   export let contourBandwidth = 0.3;
   export let contourLevels = 5;
   export let contourOpacity = 0.25;
-  export let sourceContourColor = '#3b82f6'; // Blue
-  export let targetContourColor = '#3b82f6'; // Blue
-  export let intermediateContourColor = '#f17720'; // Orange
+  export let sourceContourColor = "#3b82f6"; // Blue
+  export let targetContourColor = "#3b82f6"; // Blue
+  export let intermediateContourColor = "#f17720"; // Orange
   export let intermediateContourOpacity = 0.2; // Higher opacity for intermediate contours
   export let intermediatePointOpacity = 0.7; // Higher opacity for intermediate scatter points
-  export let trainingObjective = 'Flow Matching';
+  export let trainingObjective = "Flow Matching";
 
   // Visibility controls for each visualization element
   export let showSourceScatter = true;
@@ -82,7 +82,6 @@
     isPlaying = !isPlaying;
   }
 
-
   /**
    * Create D3 scales for plotting
    */
@@ -92,13 +91,16 @@
     const aspectRatio = drawableHeight / drawableWidth;
 
     // Shift target points by flowWidth for extent calculation
-    const shiftedTargetPoints = targetPoints.map(p => [p[0] + flowWidth, p[1]]);
+    const shiftedTargetPoints = targetPoints.map((p) => [
+      p[0] + flowWidth,
+      p[1],
+    ]);
 
     // Combine both point sets to get overall extent
     const allPoints = [...sourcePoints, ...shiftedTargetPoints];
 
-    const xExtent = d3.extent(allPoints, d => d[0]);
-    const yExtent = d3.extent(allPoints, d => d[1]);
+    const xExtent = d3.extent(allPoints, (d) => d[0]);
+    const yExtent = d3.extent(allPoints, (d) => d[1]);
 
     const xRange = xExtent[1] - xExtent[0];
     const yRange = yExtent[1] - yExtent[0];
@@ -119,12 +121,17 @@
     // Shift y center down to accommodate labels at the top and apply yShiftFactor
     const yCenterOffset = -adjustedYRange * 0.07 - yShiftFactor;
 
-    xScale = d3.scaleLinear()
+    xScale = d3
+      .scaleLinear()
       .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
       .range([marginWidth, width - marginWidth]);
 
-    yScale = d3.scaleLinear()
-      .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
+    yScale = d3
+      .scaleLinear()
+      .domain([
+        yCenter - adjustedYRange / 2 - yCenterOffset,
+        yCenter + adjustedYRange / 2 - yCenterOffset,
+      ])
       .range([marginHeight, height - marginHeight]);
   }
 
@@ -136,31 +143,37 @@
 
     // Create persistent layers in correct z-order (bottom to top)
     // Intermediate elements are on top for better visibility
-    svg.append('g').attr('id', 'sourceContour');
-    svg.append('g').attr('id', 'targetContour');
-    svg.append('g').attr('id', 'sourceScatter');
-    svg.append('g').attr('id', 'targetScatter');
-    svg.append('g').attr('id', 'intermediateContour');
-    svg.append('g').attr('id', 'intermediateScatter');
-    svg.append('g').attr('id', 'labels');
+    svg.append("g").attr("id", "sourceContour");
+    svg.append("g").attr("id", "targetContour");
+    svg.append("g").attr("id", "sourceScatter");
+    svg.append("g").attr("id", "targetScatter");
+    svg.append("g").attr("id", "intermediateContour");
+    svg.append("g").attr("id", "intermediateScatter");
+    svg.append("g").attr("id", "labels");
   }
 
   /**
    * Initialize scatter plot (called once per distribution)
    */
-  function initScatter(points: number[][], color: string, groupId: string, opacity: number = pointOpacity) {
+  function initScatter(
+    points: number[][],
+    color: string,
+    groupId: string,
+    opacity: number = pointOpacity
+  ) {
     if (!svgElement || !xScale || !yScale || points.length === 0) return;
 
     const svg = d3.select(svgElement);
     const group = svg.select(`#${groupId}`);
 
-    group.selectAll('circle')
+    group
+      .selectAll("circle")
       .data(points)
       .enter()
-      .append('circle')
-      .attr('r', pointRadius)
-      .attr('fill', color)
-      .attr('opacity', opacity);
+      .append("circle")
+      .attr("r", pointRadius)
+      .attr("fill", color)
+      .attr("opacity", opacity);
   }
 
   /**
@@ -173,10 +186,11 @@
     const svg = d3.select(svgElement);
     const group = svg.select(`#${groupId}`);
 
-    group.selectAll('circle')
+    group
+      .selectAll("circle")
       .data(points)
-      .attr('cx', d => xScale(d[0] + xShift))
-      .attr('cy', d => yScale(d[1]));
+      .attr("cx", (d) => xScale(d[0] + xShift))
+      .attr("cy", (d) => yScale(d[1]));
   }
 
   /**
@@ -186,16 +200,19 @@
     if (!xScale || !yScale || points.length === 0) return [];
 
     const xShift = time * flowWidth;
-    const shiftedPoints = points.map(p => [p[0] + xShift, p[1]]);
-    const transformedPoints = shiftedPoints.map(p => [xScale(p[0]), yScale(p[1])]);
+    const shiftedPoints = points.map((p) => [p[0] + xShift, p[1]]);
+    const transformedPoints = shiftedPoints.map((p) => [
+      xScale(p[0]),
+      yScale(p[1]),
+    ]);
 
-    return d3.contourDensity()
-      .x(d => d[0])
-      .y(d => d[1])
+    return d3
+      .contourDensity()
+      .x((d) => d[0])
+      .y((d) => d[1])
       .size([width, height])
-      .bandwidth(contourBandwidth * width / 10)
-      .thresholds(contourLevels)
-      (transformedPoints);
+      .bandwidth((contourBandwidth * width) / 10)
+      .thresholds(contourLevels)(transformedPoints);
   }
 
   /**
@@ -203,9 +220,13 @@
    */
   function precomputeAllContours() {
     if (!xScale || !yScale) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
-    console.log('Precomputing contours...');
+    console.log("Precomputing contours...");
 
     // Precompute source and target contours (static)
     precomputedSourceContours = computeContours(sourceDistributionSamples, 0);
@@ -222,29 +243,35 @@
       precomputedIntermediateContours.push(contours);
     }
 
-    console.log('Precomputed contours:', {
+    console.log("Precomputed contours:", {
       source: precomputedSourceContours.length,
       target: precomputedTargetContours.length,
-      intermediate: precomputedIntermediateContours.length
+      intermediate: precomputedIntermediateContours.length,
     });
   }
 
   /**
    * Update contour paths (DOM update only, called every frame)
    */
-  function updateContour(groupId: string, contours: any[], color: string, opacity: number = contourOpacity) {
+  function updateContour(
+    groupId: string,
+    contours: any[],
+    color: string,
+    opacity: number = contourOpacity
+  ) {
     if (!svgElement) return;
 
     const svg = d3.select(svgElement);
     const group = svg.select(`#${groupId}`);
 
-    group.selectAll('path')
+    group
+      .selectAll("path")
       .data(contours)
-      .join('path')  // ✅ Efficiently handles enter/update/exit
-      .attr('d', d3.geoPath())
-      .attr('fill', color)
-      .attr('stroke', 'none')
-      .attr('fill-opacity', opacity);
+      .join("path") // ✅ Efficiently handles enter/update/exit
+      .attr("d", d3.geoPath())
+      .attr("fill", color)
+      .attr("stroke", "none")
+      .attr("fill-opacity", opacity);
   }
 
   /**
@@ -252,13 +279,17 @@
    */
   function plotLabels() {
     if (!svgElement || !xScale || !yScale) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
     const svg = d3.select(svgElement);
-    const labelsGroup = svg.select('#labels');
+    const labelsGroup = svg.select("#labels");
 
     // Clear existing labels
-    labelsGroup.selectAll('*').remove();
+    labelsGroup.selectAll("*").remove();
 
     // Calculate positions for labels
     // Source label: above source distribution (centered at x=0 in data space)
@@ -273,27 +304,29 @@
     const labelY = yScale(yTop) + 0.5 * labelFontSize; // Position above the top (subtract to move up in SVG)
 
     // Add source distribution label with white outline
-    labelsGroup.append('text')
-      .attr('x', sourceLabelX)
-      .attr('y', labelY)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor)
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', '4')
-      .attr('paint-order', 'stroke')
+    labelsGroup
+      .append("text")
+      .attr("x", sourceLabelX)
+      .attr("y", labelY)
+      .attr("text-anchor", "middle")
+      .attr("font-size", `${labelFontSize}px`)
+      .attr("fill", labelColor)
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", "4")
+      .attr("paint-order", "stroke")
       .text(sourceLabelText);
 
     // Add target distribution label with white outline
-    labelsGroup.append('text')
-      .attr('x', targetLabelX)
-      .attr('y', labelY)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor)
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', '4')
-      .attr('paint-order', 'stroke')
+    labelsGroup
+      .append("text")
+      .attr("x", targetLabelX)
+      .attr("y", labelY)
+      .attr("text-anchor", "middle")
+      .attr("font-size", `${labelFontSize}px`)
+      .attr("fill", labelColor)
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", "4")
+      .attr("paint-order", "stroke")
       .text(targetLabelText);
   }
 
@@ -302,23 +335,43 @@
    */
   function draw() {
     if (!svgElement || !xScale || !yScale) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
     // Update static distributions scatter plots
     if (showSourceScatter) {
-      updateScatter(sourceDistributionSamples, 'sourceScatter', 0);
+      updateScatter(sourceDistributionSamples, "sourceScatter", 0);
     }
     if (showTargetScatter) {
-      updateScatter(targetDistributionSamples, 'targetScatter', 1);
+      updateScatter(targetDistributionSamples, "targetScatter", 1);
     }
 
     // Update source and target contours (use precomputed)
-    if (showSourceContour && showContours && precomputedSourceContours.length > 0) {
-      updateContour('sourceContour', precomputedSourceContours, sourceContourColor);
+    if (
+      showSourceContour &&
+      showContours &&
+      precomputedSourceContours.length > 0
+    ) {
+      updateContour(
+        "sourceContour",
+        precomputedSourceContours,
+        sourceContourColor
+      );
     }
 
-    if (showTargetContour && showContours && precomputedTargetContours.length > 0) {
-      updateContour('targetContour', precomputedTargetContours, targetContourColor);
+    if (
+      showTargetContour &&
+      showContours &&
+      precomputedTargetContours.length > 0
+    ) {
+      updateContour(
+        "targetContour",
+        precomputedTargetContours,
+        targetContourColor
+      );
     }
 
     // Update animated intermediate samples
@@ -330,14 +383,24 @@
 
       if (intermediateSamples && intermediateSamples.length > 0) {
         if (showIntermediateScatter) {
-          updateScatter(intermediateSamples, 'intermediateScatter', time);
+          updateScatter(intermediateSamples, "intermediateScatter", time);
         }
 
         // Use precomputed intermediate contours
-        if (showIntermediateContour && showContours && precomputedIntermediateContours.length > 0) {
-          const intermediateContours = precomputedIntermediateContours[currentStep];
+        if (
+          showIntermediateContour &&
+          showContours &&
+          precomputedIntermediateContours.length > 0
+        ) {
+          const intermediateContours =
+            precomputedIntermediateContours[currentStep];
           if (intermediateContours) {
-            updateContour('intermediateContour', intermediateContours, intermediateContourColor, intermediateContourOpacity);
+            updateContour(
+              "intermediateContour",
+              intermediateContours,
+              intermediateContourColor,
+              intermediateContourOpacity
+            );
           }
         }
       }
@@ -349,7 +412,11 @@
    */
   function initializeVisualization() {
     if (!svgElement) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
     // 1. Initialize layers
     initializeLayers();
@@ -359,15 +426,20 @@
 
     // 3. Initialize scatter plots (creates DOM nodes)
     if (showSourceScatter) {
-      initScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter');
+      initScatter(sourceDistributionSamples, sourcePointColor, "sourceScatter");
     }
     if (showTargetScatter) {
-      initScatter(targetDistributionSamples, targetPointColor, 'targetScatter');
+      initScatter(targetDistributionSamples, targetPointColor, "targetScatter");
     }
 
     const allSamples = $allTimeSamples;
     if (allSamples.length > 0 && allSamples[0] && showIntermediateScatter) {
-      initScatter(allSamples[0], intermediateContourColor, 'intermediateScatter', intermediatePointOpacity);
+      initScatter(
+        allSamples[0],
+        intermediateContourColor,
+        "intermediateScatter",
+        intermediatePointOpacity
+      );
     }
 
     // 4. Plot labels
@@ -424,10 +496,13 @@
           isPaused = true;
           pauseStartTime = currentTime;
           time = 1; // Ensure we end at 1
-          draw();  // ✅ Only updates attributes, no DOM creation
+          draw(); // ✅ Only updates attributes, no DOM creation
         }
 
-        if (pauseStartTime && currentTime - pauseStartTime >= animationPauseTime) {
+        if (
+          pauseStartTime &&
+          currentTime - pauseStartTime >= animationPauseTime
+        ) {
           // Reset for next loop
           startTime = currentTime;
           isPaused = false;
@@ -437,7 +512,7 @@
       } else {
         // Update time during animation
         time = Math.min(elapsed / animationDuration, 1);
-        draw();  // ✅ Only updates attributes, no DOM creation
+        draw(); // ✅ Only updates attributes, no DOM creation
       }
 
       animationFrameId = requestAnimationFrame(animate);
@@ -460,11 +535,13 @@
   let isInitialized = false;
 
   // React to data changes and initialize visualization once
-  $: if (!isInitialized &&
-         sourceDistributionSamples.length > 0 &&
-         targetDistributionSamples.length > 0 &&
-         $allTimeSamples.length > 0 &&
-         svgElement) {
+  $: if (
+    !isInitialized &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples.length > 0 &&
+    $allTimeSamples.length > 0 &&
+    svgElement
+  ) {
     initializeVisualization(); // Lightweight: scatter + labels
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -483,15 +560,15 @@
   });
 </script>
 
-<Figure>
+<Figure {caption}>
   {#snippet children()}
     <PlayButton {isPlaying} onclick={toggleAnimation} />
-    <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
+    <svg
+      bind:this={svgElement}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="xMidYMid meet"
+      style="width: 100%; height: auto; max-width: {width}px;"
+    >
     </svg>
-  {/snippet}
-  {#snippet caption()}
-    <div class="caption">
-      <span class="figure-number">Figure {figureNumber}:</span> {captionText}
-    </div>
   {/snippet}
 </Figure>

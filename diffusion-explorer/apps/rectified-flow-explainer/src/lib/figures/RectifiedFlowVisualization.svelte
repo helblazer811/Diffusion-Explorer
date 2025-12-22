@@ -6,21 +6,23 @@
 
   // Data props
   export let allRectifiedTrajectories: number[][][][] = []; // [step][timestep][sample][dim]
+  export let targetDistribution: number[][] = []; // The actual target distribution points
 
   // Data validation
   $: isDataValid =
     allRectifiedTrajectories &&
     allRectifiedTrajectories.length > 0 &&
     allRectifiedTrajectories[0] &&
-    allRectifiedTrajectories[0].length > 0;
+    allRectifiedTrajectories[0].length > 0 &&
+    targetDistribution &&
+    targetDistribution.length > 0;
 
-  // Derived source and target distributions from trajectory endpoints
+  // Derived source distribution from trajectory start
   $: sourceDistributionSamples = isDataValid
     ? allRectifiedTrajectories[0][0] // First timestep of first rectified step
     : [];
-  $: targetDistributionSamples = isDataValid
-    ? allRectifiedTrajectories[0][allRectifiedTrajectories[0].length - 1] // Last timestep of first rectified step
-    : [];
+  // Use the passed-in target distribution
+  $: targetDistributionSamples = targetDistribution;
 
   // Animation props
   export let animationDuration = 6000; // Duration per rectified step (ms)
@@ -49,26 +51,28 @@
   // Layout
   export let width = 800;
   export let height = 300;
-  export let marginWidth = 60;
+  export let marginWidth = 20;
   export let marginHeight = 20;
   export let yShiftFactor = -0.5; // Vertical shift for distributions (positive shifts down)
-  export let flowWidth = 10; // Horizontal gap between source and target in data units
+  export let flowWidth = 11; // Horizontal gap between source and target in data units
 
   // Label props
   export let sourceLabelText = "Source Distribution";
   export let targetLabelText = "Target Distribution";
-  export let labelFontSize = 18;
+  export let labelFontSize = 22;
   export let labelColor = "#666";
 
-  // Caption
-  export let caption: import("svelte").Snippet | undefined = undefined;
+  // Caption slot (passed as default children)
+  export let children: import("svelte").Snippet | undefined = undefined;
+  $: caption = children;
 
   // Callback when visualization is initialized
   export let onInitialized: (() => void) | undefined = undefined;
 
   // Animation state
   let initialized = false;
-  let currentRectifiedStep = 0;
+  let showingAfterRectification = false; // Toggle between before (false) and after (true)
+  let currentRectifiedStep = 0; // Derived from showingAfterRectification
   let previousRectifiedStep = -1; // Track when rectified step changes
   let time = 0; // Normalized time (0-1) within current step
   let isPlaying = playingByDefault;
@@ -77,7 +81,6 @@
   let lastTimestamp: number | null = null;
   let isPaused = false;
   let pauseStartTime: number | null = null;
-  let pauseDuration = 0; // Which pause we're in: 0 = none, 1 = between steps, 2 = before restart
 
   // SVG elements
   let svg: SVGSVGElement;
@@ -277,9 +280,8 @@
       .attr("x", width / 2)
       .attr("y", 30)
       .attr("text-anchor", "middle")
-      .attr("font-size", "18px")
-      .attr("font-weight", "bold")
-      .attr("fill", "#333");
+      .attr("font-size", `${labelFontSize}px`)
+      .attr("fill", labelColor);
 
     // Add source distribution label (positioned relative to top of SVG)
     if (sourceDistributionSamples.length > 0) {
@@ -485,11 +487,10 @@
     }
 
     // Update label
+    const labelText = currentRectifiedStep === 0 ? "Before Rectification" : "After Rectification";
     d3Svg
       .select(".rectified-step-label")
-      .text(
-        `Rectified Step ${currentRectifiedStep + 1} / ${allRectifiedTrajectories.length}`
-      );
+      .text(labelText);
 
     // Track previous step
     previousRectifiedStep = currentRectifiedStep;
@@ -510,24 +511,23 @@
 
     const elapsed = timestamp - lastTimestamp;
 
-    // Handle pause states
+    // Handle pause between steps
     if (isPaused && pauseStartTime !== null) {
       const pauseElapsed = timestamp - pauseStartTime;
-      const currentPauseDuration =
-        pauseDuration === 1 ? pauseBetweenSteps : pauseBeforeRestart;
 
-      if (pauseElapsed >= currentPauseDuration) {
-        // Pause complete
+      if (pauseElapsed >= pauseBetweenSteps) {
+        // Pause complete - toggle to next state
         isPaused = false;
         pauseStartTime = null;
-        lastTimestamp = timestamp;
+        lastTimestamp = null; // Reset timestamp so elapsed doesn't include pause time
 
-        if (pauseDuration === 2) {
-          // Restart from beginning
-          currentRectifiedStep = 0;
-          time = 0;
-        }
-        pauseDuration = 0;
+        // Toggle between before and after
+        showingAfterRectification = !showingAfterRectification;
+        currentRectifiedStep = showingAfterRectification ? 1 : 0;
+        previousRectifiedStep = -1; // Force path regeneration
+        time = 0;
+
+        updateVisualization(); // Update immediately after pause ends
       }
 
       animationFrameId = requestAnimationFrame(animate);
@@ -541,22 +541,9 @@
       time = 1.0;
       updateVisualization();
 
-      // Move to next step
-      currentRectifiedStep++;
-
-      if (currentRectifiedStep >= allRectifiedTrajectories.length) {
-        // All steps complete - pause before restart
-        currentRectifiedStep = allRectifiedTrajectories.length - 1;
-        isPaused = true;
-        pauseStartTime = timestamp;
-        pauseDuration = 2; // Before restart
-      } else {
-        // Pause between steps
-        isPaused = true;
-        pauseStartTime = timestamp;
-        pauseDuration = 1; // Between steps
-      }
-
+      // Start pause before toggling to next state
+      isPaused = true;
+      pauseStartTime = timestamp;
       time = 0;
     } else {
       updateVisualization();

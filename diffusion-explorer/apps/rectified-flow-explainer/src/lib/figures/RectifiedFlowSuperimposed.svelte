@@ -31,9 +31,9 @@
   export let animationDuration = 5000; // ms per full loop
   export let playingByDefault = true;
   export let pauseDuration = 1000; // ms pause at end of animation
-  export let figureNumber = "5";
-  export let captionText =
-    "Left: Before rectification. Right: After rectification. Trajectories shown superimposed on target distribution.";
+  // Caption slot (passed as default children)
+  export let children: import("svelte").Snippet | undefined = undefined;
+  $: caption = children;
   export let leftLabel = "Before Rectification";
   export let rightLabel = "After Rectification";
   export let labelFontSize = 22;
@@ -307,7 +307,7 @@
 </script>
 
 {#if isDataValid}
-  <DoubleFigure {gap}>
+  <DoubleFigure {gap} {caption}>
     {#snippet left()}
       <PlayButton {isPlaying} onclick={togglePlayPause} />
       <svg
@@ -327,13 +327,6 @@
         style="width: 100%; height: auto; max-width: {svgWidth}px;"
       >
       </svg>
-    {/snippet}
-
-    {#snippet caption()}
-      <div class="caption">
-        <span class="figure-number">Figure {figureNumber}:</span>
-        {captionText}
-      </div>
     {/snippet}
   </DoubleFigure>
 {:else}

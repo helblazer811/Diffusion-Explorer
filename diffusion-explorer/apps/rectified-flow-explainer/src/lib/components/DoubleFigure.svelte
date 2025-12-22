@@ -4,23 +4,26 @@
     right?: import('svelte').Snippet;
     caption?: import('svelte').Snippet;
     gap?: number;
+    inline?: boolean;
   }
 
-  let { left, right, caption, gap = 20 }: Props = $props();
+  let { left, right, caption, gap = 20, inline = false }: Props = $props();
 </script>
 
 <figure class="double-figure">
   <div class="double-figure-container" style="gap: {gap}px;">
-    <div class="figure-content left-figure">
+    <div class="figure-content left-figure" class:inline>
       {@render left?.()}
     </div>
-    <div class="figure-content right-figure">
+    <div class="figure-content right-figure" class:inline>
       {@render right?.()}
     </div>
   </div>
-  <figcaption class="figure-caption">
-    {@render caption?.()}
-  </figcaption>
+  {#if !inline}
+    <figcaption class="figure-caption">
+      {@render caption?.()}
+    </figcaption>
+  {/if}
 </figure>
 
 <style>
@@ -40,6 +43,7 @@
   }
 
   .figure-content {
+    position: relative;
     flex: 1;
     display: flex;
     justify-content: center;
@@ -49,6 +53,11 @@
     border-radius: 4px;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
+  }
+
+  .figure-content.inline {
+    background-color: transparent;
+    border: none;
   }
 
   .left-figure {
