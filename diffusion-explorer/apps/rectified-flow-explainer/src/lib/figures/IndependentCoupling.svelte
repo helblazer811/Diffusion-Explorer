@@ -16,7 +16,7 @@
   export const width = 800;
   export const sourcePointColor = '#3b82f6';
   export const targetPointColor = '#f17720';
-  export const targetShiftFactor = 8;
+  export const flowWidth = 10;
   export const margin = 20;
   export const sourceLabelText = 'Source Distribution';
   export const targetLabelText = 'Target Distribution';
@@ -94,7 +94,7 @@
 
     // Calculate x positions for labels (centered on each distribution)
     const sourceLabelX = xScale(0);
-    const targetLabelX = xScale(targetShiftFactor);
+    const targetLabelX = xScale(flowWidth);
 
     // Position labels relative to the top of the SVG
     const yDomain = yScale.domain();
@@ -342,7 +342,7 @@
     // Flip target points vertically about the center and shift right
     const yCoords = sampledPoints.map(p => p[1]);
     const yCenter = (Math.max(...yCoords) + Math.min(...yCoords)) / 2;
-    const flippedAndShiftedPoints = sampledPoints.map(([x, y]) => [x + targetShiftFactor, 2 * yCenter - y]);
+    const flippedAndShiftedPoints = sampledPoints.map(([x, y]) => [x + flowWidth, 2 * yCenter - y]);
 
     return tf.tensor(flippedAndShiftedPoints);
   }

@@ -17,6 +17,8 @@
   import RectifiedFlowVisualization from "$lib/figures/RectifiedFlowVisualization.svelte";
   import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
+  import IntersectingPaths from "$lib/figures/IntersectingPaths.svelte";
+  import TableOfContents from "$lib/components/TableOfContents.svelte";
   import { Katex } from "@diffusion-explorer/ui";
 
   // ========== DATA MANAGEMENT STATE ==========
@@ -39,6 +41,9 @@
 
   // Defer other figures until first frame renders
   let showOtherFigures = false;
+
+  // Figure width (shared across all figures)
+  export let figureWidth = 700;
 
   // ========== WRAPPER FUNCTIONS ==========
 
@@ -251,6 +256,8 @@
   });
 </script>
 
+<TableOfContents />
+
 <div class="page-container">
   <div class="title-header-wrapper">
     <h1 class="article-title">A Visual Explanation of Rectified Flows</h1>
@@ -263,6 +270,7 @@
   </div>
 
   <RectifiedFlowSuperimposed
+    width={figureWidth}
     allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
     targetDistribution={$targetDistributionSamples}
     playingByDefault={true}
@@ -280,6 +288,7 @@
   <hr />
 
   <RectifiedFlowVisualization
+    width={figureWidth}
     allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
     targetDistribution={$targetDistributionSamples}
     playingByDefault={true}
@@ -394,9 +403,10 @@ fl
     many small integration steps to accurately simulate the underlying dynamics.
   </p>
 
-  <h2>Brief Background on Flow Matching</h2>
+  <h2 id="background">Brief Background on Flow Matching</h2>
   {#if showOtherFigures}
     <FlowModelIntro
+      width={figureWidth}
       sourceDistributionSamples={$sourceDistributionSamples}
       targetDistributionSamples={$targetDistributionSamples}
       {allTimeSamples}
@@ -480,10 +490,11 @@ fl
     the source to the target distribution.
   </p>
 
-  <h2>Visualizing Flow Matching</h2>
+  <h2 id="visualizing">Visualizing Flow Matching</h2>
   <p></p>
   {#if showOtherFigures}
     <CurvedTrajectoryIntro
+      width={figureWidth}
       sourceDistributionSamples={$sourceDistributionSamples}
       targetDistributionSamples={$targetDistributionSamples}
       {allTimeSamples}
@@ -497,14 +508,14 @@ fl
     </CurvedTrajectoryIntro>
   {/if}
   <p></p>
-  <h2>Curvature is the Enemy of Speed</h2>
+  <h2 id="curvature">Curvature is the Enemy of Speed</h2>
   <p>
     Curved sampling trajectories are difficult to accurately simulate in a few
     steps.
   </p>
 
   {#if showOtherFigures}
-    <EulerSamplerFigure>
+    <EulerSamplerFigure width={figureWidth}>
       <div class="caption">
         <span class="figure-number">Figure 4:</span> Comparison of Euler method
         approximations for high-curvature (left) and low-curvature (right) functions.
@@ -513,12 +524,12 @@ fl
     </EulerSamplerFigure>
   {/if}
 
-  <h2>The Limitations of an Independent Coupling</h2>
-  <h3>What is a coupling?</h3>
+  <h2 id="limitations">The Limitations of an Independent Coupling</h2>
+  <h3 id="coupling">What is a coupling?</h3>
   <p></p>
 
   {#if showOtherFigures}
-    <IndependentCoupling>
+    <IndependentCoupling width={figureWidth}>
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
         Independent coupling visualization showing the source distribution.
@@ -528,6 +539,7 @@ fl
 
   {#if showOtherFigures}
     <LinearInterpolation
+      width={figureWidth}
       sourceDistributionSamples={$sourceDistributionSamples}
       targetDistributionSamples={$targetDistributionSamples}
       sourcePointIndex={5}
@@ -536,7 +548,20 @@ fl
     />
   {/if}
 
-  <h2>Vector Field Visualization</h2>
+  {#if showOtherFigures}
+    <IntersectingPaths
+      width={figureWidth}
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure X:</span>
+        Intersecting paths from an independent coupling. Two linear interpolation paths cross, creating conflicting velocity directions at the intersection point (orange arrows). The mean velocity (green arrow) points in an intermediate direction.
+      </div>
+    </IntersectingPaths>
+  {/if}
+
+  <h2 id="vector-field">Vector Field Visualization</h2>
   <p>
     Below we visualize the learned velocity field and how sample trajectories
     flow through it.
@@ -544,6 +569,7 @@ fl
 
   {#if showOtherFigures}
     <VectorFieldDouble
+      width={figureWidth}
       vectorFieldData={$vectorFieldData}
       allTimeSamples={$allTimeSamples}
       playingByDefault={false}
@@ -555,18 +581,36 @@ fl
     </VectorFieldDouble>
   {/if}
 
-  <h2>Acknowledgements</h2>
+  <h2 id="acknowledgements">Acknowledgements</h2>
   <div class="acknowledgements">
     <p></p>
   </div>
-  <!--
-  <h2>Material Icons</h2>
 
-  <p>
-    <span class="material-icons">favorite</span>
-    <span class="material-icons">home</span>
-    <span class="material-icons">settings</span>
-  </p> -->
+  <h2 id="references">References</h2>
+  <div class="references">
+    <ol>
+      <li id="ref-liu2022">
+        Liu, X., Gong, C., & Liu, Q. (2022). Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow. <em>arXiv preprint arXiv:2209.03003</em>.
+      </li>
+      <li id="ref-lipman2022">
+        Lipman, Y., Chen, R. T., Ben-Hamu, H., Nickel, M., & Le, M. (2022). Flow Matching for Generative Modeling. <em>arXiv preprint arXiv:2210.02747</em>.
+      </li>
+      <li id="ref-albergo2023">
+        Albergo, M. S., & Vanden-Eijnden, E. (2023). Building Normalizing Flows with Stochastic Interpolants. <em>ICLR 2023</em>.
+      </li>
+    </ol>
+  </div>
+
+  <h2 id="cite">How to Cite</h2>
+  <div class="cite-section">
+    <p>If you found this explainer helpful, please consider citing it:</p>
+    <pre><code>@article{'{'}helbling2025rectifiedflows,
+  title = {'{'}A Visual Explanation of Rectified Flows{'}'},
+  author = {'{'}Helbling, Alec{'}'},
+  year = {'{'}2025{'}'},
+  url = {'{'}https://alechelbling.com/rectified-flows{'}'}
+{'}'}</code></pre>
+  </div>
 </div>
 
 <style>
