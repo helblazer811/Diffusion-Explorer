@@ -117,6 +117,37 @@ button:focus {
   line-height: 1.4rem;
 }
 
+.references ol {
+  padding-left: 1.5rem;
+  font-size: 1rem;
+  line-height: 1.6rem;
+}
+
+.references li {
+  margin-bottom: 1rem;
+}
+
+.cite-section p {
+  font-size: 1rem;
+  line-height: 1.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.cite-section pre {
+  background: #f5f5f5;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.cite-section code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
 h2 {
   margin-top: 3em;
 }
@@ -161,4 +192,11 @@ h2 {
   max-width: 900px;
   margin: 0 auto;
   padding: 2rem;
+}
+
+/* Adjust layout when TOC sidebar is visible */
+@media (min-width: 1200px) {
+  .page-container {
+    margin-left: max(280px, calc((100vw - 900px) / 2));
+  }
 }

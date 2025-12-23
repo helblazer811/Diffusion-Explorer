@@ -3,9 +3,9 @@
 <script>
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import katex from 'katex';
   import Figure from '$lib/components/Figure.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
+  import { plotKatexInSVG } from '@diffusion-explorer/ui';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -31,13 +31,14 @@
   export let playingByDefault = true;
 
   // Layout/Styling
-  export let width = 700;
-  export let height = 250;
-  export let margin = 20;
-  export let targetShiftFactor = 8;
+  export let width = 800;
+  export let height = 300;
+  export let marginWidth = 20;
+  export let marginHeight = 0;
+  export let flowWidth = 10;
   export let pointRadius = 5;
-  export let pointOpacity = 0.4;
-  export let lineWidth = 2;
+  export let pointOpacity = 0.25;
+  export let lineWidth = 3;
   export let animatedDotRadius = 6;
   export let labelFontSize = 22;
   export let labelColor = '#666';
@@ -55,7 +56,7 @@
   // Animation state
   let isPlaying = playingByDefault;
   let animationFrameId = null;
-  let time = 0;
+  let time = 0.5;
   let direction = 1; // 1 = forward, -1 = backward
   let isPaused = false;
   let pauseStartTime = null;
@@ -64,75 +65,6 @@
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
-  }
-
-  /**
-   * Plot LaTeX math into an SVG with an SVG background box.
-   * Background size is computed from the rendered KaTeX.
-   */
-  function plotKatexInSvgWithBg(svg, latex, x, y, opts = {}) {
-    const {
-      fontSize = 18,
-      padding = 6,
-      color = latexLabelColor,
-      bg = "white",
-      bgOpacity = pointLabelBgOpacity,
-      rx = 4,
-      ry = 4,
-      className = "katex-label"
-    } = opts;
-
-    const selection = svg instanceof d3.selection
-      ? svg
-      : d3.select(svg);
-
-    // Group everything so positioning is easy
-    const g = selection.append("g")
-      .attr("class", className)
-      .attr("transform", `translate(${x}, ${y})`);
-
-    // foreignObject (initially size-less)
-    const fo = g.append("foreignObject");
-
-    const div = fo.append("xhtml:div")
-      .style("display", "inline-block")
-      .style("font-size", `${fontSize}px`)
-      .style("line-height", "1.2")
-      .style("white-space", "nowrap");
-
-    // Render KaTeX
-    katex.render(latex, div.node(), {
-      throwOnError: false
-    });
-
-    // Apply color and fill to KaTeX elements before measurement
-    const katexRoot = d3.select(div.node()).select('.katex');
-    katexRoot.style("color", color).style("fill", color);
-    katexRoot.selectAll("*").style("color", color).style("fill", color);
-
-    // Measure AFTER render
-    const bbox = div.node().getBoundingClientRect();
-    const width = bbox.width + 2 * padding;
-    const height = 0.8 * (bbox.height + 2 * padding);
-
-    // Resize foreignObject
-    fo.attr("x", padding)
-      .attr("y", padding)
-      .attr("width", bbox.width)
-      .attr("height", bbox.height);
-
-    // SVG background rect (inserted behind fo)
-    g.insert("rect", ":first-child")
-      .attr("x", 0)
-      .attr("y", 0)
-      .attr("width", width)
-      .attr("height", height)
-      .attr("rx", rx)
-      .attr("ry", ry)
-      .attr("fill", bg)
-      .attr("opacity", bgOpacity);
-
-    return g;
   }
 
   function plotPointLabel() {
@@ -149,21 +81,21 @@
     // x_0 label above source point
     const sourceX = xScale(sourcePoint[0]);
     const sourceY = yScale(sourcePoint[1]);
-    plotKatexInSvgWithBg(labelGroup, 'x_0', sourceX - 18, sourceY - 38, { fontSize: pointLabelFontSize });
+    plotKatexInSVG(labelGroup, 'x_0', sourceX - 18, sourceY - 50, { fontSize: pointLabelFontSize });
 
     // x_1 label above target point
-    const targetX = xScale(targetPoint[0] + targetShiftFactor);
+    const targetX = xScale(targetPoint[0] + flowWidth);
     const targetY = yScale(targetPoint[1]);
-    plotKatexInSvgWithBg(labelGroup, 'x_1', targetX - 18, targetY - 38, { fontSize: pointLabelFontSize });
+    plotKatexInSVG(labelGroup, 'x_1', targetX - 18, targetY - 50, { fontSize: pointLabelFontSize });
   }
 
   function createScales(sourcePoints, targetPoints) {
-    const drawableWidth = width - 2 * margin;
-    const drawableHeight = height - 2 * margin;
+    const drawableWidth = width - 2 * marginWidth;
+    const drawableHeight = height - 2 * marginHeight;
     const aspectRatio = drawableHeight / drawableWidth;
 
-    // Shift target points by targetShiftFactor for extent calculation
-    const shiftedTargetPoints = targetPoints.map(p => [p[0] + targetShiftFactor, p[1]]);
+    // Shift target points by flowWidth for extent calculation
+    const shiftedTargetPoints = targetPoints.map(p => [p[0] + flowWidth, p[1]]);
     const allPoints = [...sourcePoints, ...shiftedTargetPoints];
 
     const xExtent = d3.extent(allPoints, d => d[0]);
@@ -188,11 +120,11 @@
 
     xScale = d3.scaleLinear()
       .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
-      .range([margin, width - margin]);
+      .range([marginWidth, width - marginWidth]);
 
     yScale = d3.scaleLinear()
       .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
-      .range([margin, height - margin]);
+      .range([marginHeight, height - marginHeight]);
   }
 
   function initializeLayers() {
@@ -232,8 +164,8 @@
 
     // Formula at bottom center
     const formulaX = width / 2;
-    const formulaY = height - margin - 10;
-    plotKatexInSvgWithBg(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 90, formulaY - 16, { fontSize: pointLabelFontSize });
+    const formulaY = height - marginHeight - 10;
+    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 90, formulaY - 30, { fontSize: pointLabelFontSize });
   }
 
   function plotLine() {
@@ -250,7 +182,7 @@
 
     const x1 = xScale(sourcePoint[0]);
     const y1 = yScale(sourcePoint[1]);
-    const x2 = xScale(targetPoint[0] + targetShiftFactor);
+    const x2 = xScale(targetPoint[0] + flowWidth);
     const y2 = yScale(targetPoint[1]);
 
     lineGroup.append('line')
@@ -266,14 +198,18 @@
     lineGroup.append('circle')
       .attr('cx', x1)
       .attr('cy', y1)
-      .attr('r', animatedDotRadius * 0.6)
-      .attr('fill', animatedDotColor);
+      .attr('r', pointRadius)
+      .attr('fill', animatedDotColor)
+      .attr('stroke', 'white')
+      .attr('stroke-width', 2);
 
     lineGroup.append('circle')
       .attr('cx', x2)
       .attr('cy', y2)
-      .attr('r', animatedDotRadius * 0.6)
-      .attr('fill', animatedDotColor);
+      .attr('r', pointRadius)
+      .attr('fill', animatedDotColor)
+      .attr('stroke', 'white')
+      .attr('stroke-width', 2);
   }
 
   function initAnimatedDot() {
@@ -298,7 +234,7 @@
       .attr('fill', animatedDotColor);
 
     // x_t label above moving dot
-    const g = plotKatexInSvgWithBg(labelGroup, 'x_t', initialX - 18, initialY - 38, { fontSize: pointLabelFontSize });
+    const g = plotKatexInSVG(labelGroup, 'x_t', initialX - 18, initialY - 50, { fontSize: pointLabelFontSize });
     g.attr('id', 'movingLabelGroup');
   }
 
@@ -317,7 +253,7 @@
 
     const x1 = xScale(sourcePoint[0]);
     const y1 = yScale(sourcePoint[1]);
-    const x2 = xScale(targetPoint[0] + targetShiftFactor);
+    const x2 = xScale(targetPoint[0] + flowWidth);
     const y2 = yScale(targetPoint[1]);
 
     const currentX = x1 + progress * (x2 - x1);
@@ -328,7 +264,7 @@
     // Update x_t label position via transform, hide when outside 0.07-0.93
     const labelVisible = progress >= 0.07 && progress <= 0.93;
     labelGroup
-      .attr('transform', `translate(${currentX - 18}, ${currentY - 38})`)
+      .attr('transform', `translate(${currentX - 18}, ${currentY - 50})`)
       .attr('opacity', labelVisible ? 1 : 0);
   }
 
@@ -397,7 +333,7 @@
     initializeLayers();
     createScales(sourceDistributionSamples, targetDistributionSamples);
     plotScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter', 0);
-    plotScatter(targetDistributionSamples, targetPointColor, 'targetScatter', targetShiftFactor);
+    plotScatter(targetDistributionSamples, targetPointColor, 'targetScatter', flowWidth);
     plotLine();
     initAnimatedDot();
     plotPointLabel();
@@ -422,6 +358,11 @@
 
   $: if (!isPlaying && animationFrameId) {
     stopAnimation();
+  }
+
+  // Update dot position when time changes (e.g., from slider drag)
+  $: if (isInitialized) {
+    updateDotPosition(time);
   }
 
   onMount(() => {
