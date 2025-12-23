@@ -276,7 +276,7 @@
 
 <div class="page-container">
   <div class="title-header-wrapper">
-    <h1 class="article-title">A Visual Explanation of Rectified Flows</h1>
+    <h1 class="article-title">A Visual Introduction to Rectified Flows</h1>
     <div class="byline-dateline-container">
       <h3 class="byline">
         By <a href="https://alechelbling.com">Alec Helbling</a>
