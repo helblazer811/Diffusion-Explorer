@@ -9,6 +9,7 @@
   let headings = [];
   let activeId = '';
   let isOpen = false;
+  let isScrolling = false;
 
   onMount(() => {
     // Extract headings from the page
@@ -23,11 +24,19 @@
     // Set up IntersectionObserver for active section tracking
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            activeId = entry.target.id;
-          }
-        });
+        // Don't update during programmatic smooth scrolling
+        if (isScrolling) return;
+
+        // Find all currently visible headings
+        const visibleEntries = entries.filter(entry => entry.isIntersecting);
+
+        if (visibleEntries.length > 0) {
+          // Sort by position and pick the topmost one
+          visibleEntries.sort((a, b) => {
+            return a.boundingClientRect.top - b.boundingClientRect.top;
+          });
+          activeId = visibleEntries[0].target.id;
+        }
       },
       { rootMargin: '-20% 0% -60% 0%', threshold: 0 }
     );
@@ -37,8 +46,14 @@
   });
 
   function scrollTo(id) {
+    isScrolling = true;
+    activeId = id;
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     isOpen = false;
+    // Re-enable observer after scroll completes
+    setTimeout(() => {
+      isScrolling = false;
+    }, 600);
   }
 
   function toggleMenu() {
