@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { writable, type Writable } from "svelte/store";
   import { downloadJSON } from "$lib/utils";
   import {
@@ -8,6 +8,12 @@
     type RectifiedFlowData,
   } from "$lib/settings";
   import * as trainAndSample from "$lib/train_and_sample";
+  import {
+    loadBibliography,
+    collectCitations,
+    type BibEntry,
+    type CitationInfo,
+  } from "$lib/citations";
 
   import IndependentCoupling from "$lib/figures/IndependentCoupling.svelte";
   import FlowModelIntro from "$lib/figures/FlowModelIntro.svelte";
@@ -19,6 +25,7 @@
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
   import IntersectingPaths from "$lib/figures/IntersectingPaths.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
+  import Bibliography from "$lib/components/Bibliography.svelte";
   import { Katex } from "@diffusion-explorer/ui";
 
   // ========== DATA MANAGEMENT STATE ==========
@@ -44,6 +51,10 @@
 
   // Figure width (shared across all figures)
   export let figureWidth = 700;
+
+  // Bibliography state
+  let bibEntries: Map<string, BibEntry> | null = null;
+  let citations: CitationInfo[] = [];
 
   // ========== WRAPPER FUNCTIONS ==========
 
@@ -249,6 +260,11 @@
       await trainRectifiedFlow();
     }
 
+    // Load bibliography and collect citations
+    bibEntries = await loadBibliography();
+    await tick(); // Ensure DOM is ready
+    citations = collectCitations();
+
     return () => {
       if (trainingWorker) trainingWorker.terminate();
       if (rectifiedTrainingWorker) rectifiedTrainingWorker.terminate();
@@ -378,9 +394,10 @@ fl
     <p>This paragraph is inside the acknowledgements div, with smaller font size (1rem) and line height (1.4rem).</p>
   </div> -->
 
+  <h2 id="introduction" class="visually-hidden">Introduction</h2>
   <p>
     Recently developed flow-based generative models have led to state-of-the-art
-    results in image and video generation. In particular, flow matching has
+    results in image and video generation. In particular, flow matching <span class="citation" data-cite="lipman2022"></span> has
     enabled efficient, simulation-free training of continuous normalizing flows.
     However, a key barrier to deploying these methods at scale is their
     computational cost and inference latency. Generating a high-quality image
@@ -398,9 +415,10 @@ fl
     Training a model with flow matching alone is sufficient to generate
     high-quality samples from a target distribution. However, as illustrated in
     Figure X, the trajectories followed by individual samples during generation
-    are often curved. This curvature poses a significant obstacle to fast
-    sampling from flow-based models, since curved trajectories typically require
-    many small integration steps to accurately simulate the underlying dynamics.
+    are often curved. Rectified flows [Citation needed] address this by learning straighter trajectories, 
+    reducing the curvature that poses a significant obstacle to fast
+    sampling from flow-based models. Stochastic interpolants <span class="citation" data-cite="albergo2023"></span> provide
+    another framework for building normalizing flows with similar goals.
   </p>
 
   <h2 id="background">Brief Background on Flow Matching</h2>
@@ -587,19 +605,7 @@ fl
   </div>
 
   <h2 id="references">References</h2>
-  <div class="references">
-    <ol>
-      <li id="ref-liu2022">
-        Liu, X., Gong, C., & Liu, Q. (2022). Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow. <em>arXiv preprint arXiv:2209.03003</em>.
-      </li>
-      <li id="ref-lipman2022">
-        Lipman, Y., Chen, R. T., Ben-Hamu, H., Nickel, M., & Le, M. (2022). Flow Matching for Generative Modeling. <em>arXiv preprint arXiv:2210.02747</em>.
-      </li>
-      <li id="ref-albergo2023">
-        Albergo, M. S., & Vanden-Eijnden, E. (2023). Building Normalizing Flows with Stochastic Interpolants. <em>ICLR 2023</em>.
-      </li>
-    </ol>
-  </div>
+  <Bibliography {citations} {bibEntries} />
 
   <h2 id="cite">How to Cite</h2>
   <div class="cite-section">

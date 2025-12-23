@@ -90,7 +90,7 @@ button:focus {
 }
 
 .article-title {
-  font-size: 3em;
+  font-size: 2.8em;
   margin-bottom: 0;
 }
 
@@ -152,6 +152,27 @@ h2 {
   margin-top: 3em;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.citation {
+  color: rgb(0, 100, 200);
+  cursor: pointer;
+}
+
+.citation:hover {
+  text-decoration: underline;
+}
+
 @font-face {
   font-family: "Material Icons";
   font-style: normal;
@@ -189,7 +210,7 @@ h2 {
 }
 
 .page-container {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 2rem;
 }
