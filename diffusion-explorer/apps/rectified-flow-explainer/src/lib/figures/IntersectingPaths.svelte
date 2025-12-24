@@ -28,12 +28,12 @@
   export let marginWidth = 20;
   export let marginHeight = 20;
   export let flowWidth = 10;
-  export let pointRadius = 5;
-  export let pointOpacity = 0.25;
+  export let pointRadius = settings.scatterPlotStyling.radius;
+  export let pointOpacity = settings.scatterPlotStyling.opacity;
   export let lineColor = '#666';
   export let lineWidth = 3;
-  export let sourcePointColor = '#3b82f6';
-  export let targetPointColor = '#3b82f6';
+  export let sourcePointColor = settings.scatterPlotStyling.color;
+  export let targetPointColor = settings.scatterPlotStyling.color;
   export let arrowWidth = 2.5;
   export let labelVerticalOffset = -settings.labelStyling.yOffset;
   export let latexFontSize = settings.labelStyling.fontSize;

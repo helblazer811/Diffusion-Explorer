@@ -32,13 +32,13 @@
   export let gap = 30;
 
   // Styling props
-  export let sourcePointColor = '#3b82f6';
-  export let targetPointColor = '#3b82f6';
+  export let sourcePointColor = settings.scatterPlotStyling.color;
+  export let targetPointColor = settings.scatterPlotStyling.color;
   export let edgeColor = '#888';
   export let edgeOpacity = 0.3;
   export let edgeWidth = 1.5;
-  export let pointRadius = 5;
-  export let pointOpacity = 0.35;
+  export let pointRadius = settings.scatterPlotStyling.radius;
+  export let pointOpacity = 0.35; // Custom: different from default
   export let hoverEdgeColor = '#555';
   export let hoverEdgeWidth = 3;
   export let hoverEdgeOpacity = 0.8;
