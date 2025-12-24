@@ -94,6 +94,15 @@ button:focus {
   margin-bottom: 0;
 }
 
+.article-subtitle {
+  font-size: 1.4em;
+  font-weight: normal;
+  color: #555;
+  margin-top: 0.3em;
+  margin-bottom: 0;
+  font-style: italic;
+}
+
 .byline-dateline-container {
   display: flex;
   justify-content: space-between;

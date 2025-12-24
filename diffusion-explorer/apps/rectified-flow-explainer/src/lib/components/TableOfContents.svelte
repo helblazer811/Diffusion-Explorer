@@ -168,7 +168,7 @@
     display: block;
     width: 100%;
     text-align: left;
-    padding: 0.5rem 0.75rem;
+    padding: 0.3rem 0.75rem;
     border: none;
     background: transparent;
     color: #555;

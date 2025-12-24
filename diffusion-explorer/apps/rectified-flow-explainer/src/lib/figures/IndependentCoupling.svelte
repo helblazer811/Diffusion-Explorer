@@ -25,6 +25,8 @@
   export const targetLabelText = 'Target Distribution';
   export const labelFontSize = settings.labelStyling.fontSize;
   export const labelColor = settings.labelStyling.color;
+  export const outlineColor = settings.labelStyling.outlineColor;
+  export const outlineOpacity = settings.labelStyling.outlineOpacity;
   export const edgeColor = '#888';
   export const edgeOpacity = 0.3;
   export const edgeWidth = 1.5;
@@ -52,7 +54,9 @@
       sourceLabelText,
       targetLabelText,
       labelFontSize,
-      labelColor
+      labelColor,
+      outlineColor,
+      outlineOpacity
     });
   }
 
