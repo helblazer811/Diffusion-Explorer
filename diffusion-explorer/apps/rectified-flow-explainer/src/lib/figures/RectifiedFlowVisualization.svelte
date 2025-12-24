@@ -3,6 +3,7 @@
   import * as d3 from "d3";
   import Figure from "$lib/components/Figure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
+  import { settings } from "$lib/settings";
 
   // Data props
   export let allRectifiedTrajectories = []; // [step][timestep][sample][dim]
@@ -54,13 +55,13 @@
   export let marginWidth = 20;
   export let marginHeight = 20;
   export let yShiftFactor = -0.5; // Vertical shift for distributions (positive shifts down)
-  export let flowWidth = 11; // Horizontal gap between source and target in data units
+  export let flowWidth = 10; // Horizontal gap between source and target in data units
 
   // Label props
   export let sourceLabelText = "Source Distribution";
   export let targetLabelText = "Target Distribution";
-  export let labelFontSize = 22;
-  export let labelColor = "#666";
+  export let labelFontSize = settings.labelStyling.fontSize;
+  export let labelColor = settings.labelStyling.color;
 
   // Caption slot (passed as default children)
   export let children = undefined;

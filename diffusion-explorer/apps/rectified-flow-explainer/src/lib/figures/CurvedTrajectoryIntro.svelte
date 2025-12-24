@@ -5,6 +5,7 @@
   import * as d3 from 'd3';
   import Figure from '$lib/components/Figure.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
+  import { settings } from '$lib/settings';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -26,12 +27,12 @@
   // Styling props for visualization
   export let sourcePointColor = '#3b82f6'; // Blue
   export let targetPointColor = '#3b82f6'; // Blue
-  export let marginWidth = 60;
+  export let marginWidth = 20;
   export let marginHeight = 20;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
-  export let labelFontSize = 22;
-  export let labelColor = '#666';
+  export let labelFontSize = settings.labelStyling.fontSize;
+  export let labelColor = settings.labelStyling.color;
   export let pointRadius = 5;
   export let pointOpacity = 0.25;
   export let flowWidth = 10; // Gap between source and target in data units

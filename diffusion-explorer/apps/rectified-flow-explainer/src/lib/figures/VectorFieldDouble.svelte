@@ -10,7 +10,8 @@
   export let allTimeSamples = [];
 
   // Configuration props
-  export let margin = 0;
+  export let marginWidth = 20;
+  export let marginHeight = 20;
   export let gridMargin = 60;
   export let arrowScale = 50;
   export let arrowWidth = 2;
@@ -57,11 +58,11 @@
     // Main scales for trajectories and target points
     xScale = d3.scaleLinear()
       .domain([xMin, xMax])
-      .range([margin, svgWidth - margin]);
+      .range([marginWidth, svgWidth - marginWidth]);
 
     yScale = d3.scaleLinear()
       .domain([yMin, yMax])
-      .range([margin, svgHeight - margin]);
+      .range([marginHeight, svgHeight - marginHeight]);
 
     // Grid scales for vector field arrows
     xScaleGrid = d3.scaleLinear()

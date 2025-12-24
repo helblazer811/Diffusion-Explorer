@@ -4,7 +4,7 @@
 
   export let children = undefined;
   export let caption = undefined;
-  export let inline = false;
+  export let backgroundVisible = true;
 
   // Visibility state
   const isActive = writable(false);
@@ -67,10 +67,13 @@
 </script>
 
 <figure class="figure" bind:this={figureElement}>
-  <div class="figure-content" class:inline>
+  <div
+    class="figure-content"
+    class:no-background={!backgroundVisible}
+  >
     {@render children?.()}
   </div>
-  {#if !inline}
+  {#if backgroundVisible}
     <figcaption class="figure-caption">
       {@render caption?.()}
     </figcaption>
@@ -97,9 +100,11 @@
     border: 1px solid #e0e0e0;
     border-radius: 4px;
     padding: 1rem;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
-  .figure-content.inline {
+  .figure-content.no-background {
     background-color: transparent;
     border: none;
   }
@@ -107,7 +112,7 @@
   .figure-caption {
     font-size: 1.1rem;
     line-height: 1.5;
-    color: #555;
+    color: #666;
     text-align: left;
   }
 </style>

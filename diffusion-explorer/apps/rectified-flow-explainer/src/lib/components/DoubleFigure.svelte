@@ -3,19 +3,19 @@
   export let right = undefined;
   export let caption = undefined;
   export let gap = 20;
-  export let inline = false;
+  export let backgroundVisible = true;
 </script>
 
 <figure class="double-figure">
   <div class="double-figure-container" style="gap: {gap}px;">
-    <div class="figure-content left-figure" class:inline>
+    <div class="figure-content left-figure" class:no-background={!backgroundVisible}>
       {@render left?.()}
     </div>
-    <div class="figure-content right-figure" class:inline>
+    <div class="figure-content right-figure" class:no-background={!backgroundVisible}>
       {@render right?.()}
     </div>
   </div>
-  {#if !inline}
+  {#if backgroundVisible}
     <figcaption class="figure-caption">
       {@render caption?.()}
     </figcaption>
@@ -49,9 +49,11 @@
     border-radius: 4px;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
-  .figure-content.inline {
+  .figure-content.no-background {
     background-color: transparent;
     border: none;
   }
@@ -67,7 +69,7 @@
   .figure-caption {
     font-size: 1.1rem;
     line-height: 1.5;
-    color: #555;
+    color: #666;
     text-align: left;
   }
 </style>

@@ -21,6 +21,11 @@
       level: el.tagName.toLowerCase()
     }));
 
+    // Initialize with first heading active
+    if (headings.length > 0) {
+      activeId = headings[0].id;
+    }
+
     // Set up IntersectionObserver for active section tracking
     const observer = new IntersectionObserver(
       (entries) => {

@@ -58,6 +58,7 @@
         <div class="tick-container">
           <div class="tick" style="left: 1%;"></div>
           <div class="tick-label" style="left: 1%;">t=0</div>
+          <div class="time-label">Time</div>
           <div class="tick" style="left: 99%;"></div>
           <div class="tick-label" style="left: 99%;">t=1</div>
         </div>
@@ -171,6 +172,16 @@
     top: 12px;
     font-size: 16px;
     transform: translateX(-50%);
+    font-family: Helvetica, sans-serif;
+    color: #7b7b7b;
+  }
+
+  .time-label {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: 16px;
     font-family: Helvetica, sans-serif;
     color: #7b7b7b;
   }

@@ -6,6 +6,7 @@
   import Figure from '$lib/components/Figure.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
+  import { settings } from '$lib/settings';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -34,14 +35,14 @@
   export let width = 800;
   export let height = 300;
   export let marginWidth = 20;
-  export let marginHeight = 0;
+  export let marginHeight = 20;
   export let flowWidth = 10;
   export let pointRadius = 5;
   export let pointOpacity = 0.25;
   export let lineWidth = 3;
   export let animatedDotRadius = 6;
-  export let labelFontSize = 22;
-  export let labelColor = '#666';
+  export let labelFontSize = settings.labelStyling.fontSize;
+  export let labelColor = settings.labelStyling.color;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
   export let pointLabelFontSize = 18;
@@ -81,12 +82,12 @@
     // x_0 label above source point
     const sourceX = xScale(sourcePoint[0]);
     const sourceY = yScale(sourcePoint[1]);
-    plotKatexInSVG(labelGroup, 'x_0', sourceX - 18, sourceY - 50, { fontSize: pointLabelFontSize });
+    plotKatexInSVG(labelGroup, 'x_0', sourceX - 18, sourceY - 50, { fontSize: pointLabelFontSize, bg: false });
 
     // x_1 label above target point
     const targetX = xScale(targetPoint[0] + flowWidth);
     const targetY = yScale(targetPoint[1]);
-    plotKatexInSVG(labelGroup, 'x_1', targetX - 18, targetY - 50, { fontSize: pointLabelFontSize });
+    plotKatexInSVG(labelGroup, 'x_1', targetX - 18, targetY - 50, { fontSize: pointLabelFontSize, bg: false });
   }
 
   function createScales(sourcePoints, targetPoints) {
@@ -162,10 +163,37 @@
     const svg = d3.select(svgElement);
     const labelsGroup = svg.select('#labels');
 
+    // Source and target distribution labels at top
+    const sourceLabelX = xScale(0);
+    const targetLabelX = xScale(flowWidth);
+    const labelY = marginHeight + 1.5 * labelFontSize;
+
+    labelsGroup.append('text')
+      .attr('x', sourceLabelX)
+      .attr('y', labelY)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', `${labelFontSize}px`)
+      .attr('fill', labelColor)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', '4')
+      .attr('paint-order', 'stroke')
+      .text(sourceLabelText);
+
+    labelsGroup.append('text')
+      .attr('x', targetLabelX)
+      .attr('y', labelY)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', `${labelFontSize}px`)
+      .attr('fill', labelColor)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', '4')
+      .attr('paint-order', 'stroke')
+      .text(targetLabelText);
+
     // Formula at bottom center
     const formulaX = width / 2;
     const formulaY = height - marginHeight - 10;
-    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 90, formulaY - 30, { fontSize: pointLabelFontSize });
+    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 90, formulaY - 30, { fontSize: pointLabelFontSize, bg: false });
   }
 
   function plotLine() {
@@ -234,7 +262,7 @@
       .attr('fill', animatedDotColor);
 
     // x_t label above moving dot
-    const g = plotKatexInSVG(labelGroup, 'x_t', initialX - 18, initialY - 50, { fontSize: pointLabelFontSize });
+    const g = plotKatexInSVG(labelGroup, 'x_t', initialX - 18, initialY - 50, { fontSize: pointLabelFontSize, bg: false });
     g.attr('id', 'movingLabelGroup');
   }
 
@@ -372,7 +400,7 @@
   });
 </script>
 
-<Figure caption={caption} inline={true}>
+<Figure caption={caption}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">

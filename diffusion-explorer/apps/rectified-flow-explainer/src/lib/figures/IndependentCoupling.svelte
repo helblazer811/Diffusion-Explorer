@@ -6,22 +6,24 @@
   import * as d3 from 'd3';
   import { sampleMultivariateNormal } from '@diffusion-explorer/diffusion';
   import Figure from '$lib/components/Figure.svelte';
+  import { settings } from '$lib/settings';
 
   // Caption slot (passed as default children)
   export let children = undefined;
   $: caption = children;
 
   export const numSamples = 100;
-  export const height = 350;
+  export const height = 300;
   export const width = 800;
   export const sourcePointColor = '#3b82f6';
-  export const targetPointColor = '#f17720';
+  export const targetPointColor = '#3b82f6';
   export const flowWidth = 10;
-  export const margin = 20;
+  export const marginWidth = 20;
+  export const marginHeight = 20;
   export const sourceLabelText = 'Source Distribution';
   export const targetLabelText = 'Target Distribution';
-  export const labelFontSize = 22;
-  export const labelColor = '#666';
+  export const labelFontSize = settings.labelStyling.fontSize;
+  export const labelColor = settings.labelStyling.color;
   export const edgeColor = '#888';
   export const edgeOpacity = 0.3;
   export const edgeWidth = 1.5;
@@ -41,8 +43,8 @@
   let highlightEdgeIndex = Math.floor(Math.random() * numSamples);
 
   function createScales(sourcePoints, targetPoints) {
-    const drawableWidth = width - 2 * margin;
-    const drawableHeight = height - 2 * margin;
+    const drawableWidth = width - 2 * marginWidth;
+    const drawableHeight = height - 2 * marginHeight;
     const aspectRatio = drawableHeight / drawableWidth;
 
     // Combine both point sets to get overall extent
@@ -70,15 +72,15 @@
     }
 
     // Shift y center down to accommodate labels at the top
-    const yCenterOffset = -adjustedYRange * 0.07;
+    const yCenterOffset = -adjustedYRange * 0.12;
 
     xScale = d3.scaleLinear()
       .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
-      .range([margin, width - margin]);
+      .range([marginWidth, width - marginWidth]);
 
     yScale = d3.scaleLinear()
       .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
-      .range([height - margin, margin]);
+      .range([height - marginHeight, marginHeight]);
   }
 
   function plotLabels(sourcePoints, targetPoints) {

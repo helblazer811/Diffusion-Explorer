@@ -3,16 +3,18 @@
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
+  import { settings } from '$lib/settings';
 
   // Props
   export let width = 400;
-  export let height = 300;
+  export let height = 450;
   export let gap = 20;
   export let groundTruthColor = '#000000';
   export let eulerColor = '#f17720';
   export let lineWidth = 2;
   export let eulerLineWidth = 2;
-  export let margin = 40;
+  export let marginWidth = 20;
+  export let marginHeight = 20;
   export let deltaT = 2.5;
   export let groundTruthDeltaT = 0.05;
   export let domain = [0, 4 * Math.PI];
@@ -25,8 +27,8 @@
   export let perEdgeAnimationDelay = 250; // Pause between animating each Euler edge segment
   export let repeatAnimation = true; // Whether to repeat the animation
   export let repeatDelay = 1000; // Delay before repeating the animation
-  export let labelFontSize = 22;
-  export let labelColor = '#666';
+  export let labelFontSize = settings.labelStyling.fontSize;
+  export let labelColor = settings.labelStyling.color;
   export let highCurvatureLabel = 'Highly Curved Function';
   export let lowCurvatureLabel = 'Approximately Straight Function';
 
@@ -100,7 +102,7 @@
 
     const xScale = d3.scaleLinear()
       .domain([Math.min(...allT), Math.max(...allT)])
-      .range([margin, svgWidth - margin]);
+      .range([marginWidth, svgWidth - marginWidth]);
 
     const yMin = Math.min(...allY);
     const yMax = Math.max(...allY);
@@ -112,7 +114,7 @@
 
     const yScale = d3.scaleLinear()
       .domain([yCenter - yRange / 2 - yCenterOffset, yCenter + yRange / 2 - yCenterOffset])
-      .range([svgHeight - margin, margin]);
+      .range([svgHeight - marginHeight, marginHeight]);
 
     return { xScale, yScale };
   }
