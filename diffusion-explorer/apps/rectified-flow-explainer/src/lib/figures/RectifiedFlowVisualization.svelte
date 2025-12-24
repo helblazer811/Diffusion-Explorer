@@ -4,6 +4,7 @@
   import Figure from "$lib/components/Figure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
   import { settings } from "$lib/settings";
+  import { plotSourceTargetScatter } from "$lib/d3_helpers";
 
   // Data props
   export let allRectifiedTrajectories = []; // [step][timestep][sample][dim]
@@ -234,36 +235,21 @@
     createScales();
 
     // Create groups
-    d3Svg.append("g").attr("class", "source-scatter");
-    d3Svg.append("g").attr("class", "target-scatter");
+    d3Svg.append("g").attr("id", "sourceScatter");
+    d3Svg.append("g").attr("id", "targetScatter");
     d3Svg.append("g").attr("class", "trajectories");
     d3Svg.append("g").attr("class", "labels");
 
-    const sourceScatter = d3Svg.select(".source-scatter");
-    const targetScatter = d3Svg.select(".target-scatter");
     const labelsGroup = d3Svg.select(".labels");
 
-    // Draw source distribution (fixed on the left)
-    sourceScatter
-      .selectAll("circle")
-      .data(sourceDistributionSamples)
-      .join("circle")
-      .attr("cx", (d) => xScale(d[0]))
-      .attr("cy", (d) => yScale(d[1]))
-      .attr("r", pointRadius)
-      .attr("fill", sourcePointColor)
-      .attr("opacity", pointOpacity);
-
-    // Draw target distribution (fixed on the right)
-    targetScatter
-      .selectAll("circle")
-      .data(targetDistributionSamples)
-      .join("circle")
-      .attr("cx", (d) => xScale(d[0] + flowWidth))
-      .attr("cy", (d) => yScale(d[1]))
-      .attr("r", pointRadius)
-      .attr("fill", targetPointColor)
-      .attr("opacity", pointOpacity);
+    // Draw source and target distributions
+    plotSourceTargetScatter(d3Svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
+      flowWidth,
+      sourcePointColor,
+      targetPointColor,
+      pointRadius,
+      pointOpacity
+    });
 
     // Add rectified step label
     labelsGroup
