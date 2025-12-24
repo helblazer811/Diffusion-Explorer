@@ -7,7 +7,7 @@
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
-  import { plotSourceTargetScatter } from '$lib/d3_helpers';
+  import { plotSourceTargetScatter, plotSourceTargetLabels } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -146,33 +146,16 @@
 
     const svg = d3.select(svgElement);
     const labelsGroup = svg.select('#labels');
-
-    // Source and target distribution labels at top
-    const sourceLabelX = xScale(0);
-    const targetLabelX = xScale(flowWidth);
     const labelY = marginHeight + 1.5 * labelFontSize;
 
-    labelsGroup.append('text')
-      .attr('x', sourceLabelX)
-      .attr('y', labelY)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor)
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', '4')
-      .attr('paint-order', 'stroke')
-      .text(sourceLabelText);
-
-    labelsGroup.append('text')
-      .attr('x', targetLabelX)
-      .attr('y', labelY)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor)
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', '4')
-      .attr('paint-order', 'stroke')
-      .text(targetLabelText);
+    // Source and target distribution labels at top
+    plotSourceTargetLabels(svg, xScale, labelY, {
+      flowWidth,
+      sourceLabelText,
+      targetLabelText,
+      labelFontSize,
+      labelColor
+    });
 
     // Formula at bottom center
     const formulaX = width / 2;

@@ -4,7 +4,7 @@
   import Figure from "$lib/components/Figure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
   import { settings } from "$lib/settings";
-  import { plotSourceTargetScatter } from "$lib/d3_helpers";
+  import { plotSourceTargetScatter, plotSourceTargetLabels } from "$lib/d3_helpers";
 
   // Data props
   export let allRectifiedTrajectories = []; // [step][timestep][sample][dim]
@@ -238,9 +238,9 @@
     d3Svg.append("g").attr("id", "sourceScatter");
     d3Svg.append("g").attr("id", "targetScatter");
     d3Svg.append("g").attr("class", "trajectories");
-    d3Svg.append("g").attr("class", "labels");
+    d3Svg.append("g").attr("id", "labels");
 
-    const labelsGroup = d3Svg.select(".labels");
+    const labelsGroup = d3Svg.select("#labels");
 
     // Draw source and target distributions
     plotSourceTargetScatter(d3Svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
@@ -261,52 +261,19 @@
       .attr("font-size", `${labelFontSize}px`)
       .attr("fill", labelColor);
 
-    // Add source distribution label (positioned relative to top of SVG)
-    if (sourceDistributionSamples.length > 0) {
-      const sourceX = d3.mean(sourceDistributionSamples, (d) => xScale(d[0]));
-
-      // Get y position from top of data domain
-      const yDomain = yScale.domain();
-      const yTop = yDomain[0]; // Min value maps to top (since we flipped the y-axis)
-      const labelY = yScale(yTop) + 0.5 * labelFontSize;
-
-      labelsGroup
-        .append("text")
-        .attr("class", "source-label")
-        .attr("x", sourceX)
-        .attr("y", labelY)
-        .attr("text-anchor", "middle")
-        .attr("font-size", `${labelFontSize}px`)
-        .attr("fill", labelColor)
-        .attr("stroke", "#ffffff")
-        .attr("stroke-width", "4")
-        .attr("paint-order", "stroke")
-        .text(sourceLabelText);
-    }
-
-    // Add target distribution label (positioned relative to top of SVG)
-    if (targetDistributionSamples.length > 0) {
-      const targetX = d3.mean(targetDistributionSamples, (d) =>
-        xScale(d[0] + flowWidth)
-      );
-
-      // Get y position from top of data domain
+    // Add source and target distribution labels
+    if (sourceDistributionSamples.length > 0 && targetDistributionSamples.length > 0) {
       const yDomain = yScale.domain();
       const yTop = yDomain[0];
       const labelY = yScale(yTop) + 0.5 * labelFontSize;
 
-      labelsGroup
-        .append("text")
-        .attr("class", "target-label")
-        .attr("x", targetX)
-        .attr("y", labelY)
-        .attr("text-anchor", "middle")
-        .attr("font-size", `${labelFontSize}px`)
-        .attr("fill", labelColor)
-        .attr("stroke", "#ffffff")
-        .attr("stroke-width", "4")
-        .attr("paint-order", "stroke")
-        .text(targetLabelText);
+      plotSourceTargetLabels(d3Svg, xScale, labelY, {
+        flowWidth,
+        sourceLabelText,
+        targetLabelText,
+        labelFontSize,
+        labelColor
+      });
     }
   }
 
