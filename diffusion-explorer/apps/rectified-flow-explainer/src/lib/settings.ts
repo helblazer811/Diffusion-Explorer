@@ -89,10 +89,15 @@ export const settings = {
     domainRange: null
   } as TrainingSettings,
 
+  // Global styling
+  globalStyling: {
+    figureWidth: 750
+  },
+
   // Label styling
   labelStyling: {
     fontSize: 22,
-    yOffset: 40,
+    yShiftFactor: 0.5,
     color: '#666'
   },
 

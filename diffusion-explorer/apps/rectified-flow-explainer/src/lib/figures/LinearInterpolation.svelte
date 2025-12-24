@@ -7,7 +7,7 @@
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
-  import { plotSourceTargetScatter, plotSourceTargetLabels } from '$lib/d3_helpers';
+  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -35,11 +35,12 @@
   // Layout/Styling
   export let width = 800;
   export let height = 300;
-  export let marginWidth = 20;
+  export let marginWidth = 50;
   export let marginHeight = 20;
   export let flowWidth = 10;
   export let pointRadius = settings.scatterPlotStyling.radius;
   export let pointOpacity = settings.scatterPlotStyling.opacity;
+  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
   export let lineWidth = 3;
   export let animatedDotRadius = 6;
   export let labelFontSize = settings.labelStyling.fontSize;
@@ -91,44 +92,6 @@
     plotKatexInSVG(labelGroup, 'x_1', targetX - 18, targetY - 50, { fontSize: pointLabelFontSize, bg: false });
   }
 
-  function createScales(sourcePoints, targetPoints) {
-    const drawableWidth = width - 2 * marginWidth;
-    const drawableHeight = height - 2 * marginHeight;
-    const aspectRatio = drawableHeight / drawableWidth;
-
-    // Shift target points by flowWidth for extent calculation
-    const shiftedTargetPoints = targetPoints.map(p => [p[0] + flowWidth, p[1]]);
-    const allPoints = [...sourcePoints, ...shiftedTargetPoints];
-
-    const xExtent = d3.extent(allPoints, d => d[0]);
-    const yExtent = d3.extent(allPoints, d => d[1]);
-
-    const xRange = xExtent[1] - xExtent[0];
-    const yRange = yExtent[1] - yExtent[0];
-
-    const xCenter = (xExtent[0] + xExtent[1]) / 2;
-    const yCenter = (yExtent[0] + yExtent[1]) / 2;
-
-    let adjustedXRange = xRange;
-    let adjustedYRange = yRange;
-
-    if (yRange / xRange > aspectRatio) {
-      adjustedXRange = yRange / aspectRatio;
-    } else {
-      adjustedYRange = xRange * aspectRatio;
-    }
-
-    const yCenterOffset = -adjustedYRange * 0.07;
-
-    xScale = d3.scaleLinear()
-      .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
-      .range([marginWidth, width - marginWidth]);
-
-    yScale = d3.scaleLinear()
-      .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
-      .range([marginHeight, height - marginHeight]);
-  }
-
   function initializeLayers() {
     const svg = d3.select(svgElement);
     svg.selectAll('*').remove();
@@ -146,10 +109,9 @@
 
     const svg = d3.select(svgElement);
     const labelsGroup = svg.select('#labels');
-    const labelY = marginHeight + 1.5 * labelFontSize;
 
     // Source and target distribution labels at top
-    plotSourceTargetLabels(svg, xScale, labelY, {
+    plotSourceTargetLabels(svg, xScale, yScale, {
       flowWidth,
       sourceLabelText,
       targetLabelText,
@@ -326,7 +288,11 @@
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     initializeLayers();
-    createScales(sourceDistributionSamples, targetDistributionSamples);
+    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    });
+    xScale = scales.xScale;
+    yScale = scales.yScale;
     const svg = d3.select(svgElement);
     plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
       flowWidth,

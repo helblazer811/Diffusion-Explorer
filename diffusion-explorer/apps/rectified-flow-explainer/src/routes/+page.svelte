@@ -50,7 +50,7 @@
   let showOtherFigures = false;
 
   // Figure width (shared across all figures)
-  export let figureWidth = 700;
+  const figureWidth = settings.globalStyling.figureWidth;
 
   // Bibliography state
   let bibEntries: Map<string, BibEntry> | null = null;
@@ -473,7 +473,11 @@
   </p>
 
   {#if showOtherFigures}
-    <IndependentCoupling width={figureWidth}>
+    <IndependentCoupling
+      width={figureWidth}
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+    >
       <div class="caption">
         <span class="figure-number">Figure 6:</span>
         Visualization of an independent coupling connecting random source points to random target points.

@@ -6,7 +6,7 @@
   import Figure from '$lib/components/Figure.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
   import { settings } from '$lib/settings';
-  import { plotSourceTargetLabels } from '$lib/d3_helpers';
+  import { plotSourceTargetLabels, createSourceTargetScales } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -19,7 +19,7 @@
   export let isTraining;
 
   // Props/Configuration
-  export let width = 800;
+  export let width = 750;
   export let height = 300;
 
   // Trajectory props
@@ -28,7 +28,7 @@
   // Styling props for visualization
   export let sourcePointColor = settings.scatterPlotStyling.color;
   export let targetPointColor = settings.scatterPlotStyling.color;
-  export let marginWidth = 20;
+  export let marginWidth = 50;
   export let marginHeight = 20;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
@@ -226,41 +226,6 @@
   }
 
 
-  function createScales(sourcePoints, targetPoints) {
-    const drawableWidth = width - 2 * marginWidth;
-    const drawableHeight = height - 2 * marginHeight;
-    const aspectRatio = drawableHeight / drawableWidth;
-
-    const shiftedTargetPoints = targetPoints.map(p => [p[0] + flowWidth, p[1]]);
-    const allPoints = [...sourcePoints, ...shiftedTargetPoints];
-
-    const xExtent = d3.extent(allPoints, d => d[0]);
-    const yExtent = d3.extent(allPoints, d => d[1]);
-    const xRange = xExtent[1] - xExtent[0];
-    const yRange = yExtent[1] - yExtent[0];
-    const xCenter = (xExtent[0] + xExtent[1]) / 2;
-    const yCenter = (yExtent[0] + yExtent[1]) / 2;
-
-    let adjustedXRange = xRange;
-    let adjustedYRange = yRange;
-
-    if (yRange / xRange > aspectRatio) {
-      adjustedXRange = yRange / aspectRatio;
-    } else {
-      adjustedYRange = xRange * aspectRatio;
-    }
-
-    const yCenterOffset = -adjustedYRange * 0.07 - yShiftFactor;
-
-    xScale = d3.scaleLinear()
-      .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
-      .range([marginWidth, width - marginWidth]);
-
-    yScale = d3.scaleLinear()
-      .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
-      .range([marginHeight, height - marginHeight]);
-  }
-
   function initializeLayers() {
     const svg = d3.select(svgElement);
     svg.selectAll('*').remove();
@@ -296,11 +261,7 @@
     const labelsGroup = svg.select('#labels');
     labelsGroup.selectAll('*').remove();
 
-    const yDomain = yScale.domain();
-    const yTop = yDomain[0];
-    const labelY = yScale(yTop) + 0.5 * labelFontSize;
-
-    plotSourceTargetLabels(svg, xScale, labelY, {
+    plotSourceTargetLabels(svg, xScale, yScale, {
       flowWidth,
       sourceLabelText,
       targetLabelText,
@@ -322,7 +283,11 @@
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     initializeLayers();
-    createScales(sourceDistributionSamples, targetDistributionSamples);
+    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    });
+    xScale = scales.xScale;
+    yScale = scales.yScale;
 
     if (showSourceScatter) initScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter');
     if (showTargetScatter) initScatter(targetDistributionSamples, targetPointColor, 'targetScatter');
