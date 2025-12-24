@@ -6,6 +6,7 @@
   import Figure from '$lib/components/Figure.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
+  import { settings } from '$lib/settings';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -25,7 +26,7 @@
   export let height = 300;
   export let marginWidth = 20;
   export let marginHeight = 20;
-  export let flowWidth = 8;
+  export let flowWidth = 10;
   export let pointRadius = 5;
   export let pointOpacity = 0.25;
   export let lineColor = '#666';
@@ -33,8 +34,12 @@
   export let sourcePointColor = '#3b82f6';
   export let targetPointColor = '#3b82f6';
   export let arrowWidth = 2.5;
-  export let labelVerticalOffset = -45;
-  export let latexFontSize = 18;
+  export let labelVerticalOffset = -settings.labelStyling.yOffset;
+  export let latexFontSize = settings.labelStyling.fontSize;
+  export let labelFontSize = settings.labelStyling.fontSize;
+  export let labelColor = settings.labelStyling.color;
+  export let sourceLabelText = 'Source Distribution';
+  export let targetLabelText = 'Target Distribution';
 
   // LaTeX labels
   export let intersectionLabel = 'x';
@@ -306,9 +311,37 @@
     plotScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter', 0);
     plotScatter(targetDistributionSamples, targetPointColor, 'targetScatter', flowWidth);
 
+    // Add distribution labels at top
+    const svg = d3.select(svgElement);
+    const distributionLabelsGroup = svg.append('g').attr('id', 'distributionLabels');
+    const sourceLabelX = xScale(0);
+    const targetLabelX = xScale(flowWidth);
+    const labelY = marginHeight + 1.5 * labelFontSize;
+
+    distributionLabelsGroup.append('text')
+      .attr('x', sourceLabelX)
+      .attr('y', labelY)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', `${labelFontSize}px`)
+      .attr('fill', labelColor)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', '4')
+      .attr('paint-order', 'stroke')
+      .text(sourceLabelText);
+
+    distributionLabelsGroup.append('text')
+      .attr('x', targetLabelX)
+      .attr('y', labelY)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', `${labelFontSize}px`)
+      .attr('fill', labelColor)
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', '4')
+      .attr('paint-order', 'stroke')
+      .text(targetLabelText);
+
     const linePairs = selectPoints(sourceDistributionSamples, targetDistributionSamples);
 
-    const svg = d3.select(svgElement);
     const lineGroup = svg.select('#connectionLines');
     const arrowsGroup = svg.select('#arrows');
     const labelsGroup = svg.select('#labels');
@@ -345,7 +378,7 @@
   });
 </script>
 
-<Figure caption={caption} inline={true}>
+<Figure caption={caption}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">

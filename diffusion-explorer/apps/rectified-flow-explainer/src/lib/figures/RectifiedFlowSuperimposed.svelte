@@ -3,6 +3,7 @@
   import * as d3 from "d3";
   import DoubleFigure from "$lib/components/DoubleFigure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
+  import { settings } from "$lib/settings";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -24,7 +25,8 @@
     targetDistribution.length > 0;
 
   // Configuration props
-  export let margin = 40;
+  export let marginWidth = 20;
+  export let marginHeight = 20;
   export let svgWidth = 300;
   export let svgHeight = 300;
   export let trajectoryColor = "#f17720"; // Orange
@@ -43,8 +45,8 @@
   export let pauseDuration = 1000; // ms pause at end of animation
   export let leftLabel = "Before Rectification";
   export let rightLabel = "After Rectification";
-  export let labelFontSize = 22;
-  export let labelColor = "#666";
+  export let labelFontSize = settings.labelStyling.fontSize;
+  export let labelColor = settings.labelStyling.color;
   export let gap = 50;
   export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
 
@@ -95,12 +97,12 @@
     xScale = d3
       .scaleLinear()
       .domain([xMin, xMax])
-      .range([margin, svgWidth - margin]);
+      .range([marginWidth, svgWidth - marginWidth]);
 
     yScale = d3
       .scaleLinear()
       .domain([yMin, yMax])
-      .range([margin, svgHeight - margin]);
+      .range([marginHeight, svgHeight - marginHeight]);
   }
 
   function initializeSvg(svgElement, targetDistribution, label) {
@@ -140,7 +142,7 @@
     // Add label at top center with background rectangle
     const labelGroup = svg.append("g").attr("class", "label-group");
     const labelX = svgWidth / 2;
-    const labelY = margin / 2 + labelFontSize / 2;
+    const labelY = marginHeight / 2 + labelFontSize / 2;
     const labelPaddingX = 10;
     const labelPaddingY = 4;
 

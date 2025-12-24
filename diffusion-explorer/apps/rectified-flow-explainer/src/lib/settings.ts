@@ -87,5 +87,12 @@ export const settings = {
       displayInterval: 100
     },
     domainRange: null
-  } as TrainingSettings
+  } as TrainingSettings,
+
+  // Label styling
+  labelStyling: {
+    fontSize: 22,
+    yOffset: 40,
+    color: '#666'
+  }
 };

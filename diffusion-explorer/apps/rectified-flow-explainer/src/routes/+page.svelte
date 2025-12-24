@@ -19,11 +19,11 @@
   import FlowModelIntro from "$lib/figures/FlowModelIntro.svelte";
   import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
-  import VectorFieldDouble from "$lib/figures/VectorFieldDouble.svelte";
   import RectifiedFlowVisualization from "$lib/figures/RectifiedFlowVisualization.svelte";
   import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
   import IntersectingPaths from "$lib/figures/IntersectingPaths.svelte";
+  import InducedCouplingDouble from "$lib/figures/InducedCouplingDouble.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
   import Bibliography from "$lib/components/Bibliography.svelte";
   import { Katex } from "@diffusion-explorer/ui";
@@ -297,131 +297,53 @@
   >
     <div class="caption">
       <span class="figure-number">Figure 1:</span>
-      A rectified flow learns straighter paths. Left: Before rectification - curved trajectories. Right: After rectification - straighter trajectories superimposed on target distribution.
+      A rectified flow learns straighter paths. Left: Before rectification - curved trajectories. Right: After rectification - straighter trajectories.
     </div>
   </RectifiedFlowSuperimposed>
 
-  <hr />
-
-  <RectifiedFlowVisualization
-    width={figureWidth}
-    allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
-    targetDistribution={$targetDistributionSamples}
-    playingByDefault={true}
-  >
-    <div class="caption">
-      <span class="figure-number">Figure 2:</span>
-      A rectified flow learns straighter paths. Left: Before rectification - curved trajectories. Right: After rectification - straighter trajectories superimposed on target distribution.
-    </div>
-  </RectifiedFlowVisualization>
-
-
-  <!-- <RectifiedFlowVisualization
-    allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ??
-      []}
-    onInitialized={() => {
-      showOtherFigures = true;
-      console.log(
-        "RectifiedFlowVisualization initialized, showing other figures."
-      );
-    }}
-  >
-    {#snippet caption()}
-      <div class="caption">
-        <span class="figure-number">Figure 1:</span>
-        <strong
-          >A rectified flow is a flow-based generative model that learns
-          straighter paths.</strong
-        >
-        Watch how paths become straighter with each rectification step. Each step
-        retrains the model using trajectories from the previous step, progressively
-        reducing curvature.
-      </div>
-    {/snippet}
-  </RectifiedFlowVisualization> -->
-  <!-- 
-
-  <h2>Typography</h2>
-fl
-  <p>This is a paragraph with the default paragraph styles. It has a font size of 1.2rem and line height of 1.6em.</p>
-
-  <p>Here's some <code>inline code</code> with background styling.</p>
-
-  <h2>Inline Math</h2>
-
-  <p>
-    This paragraph demonstrates inline math equations. For example, the equation <Katex math="E = mc^2" /> .
-  </p>
-
-  <h2>Links</h2>
-
-  <p>
-    <a href="#normal">Normal link</a> |
-    <a href="#visited" style="color: rgb(0, 80, 160);">Visited link (simulated)</a>
-  </p>
-
-  <h2>Form Elements</h2>
-
-  <label>Text Input:</label>
-  <input type="text" placeholder="Type something..." />
-
-  <label>Disabled Input:</label>
-  <input type="text" disabled value="Disabled input" />
-
-  <label>Range Input:</label>
-  <input type="range" min="0" max="100" value="50" />
-
-  <label>Select Dropdown:</label>
-  <select>
-    <option>Option 1</option>
-    <option>Option 2</option>
-    <option>Option 3</option>
-  </select>
-
-  <label>Textarea:</label>
-  <textarea rows="3" placeholder="Enter multiple lines..."></textarea>
-
-  <h2>Buttons</h2>
-
-  <button>Normal Button</button>
-  <button>Click and hold to see active state</button>
-
-  <h2>Special Classes</h2>
-
-  <p><span class="figure-number">Figure 1:</span> This demonstrates the figure-number class with bold font weight.</p>
-
-  <div class="acknowledgements">
-    <p>This paragraph is inside the acknowledgements div, with smaller font size (1rem) and line height (1.4rem).</p>
-  </div> -->
+  <hr class="section-divider" />
 
   <h2 id="introduction" class="visually-hidden">Introduction</h2>
   <p>
-    Recently developed flow-based generative models have led to state-of-the-art
-    results in image and video generation. In particular, flow matching <span class="citation" data-cite="lipman2022"></span> has
-    enabled efficient, simulation-free training of continuous normalizing flows.
-    However, a key barrier to deploying these methods at scale is their
-    computational cost and inference latency. Generating a high-quality image
-    with a flow-based model using a naive sampling strategy requires repeatedly
-    evaluating a large neural network, often containing billions of parameters.
-    This repeated application not only incurs a high computational cost but also
-    leads to substantial latency, where it can take minutes before a user
-    receives a generated image or video. As a result, it is highly desirable to
-    develop methods that accelerate inference for flow-based models, allowing
-    samples to be generated using only a small number of neural network
-    evaluations.
+    Recently developed flow-based generative models have led to state-of-the-art results in image and video generation. In particular, flow matching <span class="citation" data-cite="lipman2022"></span> has enabled efficient training of flow-based models without the need for computationally expensive simulation. However, naively generating a high-quality image with a flow model requires repeatedly running a large neural network—typically with billions of parameters—many times. This incurs both high computational cost and latency, where it can take minutes before a user is served a generated image or video. Thus, it is desirable to develop methods for accelerating inference of flow-based models, allowing us to sample from them with few repeated runs of a neural network.
   </p>
 
   <p>
-    Training a model with flow matching alone is sufficient to generate
-    high-quality samples from a target distribution. However, as illustrated in
-    Figure X, the trajectories followed by individual samples during generation
-    are often curved. Rectified flows [Citation needed] address this by learning straighter trajectories, 
-    reducing the curvature that poses a significant obstacle to fast
-    sampling from flow-based models. Stochastic interpolants <span class="citation" data-cite="albergo2023"></span> provide
-    another framework for building normalizing flows with similar goals.
+    Training a model with flow matching alone is sufficient to generate high-quality samples from our target distribution. However, as we can see below, the trajectories of samples from a model trained with flow matching often produce curved paths. <strong>This curvature, its consequences, and how to mitigate them are the central focus of this article.</strong> In particular, we will discuss why trajectories generated by flow models have this curvature, why these trajectories are challenging to efficiently simulate, and how a simple approach called rectified flows <span class="citation" data-cite="liu2022"></span> can remove this curvature leading to straighter models that can be efficiently simulated.
   </p>
 
-  <h2 id="background">Brief Background on Flow Matching</h2>
+  {#if showOtherFigures}
+    <CurvedTrajectoryIntro
+      width={figureWidth}
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+      {allTimeSamples}
+      {isTraining}
+      playingByDefault={true}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 2:</span>
+        The curved trajectories produced by a model trained with flow matching.
+      </div>
+    </CurvedTrajectoryIntro>
+  {/if}
+
+  <h2 id="background">Background</h2>
+
+  <h3 id="flow-based-models">Flow-Based Generative Models</h3>
+
+  <p>
+    The broad goal of generative models is to draw samples from some complex distribution of data that we only have empirical observations from (e.g., natural images). Given a finite number of samples <Katex math={"\\mathcal{X} = \\{x_1, \\dots, x_n\\}"} /> where <Katex math={"x_i \\in \\mathbb{R}^d"} /> from a target distribution <Katex math="q" />, our goal is to learn a model that can generate new samples from <Katex math="q" />, which is quite challenging to do directly.
+  </p>
+
+  <p>
+    A continuous normalizing flow models a <em>path of probability distributions</em> <Katex math={"(p_t)_{0 \\leq t \\leq 1}"} /> which are a continuous collection of probability distributions indexed by time <Katex math={"t \\in [0, 1]"} /> that bridge a simple source distribution <Katex math={"p_0"} /> at time <Katex math={"t=0"} /> to our data distribution <Katex math={"p_1 = q"} />. By drawing samples from our simple source distribution, often represented by an easy to sample from multivariate Gaussian <Katex math={"p_0 = \\mathcal{N}(0, \\sigma^2 I)"} />, and transforming them according to our probability path we can produce samples distributed according to our data distribution <Katex math={"p_1 = q"} />.
+  </p>
+
+  <p>
+    A <em>flow</em> <Katex math={"\\psi_t(x)"} /> is a time-indexed mapping that specifies trajectories of points over time; when applied to our samples <Katex math={"X_0 \\sim p_0"} /> it transports them from the source distribution to the target distribution <Katex math={"X_1 \\sim p_1 = q"} />. The intermediate samples produced by our flow <Katex math={"X_t = \\psi_t(X_0)"} /> are distributed according to our probability path <Katex math={"X_t \\sim p_t"} />. If we can somehow learn to model this flow, then we can draw samples from our simple source distribution <Katex math={"p_0"} /> and transform them to realistic approximations of real world data with distribution <Katex math="q" />.
+  </p>
+
   {#if showOtherFigures}
     <FlowModelIntro
       width={figureWidth}
@@ -429,65 +351,17 @@ fl
       targetDistributionSamples={$targetDistributionSamples}
       {allTimeSamples}
       {isTraining}
-      playingByDefault={false}
+      playingByDefault={true}
     >
       <div class="caption">
-        <span class="figure-number">Figure 2:</span>
-        Flow matching model training and sampling visualization.
+        <span class="figure-number">Figure 3:</span>
+        The probability path <Katex math={"p_t"} /> of a continuous normalizing flow as it is transformed from a simple source distribution <Katex math={"p_0"} /> to a more complex data distribution <Katex math={"p_1 = q"} />. We can also see the trajectory of individual samples as they move from the source to target distribution.
       </div>
     </FlowModelIntro>
   {/if}
-  <p>
-    To provide context, the broad goal of generative modeling is to draw samples
-    from an unknown data distribution, such as the distribution of natural
-    images. Given a finite dataset <Katex
-      math={"\\mathcal{X} = \\{x_1, \\dots, x_n\\}"}
-    />, where each <Katex math={"x_i \\in \\mathbb{R}^d"} /> is sampled from a target
-    distribution <Katex math="q" />, the objective is to learn a model that can
-    generate new samples from <Katex math="q" />. Directly modeling and sampling
-    from <Katex math="q" /> is generally intractable, motivating the use of indirect
-    approaches.
-  </p>
 
   <p>
-    Continuous normalizing flows address this challenge by modeling a path of
-    probability distributions <Katex math={"(p_t)_{0 \\leq t \\leq 1}"} />,
-    which smoothly interpolates between a simple source distribution <Katex
-      math={"p_0"}
-    /> at time <Katex math={"t = 0"} /> and the data distribution <Katex
-      math={"p_1 = q"}
-    /> at time <Katex math={"t = 1"} />. The source distribution <Katex
-      math={"p_0"}
-    /> is typically chosen to be easy to sample from, such as a multivariate Gaussian
-    <Katex math={"p_0 = \\mathcal{N}(0, \\sigma^2 I)"} />. By sampling from <Katex
-      math={"p_0"}
-    /> and transforming these samples along the probability path, we can obtain samples
-    distributed according to the target distribution <Katex math="q" />.
-  </p>
-
-  <p>
-    A flow <Katex math={"\\psi_t(x)"} /> is a time-indexed mapping that defines trajectories
-    of individual points through this probability path. When applied to samples <Katex
-      math={"X_0 \\sim p_0"}
-    />, the flow transports them to samples <Katex
-      math={"X_1 \\sim p_1 = q"}
-    />. At intermediate times, the transformed samples <Katex
-      math={"X_t = \\psi_t(X_0)"}
-    /> are distributed according to the corresponding distribution <Katex
-      math={"p_t"}
-    />. If we can successfully model this flow, then sampling from the
-    generative model reduces to drawing samples from the simple source
-    distribution and applying the learned transformation.
-  </p>
-
-  <p>
-    Rather than modeling the flow <Katex math={"\\psi_t"} /> directly, flow-based
-    generative models instead define the flow implicitly through a time-dependent
-    velocity field <Katex math={"v(x, t) = v_t(x)"} />. This velocity field
-    specifies the instantaneous velocity of a particle located at position <Katex
-      math="x"
-    /> at time <Katex math="t" />. The flow is then defined as the solution to
-    an ordinary differential equation,
+    Instead of directly modeling our flow, say with a neural network, we instead <em>generate</em> it by modeling a velocity field <Katex math={"v_t(x)"} /> that tells us the velocity of a particle at location <Katex math="x" /> at time <Katex math="t" />. A flow is defined in relation to this velocity field through some simple ordinary differential equations:
   </p>
 
   <div style="text-align: center; margin: 1.5rem 0;">
@@ -498,62 +372,29 @@ fl
   </div>
 
   <p>
-    These equations state that the time derivative of the flow must match the
-    velocity of the particle at each point in time, starting from its initial
-    position at <Katex math={"t = 0"} />. Solving this ordinary differential
-    equation yields the flow <Katex math={"\\psi_t(x)"} />, which transports
-    samples from the source distribution to the target distribution. Sampling
-    from a flow-based generative model therefore amounts to numerically
-    simulating this differential equation, tracing each sample's trajectory from
-    the source to the target distribution.
+    These ordinary differential equations tell us that the derivative of our flow at time <Katex math="t" /> must match the velocity <Katex math={"v_t(x)"} /> of our particle <Katex math="x" /> at time <Katex math="t" /> and start from an initial location <Katex math="x" /> when <Katex math={"t=0"} />. The solution to these ordinary differential equations involving <Katex math={"v_t(x)"} /> is itself the flow <Katex math={"\\psi_t(x)"} />. Sampling from a flow-based generative model therefore amounts to numerically simulating this differential equation, tracing each sample's trajectory from the source to the target distribution.
   </p>
 
-  <h2 id="visualizing">Visualizing Flow Matching</h2>
-  <p></p>
-  {#if showOtherFigures}
-    <CurvedTrajectoryIntro
-      width={figureWidth}
-      sourceDistributionSamples={$sourceDistributionSamples}
-      targetDistributionSamples={$targetDistributionSamples}
-      {allTimeSamples}
-      {isTraining}
-      playingByDefault={false}
-    >
-      <div class="caption">
-        <span class="figure-number">Figure 3:</span>
-        Curved trajectories produced by flow matching visualization.
-      </div>
-    </CurvedTrajectoryIntro>
-  {/if}
-  <p></p>
-  <h2 id="curvature">Curvature is the Enemy of Speed</h2>
+  <h3 id="flow-matching">Flow Matching</h3>
+
   <p>
-    Curved sampling trajectories are difficult to accurately simulate in a few
-    steps.
+    So, if we can learn an approximation <Katex math={"v_t^\\theta(x)"} />, parameterized by a neural network, of the velocity field <Katex math={"v_t(x)"} /> then we can construct our flow <Katex math={"\\psi_t(x)"} /> and draw new samples from our data distribution <Katex math="q" /> by simulating a solution to these ODEs. How can we learn this vector field <Katex math={"v_t^\\theta(x)"} />? A solution to this problem is exactly what flow matching provides us with.
   </p>
 
-  {#if showOtherFigures}
-    <EulerSamplerFigure width={figureWidth}>
-      <div class="caption">
-        <span class="figure-number">Figure 4:</span> Comparison of Euler method
-        approximations for high-curvature (left) and low-curvature (right) functions.
-        Ground truth shown in black, Euler approximation in orange.
-      </div>
-    </EulerSamplerFigure>
-  {/if}
+  <p>
+    Flow matching can be broken down into two key steps: (1) we need to define our probability path <Katex math={"p_t(x)"} /> for interpolating between our source <Katex math="p" /> and target distribution <Katex math="q" />, and (2) we need to train a velocity field <Katex math={"v_t^\\theta(x)"} /> that generates the path <Katex math={"p_t"} /> through regression.
+  </p>
 
-  <h2 id="limitations">The Limitations of an Independent Coupling</h2>
-  <h3 id="coupling">What is a coupling?</h3>
-  <p></p>
+  <p>
+    For our first step, we need to design our probability path <Katex math={"p_t(x)"} />. For the duration of this article, we will specify our source distribution <Katex math={"p_0(x) = \\mathcal{N}(x|0, I)"} /> as a multivariate standard Gaussian distribution. We will then construct the path <Katex math={"p_t(x)"} /> as a mixture of conditional probability paths <Katex math={"p_{t|1}(x|x_1) = \\mathcal{N}(x|t x_1, (1-t)^2 I)"} /> where each is conditioned on data examples <Katex math={"x_1 \\sim q"} /> and has a Gaussian distribution. This is called the <em>linear path</em>, and it allows us to construct a random variable <Katex math={"X_t"} /> that is distributed according to our path <Katex math={"p_t"} /> through a simple linear interpolation between our source random variable <Katex math={"X_0 \\sim p_0"} /> and target random variable <Katex math={"X_1 \\sim q"} />:
+  </p>
 
-  {#if showOtherFigures}
-    <IndependentCoupling width={figureWidth}>
-      <div class="caption">
-        <span class="figure-number">Figure 5:</span>
-        Independent coupling visualization showing the source distribution.
-      </div>
-    </IndependentCoupling>
-  {/if}
+  <div style="text-align: center; margin: 1.5rem 0;">
+    <Katex
+      math={"X_t = (1-t)X_0 + tX_1 \\sim p_t"}
+      displayMode={true}
+    />
+  </div>
 
   {#if showOtherFigures}
     <LinearInterpolation
@@ -562,9 +403,91 @@ fl
       targetDistributionSamples={$targetDistributionSamples}
       sourcePointIndex={5}
       targetPointIndex={10}
-      playingByDefault={false}
-    />
+      playingByDefault={true}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 4:</span>
+        Linear interpolation between a source point <Katex math={"x_0"} /> and target point <Katex math={"x_1"} />, producing the interpolated sample <Katex math={"x_t"} /> at time <Katex math="t" />.
+      </div>
+    </LinearInterpolation>
   {/if}
+
+  <p>
+    Now, the second step of flow matching is to "match" the true velocity field <Katex math={"v_t(x)"} /> with an approximation <Katex math={"v_t^\\theta(x)"} />, parameterized by a neural network, by optimizing a simple regression objective. However, it's challenging to directly optimize this objective because <Katex math={"v_t(x)"} /> is difficult to directly construct in practice as it governs the transformations between two high dimensional distributions.
+  </p>
+
+  <p>
+    Luckily, we can create a related but much simpler objective by conditioning our velocity field on a particular instance from our target distribution <Katex math={"x_1 \\sim q"} />. This yields the conditional velocity field <Katex math={"v_t(x | x_1) = \\frac{x_1 - x}{1 - t}"} />. With this we can create a regression objective called <em>conditional flow matching</em>. Incredibly, the conditional flow matching and the flow matching objectives have the same gradients, meaning we can optimize our tractable conditional flow matching objective and solve the flow matching problem.
+  </p>
+
+  <p>
+    If we then plug in our specific conditional velocity field for our choice of a linear probability path, we get the remarkably simple training objective:
+  </p>
+
+  <div style="text-align: center; margin: 1.5rem 0;">
+    <Katex
+      math={"\\mathcal{L}_{CFM}(\\theta) = \\mathbb{E}_{t, X_0, X_1} ||(X_1 - X_0) - v_t^\\theta(X_t)||^2"}
+      displayMode={true}
+    />
+  </div>
+
+  <h2 id="curved-trajectories">The Problem: Curved Trajectories</h2>
+
+  <p>
+    With the fundamentals of flow models and flow matching established, we can now investigate some of their idiosyncrasies—and how they come up in practice. As shown above, a model trained with flow matching can learn to generate samples resembling our desired target distribution. However, you can see that the trajectories of these samples are curved.
+  </p>
+
+  <p>
+    An astute reader might recall that we trained our velocity field <Katex math={"v_t^\\theta(x)"} /> to match straight trajectories <Katex math={"X_1 - X_0"} /> due to our choice of a linear path. So, why does our model then learn curved trajectories, and why is this an issue? Answering the latter question—why curvature is a problem—is more straightforward: the answer is speed.
+  </p>
+
+  <h2 id="curvature">Curvature is the Enemy of Speed</h2>
+
+  <p>
+    When drawing new samples from a flow model we perform numerical integration using the trained velocity field <Katex math={"v_t^\\theta(x)"} />. At its core, numerical integration algorithms like Euler's method involve making finite steps in the direction of the velocity field: <Katex math={"x_{i+1} = x_i + \\alpha \\cdot v_t^\\theta(x_i)"} />. We are making local linear approximations of the "true trajectories". The degree to which this approximation is accurate depends on how curved the trajectories are, and the size of steps we can take without deviating from the true trajectory and degrading our sample quality too much.
+  </p>
+
+  {#if showOtherFigures}
+    <EulerSamplerFigure width={figureWidth}>
+      <div class="caption">
+        <span class="figure-number">Figure 5:</span>
+        Comparison of Euler method approximations for high-curvature (left) and low-curvature (right) functions. Ground truth shown in black, Euler approximation in orange. Highly curved trajectories require many steps to simulate accurately.
+      </div>
+    </EulerSamplerFigure>
+  {/if}
+
+  <p>
+    The punch line: curvature is the enemy of speed. Highly curved trajectories are challenging to accurately simulate with a small number of steps. This means we need to make many calls to our large neural network representing our vector field <Katex math={"v_t^\\theta(x)"} /> in order to accurately approximate these trajectories, leading to high latency and computational cost. However, as we can see above on the right, there is still hope. If our ground truth trajectories are approximately straight we can simulate them accurately with a small number of steps! <strong>So the question arises, how can we encourage our model to produce straighter paths?</strong> First, it is important to answer our question from earlier: why is our model learning curved trajectories in the first place? The answer lies in how our source <Katex math={"X_0"} /> and target random variables <Katex math={"X_1"} /> are jointly distributed, which is called their <em>coupling</em>.
+  </p>
+
+  <h2 id="coupling">The Problem with an Independent Coupling</h2>
+
+  <h3 id="what-is-coupling">What is a coupling?</h3>
+
+  <p>
+    A coupling is what tells us how samples from our source distribution <Katex math={"p(x_0)"} /> are paired with samples in our target distribution <Katex math={"q(x_1)"} />. It is the joint distribution <Katex math={"\\pi(x_0, x_1)"} /> whose marginals are <Katex math={"p(x_0)"} /> and <Katex math={"q(x_1)"} /> respectively.
+  </p>
+
+  <p>
+    In this article, we use an independent coupling where the joint distribution is defined as <Katex math={"\\pi(x_0, x_1) = p(x_0)q(x_1)"} /> which also means that we construct pairs <Katex math={"(x_0, x_1)"} /> by drawing independent samples <Katex math={"X_0 \\sim p"} /> and <Katex math={"X_1 \\sim q"} />. This choice makes sense for image data because we don't necessarily have some additional paired structure to define our joint distribution.
+  </p>
+
+  {#if showOtherFigures}
+    <IndependentCoupling width={figureWidth}>
+      <div class="caption">
+        <span class="figure-number">Figure 6:</span>
+        Visualization of an independent coupling connecting random source points to random target points.
+      </div>
+    </IndependentCoupling>
+  {/if}
+
+  <p>
+    So, we created an independent coupling by pairing random source points <Katex math={"x_0 \\sim p"} /> and target points <Katex math={"x_1 \\sim q"} />. We can visualize these points with lines <Katex math={"x_1 - x_0"} />, which is exactly the velocities that we are going to target with our flow matching objective due to our choice of linear path. <strong>What you might notice about this visualization is that these lines cross each other a lot.</strong> This crossing of trajectories is at the core of why our learned velocity field <Katex math={"v_t^\\theta(x)"} /> learns curved trajectories despite the fact that it is being trained to model linear paths.
+  </p>
+
+  <p>
+    The reason our trained velocity field <Katex math={"v_t^\\theta"} /> induces curved trajectories despite the fact it is regressing straight paths <Katex math={"X_1 - X_0"} /> is because at a given time <Katex math="t" /> our velocity field is only a function of the current <Katex math={"X_t"} />.
+  </p>
 
   {#if showOtherFigures}
     <IntersectingPaths
@@ -573,31 +496,53 @@ fl
       targetDistributionSamples={$targetDistributionSamples}
     >
       <div class="caption">
-        <span class="figure-number">Figure X:</span>
-        Intersecting paths from an independent coupling. Two linear interpolation paths cross, creating conflicting velocity directions at the intersection point (orange arrows). The mean velocity (green arrow) points in an intermediate direction.
+        <span class="figure-number">Figure 7:</span>
+        Two pairs <Katex math={"(x_0^a, x_1^a)"} /> and <Katex math={"(x_0^b, x_1^b)"} /> that intersect at a point <Katex math="x" /> at time <Katex math="t" />. The velocity field <Katex math={"v_t^\\theta(x)"} /> cannot accurately predict both conflicting velocities—the best it can do is predict the conditional expectation (green arrow).
       </div>
     </IntersectingPaths>
   {/if}
 
-  <h2 id="vector-field">Vector Field Visualization</h2>
   <p>
-    Below we visualize the learned velocity field and how sample trajectories
-    flow through it.
+    Above we can see a scenario where we have two pairs <Katex math={"(x_0^a, x_1^a)"} /> and <Katex math={"(x_0^b, x_1^b)"} /> that intersect at some point <Katex math="x" /> at a particular time <Katex math="t" />. Our velocity field <Katex math={"v_t^\\theta(x)"} /> which is a function of this <Katex math="x" /> has no way of accurately predicting the two conflicting velocities <Katex math={"x_1^a - x_0^a"} /> and <Katex math={"x_1^b - x_0^b"} />. It is not possible. The best it can do is predict the conditional expectation of velocities passing through <Katex math="x" />: <Katex math={"\\mathbb{E}[X_1 - X_0 | X_t = x]"} />. So our learned velocity field resolves <em>branches</em> in the probability path by averaging them out (shown in green).
   </p>
 
+  <h2 id="rectified-flows">Rectified Flows</h2>
+
   {#if showOtherFigures}
-    <VectorFieldDouble
-      width={figureWidth}
-      vectorFieldData={$vectorFieldData}
-      allTimeSamples={$allTimeSamples}
-      playingByDefault={false}
+    <InducedCouplingDouble
+      allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
+      targetDistribution={$targetDistributionSamples}
     >
       <div class="caption">
-        <span class="figure-number">Figure 6:</span>
-        Left: Animated vector field showing the learned velocity at each point over time. Right: A sample trajectory (red) flowing through the vector field toward the target distribution (blue points).
+        <span class="figure-number">Figure 8:</span>
+        Comparison of independent coupling (left) vs induced coupling from the flow model (right). The induced coupling connects each source point to where it actually flows, resulting in less tangled paths.
       </div>
-    </VectorFieldDouble>
+    </InducedCouplingDouble>
+
+    <RectifiedFlowVisualization
+      width={figureWidth}
+      allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
+      targetDistribution={$targetDistributionSamples}
+      playingByDefault={true}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 9:</span>
+        Watch how paths become straighter with each rectification step. Each step retrains the model using trajectories from the previous step, progressively reducing curvature.
+      </div>
+    </RectifiedFlowVisualization>
   {/if}
+
+  <p>
+    <strong>Finally, we will discuss how a simple technique called rectified flows can mitigate this curvature.</strong> Rectified flows aim to straighten out the trajectories of these flows. They do this by replacing the naive independent <em>coupling</em>—how data points <Katex math={"x_1"} /> and their noisy counterparts <Katex math={"x_0"} /> are paired—used in vanilla flow-matching training with one induced by the model itself. By recursively replacing the coupling with a straighter one, the model finally converges on generating straight paths.
+  </p>
+
+  <p>
+    Why does the coupling induced by training a flow matching model work? If the velocity field is learning a curved trajectory for a particular sample, then it is "sacrificing" loss because a perfect model would have no curvature at all because it is regressing <Katex math={"X_1 - X_0"} />. The learned velocity field can't model crossing trajectories because it is conditioned only on the current <Katex math="x" />. So the tradeoff is that it tries to learn the direction that works well on average, meaning it can never achieve minimal loss with a tangled coupling.
+  </p>
+
+  <p>
+    If a model is learning a high curvature trajectory then it really wants that sample's path to lead somewhere that is in conflict with its target destination for a given coupling, and is willing to trade off a significant amount of loss for the sake of modeling other samples. It is almost like these curved trajectory samples are outliers that the model is ignoring. By untangling the coupling you are allowing the model to resolve this conflict.
+  </p>
 
   <h2 id="acknowledgements">Acknowledgements</h2>
   <div class="acknowledgements">
@@ -611,7 +556,7 @@ fl
   <div class="cite-section">
     <p>If you found this explainer helpful, please consider citing it:</p>
     <pre><code>@article{'{'}helbling2025rectifiedflows,
-  title = {'{'}A Visual Explanation of Rectified Flows{'}'},
+  title = {'{'}A Visual Introduction to Rectified Flows{'}'},
   author = {'{'}Helbling, Alec{'}'},
   year = {'{'}2025{'}'},
   url = {'{'}https://alechelbling.com/rectified-flows{'}'}
@@ -620,8 +565,4 @@ fl
 </div>
 
 <style>
-  hr {
-    border: none;
-    border-top: 1px solid #e0e0e0;
-  }
 </style>

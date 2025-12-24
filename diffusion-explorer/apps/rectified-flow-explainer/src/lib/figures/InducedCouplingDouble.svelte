@@ -4,6 +4,7 @@
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
+  import { settings } from '$lib/settings';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -46,8 +47,8 @@
   // Label props
   export let leftLabel = 'Independent Coupling';
   export let rightLabel = 'Induced Coupling';
-  export let labelFontSize = 24;
-  export let labelColor = '#666';
+  export let labelFontSize = settings.labelStyling.fontSize;
+  export let labelColor = settings.labelStyling.color;
 
   // Number of samples to show (subsample if too many)
   export let numSamplesToShow = 50;
@@ -241,7 +242,7 @@
 
     const labelGroup = svg.append('g').attr('class', 'panel-label');
     const labelX = svgWidth / 2;
-    const labelY = marginHeight + labelFontSize;
+    const labelY = settings.labelStyling.yOffset;
     const labelPaddingX = 10;
     const labelPaddingY = 4;
 
