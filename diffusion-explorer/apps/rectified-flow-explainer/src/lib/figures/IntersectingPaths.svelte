@@ -25,7 +25,7 @@
   // Layout/Styling
   export let width = 800;
   export let height = 300;
-  export let marginWidth = 20;
+  export let marginWidth = 50;
   export let marginHeight = 20;
   export let flowWidth = 10;
   export let pointRadius = settings.scatterPlotStyling.radius;
@@ -303,13 +303,13 @@
 
     // Add distribution labels at top
     svg.append('g').attr('id', 'distributionLabels');
-    const labelY = marginHeight + 1.5 * labelFontSize;
-    plotSourceTargetLabels(svg, xScale, labelY, {
+    plotSourceTargetLabels(svg, xScale, yScale, {
       flowWidth,
       sourceLabelText,
       targetLabelText,
       labelFontSize,
       labelColor,
+      yShiftFactor: 1.5,
       groupId: 'distributionLabels'
     });
 

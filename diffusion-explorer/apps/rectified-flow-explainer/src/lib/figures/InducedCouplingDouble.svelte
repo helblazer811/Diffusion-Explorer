@@ -5,6 +5,7 @@
   import * as d3 from 'd3';
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import { settings } from '$lib/settings';
+  import { createSourceTargetScales } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -43,6 +44,7 @@
   export let hoverEdgeWidth = 3;
   export let hoverEdgeOpacity = 0.8;
   export let hoverPointOpacity = 0.9;
+  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
 
   // Label props
   export let leftLabel = 'Independent Coupling';
@@ -90,49 +92,6 @@
 
     // Create shuffled version for independent coupling (left panel)
     shuffledIndicesForLeft = [...indices].sort(() => Math.random() - 0.5);
-  }
-
-  function createScales() {
-    if (!isDataValid) return;
-
-    // Get selected source and destination points
-    const selectedSource = selectedIndices.map(i => sourcePoints[i]);
-    const selectedDest = selectedIndices.map(i => destinationPoints[i]);
-
-    // Shift destination points by flowWidth for display
-    const shiftedDest = selectedDest.map(p => [p[0] + flowWidth, p[1]]);
-
-    const allPoints = [...selectedSource, ...shiftedDest];
-
-    const drawableWidth = svgWidth - 2 * marginWidth;
-    const drawableHeight = svgHeight - 2 * marginHeight;
-    const aspectRatio = drawableHeight / drawableWidth;
-
-    const xExtent = d3.extent(allPoints, d => d[0]);
-    const yExtent = d3.extent(allPoints, d => d[1]);
-
-    const xRange = xExtent[1] - xExtent[0];
-    const yRange = yExtent[1] - yExtent[0];
-
-    const xCenter = (xExtent[0] + xExtent[1]) / 2;
-    const yCenter = (yExtent[0] + yExtent[1]) / 2;
-
-    let adjustedXRange = xRange;
-    let adjustedYRange = yRange;
-
-    if (yRange / xRange > aspectRatio) {
-      adjustedXRange = yRange / aspectRatio;
-    } else {
-      adjustedYRange = xRange * aspectRatio;
-    }
-
-    xScale = d3.scaleLinear()
-      .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
-      .range([marginWidth, svgWidth - marginWidth]);
-
-    yScale = d3.scaleLinear()
-      .domain([yCenter - adjustedYRange / 2, yCenter + adjustedYRange / 2])
-      .range([marginHeight, svgHeight - marginHeight]);
   }
 
   function plotScatter(svgElement, points, color, groupId, xShift = 0) {
@@ -242,7 +201,7 @@
 
     const labelGroup = svg.append('g').attr('class', 'panel-label');
     const labelX = svgWidth / 2;
-    const labelY = settings.labelStyling.yOffset;
+    const labelY = 1.2 * labelFontSize;
     const labelPaddingX = 10;
     const labelPaddingY = 4;
 
@@ -365,7 +324,13 @@
     if (!leftSvgElement || !rightSvgElement || !isDataValid) return;
 
     selectSampleIndices();
-    createScales();
+    const selectedSource = selectedIndices.map(i => sourcePoints[i]);
+    const selectedDest = selectedIndices.map(i => destinationPoints[i]);
+    const scales = createSourceTargetScales(selectedSource, selectedDest, {
+      width: svgWidth, height: svgHeight, marginWidth, marginHeight, flowWidth, yShiftFactor
+    });
+    xScale = scales.xScale;
+    yScale = scales.yScale;
     initializePanel(leftSvgElement, leftLabel, false);
     initializePanel(rightSvgElement, rightLabel, true);
     isInitialized = true;

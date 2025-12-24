@@ -1,24 +1,25 @@
 <!-- The goal here is to visualize a naive independent coupling (X_0, X_1) such that X_0 \sim \pi_0 and X_1 \sim \pi_1 which are independently distributed. -->
 
 <script>
-  import * as tf from '@tensorflow/tfjs';
-  import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import { sampleMultivariateNormal } from '@diffusion-explorer/diffusion';
   import Figure from '$lib/components/Figure.svelte';
   import { settings } from '$lib/settings';
+  import { plotSourceTargetLabels, plotSourceTargetScatter, createSourceTargetScales } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
   $: caption = children;
 
-  export const numSamples = 100;
+  // Data props (from parent)
+  export let sourceDistributionSamples = [];
+  export let targetDistributionSamples = [];
+
   export const height = 300;
   export const width = 800;
   export const sourcePointColor = settings.scatterPlotStyling.color;
   export const targetPointColor = settings.scatterPlotStyling.color;
   export const flowWidth = 10;
-  export const marginWidth = 20;
+  export const marginWidth = 50;
   export const marginHeight = 20;
   export const sourceLabelText = 'Source Distribution';
   export const targetLabelText = 'Target Distribution';
@@ -29,131 +30,42 @@
   export const edgeWidth = 1.5;
   export const pointRadius = settings.scatterPlotStyling.radius;
   export const pointOpacity = 0.4; // Custom: different from default
+  export const yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
   export const hoverEdgeColor = '#555';
   export const hoverEdgeWidth = 3;
   export const hoverEdgeOpacity = 0.8;
   export const hoverPointOpacity = 0.9;
   export const dashed = false;
 
-  let sourceDistributionPoints = null;
-  let targetDistributionPoints = null;
   let svgElement;
   let xScale = null;
   let yScale = null;
-  let highlightEdgeIndex = Math.floor(Math.random() * numSamples);
+  let isInitialized = false;
 
-  function createScales(sourcePoints, targetPoints) {
-    const drawableWidth = width - 2 * marginWidth;
-    const drawableHeight = height - 2 * marginHeight;
-    const aspectRatio = drawableHeight / drawableWidth;
-
-    // Combine both point sets to get overall extent
-    const allPoints = [...sourcePoints, ...targetPoints];
-
-    const xExtent = d3.extent(allPoints, d => d[0]);
-    const yExtent = d3.extent(allPoints, d => d[1]);
-
-    const xRange = xExtent[1] - xExtent[0];
-    const yRange = yExtent[1] - yExtent[0];
-
-    const xCenter = (xExtent[0] + xExtent[1]) / 2;
-    const yCenter = (yExtent[0] + yExtent[1]) / 2;
-
-    // Adjust ranges to match aspect ratio
-    let adjustedXRange = xRange;
-    let adjustedYRange = yRange;
-
-    if (yRange / xRange > aspectRatio) {
-      // Y range is too large, expand X range
-      adjustedXRange = yRange / aspectRatio;
-    } else {
-      // X range is too large, expand Y range
-      adjustedYRange = xRange * aspectRatio;
-    }
-
-    // Shift y center down to accommodate labels at the top
-    const yCenterOffset = -adjustedYRange * 0.12;
-
-    xScale = d3.scaleLinear()
-      .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
-      .range([marginWidth, width - marginWidth]);
-
-    yScale = d3.scaleLinear()
-      .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
-      .range([height - marginHeight, marginHeight]);
-  }
-
-  function plotLabels(sourcePoints, targetPoints) {
+  function plotLabels() {
     if (!svgElement || !xScale || !yScale) return;
 
     const svg = d3.select(svgElement);
 
-    // Remove existing labels group if it exists
-    svg.select('#labels').remove();
-
-    // Create labels group
-    const labelsGroup = svg.append('g').attr('id', 'labels');
-
-    // Calculate x positions for labels (centered on each distribution)
-    const sourceLabelX = xScale(0);
-    const targetLabelX = xScale(flowWidth);
-
-    // Position labels relative to the top of the SVG
-    const yDomain = yScale.domain();
-    const yTop = yDomain[1]; // Max value maps to top of screen
-    const labelY = yScale(yTop) + 1.5 * labelFontSize;
-
-    // Add source distribution label with white outline
-    labelsGroup.append('text')
-      .attr('x', sourceLabelX)
-      .attr('y', labelY)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor)
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', '4')
-      .attr('paint-order', 'stroke')
-      .text(sourceLabelText);
-
-    // Add target distribution label with white outline
-    labelsGroup.append('text')
-      .attr('x', targetLabelX)
-      .attr('y', labelY)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor)
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', '4')
-      .attr('paint-order', 'stroke')
-      .text(targetLabelText);
+    plotSourceTargetLabels(svg, xScale, yScale, {
+      flowWidth,
+      sourceLabelText,
+      targetLabelText,
+      labelFontSize,
+      labelColor
+    });
   }
 
-  function plotScatter(data, color, opacity, groupId) {
-    if (!data || !svgElement || !xScale || !yScale) return;
+  function addHoverAttributes(svg) {
+    // Add hover-related attributes to scatter circles
+    svg.select('#sourceScatter').selectAll('circle')
+      .attr('data-index', (d, i) => i)
+      .attr('data-original-opacity', pointOpacity)
+      .style('cursor', 'pointer');
 
-    const points = data.arraySync();
-
-    // Select SVG
-    const svg = d3.select(svgElement);
-
-    // Remove existing group if it exists
-    svg.select(`#${groupId}`).remove();
-
-    // Create a group for this scatter plot
-    const group = svg.append('g').attr('id', groupId);
-
-    // Plot points
-    group.selectAll('circle')
-      .data(points)
-      .enter()
-      .append('circle')
-      .attr('class', (d, i) => `${groupId}-point point-${i}`)
-      .attr('cx', d => xScale(d[0]))
-      .attr('cy', d => yScale(d[1]))
-      .attr('r', pointRadius)
-      .attr('fill', color)
-      .attr('opacity', opacity)
-      .attr('data-original-opacity', opacity)
+    svg.select('#targetScatter').selectAll('circle')
+      .attr('data-index', (d, i) => i)
+      .attr('data-original-opacity', pointOpacity)
       .style('cursor', 'pointer');
   }
 
@@ -210,7 +122,6 @@
       .style('cursor', 'pointer')
       .on('mouseover', function(event, d) {
         const index = couplingData.indexOf(d);
-        highlightEdgeIndex = index;
 
         // Highlight the edge
         edgesGroup.select(`.edge-${index}`)
@@ -220,10 +131,10 @@
 
         // Highlight both endpoints
         const targetPoint = shuffledTargets[index];
-        svg.select(`.sourcePoints-point.point-${index}`)
+        svg.select(`#sourceScatter circle[data-index="${index}"]`)
           .attr('opacity', hoverPointOpacity);
         const targetIndex = targetIndexMap.get(targetPoint.toString());
-        svg.select(`.targetPoints-point.point-${targetIndex}`)
+        svg.select(`#targetScatter circle[data-index="${targetIndex}"]`)
           .attr('opacity', hoverPointOpacity);
       })
       .on('mouseout', function(event, d) {
@@ -237,17 +148,17 @@
 
         // Reset both endpoints
         const targetPoint = shuffledTargets[index];
-        const sourceCircle = svg.select(`.sourcePoints-point.point-${index}`);
+        const sourceCircle = svg.select(`#sourceScatter circle[data-index="${index}"]`);
         sourceCircle.attr('opacity', sourceCircle.attr('data-original-opacity'));
         const targetIndex = targetIndexMap.get(targetPoint.toString());
-        const targetCircle = svg.select(`.targetPoints-point.point-${targetIndex}`);
+        const targetCircle = svg.select(`#targetScatter circle[data-index="${targetIndex}"]`);
         targetCircle.attr('opacity', targetCircle.attr('data-original-opacity'));
       });
 
     return { couplingData, shuffledTargets };
   }
 
-  function setupPointHoverHandlers(sourcePoints, targetPoints, shuffledTargets) {
+  function setupPointHoverHandlers(targetPoints, shuffledTargets) {
     if (!svgElement) return;
 
     const svg = d3.select(svgElement);
@@ -257,9 +168,9 @@
     const targetIndexMap = new Map(targetPoints.map((point, i) => [point.toString(), i]));
 
     // Add hover handlers to source points
-    svg.selectAll('.sourcePoints-point')
-      .on('mouseover', function(event, d) {
-        const sourceIndex = parseInt(d3.select(this).attr('class').match(/point-(\d+)/)?.[1] || '0');
+    svg.select('#sourceScatter').selectAll('circle')
+      .on('mouseover', function() {
+        const sourceIndex = parseInt(d3.select(this).attr('data-index'));
         const targetPoint = shuffledTargets[sourceIndex];
 
         // Highlight the edge
@@ -271,11 +182,11 @@
         // Highlight both endpoints
         d3.select(this).attr('opacity', hoverPointOpacity);
         const targetIndex = targetIndexMap.get(targetPoint.toString());
-        svg.select(`.targetPoints-point.point-${targetIndex}`)
+        svg.select(`#targetScatter circle[data-index="${targetIndex}"]`)
           .attr('opacity', hoverPointOpacity);
       })
-      .on('mouseout', function(event, d) {
-        const sourceIndex = parseInt(d3.select(this).attr('class').match(/point-(\d+)/)?.[1] || '0');
+      .on('mouseout', function() {
+        const sourceIndex = parseInt(d3.select(this).attr('data-index'));
         const targetPoint = shuffledTargets[sourceIndex];
 
         // Reset the edge
@@ -287,14 +198,14 @@
         // Reset both endpoints
         d3.select(this).attr('opacity', d3.select(this).attr('data-original-opacity'));
         const targetIndex = targetIndexMap.get(targetPoint.toString());
-        const targetCircle = svg.select(`.targetPoints-point.point-${targetIndex}`);
+        const targetCircle = svg.select(`#targetScatter circle[data-index="${targetIndex}"]`);
         targetCircle.attr('opacity', targetCircle.attr('data-original-opacity'));
       });
 
     // Add hover handlers to target points
-    svg.selectAll('.targetPoints-point')
-      .on('mouseover', function(event, d) {
-        const targetIndex = parseInt(d3.select(this).attr('class').match(/point-(\d+)/)?.[1] || '0');
+    svg.select('#targetScatter').selectAll('circle')
+      .on('mouseover', function() {
+        const targetIndex = parseInt(d3.select(this).attr('data-index'));
         const targetPoint = targetPoints[targetIndex];
 
         // Find which source point maps to this target
@@ -308,11 +219,11 @@
 
         // Highlight both endpoints
         d3.select(this).attr('opacity', hoverPointOpacity);
-        svg.select(`.sourcePoints-point.point-${sourceIndex}`)
+        svg.select(`#sourceScatter circle[data-index="${sourceIndex}"]`)
           .attr('opacity', hoverPointOpacity);
       })
-      .on('mouseout', function(event, d) {
-        const targetIndex = parseInt(d3.select(this).attr('class').match(/point-(\d+)/)?.[1] || '0');
+      .on('mouseout', function() {
+        const targetIndex = parseInt(d3.select(this).attr('data-index'));
         const targetPoint = targetPoints[targetIndex];
 
         // Find which source point maps to this target
@@ -326,80 +237,57 @@
 
         // Reset both endpoints
         d3.select(this).attr('opacity', d3.select(this).attr('data-original-opacity'));
-        const sourceCircle = svg.select(`.sourcePoints-point.point-${sourceIndex}`);
+        const sourceCircle = svg.select(`#sourceScatter circle[data-index="${sourceIndex}"]`);
         sourceCircle.attr('opacity', sourceCircle.attr('data-original-opacity'));
       });
   }
 
-  async function loadTargetDataset(numSamples) {
-    // Load smiley face data
-    const response = await fetch('/data/smiley_face.json');
-    const data = await response.json();
-    const allPoints = data.points;
+  function initializeVisualization() {
+    if (!svgElement) return;
+    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
-    // Randomly subsample numSamples points
-    const shuffled = [...allPoints].sort(() => Math.random() - 0.5);
-    const sampledPoints = shuffled.slice(0, numSamples);
+    const svg = d3.select(svgElement);
 
-    // Flip target points vertically about the center and shift right
-    const yCoords = sampledPoints.map(p => p[1]);
-    const yCenter = (Math.max(...yCoords) + Math.min(...yCoords)) / 2;
-    const flippedAndShiftedPoints = sampledPoints.map(([x, y]) => [x + flowWidth, 2 * yCenter - y]);
+    // Create groups (plotSourceTargetScatter and plotSourceTargetLabels expect these)
+    svg.append('g').attr('id', 'sourceScatter');
+    svg.append('g').attr('id', 'targetScatter');
+    svg.append('g').attr('id', 'labels');
 
-    return tf.tensor(flippedAndShiftedPoints);
+    // Create scales - helper shifts target points by flowWidth internally
+    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    });
+    xScale = scales.xScale;
+    yScale = scales.yScale;
+
+    // Plot coupling edges first (so they're behind scatter points)
+    const shiftedTargetPoints = targetDistributionSamples.map(([x, y]) => [x + flowWidth, y]);
+    const { shuffledTargets } = plotCoupling(sourceDistributionSamples, shiftedTargetPoints);
+
+    // Plot scatter using d3_helpers (centers horizontally by default)
+    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
+      flowWidth,
+      sourcePointColor,
+      targetPointColor,
+      pointRadius,
+      pointOpacity,
+      centerHorizontally: false  // Don't center - use our own scale
+    });
+
+    // Add hover attributes and handlers
+    addHoverAttributes(svg);
+    plotLabels();
+    setupPointHoverHandlers(shiftedTargetPoints, shuffledTargets);
+    isInitialized = true;
   }
 
-  onMount(async () => {
-    // Load and subsample target dataset
-    targetDistributionPoints = await loadTargetDataset(numSamples);
-    console.log('Loaded target distribution points:', targetDistributionPoints.shape);
-
-    // Generate multivariate gaussian samples with truncation at 3 std
-    const mean = [0, 0];
-    const cov = [[0.6, 0], [0, 0.6]];
-    const std = Math.sqrt(0.6);
-    const truncationThreshold = 3 * std;
-
-    // Generate samples until we have enough within 3 std
-    const acceptedSamples = [];
-    while (acceptedSamples.length < numSamples) {
-      const samples = sampleMultivariateNormal(mean, cov, numSamples * 2);
-      const samplesArray = samples.arraySync();
-
-      // Filter samples within 3 std
-      const validSamples = samplesArray.filter(([x, y]) =>
-        Math.abs(x) <= truncationThreshold && Math.abs(y) <= truncationThreshold
-      );
-
-      acceptedSamples.push(...validSamples);
-      samples.dispose();
-    }
-
-    // Take only the required number of samples
-    const truncatedSamples = acceptedSamples.slice(0, numSamples);
-    sourceDistributionPoints = tf.tensor(truncatedSamples);
-
-    console.log('Generated source distribution points:', sourceDistributionPoints.shape);
-
-    const sourcePoints = sourceDistributionPoints.arraySync();
-    let targetPointsArray = targetDistributionPoints.arraySync();
-
-    // Align the vertical centers of source and target distributions
-    const sourceYCenter = sourcePoints.reduce((sum, p) => sum + p[1], 0) / sourcePoints.length;
-    const targetYCenter = targetPointsArray.reduce((sum, p) => sum + p[1], 0) / targetPointsArray.length;
-    const yShift = sourceYCenter - targetYCenter;
-
-    // Apply vertical shift to target points
-    targetPointsArray = targetPointsArray.map(([x, y]) => [x, y + yShift]);
-    targetDistributionPoints = tf.tensor(targetPointsArray);
-
-    createScales(sourcePoints, targetPointsArray);
-    const { shuffledTargets } = plotCoupling(sourcePoints, targetPointsArray);
-    plotScatter(sourceDistributionPoints, sourcePointColor, pointOpacity, 'sourcePoints');
-    plotScatter(targetDistributionPoints, targetPointColor, pointOpacity, 'targetPoints');
-    plotLabels(sourcePoints, targetPointsArray);
-    setupPointHoverHandlers(sourcePoints, targetPointsArray, shuffledTargets);
-  });
+  // Reactive initialization
+  $: if (!isInitialized &&
+         sourceDistributionSamples.length > 0 &&
+         targetDistributionSamples.length > 0 &&
+         svgElement) {
+    initializeVisualization();
+  }
 </script>
 
 <Figure {caption}>

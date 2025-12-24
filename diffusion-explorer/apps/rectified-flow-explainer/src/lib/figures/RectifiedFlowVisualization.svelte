@@ -4,7 +4,7 @@
   import Figure from "$lib/components/Figure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
   import { settings } from "$lib/settings";
-  import { plotSourceTargetScatter, plotSourceTargetLabels } from "$lib/d3_helpers";
+  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales } from "$lib/d3_helpers";
 
   // Data props
   export let allRectifiedTrajectories = []; // [step][timestep][sample][dim]
@@ -130,64 +130,6 @@
   }
 
   /**
-   * Create D3 scales based on all data
-   * Target points are shifted right by flowWidth to create the transformation effect
-   */
-  function createScales() {
-    if (!isDataValid) return;
-
-    let allX = [];
-    let allY = [];
-
-    // Include source points (at original x position)
-    for (const pt of sourceDistributionSamples) {
-      allX.push(pt[0]);
-      allY.push(pt[1]);
-    }
-
-    // Include target points (shifted right by flowWidth)
-    for (const pt of targetDistributionSamples) {
-      allX.push(pt[0] + flowWidth);
-      allY.push(pt[1]);
-    }
-
-    // Include trajectory points (they will be shifted during animation)
-    for (const stepData of allRectifiedTrajectories) {
-      for (const timestep of stepData) {
-        for (const point of timestep) {
-          allX.push(point[0]);
-          allY.push(point[1]);
-          allX.push(point[0] + flowWidth); // Also include shifted version
-        }
-      }
-    }
-
-    // Calculate x-scale using marginWidth
-    xScale = d3
-      .scaleLinear()
-      .domain([Math.min(...allX), Math.max(...allX)])
-      .range([marginWidth, width - marginWidth]);
-
-    // Calculate y-scale with yShiftFactor and marginHeight
-    const yMin = Math.min(...allY);
-    const yMax = Math.max(...allY);
-    const yRange = yMax - yMin;
-    const yCenter = (yMin + yMax) / 2;
-
-    // Apply yShiftFactor similar to FlowModelIntro
-    // Reserve space at top for labels (7% of range) and apply shift factor
-    const yCenterOffset = -yRange * 0.07 - yShiftFactor;
-
-    yScale = d3
-      .scaleLinear()
-      .domain([
-        yCenter - yRange / 2 - yCenterOffset,
-        yCenter + yRange / 2 - yCenterOffset,
-      ])
-      .range([marginHeight, height - marginHeight]); // Flipped: smaller y values at top
-  }
-
-  /**
    * Generate SVG path for a trajectory up to endStep
    * Applies x-shift transformation to create source-to-target flow effect
    */
@@ -231,8 +173,12 @@
     // Clear existing content
     d3Svg.selectAll("*").remove();
 
-    // Create scale
-    createScales();
+    // Create scales
+    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    });
+    xScale = scales.xScale;
+    yScale = scales.yScale;
 
     // Create groups
     d3Svg.append("g").attr("id", "sourceScatter");
@@ -263,11 +209,7 @@
 
     // Add source and target distribution labels
     if (sourceDistributionSamples.length > 0 && targetDistributionSamples.length > 0) {
-      const yDomain = yScale.domain();
-      const yTop = yDomain[0];
-      const labelY = yScale(yTop) + 0.5 * labelFontSize;
-
-      plotSourceTargetLabels(d3Svg, xScale, labelY, {
+      plotSourceTargetLabels(d3Svg, xScale, yScale, {
         flowWidth,
         sourceLabelText,
         targetLabelText,
