@@ -7,7 +7,7 @@
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
-  import { plotSourceTargetScatter, plotSourceTargetLabels } from '$lib/d3_helpers';
+  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -35,10 +35,13 @@
   export let sourcePointColor = settings.scatterPlotStyling.color;
   export let targetPointColor = settings.scatterPlotStyling.color;
   export let arrowWidth = 2.5;
-  export let labelVerticalOffset = -settings.labelStyling.yOffset;
+  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
+  export let labelVerticalOffset = -settings.labelStyling.yShiftFactor * settings.labelStyling.fontSize;
   export let latexFontSize = settings.labelStyling.fontSize;
   export let labelFontSize = settings.labelStyling.fontSize;
   export let labelColor = settings.labelStyling.color;
+  export let outlineColor = settings.labelStyling.outlineColor;
+  export let outlineOpacity = settings.labelStyling.outlineOpacity;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
 
@@ -51,6 +54,12 @@
   export let sourcePointBLabel = 'x_0^b';
   export let targetPointALabel = 'x_1^a';
   export let targetPointBLabel = 'x_1^b';
+
+  // Hardcoded line endpoint coordinates
+  export let sourcePointA = [0.2, -0.5];
+  export let sourcePointB = [0.2, 0.5];
+  export let targetPointA = [10, -0.5];
+  export let targetPointB = [10, 0.5];
 
   // SVG and scale state
   let svgElement;
@@ -65,79 +74,6 @@
     const len = Math.hypot(v.x, v.y);
     if (len < 1e-10) return { x: 0, y: 0 };
     return { x: v.x / len, y: v.y / len };
-  }
-
-  function selectPoints(sourcePoints, targetPoints) {
-    // Filter source points to 60th-80th percentile range in x-direction
-    const sortedSourceByX = [...sourcePoints].sort((a, b) => a[0] - b[0]);
-    const x60thThreshold = sortedSourceByX[Math.floor(sortedSourceByX.length * 0.60)][0];
-    const x80thThreshold = sortedSourceByX[Math.floor(sortedSourceByX.length * 0.80)][0];
-    const filteredSource = sourcePoints.filter(p => p[0] >= x60thThreshold && p[0] <= x80thThreshold);
-
-    // Filter target points to lower 10% in x-direction (below 10th percentile)
-    const sortedTargetByX = [...targetPoints].sort((a, b) => a[0] - b[0]);
-    const x10thThreshold = sortedTargetByX[Math.floor(sortedTargetByX.length * 0.10)][0];
-    const filteredTarget = targetPoints.filter(p => p[0] <= x10thThreshold);
-
-    // Sort filtered points by y, then choose y percentiles
-    const sortedSource = [...filteredSource].map((p, i) => ({ point: p, index: i }))
-      .sort((a, b) => a.point[1] - b.point[1]);
-
-    const sortedTarget = [...filteredTarget].map((p, i) => ({ point: p, index: i }))
-      .sort((a, b) => a.point[1] - b.point[1]);
-
-    const source30thIdx = Math.floor(sortedSource.length * 0.30);
-    const source70thIdx = Math.floor(sortedSource.length * 0.70);
-    const target10thIdx = Math.floor(sortedTarget.length * 0.1);
-    const target90thIdx = Math.floor(sortedTarget.length * 0.9);
-
-    return {
-      pair1: {
-        source: sortedSource[source30thIdx].point,
-        target: sortedTarget[target90thIdx].point
-      },
-      pair2: {
-        source: sortedSource[source70thIdx].point,
-        target: sortedTarget[target10thIdx].point
-      }
-    };
-  }
-
-  function createScales(sourcePoints, targetPoints) {
-    const drawableWidth = width - 2 * marginWidth;
-    const drawableHeight = height - 2 * marginHeight;
-    const aspectRatio = drawableHeight / drawableWidth;
-
-    const shiftedTargetPoints = targetPoints.map(p => [p[0] + flowWidth, p[1]]);
-    const allPoints = [...sourcePoints, ...shiftedTargetPoints];
-
-    const xExtent = d3.extent(allPoints, d => d[0]);
-    const yExtent = d3.extent(allPoints, d => d[1]);
-
-    const xRange = xExtent[1] - xExtent[0];
-    const yRange = yExtent[1] - yExtent[0];
-
-    const xCenter = (xExtent[0] + xExtent[1]) / 2;
-    const yCenter = (yExtent[0] + yExtent[1]) / 2;
-
-    let adjustedXRange = xRange;
-    let adjustedYRange = yRange;
-
-    if (yRange / xRange > aspectRatio) {
-      adjustedXRange = yRange / aspectRatio;
-    } else {
-      adjustedYRange = xRange * aspectRatio;
-    }
-
-    const yCenterOffset = -adjustedYRange * 0.07;
-
-    xScale = d3.scaleLinear()
-      .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
-      .range([marginWidth, width - marginWidth]);
-
-    yScale = d3.scaleLinear()
-      .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
-      .range([marginHeight, height - marginHeight]);
   }
 
   function createArrowMarkers(svg) {
@@ -290,7 +226,11 @@
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     initializeLayers();
-    createScales(sourceDistributionSamples, targetDistributionSamples);
+    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    });
+    xScale = scales.xScale;
+    yScale = scales.yScale;
 
     const svg = d3.select(svgElement);
     plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
@@ -309,18 +249,18 @@
       targetLabelText,
       labelFontSize,
       labelColor,
+      outlineColor,
+      outlineOpacity,
       yShiftFactor: 1.5,
       groupId: 'distributionLabels'
     });
-
-    const linePairs = selectPoints(sourceDistributionSamples, targetDistributionSamples);
 
     const lineGroup = svg.select('#connectionLines');
     const arrowsGroup = svg.select('#arrows');
     const labelsGroup = svg.select('#labels');
 
-    const line1Coords = plotConnectingLine(linePairs.pair1.source, linePairs.pair1.target, lineGroup);
-    const line2Coords = plotConnectingLine(linePairs.pair2.source, linePairs.pair2.target, lineGroup);
+    const line1Coords = plotConnectingLine(sourcePointB, targetPointB, lineGroup);
+    const line2Coords = plotConnectingLine(sourcePointA, targetPointA, lineGroup);
 
     const intersection = findIntersection(line1Coords, line2Coords);
     if (intersection) {

@@ -4,7 +4,7 @@
   import { onMount } from "svelte";
   import * as d3 from "d3";
   import Figure from "$lib/components/Figure.svelte";
-  import PlayButton from "$lib/components/PlayButton.svelte";
+  import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { plotSourceTargetLabels, createSourceTargetScales } from "$lib/d3_helpers";
 
@@ -20,7 +20,7 @@
 
   // Props/Configuration
   export let width = 800;
-  export let height = 300;
+  export let height = 275;
 
   // Styling props for visualization
   export let sourcePointColor = settings.scatterPlotStyling.color;
@@ -31,6 +31,8 @@
   export let targetLabelText = "Target Distribution";
   export let labelFontSize = settings.labelStyling.fontSize;
   export let labelColor = settings.labelStyling.color;
+  export let outlineColor = settings.labelStyling.outlineColor;
+  export let outlineOpacity = settings.labelStyling.outlineOpacity;
   export let pointRadius = settings.scatterPlotStyling.radius;
   export let pointOpacity = settings.scatterPlotStyling.opacity;
   export let flowWidth = 10; // Gap between source and target in data units
@@ -244,7 +246,9 @@
       sourceLabelText,
       targetLabelText,
       labelFontSize,
-      labelColor
+      labelColor,
+      outlineColor,
+      outlineOpacity
     });
   }
 
@@ -456,6 +460,11 @@
   // Reactive initialization flag
   let isInitialized = false;
 
+  // Update visualization when time changes (e.g., from slider drag)
+  $: if (isInitialized) {
+    draw();
+  }
+
   // React to data changes and initialize visualization once
   $: if (
     !isInitialized &&
@@ -484,13 +493,22 @@
 
 <Figure {caption}>
   {#snippet children()}
-    <PlayButton {isPlaying} onclick={toggleAnimation} />
-    <svg
-      bind:this={svgElement}
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="xMidYMid meet"
-      style="width: 100%; height: auto; max-width: {width}px;"
-    >
-    </svg>
+    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+      <svg
+        bind:this={svgElement}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        style="width: 100%; height: auto; max-width: {width}px;"
+      >
+      </svg>
+      <TimeSlider
+        bind:value={time}
+        bind:isPlaying={isPlaying}
+        min={0}
+        max={1}
+        onTogglePlay={toggleAnimation}
+        color="#f17720"
+      />
+    </div>
   {/snippet}
 </Figure>

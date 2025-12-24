@@ -98,7 +98,9 @@ export const settings = {
   labelStyling: {
     fontSize: 22,
     yShiftFactor: 0.5,
-    color: '#666'
+    color: '#666',
+    outlineColor: '#f9f9f9',
+    outlineOpacity: 0.5
   },
 
   // Scatter plot styling
@@ -106,6 +108,6 @@ export const settings = {
     radius: 5,
     opacity: 0.25,
     color: '#3b82f6',
-    yShiftFactor: -0.5
+    yShiftFactor: -0.85
   }
 };

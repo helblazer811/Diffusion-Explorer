@@ -52,7 +52,7 @@
 
   // Layout
   export let width = 800;
-  export let height = 300;
+  export let height = 325;
   export let marginWidth = 20;
   export let marginHeight = 20;
   export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
@@ -63,6 +63,8 @@
   export let targetLabelText = "Target Distribution";
   export let labelFontSize = settings.labelStyling.fontSize;
   export let labelColor = settings.labelStyling.color;
+  export let outlineColor = settings.labelStyling.outlineColor;
+  export let outlineOpacity = settings.labelStyling.outlineOpacity;
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -214,7 +216,9 @@
         sourceLabelText,
         targetLabelText,
         labelFontSize,
-        labelColor
+        labelColor,
+        outlineColor,
+        outlineOpacity
       });
     }
   }

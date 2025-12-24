@@ -204,6 +204,7 @@ export function plotLabel(
     withOutline?: boolean;
     outlineColor?: string;
     outlineWidth?: string;
+    outlineOpacity?: number;
   } = {}
 ): d3.Selection<SVGTextElement, unknown, null, undefined> {
   const {
@@ -212,7 +213,8 @@ export function plotLabel(
     textAnchor = 'middle',
     withOutline = true,
     outlineColor = '#ffffff',
-    outlineWidth = '4'
+    outlineWidth = '4',
+    outlineOpacity = 1
   } = options;
 
   const textElement = group.append('text')
@@ -226,6 +228,7 @@ export function plotLabel(
     textElement
       .attr('stroke', outlineColor)
       .attr('stroke-width', outlineWidth)
+      .attr('stroke-opacity', outlineOpacity)
       .attr('paint-order', 'stroke');
   }
 
@@ -256,6 +259,8 @@ export function plotSourceTargetLabels(
     labelColor?: string;
     yShiftFactor?: number;
     groupId?: string;
+    outlineColor?: string;
+    outlineOpacity?: number;
   } = {}
 ): void {
   const {
@@ -265,7 +270,9 @@ export function plotSourceTargetLabels(
     labelFontSize = 22,
     labelColor = '#666',
     yShiftFactor = 0.5,
-    groupId = 'labels'
+    groupId = 'labels',
+    outlineColor = '#f9f9f9',
+    outlineOpacity = 0.5
   } = options;
 
   const group = svg.select(`#${groupId}`) as d3.Selection<SVGGElement, unknown, null, undefined>;
@@ -281,11 +288,15 @@ export function plotSourceTargetLabels(
 
   plotLabel(group, sourceLabelText, sourceLabelX, labelY, {
     fontSize: labelFontSize,
-    color: labelColor
+    color: labelColor,
+    outlineColor,
+    outlineOpacity
   });
 
   plotLabel(group, targetLabelText, targetLabelX, labelY, {
     fontSize: labelFontSize,
-    color: labelColor
+    color: labelColor,
+    outlineColor,
+    outlineOpacity
   });
 }

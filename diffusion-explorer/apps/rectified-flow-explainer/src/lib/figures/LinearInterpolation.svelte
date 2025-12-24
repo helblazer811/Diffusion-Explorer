@@ -34,7 +34,7 @@
 
   // Layout/Styling
   export let width = 800;
-  export let height = 300;
+  export let height = 275;
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let flowWidth = 10;
@@ -45,6 +45,8 @@
   export let animatedDotRadius = 6;
   export let labelFontSize = settings.labelStyling.fontSize;
   export let labelColor = settings.labelStyling.color;
+  export let outlineColor = settings.labelStyling.outlineColor;
+  export let outlineOpacity = settings.labelStyling.outlineOpacity;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
   export let pointLabelFontSize = 18;
@@ -116,13 +118,15 @@
       sourceLabelText,
       targetLabelText,
       labelFontSize,
-      labelColor
+      labelColor,
+      outlineColor,
+      outlineOpacity
     });
 
     // Formula at bottom center
     const formulaX = width / 2;
     const formulaY = height - marginHeight - 10;
-    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 90, formulaY - 30, { fontSize: pointLabelFontSize, bg: false });
+    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 130, formulaY - 30, { fontSize: pointLabelFontSize, bg: false });
   }
 
   function plotLine() {
@@ -158,7 +162,8 @@
       .attr('r', pointRadius)
       .attr('fill', animatedDotColor)
       .attr('stroke', 'white')
-      .attr('stroke-width', 2);
+      .attr('stroke-width', 2)
+      .attr('stroke-opacity', 0.5);
 
     lineGroup.append('circle')
       .attr('cx', x2)
@@ -166,7 +171,8 @@
       .attr('r', pointRadius)
       .attr('fill', animatedDotColor)
       .attr('stroke', 'white')
-      .attr('stroke-width', 2);
+      .attr('stroke-width', 2)
+      .attr('stroke-opacity', 0.5);
   }
 
   function initAnimatedDot() {
