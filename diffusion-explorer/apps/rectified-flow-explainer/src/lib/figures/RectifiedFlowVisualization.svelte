@@ -37,25 +37,25 @@
 
   // Styling props (colors)
   export let trajectoryColor = "#f17720"; // Orange
-  export let sourcePointColor = "#3b82f6"; // Blue
-  export let targetPointColor = "#3b82f6"; // Blue
+  export let sourcePointColor = settings.scatterPlotStyling.color;
+  export let targetPointColor = settings.scatterPlotStyling.color;
 
   // Styling props (opacity)
   export let trajectoryFullOpacity = 0.3; // Background paths
   export let trajectoryProgressOpacity = 0.8; // Animated paths
-  export let pointOpacity = 0.25; // Distribution points
+  export let pointOpacity = settings.scatterPlotStyling.opacity;
 
   // Styling props (dimensions)
   export let trajectoryStrokeWidth = 2;
   export let trajectoryPointRadius = 4;
-  export let pointRadius = 5;
+  export let pointRadius = settings.scatterPlotStyling.radius;
 
   // Layout
   export let width = 800;
   export let height = 300;
   export let marginWidth = 20;
   export let marginHeight = 20;
-  export let yShiftFactor = -0.5; // Vertical shift for distributions (positive shifts down)
+  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
   export let flowWidth = 10; // Horizontal gap between source and target in data units
 
   // Label props

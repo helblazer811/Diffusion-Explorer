@@ -94,5 +94,13 @@ export const settings = {
     fontSize: 22,
     yOffset: 40,
     color: '#666'
+  },
+
+  // Scatter plot styling
+  scatterPlotStyling: {
+    radius: 5,
+    opacity: 0.25,
+    color: '#3b82f6',
+    yShiftFactor: -0.5
   }
 };

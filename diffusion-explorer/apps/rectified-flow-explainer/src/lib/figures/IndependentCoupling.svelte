@@ -15,8 +15,8 @@
   export const numSamples = 100;
   export const height = 300;
   export const width = 800;
-  export const sourcePointColor = '#3b82f6';
-  export const targetPointColor = '#3b82f6';
+  export const sourcePointColor = settings.scatterPlotStyling.color;
+  export const targetPointColor = settings.scatterPlotStyling.color;
   export const flowWidth = 10;
   export const marginWidth = 20;
   export const marginHeight = 20;
@@ -27,8 +27,8 @@
   export const edgeColor = '#888';
   export const edgeOpacity = 0.3;
   export const edgeWidth = 1.5;
-  export const pointRadius = 5;
-  export const pointOpacity = 0.4;
+  export const pointRadius = settings.scatterPlotStyling.radius;
+  export const pointOpacity = 0.4; // Custom: different from default
   export const hoverEdgeColor = '#555';
   export const hoverEdgeWidth = 3;
   export const hoverEdgeOpacity = 0.8;

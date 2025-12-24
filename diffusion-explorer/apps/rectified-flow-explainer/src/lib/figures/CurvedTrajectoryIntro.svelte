@@ -26,18 +26,18 @@
   export let numTrajectories = 20; // Number of trajectories to display
 
   // Styling props for visualization
-  export let sourcePointColor = '#3b82f6'; // Blue
-  export let targetPointColor = '#3b82f6'; // Blue
+  export let sourcePointColor = settings.scatterPlotStyling.color;
+  export let targetPointColor = settings.scatterPlotStyling.color;
   export let marginWidth = 20;
   export let marginHeight = 20;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
   export let labelFontSize = settings.labelStyling.fontSize;
   export let labelColor = settings.labelStyling.color;
-  export let pointRadius = 5;
-  export let pointOpacity = 0.25;
+  export let pointRadius = settings.scatterPlotStyling.radius;
+  export let pointOpacity = settings.scatterPlotStyling.opacity;
   export let flowWidth = 10; // Gap between source and target in data units
-  export let yShiftFactor = -0.5; // Vertical shift for distributions (positive shifts down)
+  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
 
   // Animation settings
   export let animationDuration = 8000; // Duration in milliseconds

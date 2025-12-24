@@ -22,8 +22,8 @@
   export let targetPointIndex = 0;
 
   // Colors
-  export let sourcePointColor = '#3b82f6';
-  export let targetPointColor = '#3b82f6';
+  export let sourcePointColor = settings.scatterPlotStyling.color;
+  export let targetPointColor = settings.scatterPlotStyling.color;
   export let lineColor = '#f17720';
   export let animatedDotColor = '#f17720';
 
@@ -38,8 +38,8 @@
   export let marginWidth = 20;
   export let marginHeight = 20;
   export let flowWidth = 10;
-  export let pointRadius = 5;
-  export let pointOpacity = 0.25;
+  export let pointRadius = settings.scatterPlotStyling.radius;
+  export let pointOpacity = settings.scatterPlotStyling.opacity;
   export let lineWidth = 3;
   export let animatedDotRadius = 6;
   export let labelFontSize = settings.labelStyling.fontSize;
