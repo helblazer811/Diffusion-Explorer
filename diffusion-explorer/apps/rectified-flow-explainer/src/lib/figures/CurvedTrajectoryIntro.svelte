@@ -6,6 +6,7 @@
   import Figure from '$lib/components/Figure.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
   import { settings } from '$lib/settings';
+  import { plotSourceTargetLabels } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -295,25 +296,17 @@
     const labelsGroup = svg.select('#labels');
     labelsGroup.selectAll('*').remove();
 
-    const sourceLabelX = xScale(0);
-    const targetLabelX = xScale(flowWidth);
     const yDomain = yScale.domain();
     const yTop = yDomain[0];
     const labelY = yScale(yTop) + 0.5 * labelFontSize;
 
-    labelsGroup.append('text')
-      .attr('x', sourceLabelX).attr('y', labelY)
-      .attr('text-anchor', 'middle').attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor).attr('stroke', '#ffffff')
-      .attr('stroke-width', '4').attr('paint-order', 'stroke')
-      .text(sourceLabelText);
-
-    labelsGroup.append('text')
-      .attr('x', targetLabelX).attr('y', labelY)
-      .attr('text-anchor', 'middle').attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor).attr('stroke', '#ffffff')
-      .attr('stroke-width', '4').attr('paint-order', 'stroke')
-      .text(targetLabelText);
+    plotSourceTargetLabels(svg, xScale, labelY, {
+      flowWidth,
+      sourceLabelText,
+      targetLabelText,
+      labelFontSize,
+      labelColor
+    });
   }
 
   function draw() {

@@ -6,6 +6,7 @@
   import Figure from "$lib/components/Figure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
   import { settings } from "$lib/settings";
+  import { plotSourceTargetLabels } from "$lib/d3_helpers";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -291,43 +292,18 @@
     // Clear existing labels
     labelsGroup.selectAll("*").remove();
 
-    // Calculate positions for labels
-    // Source label: above source distribution (centered at x=0 in data space)
-    const sourceLabelX = xScale(0);
-
-    // Target label: above target distribution (centered at x=flowWidth in data space)
-    const targetLabelX = xScale(flowWidth);
-
     // Get the y position from the top of the data domain
     const yDomain = yScale.domain();
     const yTop = yDomain[0]; // Min value maps to top of screen with this scale
-    const labelY = yScale(yTop) + 0.5 * labelFontSize; // Position above the top (subtract to move up in SVG)
+    const labelY = yScale(yTop) + 0.5 * labelFontSize;
 
-    // Add source distribution label with white outline
-    labelsGroup
-      .append("text")
-      .attr("x", sourceLabelX)
-      .attr("y", labelY)
-      .attr("text-anchor", "middle")
-      .attr("font-size", `${labelFontSize}px`)
-      .attr("fill", labelColor)
-      .attr("stroke", "#ffffff")
-      .attr("stroke-width", "4")
-      .attr("paint-order", "stroke")
-      .text(sourceLabelText);
-
-    // Add target distribution label with white outline
-    labelsGroup
-      .append("text")
-      .attr("x", targetLabelX)
-      .attr("y", labelY)
-      .attr("text-anchor", "middle")
-      .attr("font-size", `${labelFontSize}px`)
-      .attr("fill", labelColor)
-      .attr("stroke", "#ffffff")
-      .attr("stroke-width", "4")
-      .attr("paint-order", "stroke")
-      .text(targetLabelText);
+    plotSourceTargetLabels(svg, xScale, labelY, {
+      flowWidth,
+      sourceLabelText,
+      targetLabelText,
+      labelFontSize,
+      labelColor
+    });
   }
 
   /**

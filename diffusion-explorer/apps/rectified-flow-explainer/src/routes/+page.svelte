@@ -565,4 +565,9 @@
 </div>
 
 <style>
+  .section-divider {
+    border: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.15);
+    margin: 2rem 0;
+  }
 </style>

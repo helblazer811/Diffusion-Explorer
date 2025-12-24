@@ -92,3 +92,103 @@ export function plotSourceTargetScatter(
     xShift: flowWidth
   });
 }
+
+/**
+ * Plot a text label with optional white outline for readability.
+ *
+ * @param group - D3 selection of the group element to append to
+ * @param text - The label text
+ * @param x - X position
+ * @param y - Y position
+ * @param options - Styling options
+ * @returns The created text element
+ */
+export function plotLabel(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  text: string,
+  x: number,
+  y: number,
+  options: {
+    fontSize?: number;
+    color?: string;
+    textAnchor?: string;
+    withOutline?: boolean;
+    outlineColor?: string;
+    outlineWidth?: string;
+  } = {}
+): d3.Selection<SVGTextElement, unknown, null, undefined> {
+  const {
+    fontSize = 22,
+    color = '#666',
+    textAnchor = 'middle',
+    withOutline = true,
+    outlineColor = '#ffffff',
+    outlineWidth = '4'
+  } = options;
+
+  const textElement = group.append('text')
+    .attr('x', x)
+    .attr('y', y)
+    .attr('text-anchor', textAnchor)
+    .attr('font-size', `${fontSize}px`)
+    .attr('fill', color);
+
+  if (withOutline) {
+    textElement
+      .attr('stroke', outlineColor)
+      .attr('stroke-width', outlineWidth)
+      .attr('paint-order', 'stroke');
+  }
+
+  textElement.text(text);
+
+  return textElement;
+}
+
+/**
+ * Plot source and target distribution labels.
+ * Source label at xScale(0), target label at xScale(flowWidth).
+ *
+ * @param svg - D3 selection of the SVG element
+ * @param xScale - D3 linear scale for x-axis
+ * @param labelY - Y position for the labels
+ * @param options - Styling options
+ */
+export function plotSourceTargetLabels(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  xScale: d3.ScaleLinear<number, number>,
+  labelY: number,
+  options: {
+    flowWidth?: number;
+    sourceLabelText?: string;
+    targetLabelText?: string;
+    labelFontSize?: number;
+    labelColor?: string;
+    groupId?: string;
+  } = {}
+): void {
+  const {
+    flowWidth = 10,
+    sourceLabelText = 'Source Distribution',
+    targetLabelText = 'Target Distribution',
+    labelFontSize = 22,
+    labelColor = '#666',
+    groupId = 'labels'
+  } = options;
+
+  const group = svg.select(`#${groupId}`) as d3.Selection<SVGGElement, unknown, null, undefined>;
+  if (group.empty()) return;
+
+  const sourceLabelX = xScale(0);
+  const targetLabelX = xScale(flowWidth);
+
+  plotLabel(group, sourceLabelText, sourceLabelX, labelY, {
+    fontSize: labelFontSize,
+    color: labelColor
+  });
+
+  plotLabel(group, targetLabelText, targetLabelX, labelY, {
+    fontSize: labelFontSize,
+    color: labelColor
+  });
+}
