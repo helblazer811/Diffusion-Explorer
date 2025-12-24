@@ -7,6 +7,7 @@
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
+  import { plotSourceTargetScatter } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -180,23 +181,6 @@
     svg.append('g').attr('id', 'labels');
   }
 
-  function plotScatter(points, color, groupId, xShift = 0) {
-    if (!svgElement || !xScale || !yScale || points.length === 0) return;
-
-    const svg = d3.select(svgElement);
-    const group = svg.select(`#${groupId}`);
-
-    group.selectAll('circle')
-      .data(points)
-      .enter()
-      .append('circle')
-      .attr('cx', d => xScale(d[0] + xShift))
-      .attr('cy', d => yScale(d[1]))
-      .attr('r', pointRadius)
-      .attr('fill', color)
-      .attr('opacity', pointOpacity);
-  }
-
   function plotConnectingLine(sourcePoint, targetPoint, lineGroup) {
     const x1 = xScale(sourcePoint[0]);
     const y1 = yScale(sourcePoint[1]);
@@ -308,11 +292,16 @@
     initializeLayers();
     createScales(sourceDistributionSamples, targetDistributionSamples);
 
-    plotScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter', 0);
-    plotScatter(targetDistributionSamples, targetPointColor, 'targetScatter', flowWidth);
+    const svg = d3.select(svgElement);
+    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
+      flowWidth,
+      sourcePointColor,
+      targetPointColor,
+      pointRadius,
+      pointOpacity
+    });
 
     // Add distribution labels at top
-    const svg = d3.select(svgElement);
     const distributionLabelsGroup = svg.append('g').attr('id', 'distributionLabels');
     const sourceLabelX = xScale(0);
     const targetLabelX = xScale(flowWidth);
