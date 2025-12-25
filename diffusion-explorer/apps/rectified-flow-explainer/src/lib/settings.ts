@@ -25,9 +25,6 @@ export interface TrainingSettings {
   trainingObjectiveToModelConfig: {
     [key: string]: { dim: number; hidden: number };
   };
-  datasetNameToPath: {
-    [key: string]: string;
-  };
   trainingConfig: {
     epochs: number;
     batchSize: number;
@@ -72,13 +69,16 @@ export const settings = {
     sourceDistributionPath: null
   } as RectifiedFlowConfig,
 
+  // Rectified flow superimposed visualization settings
+  rectifiedFlowSuperimposed: {
+    gridResolution: 6, // Number of points per axis in the uniform grid
+    gridDomainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 } // Domain for grid sampling
+  },
+
   // Training settings
   training: {
     trainingObjectiveToModelConfig: {
       "Flow Matching": { dim: 2, hidden: 64 }
-    },
-    datasetNameToPath: {
-      smiley_face: '/data/smiley_face.json'
     },
     trainingConfig: {
       epochs: 500,
@@ -109,5 +109,10 @@ export const settings = {
     opacity: 0.25,
     color: '#3b82f6',
     yShiftFactor: -0.85
+  },
+
+  // Figure LaTeX styling
+  figureLatexStyling: {
+    color: '#666'
   }
 };

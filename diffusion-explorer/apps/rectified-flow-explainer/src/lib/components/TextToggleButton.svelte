@@ -35,7 +35,7 @@
   style="--border-radius: {borderRadius}px; --inactive-color: {inactiveColor};"
 >
   <div
-    class="slider"
+    class="toggle-slider"
     style="
       width: {sliderWidth}px;
       transform: translateX({sliderX}px);
@@ -88,7 +88,7 @@
     gap: 5px;
   }
 
-  .slider {
+  .toggle-slider {
     position: absolute;
     top: 4px;
     left: 4px;

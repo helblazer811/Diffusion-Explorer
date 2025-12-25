@@ -48,6 +48,7 @@
   // LaTeX labels
   export let labelVerticalOffset = -35;
   export let latexFontSize = 16;
+  export let figureLatexColor = settings.figureLatexStyling.color;
   export let intersectionLabel = 'x';
   export let topArrowLabel = 'v_t(x|x_0^a, x_1^a)';
   export let bottomArrowLabel = 'v_t(x|x_0^b, x_1^b)';
@@ -191,7 +192,7 @@
   }
 
   function plotVectors(intersection, line1, line2, arrowsGroup, labelsGroup) {
-    plotKatexInSVG(labelsGroup, intersectionLabel, intersection.x - 15, intersection.y + labelVerticalOffset, { bg: false, fontSize: latexFontSize });
+    plotKatexInSVG(labelsGroup, intersectionLabel, intersection.x - 15, intersection.y + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
 
     const dir1 = normalize({ x: line1.x2 - line1.x1, y: line1.y2 - line1.y1 });
     const dir2 = normalize({ x: line2.x2 - line2.x1, y: line2.y2 - line2.y1 });
@@ -217,11 +218,11 @@
     // Label above the arrow (midpoint between intersection and arrow end)
     const arrow1Mid = { x: (intersection.x + arrow1End.x) / 2, y: (intersection.y + arrow1End.y) / 2 };
     const arrow2Mid = { x: (intersection.x + arrow2End.x) / 2, y: (intersection.y + arrow2End.y) / 2 };
-    plotKatexInSVG(labelsGroup, topArrowLabel, arrow1Mid.x + topArrowLabelOffset.x, arrow1Mid.y + topArrowLabelOffset.y, { bg: false, fontSize: latexFontSize });
+    plotKatexInSVG(labelsGroup, topArrowLabel, arrow1Mid.x + topArrowLabelOffset.x, arrow1Mid.y + topArrowLabelOffset.y, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
     // Label below the arrow
-    plotKatexInSVG(labelsGroup, bottomArrowLabel, arrow2Mid.x + bottomArrowLabelOffset.x, arrow2Mid.y + bottomArrowLabelOffset.y, { bg: false, fontSize: latexFontSize });
+    plotKatexInSVG(labelsGroup, bottomArrowLabel, arrow2Mid.x + bottomArrowLabelOffset.x, arrow2Mid.y + bottomArrowLabelOffset.y, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
     // Label to the right of mean arrow
-    plotKatexInSVG(labelsGroup, meanArrowLabel, meanEnd.x + meanArrowLabelOffset.x, meanEnd.y + meanArrowLabelOffset.y, { bg: false, fontSize: latexFontSize });
+    plotKatexInSVG(labelsGroup, meanArrowLabel, meanEnd.x + meanArrowLabelOffset.x, meanEnd.y + meanArrowLabelOffset.y, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
 
     arrowsGroup.append('circle')
       .attr('cx', intersection.x)
@@ -279,10 +280,10 @@
     // Add endpoint labels (all above points)
     // pair1: bottom-left source (x_0^b) -> top-right target (x_1^b)
     // pair2: top-left source (x_0^a) -> bottom-right target (x_1^a)
-    plotKatexInSVG(labelsGroup, sourcePointALabel, line2Coords.x1 - 15, line2Coords.y1 + labelVerticalOffset, { bg: false, fontSize: latexFontSize });
-    plotKatexInSVG(labelsGroup, sourcePointBLabel, line1Coords.x1 - 15, line1Coords.y1 + labelVerticalOffset, { bg: false, fontSize: latexFontSize });
-    plotKatexInSVG(labelsGroup, targetPointBLabel, line1Coords.x2 - 15, line1Coords.y2 + labelVerticalOffset, { bg: false, fontSize: latexFontSize });
-    plotKatexInSVG(labelsGroup, targetPointALabel, line2Coords.x2 - 15, line2Coords.y2 + labelVerticalOffset, { bg: false, fontSize: latexFontSize });
+    plotKatexInSVG(labelsGroup, sourcePointALabel, line2Coords.x1 - 15, line2Coords.y1 + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, sourcePointBLabel, line1Coords.x1 - 15, line1Coords.y1 + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, targetPointBLabel, line1Coords.x2 - 15, line1Coords.y2 + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, targetPointALabel, line2Coords.x2 - 15, line2Coords.y2 + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
 
     isInitialized = true;
   }

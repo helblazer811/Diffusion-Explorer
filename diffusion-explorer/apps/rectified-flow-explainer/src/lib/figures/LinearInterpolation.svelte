@@ -51,7 +51,7 @@
   export let targetLabelText = 'Target Distribution';
   export let pointLabelFontSize = 18;
   export let pointLabelBgOpacity = 0.9;
-  export let latexLabelColor = '#111';
+  export let figureLatexColor = settings.figureLatexStyling.color;
 
   // SVG and scale state
   let svgElement;
@@ -101,12 +101,12 @@
     // x_0 label above source point
     const sourceX = xScale(sourcePoint[0]);
     const sourceY = yScale(sourcePoint[1]);
-    plotKatexInSVG(labelGroup, 'x_0', sourceX - 18, sourceY - 50, { fontSize: pointLabelFontSize, bg: false });
+    plotKatexInSVG(labelGroup, 'x_0', sourceX - 18, sourceY - 50, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
 
     // x_1 label above target point
     const targetX = xScale(targetPoint[0] + flowWidth);
     const targetY = yScale(targetPoint[1]);
-    plotKatexInSVG(labelGroup, 'x_1', targetX - 18, targetY - 50, { fontSize: pointLabelFontSize, bg: false });
+    plotKatexInSVG(labelGroup, 'x_1', targetX - 18, targetY - 50, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
   }
 
   function initializeLayers() {
@@ -141,7 +141,7 @@
     // Formula at bottom center
     const formulaX = width / 2;
     const formulaY = height - marginHeight - 10;
-    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 130, formulaY - 30, { fontSize: pointLabelFontSize, bg: false });
+    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 130, formulaY - 30, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
   }
 
   function plotLine() {
@@ -212,7 +212,7 @@
       .attr('fill', animatedDotColor);
 
     // x_t label above moving dot
-    const g = plotKatexInSVG(labelGroup, 'x_t', initialX - 18, initialY - 50, { fontSize: pointLabelFontSize, bg: false });
+    const g = plotKatexInSVG(labelGroup, 'x_t', initialX - 18, initialY - 50, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
     g.attr('id', 'movingLabelGroup');
   }
 
