@@ -33,7 +33,6 @@
   export let targetColor = "#3b82f6"; // Blue
   export let targetOpacity = 0.35;
   export let targetPointRadius = 5;
-  export let numTrajectoriesToShow = 10;
 
   // Trajectory styling (matching RectifiedFlowVisualization)
   export let trajectoryFullOpacity = 0.3; // Background paths
@@ -66,7 +65,9 @@
   let isPlaying = playingByDefault;
   let animationFrameId = null;
   let isInitialized = false;
-  let selectedTrajectoryIndices = [];
+
+  // Total number of trajectories (derived from data)
+  $: numTrajectories = isDataValid ? (allRectifiedTrajectories[0]?.[0]?.length || 0) : 0;
 
   // Visibility-based animation control
   let figureIsActive;
@@ -81,26 +82,6 @@
       wasPlayingBeforeHidden = false;
       isPlaying = true;
     }
-  }
-
-  /**
-   * Select random trajectory indices (same for both panels)
-   */
-  function selectTrajectoryIndices() {
-    if (!isDataValid) return;
-
-    const numAvailable = allRectifiedTrajectories[0]?.[0]?.length || 0;
-    const numToSelect = Math.min(numTrajectoriesToShow, numAvailable);
-
-    const indices = [];
-    const availableIndices = Array.from({ length: numAvailable }, (_, i) => i);
-
-    for (let i = 0; i < numToSelect; i++) {
-      const randomIndex = Math.floor(Math.random() * availableIndices.length);
-      indices.push(availableIndices.splice(randomIndex, 1)[0]);
-    }
-
-    selectedTrajectoryIndices = indices;
   }
 
   function initializeScales() {
@@ -145,7 +126,7 @@
 
     // Add current position markers for each trajectory
     const markersGroup = svg.append("g").attr("id", "markers-group");
-    for (let i = 0; i < selectedTrajectoryIndices.length; i++) {
+    for (let i = 0; i < numTrajectories; i++) {
       markersGroup
         .append("circle")
         .attr("class", `current-position-${i}`)
@@ -188,7 +169,6 @@
     if (!leftSvgElement || !rightSvgElement || !isDataValid) return;
 
     initializeScales();
-    selectTrajectoryIndices();
     initializeSvg(leftSvgElement, targetDistribution, leftLabel);
     initializeSvg(rightSvgElement, targetDistribution, rightLabel);
     updateVisualization(currentTimeIndex);
@@ -212,10 +192,9 @@
     const trajectoryGroup = svg.select("#trajectory-group");
     trajectoryGroup.selectAll("*").remove();
 
-    // Draw all selected trajectories
-    for (let i = 0; i < selectedTrajectoryIndices.length; i++) {
-      const sampleIdx = selectedTrajectoryIndices[i];
-      const trajectoryPoints = stepData.map((timestep) => timestep[sampleIdx]);
+    // Draw all trajectories from the grid
+    for (let i = 0; i < numTrajectories; i++) {
+      const trajectoryPoints = stepData.map((timestep) => timestep[i]);
 
       // Draw full trajectory path (lighter)
       const fullPath = trajectoryPoints
@@ -295,13 +274,6 @@
       currentTimeIndex = nextTimeIndex;
 
       setTimeout(() => {
-        // When animation completes (after pause), pick new random trajectories
-        // and reinitialize SVG with new markers
-        if (isLastFrame) {
-          selectTrajectoryIndices();
-          initializeSvg(leftSvgElement, targetDistribution, leftLabel);
-          initializeSvg(rightSvgElement, targetDistribution, rightLabel);
-        }
         animationFrameId = requestAnimationFrame(animate);
       }, delay);
     }
