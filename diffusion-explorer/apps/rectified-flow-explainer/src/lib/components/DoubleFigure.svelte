@@ -1,12 +1,67 @@
 <script>
+  import { onMount, onDestroy } from 'svelte';
+  import { writable } from 'svelte/store';
+
   export let left = undefined;
   export let right = undefined;
   export let caption = undefined;
   export let gap = 20;
   export let backgroundVisible = true;
+
+  // Visibility state - exported so parent can bind to it
+  export let isActive = writable(false);
+  let figureElement;
+  let observer = null;
+
+  // Track both scroll visibility and tab visibility
+  let isInViewport = false;
+  let isTabVisible = true;
+
+  // Update isActive when either visibility state changes
+  function updateActiveState() {
+    isActive.set(isInViewport && isTabVisible);
+  }
+
+  onMount(() => {
+    // Create IntersectionObserver to track scrolling visibility
+    observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isInViewport = entry.isIntersecting;
+          updateActiveState();
+        });
+      },
+      {
+        threshold: 0,
+        rootMargin: '50px'
+      }
+    );
+
+    if (figureElement) {
+      observer.observe(figureElement);
+    }
+
+    // Handle tab visibility changes
+    const handleVisibilityChange = () => {
+      isTabVisible = !document.hidden;
+      updateActiveState();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  });
+
+  onDestroy(() => {
+    if (observer) {
+      observer.disconnect();
+    }
+  });
 </script>
 
-<figure class="double-figure">
+<figure class="double-figure" bind:this={figureElement}>
   <div class="double-figure-container" style="gap: {gap}px;">
     <div class="figure-content left-figure" class:no-background={!backgroundVisible}>
       {@render left?.()}

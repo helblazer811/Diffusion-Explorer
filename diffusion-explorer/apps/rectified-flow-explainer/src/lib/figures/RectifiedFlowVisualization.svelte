@@ -86,6 +86,21 @@
   let isPaused = false;
   let pauseStartTime = null;
 
+  // Visibility-based animation control
+  let figureIsActive;
+  let wasPlayingBeforeHidden = false;
+
+  // Pause animation when figure goes off-screen, resume when back
+  $: if (figureIsActive && initialized) {
+    if (!$figureIsActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+    } else if ($figureIsActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+    }
+  }
+
   // SVG elements
   let svg;
   let xScale;
@@ -478,7 +493,7 @@
   });
 </script>
 
-<Figure {caption}>
+<Figure {caption} bind:isActive={figureIsActive}>
   {#snippet children()}
     <PlayButton {isPlaying} onclick={toggleAnimation} />
     <svg

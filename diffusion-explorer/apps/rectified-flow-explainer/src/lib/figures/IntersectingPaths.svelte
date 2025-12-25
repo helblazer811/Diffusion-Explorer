@@ -19,7 +19,7 @@
 
   // Arrow styling
   export let arrowColor = '#f17720';
-  export let arrowLength = 0.25;
+  export let arrowLength = 0.4;
   export let meanVectorColor = '#22c55e';
 
   // Layout/Styling
@@ -36,16 +36,18 @@
   export let targetPointColor = settings.scatterPlotStyling.color;
   export let arrowWidth = 2.5;
   export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
-  export let labelVerticalOffset = -settings.labelStyling.yShiftFactor * settings.labelStyling.fontSize;
-  export let latexFontSize = settings.labelStyling.fontSize;
+
   export let labelFontSize = settings.labelStyling.fontSize;
   export let labelColor = settings.labelStyling.color;
   export let outlineColor = settings.labelStyling.outlineColor;
   export let outlineOpacity = settings.labelStyling.outlineOpacity;
+  export let labelYShiftFactor = settings.labelStyling.yShiftFactor;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
 
   // LaTeX labels
+  export let labelVerticalOffset = -35;
+  export let latexFontSize = 16;
   export let intersectionLabel = 'x';
   export let topArrowLabel = 'v_t(x|x_0^a, x_1^a)';
   export let bottomArrowLabel = 'v_t(x|x_0^b, x_1^b)';
@@ -55,11 +57,16 @@
   export let targetPointALabel = 'x_1^a';
   export let targetPointBLabel = 'x_1^b';
 
+  // LaTeX label offsets
+  export let topArrowLabelOffset = { x: -55, y: -45 };
+  export let bottomArrowLabelOffset = { x: -55, y: 8 };
+  export let meanArrowLabelOffset = { x: 10, y: -18 };
+
   // Hardcoded line endpoint coordinates
-  export let sourcePointA = [0.2, -0.5];
-  export let sourcePointB = [0.2, 0.5];
-  export let targetPointA = [10, -0.5];
-  export let targetPointB = [10, 0.5];
+  export let sourcePointA = [0.6, -0.8];
+  export let sourcePointB = [0.6, 0.5];
+  export let targetPointA = [0.2, 1.6];
+  export let targetPointB = [-1.1, -1.0];
 
   // SVG and scale state
   let svgElement;
@@ -207,12 +214,14 @@
     const arrow2End = { x: intersection.x + dir2.x * arrowScale, y: intersection.y + dir2.y * arrowScale };
     const meanEnd = { x: intersection.x + meanDir.x * arrowScale, y: intersection.y + meanDir.y * arrowScale };
 
-    // Label directly above top arrow
-    plotKatexInSVG(labelsGroup, topArrowLabel, arrow2End.x - 70, arrow2End.y - 50, { bg: false, fontSize: latexFontSize });
-    // Label directly below bottom arrow
-    plotKatexInSVG(labelsGroup, bottomArrowLabel, arrow1End.x - 70, arrow1End.y + 20, { bg: false, fontSize: latexFontSize });
+    // Label above the arrow (midpoint between intersection and arrow end)
+    const arrow1Mid = { x: (intersection.x + arrow1End.x) / 2, y: (intersection.y + arrow1End.y) / 2 };
+    const arrow2Mid = { x: (intersection.x + arrow2End.x) / 2, y: (intersection.y + arrow2End.y) / 2 };
+    plotKatexInSVG(labelsGroup, topArrowLabel, arrow1Mid.x + topArrowLabelOffset.x, arrow1Mid.y + topArrowLabelOffset.y, { bg: false, fontSize: latexFontSize });
+    // Label below the arrow
+    plotKatexInSVG(labelsGroup, bottomArrowLabel, arrow2Mid.x + bottomArrowLabelOffset.x, arrow2Mid.y + bottomArrowLabelOffset.y, { bg: false, fontSize: latexFontSize });
     // Label to the right of mean arrow
-    plotKatexInSVG(labelsGroup, meanArrowLabel, meanEnd.x + 10, meanEnd.y - 18, { bg: false, fontSize: latexFontSize });
+    plotKatexInSVG(labelsGroup, meanArrowLabel, meanEnd.x + meanArrowLabelOffset.x, meanEnd.y + meanArrowLabelOffset.y, { bg: false, fontSize: latexFontSize });
 
     arrowsGroup.append('circle')
       .attr('cx', intersection.x)
@@ -251,7 +260,7 @@
       labelColor,
       outlineColor,
       outlineOpacity,
-      yShiftFactor: 1.5,
+      yShiftFactor: labelYShiftFactor,
       groupId: 'distributionLabels'
     });
 

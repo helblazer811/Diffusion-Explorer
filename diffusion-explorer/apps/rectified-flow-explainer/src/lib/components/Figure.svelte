@@ -1,22 +1,19 @@
 <script>
-  import { onMount, onDestroy, setContext } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
 
   export let children = undefined;
   export let caption = undefined;
   export let backgroundVisible = true;
 
-  // Visibility state
-  const isActive = writable(false);
+  // Visibility state - exported so parent can bind to it
+  export let isActive = writable(false);
   let figureElement;
   let observer = null;
 
   // Track both scroll visibility and tab visibility
   let isInViewport = false;
   let isTabVisible = true;
-
-  // Expose isActive to children via context
-  setContext('figureIsActive', isActive);
 
   // Update isActive when either visibility state changes
   function updateActiveState() {

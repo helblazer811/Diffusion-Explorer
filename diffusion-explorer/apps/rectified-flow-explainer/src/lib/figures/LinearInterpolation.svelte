@@ -68,6 +68,21 @@
   let lastTimestamp = null;
   let isInitialized = false;
 
+  // Visibility-based animation control
+  let figureIsActive;
+  let wasPlayingBeforeHidden = false;
+
+  // Pause animation when figure goes off-screen, resume when back
+  $: if (figureIsActive && isInitialized) {
+    if (!$figureIsActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+    } else if ($figureIsActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+    }
+  }
+
   function toggleAnimation() {
     isPlaying = !isPlaying;
   }
@@ -345,7 +360,7 @@
   });
 </script>
 
-<Figure caption={caption}>
+<Figure caption={caption} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
