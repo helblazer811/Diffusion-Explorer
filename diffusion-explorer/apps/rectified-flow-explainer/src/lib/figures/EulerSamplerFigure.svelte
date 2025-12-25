@@ -5,6 +5,49 @@
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import { settings } from '$lib/settings';
 
+  // Visibility-based animation control
+  let figureIsActive;
+  let isInitialized = false;
+  let wasAnimatingBeforeHidden = false;
+  let shouldAnimate = true;
+  let activeTimeoutIds = [];
+
+  // Pause animation when figure goes off-screen, resume when back
+  $: if (figureIsActive && isInitialized) {
+    if (!$figureIsActive && shouldAnimate) {
+      wasAnimatingBeforeHidden = true;
+      shouldAnimate = false;
+      // Cancel any pending timeouts
+      activeTimeoutIds.forEach(id => clearTimeout(id));
+      activeTimeoutIds = [];
+    } else if ($figureIsActive && wasAnimatingBeforeHidden) {
+      wasAnimatingBeforeHidden = false;
+      shouldAnimate = true;
+      // Restart animations
+      restartAnimations();
+    }
+  }
+
+  // Store animation data for restart
+  let animationData = null;
+
+  function restartAnimations() {
+    if (!animationData) return;
+    const { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler } = animationData;
+    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, 'left', highCurvatureYScaleFactor, highCurvatureLabel, 0);
+    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, 'right', lowCurvatureYScaleFactor, lowCurvatureLabel, 0);
+  }
+
+  function scheduleTimeout(fn, delay) {
+    const id = setTimeout(() => {
+      // Remove from active list when executed
+      activeTimeoutIds = activeTimeoutIds.filter(tid => tid !== id);
+      fn();
+    }, delay);
+    activeTimeoutIds.push(id);
+    return id;
+  }
+
   // Props
   export let width = 400;
   export let height = 450;
@@ -277,9 +320,11 @@
       // On the last segment, trigger repeat if needed
       if (isLastSegment && repeatAnimation) {
         transition.on('end', function() {
-          setTimeout(() => {
-            animateEulerSegments(svg, eulerPoints, xScale, yScale, 0);
-          }, repeatDelay);
+          if (shouldAnimate) {
+            scheduleTimeout(() => {
+              animateEulerSegments(svg, eulerPoints, xScale, yScale, 0);
+            }, repeatDelay);
+          }
         });
       }
     }
@@ -346,13 +391,24 @@
     const lowCurvatureEuler = eulerMethod(lowCurvatureODE, t0, y0, tEnd, deltaT);
     const lowCurvatureGT = generateGroundTruthPoints(lowCurvatureGroundTruth, t0, tEnd, groundTruthDeltaT);
 
+    // Store animation data for restart
+    animationData = { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler };
+
     // Plot both with same animation delay so they start in sync
     plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, 'left', highCurvatureYScaleFactor, highCurvatureLabel, animationDelay);
     plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, 'right', lowCurvatureYScaleFactor, lowCurvatureLabel, animationDelay);
+
+    isInitialized = true;
+
+    // Cleanup timeouts on unmount
+    return () => {
+      activeTimeoutIds.forEach(id => clearTimeout(id));
+      activeTimeoutIds = [];
+    };
   });
 </script>
 
-<DoubleFigure {gap} {caption}>
+<DoubleFigure {gap} {caption} bind:isActive={figureIsActive}>
   {#snippet left()}
     <svg bind:this={leftSvg} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
     </svg>

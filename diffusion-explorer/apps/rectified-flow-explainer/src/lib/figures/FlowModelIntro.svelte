@@ -78,8 +78,24 @@
   let isPlaying = playingByDefault;
   let isPausedByFigure = false;
 
+  // Visibility-based animation control
+  let figureIsActive;
+  let wasPlayingBeforeHidden = false;
+  let isInitialized = false;
+
   // Update isPausedByFigure when isPlaying changes
   $: isPausedByFigure = !isPlaying;
+
+  // Pause animation when figure goes off-screen, resume when back
+  $: if (figureIsActive && isInitialized) {
+    if (!$figureIsActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+    } else if ($figureIsActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+    }
+  }
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
@@ -457,9 +473,6 @@
     }
   }
 
-  // Reactive initialization flag
-  let isInitialized = false;
-
   // Update visualization when time changes (e.g., from slider drag)
   $: if (isInitialized) {
     draw();
@@ -491,7 +504,7 @@
   });
 </script>
 
-<Figure {caption}>
+<Figure {caption} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg

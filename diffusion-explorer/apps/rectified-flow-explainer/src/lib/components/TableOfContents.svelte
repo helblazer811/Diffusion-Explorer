@@ -12,8 +12,8 @@
   let isScrolling = false;
 
   onMount(() => {
-    // Extract headings from the page
-    const selector = includeH3 ? 'h2[id], h3[id]' : 'h2[id]';
+    // Extract headings from the page (h1, h2, and optionally h3)
+    const selector = includeH3 ? 'h1[id], h2[id], h3[id]' : 'h1[id], h2[id]';
     const elements = document.querySelectorAll(selector);
     headings = Array.from(elements).map(el => ({
       id: el.id,
@@ -79,6 +79,7 @@
         <button
           class="toc-item"
           class:active={activeId === heading.id}
+          class:h2={heading.level === 'h2'}
           class:h3={heading.level === 'h3'}
           on:click={() => scrollTo(heading.id)}
         >
@@ -116,6 +117,7 @@
         <li>
           <button
             class="toc-modal-item"
+            class:h2={heading.level === 'h2'}
             class:h3={heading.level === 'h3'}
             on:click={() => scrollTo(heading.id)}
           >
@@ -190,8 +192,13 @@
     font-weight: 500;
   }
 
+  .toc-item.h2 {
+    padding-left: 1.25rem;
+    font-size: 0.875rem;
+  }
+
   .toc-item.h3 {
-    padding-left: 1.5rem;
+    padding-left: 2rem;
     font-size: 0.85rem;
   }
 
@@ -311,8 +318,13 @@
     background: #f5f5f5;
   }
 
+  .toc-modal-item.h2 {
+    padding-left: 1.75rem;
+    font-size: 0.975rem;
+  }
+
   .toc-modal-item.h3 {
-    padding-left: 2rem;
+    padding-left: 2.5rem;
     font-size: 0.95rem;
     color: #555;
   }

@@ -279,10 +279,10 @@
     <h1 class="article-title">A Visual Introduction to Rectified Flows</h1>
     <!-- <h2 class="article-subtitle">Why flow matching trajectories are curved and how to straighten them.</h2> -->
     <div class="byline-dateline-container">
-      <h3 class="byline">
+      <h2 class="byline">
         By <a href="https://alechelbling.com">Alec Helbling</a>
-      </h3>
-      <h3 class="dateline">December 24, 2025</h3>
+      </h2>
+      <h2 class="dateline">December 24, 2025</h2>
     </div>
   </div>
 
@@ -308,7 +308,7 @@
 
   <hr class="section-divider" />
 
-  <h2 id="introduction" class="visually-hidden">Introduction</h2>
+  <h1 id="introduction" class="section-heading visually-hidden">Introduction</h1>
   <p>
     Recently developed flow-based generative models <span class="citation" data-cite="rezende2016variationalinferencenormalizingflows"></span> have led to state-of-the-art
     results in image and video generation. In particular, flow matching <span
@@ -355,9 +355,14 @@
     </CurvedTrajectoryIntro>
   {/if}
 
-  <h2 id="background">Background</h2>
+  <h1 id="background" class="section-heading">Background</h1>
+  <p>
+    Before diving into the details behind why models trained with flow matching produce 
+    curved trajectories and how rectified flows can help, we will first cover some necessary background
+    on flow-based generative models and flow matching.
+  </p>
 
-  <h3 id="flow-based-models">Flow-Based Generative Models</h3>
+  <h2 id="flow-based-models">Flow-Based Generative Models</h2>
 
   <p>
     The broad goal of generative models is to draw samples from some complex
@@ -454,7 +459,7 @@
     the target distribution.
   </p>
 
-  <h3 id="flow-matching">Flow Matching</h3>
+  <h2 id="flow-matching">Flow Matching</h2>
 
   <p>
     So, if we can learn an approximation <Katex math={"v_t^\\theta(x)"} />,
@@ -553,7 +558,7 @@
     />
   </div>
 
-  <h2 id="curved-trajectories">The Problem: Curved Trajectories</h2>
+  <h1 id="curved-trajectories" class="section-heading">The Problem: Curved Trajectories</h1>
 
   <p>
     With the fundamentals of flow models and flow matching established, we can
@@ -619,7 +624,7 @@
 
   <h2 id="coupling">The Problem with an Independent Coupling</h2>
 
-  <h3 id="what-is-coupling">What is a coupling?</h3>
+  <h2 id="what-is-coupling">What is a coupling?</h2>
 
   <p>
     A coupling is what tells us how samples from our source distribution <Katex
@@ -713,7 +718,7 @@
     path by averaging them out (shown in green).
   </p>
 
-  <h2 id="rectified-flows">Rectified Flows</h2>
+  <h1 id="rectified-flows" class="section-heading">Rectified Flows</h1>
 
   {#if showOtherFigures}
     <InducedCouplingDouble
@@ -779,15 +784,15 @@
     untangling the coupling you are allowing the model to resolve this conflict.
   </p>
 
-  <h2 id="acknowledgements">Acknowledgements</h2>
+  <h1 id="acknowledgements" class="section-heading">Acknowledgements</h1>
   <div class="acknowledgements">
     <p></p>
   </div>
 
-  <h2 id="references">References</h2>
+  <h1 id="references" class="section-heading">References</h1>
   <Bibliography {citations} {bibEntries} />
 
-  <h2 id="cite">How to Cite</h2>
+  <h1 id="cite" class="section-heading">How to Cite</h1>
   <div class="cite-section">
     <p>If you found this explainer helpful, please consider citing it:</p>
     <pre><code
@@ -802,6 +807,13 @@
 </div>
 
 <style>
+  .section-heading {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+  }
+
   .section-divider {
     border: none;
     border-top: 1px solid rgba(0, 0, 0, 0.15);

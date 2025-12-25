@@ -68,6 +68,21 @@
   let isInitialized = false;
   let selectedTrajectoryIndices = [];
 
+  // Visibility-based animation control
+  let figureIsActive;
+  let wasPlayingBeforeHidden = false;
+
+  // Pause animation when figure goes off-screen, resume when back
+  $: if (figureIsActive && isInitialized) {
+    if (!$figureIsActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+    } else if ($figureIsActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+    }
+  }
+
   /**
    * Select random trajectory indices (same for both panels)
    */
@@ -324,7 +339,7 @@
 </script>
 
 {#if isDataValid}
-  <DoubleFigure {gap} {caption}>
+  <DoubleFigure {gap} {caption} bind:isActive={figureIsActive}>
     {#snippet left()}
       <PlayButton {isPlaying} onclick={togglePlayPause} />
       <svg
