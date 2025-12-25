@@ -3,6 +3,7 @@
   import * as d3 from "d3";
   import Figure from "$lib/components/Figure.svelte";
   import PlayButton from "$lib/components/PlayButton.svelte";
+  import TextToggleButton from "$lib/components/TextToggleButton.svelte";
   import { settings } from "$lib/settings";
   import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales } from "$lib/d3_helpers";
 
@@ -66,6 +67,11 @@
   export let outlineColor = settings.labelStyling.outlineColor;
   export let outlineOpacity = settings.labelStyling.outlineOpacity;
 
+  // Toggle button props
+  export let beforeLabel = "Before Rectification";
+  export let afterLabel = "After Rectification";
+  export let toggleBorderRadius = 20;
+
   // Caption slot (passed as default children)
   export let children = undefined;
   $: caption = children;
@@ -115,6 +121,19 @@
    */
   function toggleAnimation() {
     isPlaying = !isPlaying;
+  }
+
+  /**
+   * Handle toggle button change
+   */
+  function handleToggleChange(newValue) {
+    if (newValue !== showingAfterRectification) {
+      showingAfterRectification = newValue;
+      currentRectifiedStep = newValue ? 1 : 0;
+      previousRectifiedStep = -1; // Force path regeneration
+      time = 0;
+      updateVisualization();
+    }
   }
 
   /**
@@ -203,8 +222,6 @@
     d3Svg.append("g").attr("class", "trajectories");
     d3Svg.append("g").attr("id", "labels");
 
-    const labelsGroup = d3Svg.select("#labels");
-
     // Draw source and target distributions
     plotSourceTargetScatter(d3Svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
       flowWidth,
@@ -213,16 +230,6 @@
       pointRadius,
       pointOpacity
     });
-
-    // Add rectified step label
-    labelsGroup
-      .append("text")
-      .attr("class", "rectified-step-label")
-      .attr("x", width / 2)
-      .attr("y", 30)
-      .attr("text-anchor", "middle")
-      .attr("font-size", `${labelFontSize}px`)
-      .attr("fill", labelColor);
 
     // Add source and target distribution labels
     if (sourceDistributionSamples.length > 0 && targetDistributionSamples.length > 0) {
@@ -360,12 +367,6 @@
       }
     }
 
-    // Update label
-    const labelText = currentRectifiedStep === 0 ? "Before Rectification" : "After Rectification";
-    d3Svg
-      .select(".rectified-step-label")
-      .text(labelText);
-
     // Track previous step
     previousRectifiedStep = currentRectifiedStep;
   }
@@ -495,13 +496,26 @@
 
 <Figure {caption} bind:isActive={figureIsActive}>
   {#snippet children()}
-    <PlayButton {isPlaying} onclick={toggleAnimation} />
-    <svg
-      bind:this={svg}
-      viewBox="0 0 {width} {height}"
-      preserveAspectRatio="xMidYMid meet"
-      style="width: 100%; height: auto; max-width: {width}px; aspect-ratio: {width} / {height};"
-    >
-    </svg>
+    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+      <div style="position: relative; width: 100%; display: flex; justify-content: center;">
+        <PlayButton {isPlaying} onclick={toggleAnimation} />
+        <svg
+          bind:this={svg}
+          viewBox="0 0 {width} {height}"
+          preserveAspectRatio="xMidYMid meet"
+          style="width: 100%; height: auto; max-width: {width}px; aspect-ratio: {width} / {height};"
+        >
+        </svg>
+      </div>
+      <div>
+        <TextToggleButton
+          leftLabel={beforeLabel}
+          rightLabel={afterLabel}
+          value={showingAfterRectification}
+          borderRadius={toggleBorderRadius}
+          onchange={handleToggleChange}
+        />
+      </div>
+    </div>
   {/snippet}
 </Figure>
