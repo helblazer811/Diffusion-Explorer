@@ -29,6 +29,7 @@
   import IntersectingPaths from "$lib/figures/IntersectingPaths.svelte";
   import InducedCouplingDouble from "$lib/figures/InducedCouplingDouble.svelte";
   import VectorFieldCurvatureComparison from "$lib/figures/VectorFieldCurvatureComparison.svelte";
+  import Figure from "$lib/components/Figure.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
   import Bibliography from "$lib/components/Bibliography.svelte";
   import { Katex } from "@diffusion-explorer/ui";
@@ -902,6 +903,7 @@
       width={figureWidth}
       sourceDistributionSamples={$sourceDistributionSamples}
       targetDistributionSamples={$targetDistributionSamples}
+      backgroundVisible={false}
     >
       <div class="caption">
         <span class="figure-number">Figure 6:</span>
@@ -940,6 +942,7 @@
       width={figureWidth}
       sourceDistributionSamples={$sourceDistributionSamples}
       targetDistributionSamples={$targetDistributionSamples}
+      backgroundVisible={false}
     >
       <div class="caption">
         <span class="figure-number">Figure 7:</span>
@@ -972,6 +975,58 @@
   </p>
 
   <h1 id="rectified-flows" class="section-heading">Rectified Flows</h1>
+
+  <Figure backgroundVisible={true}>
+    {#snippet caption()}
+      <div class="caption">
+        <span class="figure-number">Algorithm 1:</span>
+        The Reflow procedure iteratively straightens trajectories by retraining on the coupling induced by the previous model.
+      </div>
+    {/snippet}
+    {#snippet children()}
+      <div class="algorithm-box">
+        <div class="algorithm-title">Algorithm: Reflow Procedure</div>
+        <div class="algorithm-content">
+          <div class="algorithm-line">
+            <span class="line-label">Inputs:</span>
+            <span>Source distribution <Katex math={"p"} />, target distribution <Katex math={"q"} />, number of iterations <Katex math={"K"} /></span>
+          </div>
+          <div class="algorithm-line">
+            <span class="line-label">Outputs:</span>
+            <span>Rectified velocity field <Katex math={"v_\\theta^K"} /></span>
+          </div>
+          <div class="algorithm-line">
+            <span class="line-number">1:</span>
+            <span>Sample pairs <Katex math={"(X_0, X_1)"} /> from independent coupling <Katex math={"\\pi_0 = p \\times q"} /></span>
+          </div>
+          <div class="algorithm-line">
+            <span class="line-number">2:</span>
+            <span><strong>for</strong> <Katex math={"k = 1, 2, \\ldots, K"} /> <strong>do</strong></span>
+          </div>
+          <div class="algorithm-line indented">
+            <span class="line-number">3:</span>
+            <span>Train velocity field <Katex math={"v_\\theta^k"} /> on pairs from <Katex math={"\\pi_{k-1}"} /></span>
+          </div>
+          <div class="algorithm-line indented">
+            <span class="line-number">4:</span>
+            <span>Generate new pairs: <Katex math={"X_1^k = \\psi_1^k(X_0)"} /> by flowing <Katex math={"X_0 \\sim p"} /> through <Katex math={"v_\\theta^k"} /></span>
+          </div>
+          <div class="algorithm-line indented">
+            <span class="line-number">5:</span>
+            <span>Update coupling: <Katex math={"\\pi_k = (X_0, X_1^k)"} /></span>
+          </div>
+          <div class="algorithm-line">
+            <span class="line-number">6:</span>
+            <span><strong>end for</strong></span>
+          </div>
+          <div class="algorithm-line">
+            <span class="line-number">7:</span>
+            <span><strong>return</strong> <Katex math={"v_\\theta^K"} /></span>
+          </div>
+        </div>
+      </div>
+    {/snippet}
+  </Figure>
 
   {#if showOtherFigures}
     <RectifiedFlowSuperimposed
@@ -1088,5 +1143,44 @@
     border: none;
     border-top: 1px solid rgba(0, 0, 0, 0.15);
     margin: 2rem 0;
+  }
+
+  .algorithm-box {
+    width: 100%;
+  }
+
+  .algorithm-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #ccc;
+    color: #333;
+  }
+
+  .algorithm-content {
+    font-size: 1.15rem;
+    line-height: 1.8;
+  }
+
+  .algorithm-line {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .algorithm-line.indented {
+    padding-left: 1.5rem;
+  }
+
+  .line-number {
+    color: #888;
+    min-width: 1.5rem;
+    text-align: right;
+  }
+
+  .line-label {
+    font-weight: 600;
+    min-width: 4.5rem;
   }
 </style>
