@@ -54,10 +54,11 @@
   // Layout
   export let width = 800;
   export let height = 325;
-  export let marginWidth = 20;
+  export let marginWidth = 50;
   export let marginHeight = 20;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
-  export let flowWidth = 10; // Horizontal gap between source and target in data units
+  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
 
   // Label props
   export let sourceLabelText = "Source Distribution";
@@ -109,8 +110,7 @@
 
   // SVG elements
   let svg;
-  let xScale;
-  let yScale;
+  let scales;
 
   // Cache for trajectory lengths
   // Map structure: Map<rectifiedStep, Map<trajectoryIdx, totalLength>>
@@ -166,10 +166,23 @@
   }
 
   /**
+   * Compute pixel x position for a data point at a given time.
+   * At t=0, positions are centered at sourceCenterPixelX.
+   * At t=1, positions are centered at targetCenterPixelX.
+   */
+  function getPixelX(dataX, dataMeanX, t) {
+    if (!scales) return 0;
+    const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    return centerPixelX + (dataX - dataMeanX) * scales.xScaleFactor;
+  }
+
+  /**
    * Generate SVG path for a trajectory up to endStep
-   * Applies x-shift transformation to create source-to-target flow effect
+   * Applies position interpolation to create source-to-target flow effect
    */
   function generateTrajectoryPath(rectifiedStep, trajectoryIndex, endStep = null) {
+    if (!scales) return "";
+
     const trajectoryData = getTrajectoryData(
       rectifiedStep,
       selectedTrajectoryIndices[trajectoryIndex]
@@ -177,16 +190,20 @@
     const numPoints = trajectoryData.length;
     const maxStep = endStep !== null ? endStep : numPoints - 1;
 
+    // Compute combined mean for positioning
+    const allSourceX = sourceDistributionSamples.map(p => p[0]);
+    const allTargetX = targetDistributionSamples.map(p => p[0]);
+    const combinedMeanX = [...allSourceX, ...allTargetX].reduce((a, b) => a + b, 0) / (allSourceX.length + allTargetX.length);
+
     let path = "";
     for (let i = 0; i <= maxStep; i++) {
       const [x, y] = trajectoryData[i];
 
-      // Apply x-shift based on progress through trajectory
+      // Compute time at this step for interpolation
       const timeAtStep = i / (numPoints - 1);
-      const xShifted = x + timeAtStep * flowWidth;
 
-      const svgX = xScale(xShifted);
-      const svgY = yScale(y);
+      const svgX = getPixelX(x, combinedMeanX, timeAtStep);
+      const svgY = scales.yScale(y);
 
       if (i === 0) {
         path += `M ${svgX},${svgY}`;
@@ -209,12 +226,10 @@
     // Clear existing content
     d3Svg.selectAll("*").remove();
 
-    // Create scales
-    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    // Create scales using proportional positioning
+    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
     });
-    xScale = scales.xScale;
-    yScale = scales.yScale;
 
     // Create groups
     d3Svg.append("g").attr("id", "sourceScatter");
@@ -223,8 +238,7 @@
     d3Svg.append("g").attr("id", "labels");
 
     // Draw source and target distributions
-    plotSourceTargetScatter(d3Svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
-      flowWidth,
+    plotSourceTargetScatter(d3Svg, sourceDistributionSamples, targetDistributionSamples, scales, {
       sourcePointColor,
       targetPointColor,
       pointRadius,
@@ -233,8 +247,7 @@
 
     // Add source and target distribution labels
     if (sourceDistributionSamples.length > 0 && targetDistributionSamples.length > 0) {
-      plotSourceTargetLabels(d3Svg, xScale, yScale, {
-        flowWidth,
+      plotSourceTargetLabels(d3Svg, scales, {
         sourceLabelText,
         targetLabelText,
         labelFontSize,

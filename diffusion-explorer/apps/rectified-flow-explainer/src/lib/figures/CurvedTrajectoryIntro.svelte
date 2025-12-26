@@ -6,7 +6,7 @@
   import Figure from '$lib/components/Figure.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { settings } from '$lib/settings';
-  import { plotSourceTargetLabels, createSourceTargetScales } from '$lib/d3_helpers';
+  import { plotSourceTargetLabels, plotScatterAtCenter, createSourceTargetScales } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -38,7 +38,8 @@
   export let outlineOpacity = settings.stylingSettings.label.outlineOpacity;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
-  export let flowWidth = 10; // Gap between source and target in data units
+  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
 
   // Animation settings
@@ -61,8 +62,7 @@
   // Selected trajectory indices (visualization-specific state)
   let selectedTrajectoryIndices = [];
   let svgElement;
-  let xScale = null;
-  let yScale = null;
+  let scales = null;
   let time = 0; // Animation time parameter (0 to 1)
   let animationFrameId = null;
   let trajectoryLengths = new Map(); // Cache total path lengths
@@ -91,6 +91,17 @@
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
+  }
+
+  /**
+   * Compute pixel x position for a data point at a given time.
+   * At t=0, positions are centered at sourceCenterPixelX.
+   * At t=1, positions are centered at targetCenterPixelX.
+   */
+  function getPixelX(dataX, dataMeanX, t) {
+    if (!scales) return 0;
+    const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    return centerPixelX + (dataX - dataMeanX) * scales.xScaleFactor;
   }
 
   /**
@@ -123,7 +134,12 @@
    */
   function generateTrajectoryPath(trajectoryIndex, endStep = null) {
     const allSamples = $allTimeSamples;
-    if (!allSamples || allSamples.length === 0) return '';
+    if (!allSamples || allSamples.length === 0 || !scales) return '';
+
+    // Compute combined mean for positioning
+    const allSourceX = sourceDistributionSamples.map(p => p[0]);
+    const allTargetX = targetDistributionSamples.map(p => p[0]);
+    const combinedMeanX = [...allSourceX, ...allTargetX].reduce((a, b) => a + b, 0) / (allSourceX.length + allTargetX.length);
 
     const maxStep = endStep !== null ? endStep : allSamples.length - 1;
     const pathData = [];
@@ -133,13 +149,12 @@
       if (!samples || !samples[trajectoryIndex]) continue;
 
       const [x, y] = samples[trajectoryIndex];
-      // Apply x-shift based on time progression
+      // Compute time at this step
       const timeAtStep = step / (allSamples.length - 1);
-      const xShifted = x + timeAtStep * flowWidth;
 
-      // Transform to SVG coordinates
-      const svgX = xScale(xShifted);
-      const svgY = yScale(y);
+      // Transform to SVG coordinates using proportional positioning
+      const svgX = getPixelX(x, combinedMeanX, timeAtStep);
+      const svgY = scales.yScale(y);
 
       if (step === 0) {
         pathData.push(`M ${svgX},${svgY}`);
@@ -253,33 +268,34 @@
   }
 
   function initScatter(points, color, groupId, opacity = pointOpacity) {
-    if (!svgElement || !xScale || !yScale || points.length === 0) return;
+    if (!svgElement || !scales || points.length === 0) return;
     const svg = d3.select(svgElement);
     const group = svg.select(`#${groupId}`);
     group.selectAll('circle').data(points).enter().append('circle')
       .attr('r', pointRadius).attr('fill', color).attr('opacity', opacity);
   }
 
-  function updateScatter(points, groupId, time) {
-    if (!svgElement || !xScale || !yScale || points.length === 0) return;
-    const xShift = time * flowWidth;
+  function updateScatter(points, groupId, isSource) {
+    if (!svgElement || !scales || points.length === 0) return;
     const svg = d3.select(svgElement);
     const group = svg.select(`#${groupId}`);
+    const { yScale, xScaleFactor, sourceCenterPixelX, targetCenterPixelX, sourceMeanX, targetMeanX } = scales;
+    const centerPixelX = isSource ? sourceCenterPixelX : targetCenterPixelX;
+    const meanX = isSource ? sourceMeanX : targetMeanX;
     group.selectAll('circle').data(points)
-      .attr('cx', d => xScale(d[0] + xShift))
+      .attr('cx', d => centerPixelX + (d[0] - meanX) * xScaleFactor)
       .attr('cy', d => yScale(d[1]));
   }
 
   function plotLabels() {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     const svg = d3.select(svgElement);
     const labelsGroup = svg.select('#labels');
     labelsGroup.selectAll('*').remove();
 
-    plotSourceTargetLabels(svg, xScale, yScale, {
-      flowWidth,
+    plotSourceTargetLabels(svg, scales, {
       sourceLabelText,
       targetLabelText,
       labelFontSize,
@@ -290,10 +306,10 @@
   }
 
   function draw() {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
-    if (showSourceScatter) updateScatter(sourceDistributionSamples, 'sourceScatter', 0);
-    if (showTargetScatter) updateScatter(targetDistributionSamples, 'targetScatter', 1);
+    if (showSourceScatter) updateScatter(sourceDistributionSamples, 'sourceScatter', true);
+    if (showTargetScatter) updateScatter(targetDistributionSamples, 'targetScatter', false);
     updateTrajectories(time);
   }
 
@@ -302,11 +318,9 @@
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     initializeLayers();
-    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
     });
-    xScale = scales.xScale;
-    yScale = scales.yScale;
 
     if (showSourceScatter) initScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter');
     if (showTargetScatter) initScatter(targetDistributionSamples, targetPointColor, 'targetScatter');

@@ -8,7 +8,7 @@
   export let inactiveColor = "#e5e5e5";  // Light gray
   export let textColor = "#333";
   export let activeTextColor = "#fff";
-  export let fontSize = 14;  // px
+  export let fontSize = 18;  // px
   export let padding = "8px 16px";
   export let onchange = (newValue) => {};
 

@@ -7,7 +7,7 @@
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
-  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales } from '$lib/d3_helpers';
+  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -37,7 +37,8 @@
   export let height = 275;
   export let marginWidth = 50;
   export let marginHeight = 20;
-  export let flowWidth = 10;
+  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
@@ -55,8 +56,7 @@
 
   // SVG and scale state
   let svgElement;
-  let xScale = null;
-  let yScale = null;
+  let scales = null;
 
   // Animation state
   let isPlaying = playingByDefault;
@@ -88,7 +88,7 @@
   }
 
   function plotPointLabel() {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     const svg = d3.select(svgElement);
@@ -99,13 +99,13 @@
     if (!sourcePoint || !targetPoint) return;
 
     // x_0 label above source point
-    const sourceX = xScale(sourcePoint[0]);
-    const sourceY = yScale(sourcePoint[1]);
+    const sourceX = dataToPixelX(sourcePoint[0], true, scales);
+    const sourceY = scales.yScale(sourcePoint[1]);
     plotKatexInSVG(labelGroup, 'x_0', sourceX - 18, sourceY - 50, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
 
     // x_1 label above target point
-    const targetX = xScale(targetPoint[0] + flowWidth);
-    const targetY = yScale(targetPoint[1]);
+    const targetX = dataToPixelX(targetPoint[0], false, scales);
+    const targetY = scales.yScale(targetPoint[1]);
     plotKatexInSVG(labelGroup, 'x_1', targetX - 18, targetY - 50, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
   }
 
@@ -122,14 +122,13 @@
   }
 
   function plotLabels() {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
 
     const svg = d3.select(svgElement);
     const labelsGroup = svg.select('#labels');
 
     // Source and target distribution labels at top
-    plotSourceTargetLabels(svg, xScale, yScale, {
-      flowWidth,
+    plotSourceTargetLabels(svg, scales, {
       sourceLabelText,
       targetLabelText,
       labelFontSize,
@@ -141,11 +140,11 @@
     // Formula at bottom center
     const formulaX = width / 2;
     const formulaY = height - marginHeight - 10;
-    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 130, formulaY - 30, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 100, formulaY - 30, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
   }
 
   function plotLine() {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     const svg = d3.select(svgElement);
@@ -156,10 +155,10 @@
 
     if (!sourcePoint || !targetPoint) return;
 
-    const x1 = xScale(sourcePoint[0]);
-    const y1 = yScale(sourcePoint[1]);
-    const x2 = xScale(targetPoint[0] + flowWidth);
-    const y2 = yScale(targetPoint[1]);
+    const x1 = dataToPixelX(sourcePoint[0], true, scales);
+    const y1 = scales.yScale(sourcePoint[1]);
+    const x2 = dataToPixelX(targetPoint[0], false, scales);
+    const y2 = scales.yScale(targetPoint[1]);
 
     lineGroup.append('line')
       .attr('x1', x1)
@@ -191,7 +190,7 @@
   }
 
   function initAnimatedDot() {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     const svg = d3.select(svgElement);
@@ -201,8 +200,8 @@
     const sourcePoint = sourceDistributionSamples[sourcePointIndex];
     if (!sourcePoint) return;
 
-    const initialX = xScale(sourcePoint[0]);
-    const initialY = yScale(sourcePoint[1]);
+    const initialX = dataToPixelX(sourcePoint[0], true, scales);
+    const initialY = scales.yScale(sourcePoint[1]);
 
     dotGroup.append('circle')
       .attr('id', 'movingDot')
@@ -217,7 +216,7 @@
   }
 
   function updateDotPosition(progress) {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     const svg = d3.select(svgElement);
@@ -229,10 +228,10 @@
 
     if (!sourcePoint || !targetPoint) return;
 
-    const x1 = xScale(sourcePoint[0]);
-    const y1 = yScale(sourcePoint[1]);
-    const x2 = xScale(targetPoint[0] + flowWidth);
-    const y2 = yScale(targetPoint[1]);
+    const x1 = dataToPixelX(sourcePoint[0], true, scales);
+    const y1 = scales.yScale(sourcePoint[1]);
+    const x2 = dataToPixelX(targetPoint[0], false, scales);
+    const y2 = scales.yScale(targetPoint[1]);
 
     const currentX = x1 + progress * (x2 - x1);
     const currentY = y1 + progress * (y2 - y1);
@@ -309,14 +308,11 @@
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     initializeLayers();
-    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
     });
-    xScale = scales.xScale;
-    yScale = scales.yScale;
     const svg = d3.select(svgElement);
-    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
-      flowWidth,
+    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, scales, {
       sourcePointColor,
       targetPointColor,
       pointRadius,

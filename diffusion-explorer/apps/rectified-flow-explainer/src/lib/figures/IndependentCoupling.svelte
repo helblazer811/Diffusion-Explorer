@@ -4,7 +4,7 @@
   import * as d3 from 'd3';
   import Figure from '$lib/components/Figure.svelte';
   import { settings } from '$lib/settings';
-  import { plotSourceTargetLabels, plotSourceTargetScatter, createSourceTargetScales } from '$lib/d3_helpers';
+  import { plotSourceTargetLabels, plotSourceTargetScatter, createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -18,7 +18,8 @@
   export const width = 800;
   export const sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export const targetPointColor = settings.stylingSettings.scatterPlot.color;
-  export const flowWidth = 10;
+  export const sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export const targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export const marginWidth = 50;
   export const marginHeight = 20;
   export const sourceLabelText = 'Source Distribution';
@@ -40,17 +41,15 @@
   export const dashed = false;
 
   let svgElement;
-  let xScale = null;
-  let yScale = null;
+  let scales = null;
   let isInitialized = false;
 
   function plotLabels() {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
 
     const svg = d3.select(svgElement);
 
-    plotSourceTargetLabels(svg, xScale, yScale, {
-      flowWidth,
+    plotSourceTargetLabels(svg, scales, {
       sourceLabelText,
       targetLabelText,
       labelFontSize,
@@ -74,9 +73,10 @@
   }
 
   function plotCoupling(sourcePoints, targetPoints) {
-    if (!svgElement || !xScale || !yScale) return { couplingData: [], shuffledTargets: [] };
+    if (!svgElement || !scales) return { couplingData: [], shuffledTargets: [] };
 
     const svg = d3.select(svgElement);
+    const { yScale } = scales;
 
     // Remove existing coupling edges if they exist
     svg.select('#couplingEdges').remove();
@@ -90,7 +90,7 @@
     // Create random pairings without replacement
     const couplingData = sourcePoints.map((sourcePoint, i) => {
       const targetPoint = shuffledTargets[i];
-      return { source: sourcePoint, target: targetPoint };
+      return { source: sourcePoint, target: targetPoint, isSourcePoint: true };
     });
 
     // Draw visible dashed edges
@@ -99,9 +99,9 @@
       .enter()
       .append('line')
       .attr('class', (d, i) => `visible-edge edge-${i}`)
-      .attr('x1', d => xScale(d.source[0]))
+      .attr('x1', d => dataToPixelX(d.source[0], true, scales))
       .attr('y1', d => yScale(d.source[1]))
-      .attr('x2', d => xScale(d.target[0]))
+      .attr('x2', d => dataToPixelX(d.target[0], false, scales))
       .attr('y2', d => yScale(d.target[1]))
       .attr('stroke', edgeColor)
       .attr('stroke-width', edgeWidth)
@@ -117,9 +117,9 @@
       .enter()
       .append('line')
       .attr('class', (d, i) => `hit-area hit-area-${i}`)
-      .attr('x1', d => xScale(d.source[0]))
+      .attr('x1', d => dataToPixelX(d.source[0], true, scales))
       .attr('y1', d => yScale(d.source[1]))
-      .attr('x2', d => xScale(d.target[0]))
+      .attr('x2', d => dataToPixelX(d.target[0], false, scales))
       .attr('y2', d => yScale(d.target[1]))
       .attr('stroke', 'transparent')
       .attr('stroke-width', edgeWidth * 2)
@@ -257,31 +257,27 @@
     svg.append('g').attr('id', 'targetScatter');
     svg.append('g').attr('id', 'labels');
 
-    // Create scales - helper shifts target points by flowWidth internally
-    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    // Create scales using proportional positioning
+    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
     });
-    xScale = scales.xScale;
-    yScale = scales.yScale;
 
     // Plot coupling edges first (so they're behind scatter points)
-    const shiftedTargetPoints = targetDistributionSamples.map(([x, y]) => [x + flowWidth, y]);
-    const { shuffledTargets } = plotCoupling(sourceDistributionSamples, shiftedTargetPoints);
+    // Note: we pass original target points, dataToPixelX handles the pixel positioning
+    const { shuffledTargets } = plotCoupling(sourceDistributionSamples, targetDistributionSamples);
 
-    // Plot scatter using d3_helpers (centers horizontally by default)
-    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
-      flowWidth,
+    // Plot scatter using d3_helpers
+    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, scales, {
       sourcePointColor,
       targetPointColor,
       pointRadius,
-      pointOpacity,
-      centerHorizontally: false  // Don't center - use our own scale
+      pointOpacity
     });
 
     // Add hover attributes and handlers
     addHoverAttributes(svg);
     plotLabels();
-    setupPointHoverHandlers(shiftedTargetPoints, shuffledTargets);
+    setupPointHoverHandlers(targetDistributionSamples, shuffledTargets);
     isInitialized = true;
   }
 
