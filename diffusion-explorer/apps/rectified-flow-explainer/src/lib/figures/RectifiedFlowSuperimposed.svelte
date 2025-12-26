@@ -87,6 +87,7 @@
     } else if ($figureIsActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
       isPlaying = true;
+      startAnimation();
     }
   }
 
@@ -302,10 +303,7 @@
   }
 
   onMount(() => {
-    if (isDataValid) {
-      initializeScales();
-      if (isPlaying) startAnimation();
-    }
+    // Scales and animation are handled by the reactive statement
   });
 
   onDestroy(() => {
