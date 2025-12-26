@@ -46,7 +46,7 @@
   export let hoverEdgeOpacity = 0.8;
   export let hoverPointOpacity = 0.9;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
-  export let distributionScaleFactor = 0.7;
+  export let distributionScaleFactor = 0.6;
 
   // Label props
   export let leftLabel = 'Independent Coupling';

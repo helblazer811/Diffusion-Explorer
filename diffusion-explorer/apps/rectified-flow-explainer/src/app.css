@@ -221,6 +221,49 @@ h2 {
   font-feature-settings: "liga";
 }
 
+.top-nav {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.top-nav .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #555;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.top-nav .nav-link:hover {
+  color: rgb(0, 100, 200);
+}
+
+.internal-link {
+  color: rgb(0, 100, 200);
+  text-decoration: none;
+  background-image: linear-gradient(to right, rgb(0, 100, 200) 50%, transparent 50%);
+  background-size: 8px 2px;
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+  padding-bottom: 2px;
+}
+
+.internal-link:hover {
+  text-decoration: none;
+  font-weight: 500;
+  background-image: linear-gradient(to right, rgb(0, 100, 200) 100%, transparent 0%);
+}
+
+.internal-link:visited {
+  color: rgb(0, 80, 160);
+  background-image: linear-gradient(to right, rgb(0, 80, 160) 50%, transparent 50%);
+}
+
 .page-container {
   max-width: 800px;
   margin: 0 auto;
@@ -229,6 +272,10 @@ h2 {
 
 /* Adjust layout when TOC sidebar is visible */
 @media (min-width: 1200px) {
+  .top-nav {
+    margin-left: max(280px, calc((100vw - 900px) / 2));
+  }
+
   .page-container {
     margin-left: max(280px, calc((100vw - 900px) / 2));
   }

@@ -21,7 +21,7 @@
 
   // Props/Configuration
   export let width = 800;
-  export let height = 360;
+  export let height = 320;
 
   // Styling props for visualization
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
@@ -38,7 +38,7 @@
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
   export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
-  export let yShiftFactor = -1.1;
+  export let yShiftFactor = -1.0;
   export let distributionScaleFactor = 0.6;
 
   // Animation settings
@@ -288,7 +288,7 @@
     const yDomain = scales.yScale.domain();
     const yTop = yDomain[0];
     const textLabelY = scales.yScale(yTop) + 0.5 * labelFontSize;
-    const mathLabelY = textLabelY + labelFontSize - 5;
+    const mathLabelY = textLabelY + labelFontSize - 10;
 
     // Text labels (Source/Target Distribution)
     labelsGroup.append("text")
@@ -344,7 +344,7 @@
     const yDomain = scales.yScale.domain();
     const yTop = yDomain[0];
     const textLabelY = scales.yScale(yTop) + 0.5 * labelFontSize;
-    const mathLabelY = textLabelY + labelFontSize - 5;
+    const mathLabelY = textLabelY + labelFontSize - 10;
 
     // Clear and re-render - offset to center (plotKatexInSVG positions from left edge)
     const katexCenterOffset = 15;
