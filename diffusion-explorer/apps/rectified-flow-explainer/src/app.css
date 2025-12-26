@@ -113,12 +113,14 @@ button:focus {
 
 .byline {
   margin: 0;
+  font-size: 1.1rem;
 }
 
 .dateline {
   margin: 0;
   color: #777;
   font-weight: normal;
+  font-size: 1.1rem;
 }
 
 .acknowledgements p {

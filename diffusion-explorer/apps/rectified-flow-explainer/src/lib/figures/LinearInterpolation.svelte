@@ -22,8 +22,8 @@
   export let targetPointIndex = 0;
 
   // Colors
-  export let sourcePointColor = settings.scatterPlotStyling.color;
-  export let targetPointColor = settings.scatterPlotStyling.color;
+  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
+  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
   export let lineColor = '#f17720';
   export let animatedDotColor = '#f17720';
 
@@ -38,20 +38,20 @@
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let flowWidth = 10;
-  export let pointRadius = settings.scatterPlotStyling.radius;
-  export let pointOpacity = settings.scatterPlotStyling.opacity;
-  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
+  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
+  export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
+  export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
   export let lineWidth = 3;
   export let animatedDotRadius = 6;
-  export let labelFontSize = settings.labelStyling.fontSize;
-  export let labelColor = settings.labelStyling.color;
-  export let outlineColor = settings.labelStyling.outlineColor;
-  export let outlineOpacity = settings.labelStyling.outlineOpacity;
+  export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelColor = settings.stylingSettings.label.color;
+  export let outlineColor = settings.stylingSettings.label.outlineColor;
+  export let outlineOpacity = settings.stylingSettings.label.outlineOpacity;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
   export let pointLabelFontSize = 18;
   export let pointLabelBgOpacity = 0.9;
-  export let figureLatexColor = settings.figureLatexStyling.color;
+  export let figureLatexColor = settings.stylingSettings.figureLatex.color;
 
   // SVG and scale state
   let svgElement;

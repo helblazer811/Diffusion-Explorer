@@ -19,7 +19,8 @@ const trainingObjectiveToModelClass = {
 };
 
 self.onmessage = async (e) => {
-  const { type, data } = e.data;
+  try {
+    const { type, data } = e.data;
   // Destructure the data
 
   const modelJSONPath = data.modelJSONPath;
@@ -244,4 +245,10 @@ self.onmessage = async (e) => {
   }
 
   self.postMessage(resultMessage);
+  } catch (error) {
+    self.postMessage({
+      type: 'error',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
 };

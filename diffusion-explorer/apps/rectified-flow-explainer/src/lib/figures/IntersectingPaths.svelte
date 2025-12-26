@@ -28,27 +28,27 @@
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let flowWidth = 10;
-  export let pointRadius = settings.scatterPlotStyling.radius;
-  export let pointOpacity = settings.scatterPlotStyling.opacity;
+  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
+  export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let lineColor = '#666';
   export let lineWidth = 3;
-  export let sourcePointColor = settings.scatterPlotStyling.color;
-  export let targetPointColor = settings.scatterPlotStyling.color;
+  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
+  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
   export let arrowWidth = 2.5;
-  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
+  export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
 
-  export let labelFontSize = settings.labelStyling.fontSize;
-  export let labelColor = settings.labelStyling.color;
-  export let outlineColor = settings.labelStyling.outlineColor;
-  export let outlineOpacity = settings.labelStyling.outlineOpacity;
-  export let labelYShiftFactor = settings.labelStyling.yShiftFactor;
+  export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelColor = settings.stylingSettings.label.color;
+  export let outlineColor = settings.stylingSettings.label.outlineColor;
+  export let outlineOpacity = settings.stylingSettings.label.outlineOpacity;
+  export let labelYShiftFactor = settings.stylingSettings.label.yShiftFactor;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
 
   // LaTeX labels
   export let labelVerticalOffset = -35;
   export let latexFontSize = 16;
-  export let figureLatexColor = settings.figureLatexStyling.color;
+  export let figureLatexColor = settings.stylingSettings.figureLatex.color;
   export let intersectionLabel = 'x';
   export let topArrowLabel = 'v_t(x|x_0^a, x_1^a)';
   export let bottomArrowLabel = 'v_t(x|x_0^b, x_1^b)';
