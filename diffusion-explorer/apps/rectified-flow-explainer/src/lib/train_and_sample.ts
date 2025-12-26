@@ -10,12 +10,11 @@ import {
   settings as globalSettings,
   type VectorFieldData,
   type RectifiedFlowData,
-  type RectifiedFlowConfig,
   type TrainingSettings
 } from './settings';
 
 // Re-export types for convenience
-export type { VectorFieldData, RectifiedFlowData, RectifiedFlowConfig, TrainingSettings };
+export type { VectorFieldData, RectifiedFlowData, TrainingSettings };
 
 // ========== HELPER FUNCTIONS ==========
 
@@ -95,7 +94,12 @@ export async function loadTargetDistribution(
     const response = await fetch(dataPath);
     const data = await response.json();
     const allPoints = data.points as number[][];
-    const shuffled = [...allPoints].sort(() => Math.random() - 0.5);
+    // Fisher-Yates shuffle for unbiased random sampling
+    const shuffled = [...allPoints];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     console.log('Loaded target distribution samples:', numSamples);
     return shuffled.slice(0, numSamples);
   } catch (error) {
@@ -116,7 +120,7 @@ export async function loadCachedTrajectories(
 
     const cachedData = await response.json();
     if (!cachedData || !Array.isArray(cachedData)) {
-      console.error('Invalid cached trajectories format');
+      console.error('Invalid cached trajectories format from file: ', path);
       return null;
     }
 
@@ -199,15 +203,14 @@ export async function loadCachedRectifiedFlowTrajectories(
 // ========== TRAINING AND SAMPLING FUNCTIONS ==========
 
 export async function trainModel(
-  trainingObjective: string,
   settings: TrainingSettings,
   trainWorkerUrl: string,
   onTrainingStart?: () => void,
   onTrainingEnd?: () => void
 ): Promise<{ modelPath: string; worker: Worker }> {
   console.log('Starting model training...');
-  const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjective];
-  const trainingConfig = settings.trainingConfig;
+  const modelConfig = settings.modelConfig;
+  const trainingConfig = settings.flowMatchingTrainingConfig;
   const datasetPath = globalSettings.targetDistributionPointsPath;
 
   onTrainingStart?.();
@@ -216,7 +219,7 @@ export async function trainModel(
     console.log("Starting training worker thread...");
     const worker = callTrainingWorkerThread(
       trainWorkerUrl,
-      trainingObjective,
+      'Flow Matching',
       modelConfig,
       datasetPath,
       trainingConfig,
@@ -236,18 +239,17 @@ export async function generateSamples(
   modelPath: string,
   numSamples: number,
   numberOfSteps: number,
-  trainingObjective: string,
   settings: TrainingSettings,
   samplingWorkerUrl: string
 ): Promise<{ allTimeSamples: number[][][]; sourceDistribution: number[][] }> {
-  const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjective];
+  const modelConfig = settings.modelConfig;
   const initialPoints = generateClippedGaussianSamples(numSamples);
 
   return new Promise((resolve) => {
     callSamplingWorkerThreadFromInitialPoints(
       samplingWorkerUrl,
       modelPath,
-      trainingObjective,
+      'Flow Matching',
       modelConfig,
       initialPoints,
       numberOfSteps,
@@ -263,24 +265,47 @@ export async function generateSamples(
   });
 }
 
+export async function generateSamplesUniformGrid(
+  modelPath: string,
+  gridResolution: number,
+  gridDomainRange: { xMin: number; xMax: number; yMin: number; yMax: number },
+  numberOfSteps: number,
+  settings: TrainingSettings,
+  samplingWorkerUrl: string
+): Promise<{ allTimeSamples: number[][][]; sourceDistribution: number[][] }> {
+  const modelConfig = settings.modelConfig;
+  const initialPoints = generateUniformGridSamples(gridResolution, gridDomainRange);
+
+  return new Promise((resolve) => {
+    callSamplingWorkerThreadFromInitialPoints(
+      samplingWorkerUrl,
+      modelPath,
+      'Flow Matching',
+      modelConfig,
+      initialPoints,
+      numberOfSteps,
+      (allSamples: number[][][]) => {
+        console.log('Generated uniform grid samples:', allSamples.length, 'timesteps');
+        resolve({
+          allTimeSamples: allSamples,
+          sourceDistribution: allSamples[0]
+        });
+      },
+      gridDomainRange
+    );
+  });
+}
+
 export async function generateVectorField(
   modelPath: string,
   gridResolution: number,
   numTimeSteps: number,
-  trainingObjective: string,
+  domainRange: { xMin: number; xMax: number; yMin: number; yMax: number },
   settings: TrainingSettings,
   samplingWorkerUrl: string
 ): Promise<VectorFieldData> {
   console.log('Generating vector field...');
-  const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjective];
-
-  // Use hardcoded domain range
-  const domainRange = {
-    xMin: -2.5,
-    xMax: 2.5,
-    yMin: -2.5,
-    yMax: 2.5
-  };
+  const modelConfig = settings.modelConfig;
 
   // Generate time steps
   const timeSteps: number[] = [];
@@ -301,7 +326,7 @@ export async function generateVectorField(
       const worker = callSamplingWorkerThreadVectorFieldGrid(
         samplingWorkerUrl,
         modelPath,
-        trainingObjective,
+        'Flow Matching',
         modelConfig,
         gridResolution,
         domainRange,
@@ -345,22 +370,21 @@ export async function generateVectorField(
 }
 
 export async function trainRectifiedFlow(
-  trainingObjective: string,
   settings: TrainingSettings,
-  rectifiedFlowConfig: RectifiedFlowConfig,
   trainWorkerUrl: string,
   onEpochCallback?: (epoch: number, rectifiedStep: number) => void,
   onRectifiedStepCallback?: (rectifiedStep: number, trajectories: number[][] | null) => void
 ): Promise<{ data: RectifiedFlowData; worker: Worker }> {
   console.log('Starting rectified flow training...');
-  const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjective];
+  const modelConfig = settings.modelConfig;
+  const rectifiedFlowConfig = settings.rectifiedFlowTrainingConfig;
   const datasetPath = globalSettings.targetDistributionPointsPath;
 
   return new Promise((resolve) => {
     console.log("Starting rectified flow training worker thread...");
     const worker = callRectifiedFlowTrainingWorker(
       trainWorkerUrl,
-      trainingObjective,
+      'Flow Matching', // trainingObjective is constant
       modelConfig,
       datasetPath,
       rectifiedFlowConfig,

@@ -38,34 +38,34 @@
 
   // Styling props (colors)
   export let trajectoryColor = "#f17720"; // Orange
-  export let sourcePointColor = settings.scatterPlotStyling.color;
-  export let targetPointColor = settings.scatterPlotStyling.color;
+  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
+  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
 
   // Styling props (opacity)
   export let trajectoryFullOpacity = 0.3; // Background paths
   export let trajectoryProgressOpacity = 0.8; // Animated paths
-  export let pointOpacity = settings.scatterPlotStyling.opacity;
+  export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
 
   // Styling props (dimensions)
   export let trajectoryStrokeWidth = 2;
   export let trajectoryPointRadius = 4;
-  export let pointRadius = settings.scatterPlotStyling.radius;
+  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
 
   // Layout
   export let width = 800;
   export let height = 325;
   export let marginWidth = 20;
   export let marginHeight = 20;
-  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
+  export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
   export let flowWidth = 10; // Horizontal gap between source and target in data units
 
   // Label props
   export let sourceLabelText = "Source Distribution";
   export let targetLabelText = "Target Distribution";
-  export let labelFontSize = settings.labelStyling.fontSize;
-  export let labelColor = settings.labelStyling.color;
-  export let outlineColor = settings.labelStyling.outlineColor;
-  export let outlineOpacity = settings.labelStyling.outlineOpacity;
+  export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelColor = settings.stylingSettings.label.color;
+  export let outlineColor = settings.stylingSettings.label.outlineColor;
+  export let outlineOpacity = settings.stylingSettings.label.outlineOpacity;
 
   // Toggle button props
   export let beforeLabel = "Before Rectification";

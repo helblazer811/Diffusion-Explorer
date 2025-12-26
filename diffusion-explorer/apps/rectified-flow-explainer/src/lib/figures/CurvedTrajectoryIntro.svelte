@@ -26,20 +26,20 @@
   export let numTrajectories = 20; // Number of trajectories to display
 
   // Styling props for visualization
-  export let sourcePointColor = settings.scatterPlotStyling.color;
-  export let targetPointColor = settings.scatterPlotStyling.color;
+  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
+  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let sourceLabelText = 'Source Distribution';
   export let targetLabelText = 'Target Distribution';
-  export let labelFontSize = settings.labelStyling.fontSize;
-  export let labelColor = settings.labelStyling.color;
-  export let outlineColor = settings.labelStyling.outlineColor;
-  export let outlineOpacity = settings.labelStyling.outlineOpacity;
-  export let pointRadius = settings.scatterPlotStyling.radius;
-  export let pointOpacity = settings.scatterPlotStyling.opacity;
+  export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelColor = settings.stylingSettings.label.color;
+  export let outlineColor = settings.stylingSettings.label.outlineColor;
+  export let outlineOpacity = settings.stylingSettings.label.outlineOpacity;
+  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
+  export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let flowWidth = 10; // Gap between source and target in data units
-  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
+  export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
 
   // Animation settings
   export let animationDuration = 8000; // Duration in milliseconds

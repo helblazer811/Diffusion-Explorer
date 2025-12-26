@@ -36,11 +36,16 @@
   const allTimeSamples: Writable<number[][][]> = writable([]);
   const isTraining: Writable<boolean> = writable(false);
 
-  // Vector field data store
+  // Vector field data stores
   const vectorFieldData: Writable<VectorFieldData | null> = writable(null);
+  const rectifiedFlowVectorFieldData: Writable<VectorFieldData | null> = writable(null);
 
   // Rectified flow data store
   const rectifiedFlowData: Writable<RectifiedFlowData | null> = writable(null);
+
+  // Grid trajectory stores
+  const flowMatchingGridTrajectories: Writable<number[][][] | null> = writable(null);
+  const rectifiedFlowGridTrajectories: Writable<number[][][][] | null> = writable(null);
 
   // Worker references
   let trainingWorker: Worker | null = null;
@@ -50,7 +55,7 @@
   let showOtherFigures = false;
 
   // Figure width (shared across all figures)
-  const figureWidth = settings.globalStyling.figureWidth;
+  const figureWidth = settings.stylingSettings.global.figureWidth;
 
   // Bibliography state
   let bibEntries: Map<string, BibEntry> | null = null;
@@ -61,7 +66,7 @@
   async function loadTargetDistribution() {
     const samples = await trainAndSample.loadTargetDistribution(
       settings.targetDistributionPointsPath,
-      settings.numSamples
+      settings.samplingSettings.flowMatching.numSamples
     );
     if (samples) {
       targetDistributionSamples.set(samples);
@@ -99,10 +104,38 @@
     return false;
   }
 
+  async function loadCachedGridTrajectories(path: string, isRectifiedFlow: boolean) {
+    if (isRectifiedFlow) {
+      // Rectified flow grid is stored in RectifiedFlowData format: { allRectifiedTrajectories, modelPath }
+      const rfResult = await trainAndSample.loadCachedRectifiedFlowTrajectories(path);
+      if (rfResult) {
+        rectifiedFlowGridTrajectories.set(rfResult.allRectifiedTrajectories);
+        return true;
+      }
+      return false;
+    } else {
+      // Flow matching grid is stored as raw array format
+      const result = await trainAndSample.loadCachedTrajectories(path);
+      if (result) {
+        flowMatchingGridTrajectories.set(result.trajectories);
+        return true;
+      }
+      return false;
+    }
+  }
+
+  async function loadCachedRectifiedFlowVectorField(path: string) {
+    const result = await trainAndSample.loadCachedVectorField(path);
+    if (result) {
+      rectifiedFlowVectorFieldData.set(result);
+      return true;
+    }
+    return false;
+  }
+
   async function trainModel() {
     const result = await trainAndSample.trainModel(
-      settings.trainingObjective,
-      settings.training,
+      settings.trainingSettings,
       settings.trainWorkerUrl,
       () => isTraining.set(true),
       () => isTraining.set(false)
@@ -114,10 +147,9 @@
   async function generateSamples(modelPath: string) {
     const result = await trainAndSample.generateSamples(
       modelPath,
-      settings.numSamples,
-      settings.numSteps,
-      settings.trainingObjective,
-      settings.training,
+      settings.samplingSettings.flowMatching.numSamples,
+      settings.samplingSettings.flowMatching.numSteps,
+      settings.trainingSettings,
       settings.samplingWorkerUrl
     );
     allTimeSamples.set(result.allTimeSamples);
@@ -129,10 +161,10 @@
   async function generateVectorField(modelPath: string) {
     const result = await trainAndSample.generateVectorField(
       modelPath,
-      settings.vectorFieldGridResolution,
-      settings.vectorFieldTimeSteps,
-      settings.trainingObjective,
-      settings.training,
+      settings.samplingSettings.flowMatchingVectorField.gridResolution,
+      settings.samplingSettings.flowMatchingVectorField.numTimeSteps,
+      settings.samplingSettings.flowMatchingVectorField.domainRange,
+      settings.trainingSettings,
       settings.samplingWorkerUrl
     );
     vectorFieldData.set(result);
@@ -141,15 +173,66 @@
 
   async function trainRectifiedFlow() {
     const result = await trainAndSample.trainRectifiedFlow(
-      settings.trainingObjective,
-      settings.training,
-      settings.rectifiedFlowConfig,
+      settings.trainingSettings,
       settings.trainWorkerUrl
     );
     rectifiedTrainingWorker = result.worker;
     rectifiedFlowData.set(result.data);
     downloadRectifiedFlowData();
     return result.data.modelPath;
+  }
+
+  async function generateFlowMatchingGridSamples(modelPath: string) {
+    const result = await trainAndSample.generateSamplesUniformGrid(
+      modelPath,
+      settings.samplingSettings.flowMatchingGrid.gridResolution,
+      settings.samplingSettings.flowMatchingGrid.gridDomainRange,
+      settings.samplingSettings.flowMatchingGrid.numSteps,
+      settings.trainingSettings,
+      settings.samplingWorkerUrl
+    );
+    flowMatchingGridTrajectories.set(result.allTimeSamples);
+    downloadFlowMatchingGridTrajectories();
+    return result.allTimeSamples;
+  }
+
+  async function generateRectifiedFlowGridSamples(modelPath: string) {
+    // Generate grid samples for each rectified step (before and after rectification)
+    // We need the model from step 0 (before) and step 1+ (after)
+    const gridTrajectories: number[][][][] = [];
+
+    // For the "before" visualization, use the flow matching model (step 0)
+    const beforeResult = await trainAndSample.generateSamplesUniformGrid(
+      modelPath, // This should be the final rectified model
+      settings.samplingSettings.rectifiedFlowGrid.gridResolution,
+      settings.samplingSettings.rectifiedFlowGrid.gridDomainRange,
+      settings.samplingSettings.rectifiedFlowGrid.numSteps,
+      settings.trainingSettings,
+      settings.samplingWorkerUrl
+    );
+    gridTrajectories.push(beforeResult.allTimeSamples);
+
+    // For now, we only have one model, so use same for "after"
+    // In a full implementation, you'd sample from intermediate models
+    gridTrajectories.push(beforeResult.allTimeSamples);
+
+    rectifiedFlowGridTrajectories.set(gridTrajectories);
+    downloadRectifiedFlowGridTrajectories();
+    return gridTrajectories;
+  }
+
+  async function generateRectifiedFlowVectorField(modelPath: string) {
+    const result = await trainAndSample.generateVectorField(
+      modelPath,
+      settings.samplingSettings.rectifiedFlowVectorField.gridResolution,
+      settings.samplingSettings.rectifiedFlowVectorField.numTimeSteps,
+      settings.samplingSettings.rectifiedFlowVectorField.domainRange,
+      settings.trainingSettings,
+      settings.samplingWorkerUrl
+    );
+    rectifiedFlowVectorFieldData.set(result);
+    downloadRectifiedFlowVectorField();
+    return result;
   }
 
   // ========== DOWNLOAD FUNCTIONS ==========
@@ -209,6 +292,66 @@
     );
   }
 
+  function downloadFlowMatchingGridTrajectories() {
+    const trajectories = $flowMatchingGridTrajectories;
+    if (!trajectories || trajectories.length === 0) {
+      console.error("No flow matching grid trajectories to download");
+      return;
+    }
+    const filename =
+      "flow_matching_grid_trajectories_" + new Date().getTime() + ".json";
+    downloadJSON(trajectories, filename);
+    console.log(
+      "Flow matching grid trajectories downloaded:",
+      filename,
+      trajectories.length,
+      "timesteps"
+    );
+  }
+
+  function downloadRectifiedFlowGridTrajectories() {
+    const trajectories = $rectifiedFlowGridTrajectories;
+    if (!trajectories || trajectories.length === 0) {
+      console.error("No rectified flow grid trajectories to download");
+      return;
+    }
+    const filename =
+      "rectified_flow_grid_trajectories_" + new Date().getTime() + ".json";
+    // Wrap in RectifiedFlowData format for consistency
+    const data = {
+      allRectifiedTrajectories: trajectories,
+      modelPath: "generated"
+    };
+    downloadJSON(data, filename);
+    console.log(
+      "Rectified flow grid trajectories downloaded:",
+      filename,
+      trajectories.length,
+      "rectified steps"
+    );
+  }
+
+  function downloadRectifiedFlowVectorField() {
+    const field = $rectifiedFlowVectorFieldData;
+    if (!field) {
+      console.error("No rectified flow vector field to download");
+      return;
+    }
+    const filename =
+      "rectified_flow_vector_field_" + new Date().getTime() + ".json";
+    downloadJSON(field, filename);
+    console.log(
+      "Rectified flow vector field downloaded:",
+      filename,
+      field.timeSteps.length,
+      "timesteps,",
+      field.gridResolution,
+      "x",
+      field.gridResolution,
+      "grid"
+    );
+  }
+
   // ========== LIFECYCLE ==========
 
   onMount(async () => {
@@ -216,48 +359,101 @@
     await loadTargetDistribution();
 
     // Try to load each cached resource independently
-    let trajectoriesLoaded = false;
-    let vectorFieldLoaded = false;
-    let rectifiedFlowLoaded = false;
+    let flowMatchingTrajectoriesLoaded = false;
+    let flowMatchingVectorFieldLoaded = false;
+    let flowMatchingGridTrajectoriesLoaded = false;
+    let rectifiedFlowTrajectoriesLoaded = false;
+    let rectifiedFlowGridTrajectoriesLoaded = false;
+    let rectifiedFlowVectorFieldLoaded = false;
 
-    if (settings.cachedTrajectoriesPath) {
-      trajectoriesLoaded = await loadCachedTrajectories(
-        settings.cachedTrajectoriesPath
+    // Load flow matching trajectories
+    if (settings.cachedFlowMatchingTrajectoriesPath) {
+      flowMatchingTrajectoriesLoaded = await loadCachedTrajectories(
+        settings.cachedFlowMatchingTrajectoriesPath
       );
     }
 
-    if (settings.cachedVectorFieldPath) {
-      vectorFieldLoaded = await loadCachedVectorField(
-        settings.cachedVectorFieldPath
+    // Load flow matching vector field
+    if (settings.cachedFlowMatchingVectorFieldPath) {
+      flowMatchingVectorFieldLoaded = await loadCachedVectorField(
+        settings.cachedFlowMatchingVectorFieldPath
       );
     }
 
+    // Load flow matching grid trajectories
+    if (settings.cachedFlowMatchingGridTrajectoriesPath) {
+      flowMatchingGridTrajectoriesLoaded = await loadCachedGridTrajectories(
+        settings.cachedFlowMatchingGridTrajectoriesPath,
+        false
+      );
+    }
+
+    // Load rectified flow trajectories
     if (settings.cachedRectifiedFlowTrajectoriesPath) {
-      rectifiedFlowLoaded = await loadCachedRectifiedFlowTrajectories(
+      rectifiedFlowTrajectoriesLoaded = await loadCachedRectifiedFlowTrajectories(
         settings.cachedRectifiedFlowTrajectoriesPath
       );
     }
 
-    // Train and generate any missing data
-    let modelPath: string | null = null;
-
-    if (!trajectoriesLoaded) {
-      console.log("Training new model...");
-      modelPath = await trainModel();
-      await generateSamples(modelPath);
+    // Load rectified flow grid trajectories
+    if (settings.cachedRectifiedFlowGridTrajectoriesPath) {
+      rectifiedFlowGridTrajectoriesLoaded = await loadCachedGridTrajectories(
+        settings.cachedRectifiedFlowGridTrajectoriesPath,
+        true
+      );
     }
 
-    if (!vectorFieldLoaded) {
-      if (!modelPath) {
+    // Load rectified flow vector field
+    if (settings.cachedRectifiedFlowVectorFieldPath) {
+      rectifiedFlowVectorFieldLoaded = await loadCachedRectifiedFlowVectorField(
+        settings.cachedRectifiedFlowVectorFieldPath
+      );
+    }
+
+    // Train and generate any missing flow matching data
+    let flowMatchingModelPath: string | null = null;
+
+    if (!flowMatchingTrajectoriesLoaded) {
+      console.log("Training new flow matching model...");
+      flowMatchingModelPath = await trainModel();
+      await generateSamples(flowMatchingModelPath);
+    }
+
+    if (!flowMatchingVectorFieldLoaded) {
+      if (!flowMatchingModelPath) {
         console.log("Training model for vector field generation...");
-        modelPath = await trainModel();
+        flowMatchingModelPath = await trainModel();
       }
-      await generateVectorField(modelPath);
+      await generateVectorField(flowMatchingModelPath);
     }
 
-    if (!rectifiedFlowLoaded) {
+    if (!flowMatchingGridTrajectoriesLoaded) {
+      if (!flowMatchingModelPath) {
+        console.log("Training model for grid trajectories...");
+        flowMatchingModelPath = await trainModel();
+      }
+      await generateFlowMatchingGridSamples(flowMatchingModelPath);
+    }
+
+    // Train and generate any missing rectified flow data
+    let rectifiedFlowModelPath: string | null = null;
+
+    if (!rectifiedFlowTrajectoriesLoaded) {
       console.log("Training rectified flow...");
-      await trainRectifiedFlow();
+      rectifiedFlowModelPath = await trainRectifiedFlow();
+    } else {
+      // Get the model path from loaded data
+      rectifiedFlowModelPath = $rectifiedFlowData?.modelPath ?? null;
+    }
+
+    if (!rectifiedFlowGridTrajectoriesLoaded && rectifiedFlowModelPath) {
+      console.log("Generating rectified flow grid samples...");
+      await generateRectifiedFlowGridSamples(rectifiedFlowModelPath);
+    }
+
+    if (!rectifiedFlowVectorFieldLoaded && rectifiedFlowModelPath) {
+      console.log("Generating rectified flow vector field...");
+      await generateRectifiedFlowVectorField(rectifiedFlowModelPath);
     }
 
     // Load bibliography and collect citations
@@ -288,8 +484,8 @@
 
   <RectifiedFlowSuperimposed
     width={figureWidth}
-    allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ??
-      []}
+    leftTrajectories={$flowMatchingGridTrajectories ?? []}
+    rightTrajectories={$rectifiedFlowGridTrajectories?.[$rectifiedFlowGridTrajectories.length - 1] ?? []}
     targetDistribution={$targetDistributionSamples}
     playingByDefault={true}
     onInitialized={() => {

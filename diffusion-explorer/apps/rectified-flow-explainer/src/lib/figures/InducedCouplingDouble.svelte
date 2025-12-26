@@ -33,24 +33,24 @@
   export let gap = 30;
 
   // Styling props
-  export let sourcePointColor = settings.scatterPlotStyling.color;
-  export let targetPointColor = settings.scatterPlotStyling.color;
+  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
+  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
   export let edgeColor = '#888';
   export let edgeOpacity = 0.3;
   export let edgeWidth = 1.5;
-  export let pointRadius = settings.scatterPlotStyling.radius;
+  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = 0.35; // Custom: different from default
   export let hoverEdgeColor = '#555';
   export let hoverEdgeWidth = 3;
   export let hoverEdgeOpacity = 0.8;
   export let hoverPointOpacity = 0.9;
-  export let yShiftFactor = settings.scatterPlotStyling.yShiftFactor;
+  export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
 
   // Label props
   export let leftLabel = 'Independent Coupling';
   export let rightLabel = 'Induced Coupling';
-  export let labelFontSize = settings.labelStyling.fontSize;
-  export let labelColor = settings.labelStyling.color;
+  export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelColor = settings.stylingSettings.label.color;
 
   // Number of samples to show (subsample if too many)
   export let numSamplesToShow = 50;

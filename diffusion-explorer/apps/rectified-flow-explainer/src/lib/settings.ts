@@ -9,110 +9,129 @@ export interface VectorFieldData {
 }
 
 export interface RectifiedFlowData {
-  allRectifiedTrajectories: number[][][][]; // [rectified_step][num_timesteps][num_samples][dim]
+  allRectifiedTrajectories: number[][][][];
   modelPath: string;
 }
 
-export interface RectifiedFlowConfig {
-  num_rectified_steps: number;
-  epochs_per_rectified_step: number;
-  batchSize: number;
-  num_simulation_steps: number;
-  sourceDistributionPath: string | null;
-}
-
 export interface TrainingSettings {
-  trainingObjectiveToModelConfig: {
-    [key: string]: { dim: number; hidden: number };
-  };
-  trainingConfig: {
+  modelConfig: { dim: number; hidden: number };
+  domainRange: { xMin: number; xMax: number; yMin: number; yMax: number } | null;
+  flowMatchingTrainingConfig: {
     epochs: number;
     batchSize: number;
     verbose: boolean;
     displayInterval: number;
   };
-  domainRange: { xMin: number; xMax: number; yMin: number; yMax: number } | null;
+  rectifiedFlowTrainingConfig: {
+    num_rectified_steps: number;
+    epochs_per_rectified_step: number;
+    batchSize: number;
+    num_simulation_steps: number;
+  };
 }
 
 // ========== SETTINGS OBJECT ==========
 
 export const settings = {
-  // Sampling configuration
-  numSamples: 100,
-  numSteps: 300,
-
   // Target distribution
   targetDistributionPointsPath: '/data/smiley_face.json',
 
-  // Cached data paths
-  cachedTrajectoriesPath: "cached_samples/smiley_face_trajectories.json",
-  cachedVectorFieldPath: "cached_samples/smiley_face_vector_field.json",
-  cachedRectifiedFlowTrajectoriesPath: "cached_samples/smiley_face_rectified_flow_trajectories.json",
-
-  // Vector field configuration
-  vectorFieldGridResolution: 12,
-  vectorFieldTimeSteps: 200,
+  // Cached data paths (null means generate fresh, string path means try to load)
+  cachedFlowMatchingTrajectoriesPath: "cached_samples/flow_matching_trajectories.json" as string | null,
+  cachedFlowMatchingVectorFieldPath: "cached_samples/flow_matching_vector_field.json" as string | null,
+  cachedFlowMatchingGridTrajectoriesPath: "cached_samples/flow_matching_grid_trajectories.json" as string | null,
+  cachedRectifiedFlowTrajectoriesPath: "cached_samples/rectified_flow_trajectories.json" as string | null,
+  cachedRectifiedFlowGridTrajectoriesPath: "cached_samples/rectified_flow_grid_trajectories.json" as string | null,
+  cachedRectifiedFlowVectorFieldPath: "cached_samples/rectified_flow_vector_field.json" as string | null,
 
   // Worker URLs
   trainWorkerUrl: 'src/lib/flow_matching_workers/train.worker.js',
   samplingWorkerUrl: 'src/lib/flow_matching_workers/sampling.worker.js',
 
-  // Training objective
-  trainingObjective: 'Flow Matching',
+  // Model paths (null means train from scratch, otherwise load from path)
+  flowMatchingModelPath: null as string | null,
+  rectifiedFlowModelPath: null as string | null,
 
-  // Rectified flow configuration
-  rectifiedFlowConfig: {
-    num_rectified_steps: 3,
-    epochs_per_rectified_step: 100,
-    batchSize: 32,
-    num_simulation_steps: 200,
-    sourceDistributionPath: null
-  } as RectifiedFlowConfig,
-
-  // Rectified flow superimposed visualization settings
-  rectifiedFlowSuperimposed: {
-    gridResolution: 6, // Number of points per axis in the uniform grid
-    gridDomainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 } // Domain for grid sampling
+  // ========== SAMPLING SETTINGS ==========
+  samplingSettings: {
+    // Flow matching trajectory sampling
+    flowMatching: {
+      numSamples: 100,
+      numSteps: 300
+    },
+    // Flow matching grid sampling
+    flowMatchingGrid: {
+      gridResolution: 6,
+      gridDomainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 },
+      numSteps: 300
+    },
+    // Flow matching vector field sampling
+    flowMatchingVectorField: {
+      gridResolution: 12,
+      numTimeSteps: 200,
+      domainRange: { xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 }
+    },
+    // Rectified flow trajectory sampling
+    rectifiedFlow: {
+      numSamples: 100,
+      numSteps: 300
+    },
+    // Rectified flow grid sampling
+    rectifiedFlowGrid: {
+      gridResolution: 6,
+      gridDomainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 },
+      numSteps: 300
+    },
+    // Rectified flow vector field sampling
+    rectifiedFlowVectorField: {
+      gridResolution: 12,
+      numTimeSteps: 300,
+      domainRange: { xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 }
+    }
   },
 
-  // Training settings
-  training: {
-    trainingObjectiveToModelConfig: {
-      "Flow Matching": { dim: 2, hidden: 64 }
-    },
-    trainingConfig: {
+  // ========== TRAINING SETTINGS ==========
+  trainingSettings: {
+    modelConfig: { dim: 2, hidden: 64 },
+    domainRange: null,
+    flowMatchingTrainingConfig: {
       epochs: 500,
       batchSize: 1024,
       verbose: true,
       displayInterval: 100
     },
-    domainRange: null
+    rectifiedFlowTrainingConfig: {
+      num_rectified_steps: 3,
+      epochs_per_rectified_step: 200,
+      batchSize: 64,
+      num_simulation_steps: 200
+    }
   } as TrainingSettings,
 
-  // Global styling
-  globalStyling: {
-    figureWidth: 750
-  },
-
-  // Label styling
-  labelStyling: {
-    fontSize: 22,
-    yShiftFactor: 0.5,
-    color: '#666',
-    outlineColor: '#f9f9f9',
-    outlineOpacity: 0.5
-  },
-
-  // Scatter plot styling
-  scatterPlotStyling: {
-    radius: 5,
-    opacity: 0.25,
-    color: '#3b82f6',
-    yShiftFactor: -0.85
-  },
-
-  // Figure LaTeX styling
-  figureLatexStyling: {
-    color: '#666'
+  // ========== STYLING SETTINGS ==========
+  stylingSettings: {
+    // Global styling
+    global: {
+      figureWidth: 750
+    },
+    // Label styling
+    label: {
+      fontSize: 22,
+      yShiftFactor: 0.5,
+      color: '#666',
+      outlineColor: '#f9f9f9',
+      outlineOpacity: 0.5
+    },
+    // Scatter plot styling
+    scatterPlot: {
+      radius: 5,
+      opacity: 0.25,
+      color: '#3b82f6',
+      yShiftFactor: -0.85
+    },
+    // Figure LaTeX styling
+    figureLatex: {
+      color: '#666'
+    }
   }
 };

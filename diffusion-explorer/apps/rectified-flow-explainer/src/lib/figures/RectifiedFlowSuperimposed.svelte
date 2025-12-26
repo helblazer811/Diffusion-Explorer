@@ -9,18 +9,17 @@
   export let children = undefined;
   $: caption = children;
 
-  // Data props
-  export let allRectifiedTrajectories = []; // [rectifiedStep][timestep][sample][dim]
+  // Data props - separate trajectories for left and right panels
+  export let leftTrajectories = []; // [timestep][sample][dim] - flow matching grid
+  export let rightTrajectories = []; // [timestep][sample][dim] - rectified flow grid
   export let targetDistribution = []; // The actual target distribution points
 
   // Data validation
   $: isDataValid =
-    allRectifiedTrajectories &&
-    allRectifiedTrajectories.length >= 2 &&
-    allRectifiedTrajectories[0] &&
-    allRectifiedTrajectories[0].length > 0 &&
-    allRectifiedTrajectories[1] &&
-    allRectifiedTrajectories[1].length > 0 &&
+    leftTrajectories &&
+    leftTrajectories.length > 0 &&
+    rightTrajectories &&
+    rightTrajectories.length > 0 &&
     targetDistribution &&
     targetDistribution.length > 0;
 
@@ -44,8 +43,8 @@
   export let pauseDuration = 1000; // ms pause at end of animation
   export let leftLabel = "Before Rectification";
   export let rightLabel = "After Rectification";
-  export let labelFontSize = settings.labelStyling.fontSize;
-  export let labelColor = settings.labelStyling.color;
+  export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelColor = settings.stylingSettings.label.color;
   export let gap = 50;
   export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
 
@@ -67,7 +66,7 @@
   let isInitialized = false;
 
   // Total number of trajectories (derived from data)
-  $: numTrajectories = isDataValid ? (allRectifiedTrajectories[0]?.[0]?.length || 0) : 0;
+  $: numTrajectories = isDataValid ? (leftTrajectories[0]?.length || 0) : 0;
 
   // Visibility-based animation control
   let figureIsActive;
@@ -176,12 +175,11 @@
     onInitialized?.();
   }
 
-  function updatePanel(svgElement, rectifiedStep, timeIndex) {
+  function updatePanel(svgElement, trajectories, timeIndex) {
     if (!svgElement || !isDataValid || !xScale || !yScale) return;
 
     const svg = d3.select(svgElement);
-    const stepData = allRectifiedTrajectories[rectifiedStep];
-    const numTimeSteps = stepData.length;
+    const numTimeSteps = trajectories.length;
 
     // Map timeIndex to trajectory timestep
     const trajectoryTimeIndex = Math.floor(
@@ -194,7 +192,7 @@
 
     // Draw all trajectories from the grid
     for (let i = 0; i < numTrajectories; i++) {
-      const trajectoryPoints = stepData.map((timestep) => timestep[i]);
+      const trajectoryPoints = trajectories.map((timestep) => timestep[i]);
 
       // Draw full trajectory path (lighter)
       const fullPath = trajectoryPoints
@@ -245,17 +243,17 @@
   function updateVisualization(timeIndex) {
     if (!isDataValid) return;
 
-    const numTimeSteps = allRectifiedTrajectories[0].length;
+    const numTimeSteps = leftTrajectories.length;
     const clampedTimeIndex = Math.min(timeIndex, numTimeSteps - 1);
 
-    updatePanel(leftSvgElement, 0, clampedTimeIndex);
-    updatePanel(rightSvgElement, 1, clampedTimeIndex);
+    updatePanel(leftSvgElement, leftTrajectories, clampedTimeIndex);
+    updatePanel(rightSvgElement, rightTrajectories, clampedTimeIndex);
   }
 
   function startAnimation() {
     if (!isDataValid) return;
 
-    const numSteps = allRectifiedTrajectories[0].length;
+    const numSteps = leftTrajectories.length;
     const stepDuration = animationDuration / numSteps;
 
     function animate() {

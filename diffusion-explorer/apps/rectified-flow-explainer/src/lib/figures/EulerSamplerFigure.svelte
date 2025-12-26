@@ -70,8 +70,8 @@
   export let perEdgeAnimationDelay = 250; // Pause between animating each Euler edge segment
   export let repeatAnimation = true; // Whether to repeat the animation
   export let repeatDelay = 1000; // Delay before repeating the animation
-  export let labelFontSize = settings.labelStyling.fontSize;
-  export let labelColor = settings.labelStyling.color;
+  export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelColor = settings.stylingSettings.label.color;
   export let highCurvatureLabel = 'Highly Curved Function';
   export let lowCurvatureLabel = 'Approximately Straight Function';
 
