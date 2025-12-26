@@ -105,6 +105,7 @@
     opacity: 0.7;
     transition: opacity 0.2s;
     flex-shrink: 0;
+    align-self: flex-start;
   }
 
   .play-button:hover {
@@ -124,11 +125,14 @@
     width: 32px;
     margin-left: 12px;
     flex-shrink: 0;
+    align-self: flex-start;
+    height: 32px;
   }
 
   .slider-wrapper {
     flex: 1;
     position: relative;
+    padding-top: 4px;
   }
 
   .slider {
