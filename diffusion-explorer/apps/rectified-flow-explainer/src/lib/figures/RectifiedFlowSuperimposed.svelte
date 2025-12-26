@@ -71,6 +71,10 @@
   // Total number of trajectories (derived from data)
   $: numTrajectories = isDataValid ? (leftTrajectories[0]?.length || 0) : 0;
 
+  // Normalized time for timing circle (0-1)
+  $: numTimeSteps = isDataValid ? leftTrajectories.length : 1;
+  $: normalizedTime = numTimeSteps > 1 ? currentTimeIndex / (numTimeSteps - 1) : 0;
+
   // Visibility-based animation control
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
@@ -314,7 +318,7 @@
 {#if isDataValid}
   <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     {#snippet left()}
-      <PlayButton {isPlaying} onclick={togglePlayPause} />
+      <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
       <svg
         bind:this={leftSvgElement}
         viewBox="0 0 {svgWidth} {svgHeight}"

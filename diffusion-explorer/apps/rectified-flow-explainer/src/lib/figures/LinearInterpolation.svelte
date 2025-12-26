@@ -153,7 +153,7 @@
     // Formula at bottom center
     const formulaX = width / 2;
     const formulaY = height - marginHeight - 10;
-    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 100, formulaY - 30, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 140, formulaY - 30, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
   }
 
   function plotLine() {

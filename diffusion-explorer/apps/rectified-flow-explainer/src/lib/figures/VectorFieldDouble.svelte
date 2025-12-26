@@ -47,6 +47,10 @@
   let animationFrameId = null;
   let isInitialized = false;
 
+  // Normalized time for timing circle (0-1)
+  $: numTimeSteps = vectorFieldData?.timeSteps?.length || 1;
+  $: normalizedTime = numTimeSteps > 1 ? currentTimeIndex / (numTimeSteps - 1) : 0;
+
   // Pre-calculated grid positions
   let gridPositions = [];
 
@@ -333,7 +337,7 @@
 {#if vectorFieldData && allTimeSamples.length > 0}
   <DoubleFigure {caption}>
     {#snippet left()}
-      <PlayButton {isPlaying} onclick={togglePlayPause} />
+      <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
       <svg
         bind:this={leftSvgElement}
         viewBox="0 0 {svgWidth} {svgHeight}"

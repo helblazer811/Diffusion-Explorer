@@ -55,7 +55,7 @@
   export let width = 800;
   export let height = 325;
   export let marginWidth = 50;
-  export let marginHeight = 20;
+  export let marginHeight = 23;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
   export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
   export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
@@ -514,7 +514,7 @@
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <div style="position: relative; width: 100%; display: flex; justify-content: center;">
-        <PlayButton {isPlaying} onclick={toggleAnimation} />
+        <PlayButton {isPlaying} onclick={toggleAnimation} {time} />
         <svg
           bind:this={svg}
           viewBox="0 0 {width} {height}"
