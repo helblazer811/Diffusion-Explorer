@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { writable, type Writable } from "svelte/store";
-  import { downloadJSON } from "$lib/utils";
+  import { downloadJSON, clipSamplesToRadius, clipAllRectifiedTrajectoriesToStartingRadius } from "$lib/utils";
   import {
     settings,
     type VectorFieldData,
@@ -79,7 +79,7 @@
     const result = await trainAndSample.loadCachedTrajectories(path);
     if (result) {
       allTimeSamples.set(result.trajectories);
-      sourceDistributionSamples.set(result.sourceDistribution);
+      sourceDistributionSamples.set(clipSamplesToRadius(result.sourceDistribution, settings.stylingSettings.scatterPlot.clippingRadius));
       return true;
     }
     return false;
@@ -153,7 +153,7 @@
       settings.samplingWorkerUrl
     );
     allTimeSamples.set(result.allTimeSamples);
-    sourceDistributionSamples.set(result.sourceDistribution);
+    sourceDistributionSamples.set(clipSamplesToRadius(result.sourceDistribution, settings.stylingSettings.scatterPlot.clippingRadius));
     downloadTrajectories();
     return result.allTimeSamples;
   }
@@ -482,25 +482,28 @@
     </div>
   </div>
 
-  <RectifiedFlowSuperimposed
+  <RectifiedFlowVisualization
     width={figureWidth}
-    leftTrajectories={$flowMatchingGridTrajectories ?? []}
-    rightTrajectories={$rectifiedFlowGridTrajectories?.[$rectifiedFlowGridTrajectories.length - 1] ?? []}
+    allRectifiedTrajectories={clipAllRectifiedTrajectoriesToStartingRadius(
+      $rectifiedFlowData?.allRectifiedTrajectories ?? [],
+      settings.stylingSettings.scatterPlot.clippingRadius
+    )}
     targetDistribution={$targetDistributionSamples}
     playingByDefault={true}
     onInitialized={() => {
       showOtherFigures = true;
       console.log(
-        "RectifiedFlowSuperimposed initialized, showing other figures."
+        "RectifiedFlowVisualization initialized, showing other figures."
       );
     }}
   >
     <div class="caption">
       <span class="figure-number">Figure 1:</span>
-      A rectified flow learns straighter paths. Left: Before rectification - curved
-      trajectories. Right: After rectification - straighter trajectories.
+      Watch how paths become straighter with each rectification step. Each step
+      retrains the model using trajectories from the previous step, progressively
+      reducing curvature.
     </div>
-  </RectifiedFlowSuperimposed>
+  </RectifiedFlowVisualization>
 
   <hr class="section-divider" />
 
@@ -917,33 +920,34 @@
   <h1 id="rectified-flows" class="section-heading">Rectified Flows</h1>
 
   {#if showOtherFigures}
-    <InducedCouplingDouble
-      allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ??
-        []}
+    <RectifiedFlowSuperimposed
+      width={figureWidth}
+      leftTrajectories={$flowMatchingGridTrajectories ?? []}
+      rightTrajectories={$rectifiedFlowGridTrajectories?.[$rectifiedFlowGridTrajectories.length - 1] ?? []}
       targetDistribution={$targetDistributionSamples}
+      playingByDefault={true}
     >
       <div class="caption">
         <span class="figure-number">Figure 8:</span>
+        A rectified flow learns straighter paths. Left: Before rectification - curved
+        trajectories. Right: After rectification - straighter trajectories.
+      </div>
+    </RectifiedFlowSuperimposed>
+
+    <InducedCouplingDouble
+      allRectifiedTrajectories={clipAllRectifiedTrajectoriesToStartingRadius(
+        $rectifiedFlowData?.allRectifiedTrajectories ?? [],
+        settings.stylingSettings.scatterPlot.clippingRadius
+      )}
+      targetDistribution={$targetDistributionSamples}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 9:</span>
         Comparison of independent coupling (left) vs induced coupling from the flow
         model (right). The induced coupling connects each source point to where it
         actually flows, resulting in less tangled paths.
       </div>
     </InducedCouplingDouble>
-
-    <RectifiedFlowVisualization
-      width={figureWidth}
-      allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ??
-        []}
-      targetDistribution={$targetDistributionSamples}
-      playingByDefault={true}
-    >
-      <div class="caption">
-        <span class="figure-number">Figure 9:</span>
-        Watch how paths become straighter with each rectification step. Each step
-        retrains the model using trajectories from the previous step, progressively
-        reducing curvature.
-      </div>
-    </RectifiedFlowVisualization>
   {/if}
 
   <p>

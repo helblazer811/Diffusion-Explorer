@@ -105,25 +105,41 @@
   }
 
   /**
-   * Randomly select a subset of trajectory indices to display
-   * @param numSamples - Total number of available trajectories
+   * Select a subset of trajectory indices to display, filtering to only those
+   * whose starting points are within the clipping radius.
+   * @param allSamples - All trajectory data [timestep][sample][dim]
    * @param numToSelect - Number of trajectories to display
+   * @param clippingRadius - Maximum distance from origin for starting points
    * @returns Array of selected indices
    */
-  function selectTrajectoryIndices(numSamples, numToSelect) {
-    // If requesting more than available, return all indices
-    if (numToSelect >= numSamples) {
-      return Array.from({ length: numSamples }, (_, i) => i);
+  function selectTrajectoryIndices(allSamples, numToSelect, clippingRadius) {
+    if (!allSamples || allSamples.length === 0) return [];
+
+    const startingPoints = allSamples[0]; // Timestep 0
+
+    // Filter to indices within clipping radius
+    const validIndices = [];
+    for (let i = 0; i < startingPoints.length; i++) {
+      const [x, y] = startingPoints[i];
+      const distance = Math.sqrt(x * x + y * y);
+      if (distance <= clippingRadius) {
+        validIndices.push(i);
+      }
+    }
+
+    // If requesting more than available valid indices, return all valid
+    if (numToSelect >= validIndices.length) {
+      return validIndices;
     }
 
     // Use uniform spacing for better coverage
-    const step = numSamples / numToSelect;
-    const indices = [];
+    const step = validIndices.length / numToSelect;
+    const selectedIndices = [];
     for (let i = 0; i < numToSelect; i++) {
-      indices.push(Math.floor(i * step));
+      selectedIndices.push(validIndices[Math.floor(i * step)]);
     }
 
-    return indices;
+    return selectedIndices;
   }
 
   /**
@@ -325,7 +341,7 @@
     if (showSourceScatter) initScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter');
     if (showTargetScatter) initScatter(targetDistributionSamples, targetPointColor, 'targetScatter');
 
-    selectedTrajectoryIndices = selectTrajectoryIndices(sourceDistributionSamples.length, numTrajectories);
+    selectedTrajectoryIndices = selectTrajectoryIndices($allTimeSamples, numTrajectories, settings.stylingSettings.scatterPlot.clippingRadius);
     initTrajectories();
     draw();
     plotLabels();

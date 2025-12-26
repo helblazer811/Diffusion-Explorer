@@ -132,7 +132,9 @@ export const settings = {
       radius: 5,
       opacity: 0.25,
       color: '#3b82f6',
-      yShiftFactor: -0.85
+      yShiftFactor: -0.55,
+      scaleFactor: 0.8,
+      clippingRadius: 2.0
     },
     // Figure LaTeX styling
     figureLatex: {
