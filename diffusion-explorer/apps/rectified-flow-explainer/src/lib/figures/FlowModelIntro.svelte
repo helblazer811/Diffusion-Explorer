@@ -47,7 +47,7 @@
   export let animationPauseTime = 1000; // Pause time between loops in milliseconds
 
   // Contour plot settings
-  export let showContours = true;
+  export let showContours = false;
   export let contourBandwidth = 0.3;
   export let contourLevels = 5;
   export let contourOpacity = 0.25;
@@ -308,7 +308,7 @@
       .text(targetLabelText);
 
     // Math labels (p_0, p_1) below - offset to center (plotKatexInSVG positions from left edge)
-    const katexCenterOffset = -15;
+    const katexCenterOffset = 15;
     plotKatexInSVG(labelsGroup, 'p_0', scales.sourceCenterPixelX - katexCenterOffset, mathLabelY, {
       fontSize: labelFontSize,
       bg: false,
@@ -483,8 +483,10 @@
    * Initialize contours (heavy: precompute all contours)
    */
   function initializeContours() {
-    // Precompute all contours for performance
-    precomputeAllContours();
+    // Only precompute contours if they are enabled
+    if (showContours) {
+      precomputeAllContours();
+    }
 
     // Initial draw
     draw();
