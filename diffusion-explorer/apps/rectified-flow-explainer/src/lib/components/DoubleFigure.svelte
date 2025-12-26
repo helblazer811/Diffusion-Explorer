@@ -4,6 +4,7 @@
 
   export let left = undefined;
   export let right = undefined;
+  export let footer = undefined;
   export let caption = undefined;
   export let gap = 20;
   export let backgroundVisible = true;
@@ -70,11 +71,14 @@
       {@render right?.()}
     </div>
   </div>
-  {#if backgroundVisible}
-    <figcaption class="figure-caption">
-      {@render caption?.()}
-    </figcaption>
+  {#if footer}
+    <div class="figure-footer">
+      {@render footer?.()}
+    </div>
   {/if}
+  <figcaption class="figure-caption">
+    {@render caption?.()}
+  </figcaption>
 </figure>
 
 <style>
@@ -119,6 +123,12 @@
 
   .right-figure {
     /* Additional styling for right figure if needed */
+  }
+
+  .figure-footer {
+    display: flex;
+    justify-content: center;
+    width: 100%;
   }
 
   .figure-caption {

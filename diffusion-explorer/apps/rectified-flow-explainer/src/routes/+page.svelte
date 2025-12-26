@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { writable, type Writable } from "svelte/store";
-  import { downloadJSON, clipSamplesToRadius, clipAllRectifiedTrajectoriesToStartingRadius } from "$lib/utils";
+  import {
+    downloadJSON,
+    clipSamplesToRadius,
+    clipAllRectifiedTrajectoriesToStartingRadius,
+  } from "$lib/utils";
   import {
     settings,
     type VectorFieldData,
@@ -24,6 +28,7 @@
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
   import IntersectingPaths from "$lib/figures/IntersectingPaths.svelte";
   import InducedCouplingDouble from "$lib/figures/InducedCouplingDouble.svelte";
+  import VectorFieldCurvatureComparison from "$lib/figures/VectorFieldCurvatureComparison.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
   import Bibliography from "$lib/components/Bibliography.svelte";
   import { Katex } from "@diffusion-explorer/ui";
@@ -38,14 +43,17 @@
 
   // Vector field data stores
   const vectorFieldData: Writable<VectorFieldData | null> = writable(null);
-  const rectifiedFlowVectorFieldData: Writable<VectorFieldData | null> = writable(null);
+  const rectifiedFlowVectorFieldData: Writable<VectorFieldData | null> =
+    writable(null);
 
   // Rectified flow data store
   const rectifiedFlowData: Writable<RectifiedFlowData | null> = writable(null);
 
   // Grid trajectory stores
-  const flowMatchingGridTrajectories: Writable<number[][][] | null> = writable(null);
-  const rectifiedFlowGridTrajectories: Writable<number[][][][] | null> = writable(null);
+  const flowMatchingGridTrajectories: Writable<number[][][] | null> =
+    writable(null);
+  const rectifiedFlowGridTrajectories: Writable<number[][][][] | null> =
+    writable(null);
 
   // Worker references
   let trainingWorker: Worker | null = null;
@@ -79,7 +87,12 @@
     const result = await trainAndSample.loadCachedTrajectories(path);
     if (result) {
       allTimeSamples.set(result.trajectories);
-      sourceDistributionSamples.set(clipSamplesToRadius(result.sourceDistribution, settings.stylingSettings.scatterPlot.clippingRadius));
+      sourceDistributionSamples.set(
+        clipSamplesToRadius(
+          result.sourceDistribution,
+          settings.stylingSettings.scatterPlot.clippingRadius
+        )
+      );
       return true;
     }
     return false;
@@ -104,10 +117,14 @@
     return false;
   }
 
-  async function loadCachedGridTrajectories(path: string, isRectifiedFlow: boolean) {
+  async function loadCachedGridTrajectories(
+    path: string,
+    isRectifiedFlow: boolean
+  ) {
     if (isRectifiedFlow) {
       // Rectified flow grid is stored in RectifiedFlowData format: { allRectifiedTrajectories, modelPath }
-      const rfResult = await trainAndSample.loadCachedRectifiedFlowTrajectories(path);
+      const rfResult =
+        await trainAndSample.loadCachedRectifiedFlowTrajectories(path);
       if (rfResult) {
         rectifiedFlowGridTrajectories.set(rfResult.allRectifiedTrajectories);
         return true;
@@ -153,7 +170,12 @@
       settings.samplingWorkerUrl
     );
     allTimeSamples.set(result.allTimeSamples);
-    sourceDistributionSamples.set(clipSamplesToRadius(result.sourceDistribution, settings.stylingSettings.scatterPlot.clippingRadius));
+    sourceDistributionSamples.set(
+      clipSamplesToRadius(
+        result.sourceDistribution,
+        settings.stylingSettings.scatterPlot.clippingRadius
+      )
+    );
     downloadTrajectories();
     return result.allTimeSamples;
   }
@@ -320,7 +342,7 @@
     // Wrap in RectifiedFlowData format for consistency
     const data = {
       allRectifiedTrajectories: trajectories,
-      modelPath: "generated"
+      modelPath: "generated",
     };
     downloadJSON(data, filename);
     console.log(
@@ -390,9 +412,10 @@
 
     // Load rectified flow trajectories
     if (settings.cachedRectifiedFlowTrajectoriesPath) {
-      rectifiedFlowTrajectoriesLoaded = await loadCachedRectifiedFlowTrajectories(
-        settings.cachedRectifiedFlowTrajectoriesPath
-      );
+      rectifiedFlowTrajectoriesLoaded =
+        await loadCachedRectifiedFlowTrajectories(
+          settings.cachedRectifiedFlowTrajectoriesPath
+        );
     }
 
     // Load rectified flow grid trajectories
@@ -499,45 +522,37 @@
   >
     <div class="caption">
       <span class="figure-number">Figure 1:</span>
-      Watch how paths become straighter with each rectification step. Each step
-      retrains the model using trajectories from the previous step, progressively
-      reducing curvature.
+      Watch how paths become straighter with each rectification step. Each step retrains
+      the model using trajectories from the previous step, progressively reducing
+      curvature.
     </div>
   </RectifiedFlowVisualization>
 
   <hr class="section-divider" />
 
-  <h1 id="introduction" class="section-heading visually-hidden">Introduction</h1>
+  <h1 id="introduction" class="section-heading">Introduction</h1>
   <p>
-    Recently developed flow-based generative models <span class="citation" data-cite="rezende2016variationalinferencenormalizingflows"></span> have led to state-of-the-art
-    results in image and video generation. In particular, flow matching <span
+    Diffusion models [Citation Needed] have shown the incredible ability to
+    generate compelling novel samples of complex data like images and videos.
+    These models learn to gradually transform noise into realistic data through
+    the repeated application of a large neural network. More recently,
+    flow-based generative models <span
       class="citation"
-      data-cite="lipman2022"
-    ></span> has enabled efficient training of flow-based models without the need
-    for computationally expensive simulation. However, naively generating a high-quality
-    image with a flow model requires repeatedly running a large neural network—typically
-    with billions of parameters—many times. This incurs both high computational cost
-    and latency, where it can take minutes before a user is served a generated image
-    or video. Thus, it is desirable to develop methods for accelerating inference
-    of flow-based models, allowing us to sample from them with few repeated runs
-    of a neural network.
+      data-cite="rezende2016variationalinferencenormalizingflows"
+    ></span>
+    have achieved competitive performance with diffusion models, and have desirable
+    additional capabilities like evaluating the likelihood of a sample being drawn
+    from a distribution. The success of flow models is in part due to the innovation
+    of flow matching which allows for the efficient training of flow-based models
+    without the need for computationally expensive simulation
+    <span class="citation" data-cite="lipman2022"></span>. However, a practical
+    barrier to deploying flow models at scale is the need to run large neural
+    networks -- often with billions of parameters -- many times to generate
+    high-quality samples, incurring high computational cost and latency. Thus,
+    it is desirable to develop methods for accelerating inference of flow-based
+    models, allowing us to sample from them with only a few repeated runs of a
+    neural network.
   </p>
-
-  <p>
-    Training a model with flow matching alone is sufficient to generate
-    high-quality samples from our target distribution. However, as we can see
-    below, the trajectories of samples from a model trained with flow matching
-    often produce curved paths. <strong
-      >This curvature, its consequences, and how to mitigate them are the
-      central focus of this article.</strong
-    >
-    In particular, we will discuss why trajectories generated by flow models
-    have this curvature, why these trajectories are challenging to efficiently
-    simulate, and how a simple approach called rectified flows
-    <span class="citation" data-cite="liu2022"></span> can remove this curvature
-    leading to straighter models that can be efficiently simulated.
-  </p>
-
   {#if showOtherFigures}
     <CurvedTrajectoryIntro
       width={figureWidth}
@@ -546,6 +561,7 @@
       {allTimeSamples}
       {isTraining}
       playingByDefault={true}
+      backgroundVisible={false}
     >
       <div class="caption">
         <span class="figure-number">Figure 2:</span>
@@ -553,15 +569,73 @@
       </div>
     </CurvedTrajectoryIntro>
   {/if}
+  <p>
+    A major culprit behind the high computational cost of sampling from flow
+    models actually stems from the geometric properties of the learned flows. In
+    particular, we observe in Figure 2 above that models trained with flow
+    matching often produce curved trajectories. 
+    <strong
+      >This curvature, its consequences, and how to mitigate them are the
+      central focus of this article.</strong
+    >
+    Sampling from a flow model involves simulating the trajectory of an abstract
+    particle as it moves from random noise to real data by repeatedly querying a
+    neural network to determine the particle's velocity at each point in time.
+    When these trajectories are highly curved, accurately simulating them
+    requires taking many small steps, each requiring a run of the neural
+    network, leading to high computational cost and latency. 
+    In this article, we will discuss why trajectories generated by flow models
+    have this curvature, why these trajectories are challenging to efficiently
+    simulate, and how a simple approach called rectified flows
+    <span class="citation" data-cite="liu2022"></span> can remove this curvature
+    leading to straighter models that can be efficiently simulated. 
+  </p>
+
+    <!-- To sample from a flow model we model the
+    trajectory of a particle starting out as random noise, we then use a neural
+    network to predict the velocity of this particle, which points in the
+    direction of real data. By repeatedly taking many incremental steps we form
+    a trajectory that moves the sample from noise to real data. If we can take
+    larger steps along this trajectory, we can reduce the number of times we
+    need to run our, typically very large and expensive, neural network. A key
+    property that governs how effectively we can approximate this trajectory
+    with fewer steps is how curved it is. Very curved paths lead to an
+    accumulation of numerical errors when making discrete linear jumps. In
+    contrast, straight paths (or approximately straight anyway) can be simulated
+    with just one or a few steps. Unfortunately, we will observe that models
+    trained with flow matching produce curved trajectories. -->
+  
 
   <h1 id="background" class="section-heading">Background</h1>
   <p>
-    Before diving into the details behind why models trained with flow matching produce 
-    curved trajectories and how rectified flows can help, we will first cover some necessary background
-    on flow-based generative models and flow matching.
+    Before diving into the details behind why models trained with flow matching
+    produce curved trajectories and how rectified flows can help, we will first
+    cover some necessary background on flow-based generative models and flow
+    matching.
   </p>
 
   <h2 id="flow-based-models">Flow-Based Generative Models</h2>
+
+  {#if showOtherFigures}
+    <FlowModelIntro
+      width={figureWidth}
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+      {allTimeSamples}
+      {isTraining}
+      playingByDefault={true}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 3:</span>
+        The probability path <Katex math={"p_t"} /> of a continuous normalizing flow
+        as it is transformed from a simple source distribution <Katex
+          math={"p_0"}
+        /> to a more complex data distribution <Katex math={"p_1 = q"} />. We
+        can also see the trajectory of individual samples as they move from the
+        source to target distribution.
+      </div>
+    </FlowModelIntro>
+  {/if}
 
   <p>
     The broad goal of generative models is to draw samples from some complex
@@ -605,27 +679,6 @@
     distribution <Katex math={"p_0"} /> and transform them to realistic approximations
     of real world data with distribution <Katex math="q" />.
   </p>
-
-  {#if showOtherFigures}
-    <FlowModelIntro
-      width={figureWidth}
-      sourceDistributionSamples={$sourceDistributionSamples}
-      targetDistributionSamples={$targetDistributionSamples}
-      {allTimeSamples}
-      {isTraining}
-      playingByDefault={true}
-    >
-      <div class="caption">
-        <span class="figure-number">Figure 3:</span>
-        The probability path <Katex math={"p_t"} /> of a continuous normalizing flow
-        as it is transformed from a simple source distribution <Katex
-          math={"p_0"}
-        /> to a more complex data distribution <Katex math={"p_1 = q"} />. We
-        can also see the trajectory of individual samples as they move from the
-        source to target distribution.
-      </div>
-    </FlowModelIntro>
-  {/if}
 
   <p>
     Instead of directly modeling our flow, say with a neural network, we instead <em
@@ -757,7 +810,9 @@
     />
   </div>
 
-  <h1 id="curved-trajectories" class="section-heading">The Problem: Curved Trajectories</h1>
+  <h1 id="curved-trajectories" class="section-heading">
+    The Problem: Curved Trajectories
+  </h1>
 
   <p>
     With the fundamentals of flow models and flow matching established, we can
@@ -815,10 +870,9 @@
       straighter paths?</strong
     >
     First, it is important to answer our question from earlier: why is our model
-    learning curved trajectories in the first place? The answer lies in how our
-    source <Katex math={"X_0"} /> and target random variables <Katex
-      math={"X_1"}
-    /> are jointly distributed, which is called their <em>coupling</em>.
+    learning curved trajectories in the first place? The answer lies in how our source
+    <Katex math={"X_0"} /> and target random variables <Katex math={"X_1"} /> are
+    jointly distributed, which is called their <em>coupling</em>.
   </p>
 
   <h2 id="coupling">The Problem with an Independent Coupling</h2>
@@ -868,9 +922,9 @@
       >What you might notice about this visualization is that these lines cross
       each other a lot.</strong
     >
-    This crossing of trajectories is at the core of why our learned velocity
-    field <Katex math={"v_t^\\theta(x)"} /> learns curved trajectories despite the
-    fact that it is being trained to model linear paths.
+    This crossing of trajectories is at the core of why our learned velocity field
+    <Katex math={"v_t^\\theta(x)"} /> learns curved trajectories despite the fact
+    that it is being trained to model linear paths.
   </p>
 
   <p>
@@ -923,7 +977,9 @@
     <RectifiedFlowSuperimposed
       width={figureWidth}
       leftTrajectories={$flowMatchingGridTrajectories ?? []}
-      rightTrajectories={$rectifiedFlowGridTrajectories?.[$rectifiedFlowGridTrajectories.length - 1] ?? []}
+      rightTrajectories={$rectifiedFlowGridTrajectories?.[
+        $rectifiedFlowGridTrajectories.length - 1
+      ] ?? []}
       targetDistribution={$targetDistributionSamples}
       playingByDefault={true}
     >
@@ -934,6 +990,20 @@
       </div>
     </RectifiedFlowSuperimposed>
 
+    <VectorFieldCurvatureComparison
+      flowMatchingVectorField={$vectorFieldData}
+      rectifiedFlowVectorField={$rectifiedFlowVectorFieldData}
+      playingByDefault={true}
+      backgroundVisible={false}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 9:</span>
+        Comparison of vector fields. Left: Flow matching produces velocity vectors
+        that vary significantly across time. Right: Rectified flow produces more
+        consistent velocity vectors throughout the trajectory.
+      </div>
+    </VectorFieldCurvatureComparison>
+
     <InducedCouplingDouble
       allRectifiedTrajectories={clipAllRectifiedTrajectoriesToStartingRadius(
         $rectifiedFlowData?.allRectifiedTrajectories ?? [],
@@ -942,7 +1012,7 @@
       targetDistribution={$targetDistributionSamples}
     >
       <div class="caption">
-        <span class="figure-number">Figure 9:</span>
+        <span class="figure-number">Figure 10:</span>
         Comparison of independent coupling (left) vs induced coupling from the flow
         model (right). The induced coupling connects each source point to where it
         actually flows, resulting in less tangled paths.
@@ -955,8 +1025,8 @@
       >Finally, we will discuss how a simple technique called rectified flows
       can mitigate this curvature.</strong
     >
-    Rectified flows aim to straighten out the trajectories of these flows. They
-    do this by replacing the naive independent <em>coupling</em>—how data points <Katex
+    Rectified flows aim to straighten out the trajectories of these flows. They do
+    this by replacing the naive independent <em>coupling</em>—how data points <Katex
       math={"x_1"}
     /> and their noisy counterparts <Katex math={"x_0"} /> are paired—used in vanilla
     flow-matching training with one induced by the model itself. By recursively replacing
