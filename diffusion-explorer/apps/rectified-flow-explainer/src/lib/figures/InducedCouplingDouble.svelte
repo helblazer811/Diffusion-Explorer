@@ -46,6 +46,7 @@
   export let hoverEdgeOpacity = 0.8;
   export let hoverPointOpacity = 0.9;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
+  export let distributionScaleFactor = 0.7;
 
   // Label props
   export let leftLabel = 'Independent Coupling';
@@ -327,7 +328,7 @@
     const selectedSource = selectedIndices.map(i => sourcePoints[i]);
     const selectedDest = selectedIndices.map(i => destinationPoints[i]);
     scales = createSourceTargetScales(selectedSource, selectedDest, {
-      width: svgWidth, height: svgHeight, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
+      width: svgWidth, height: svgHeight, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor, distributionScaleFactor
     });
     initializePanel(leftSvgElement, leftLabel, false);
     initializePanel(rightSvgElement, rightLabel, true);

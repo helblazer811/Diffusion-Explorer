@@ -34,7 +34,7 @@
   export let pauseBeforeRestart = 2000; // Pause before looping animation (ms)
 
   // Trajectory selection
-  export let numTrajectoriesToShow = 10; // Number of trajectories to visualize
+  export let numTrajectoriesToShow = 15; // Number of trajectories to visualize
 
   // Styling props (colors)
   export let trajectoryColor = "#f17720"; // Orange

@@ -12,6 +12,7 @@ import {
   type RectifiedFlowData,
   type TrainingSettings
 } from './settings';
+import { clipSamplesToRadius } from './utils';
 
 // Re-export types for convenience
 export type { VectorFieldData, RectifiedFlowData, TrainingSettings };
@@ -71,14 +72,8 @@ export function generateClippedGaussianSamples(numSamples: number): number[][] {
       const rawSamplesTensor = sampleMultivariateNormal(mean, cov, batchSize) as tf.Tensor2D;
       const rawSamplesArray = rawSamplesTensor.arraySync() as number[][];
 
-      for (const sample of rawSamplesArray) {
-        const [x, y] = sample;
-        const distance = Math.sqrt(x * x + y * y);
-        if (distance <= threshold) {
-          allClippedSamples.push(sample);
-          if (allClippedSamples.length >= numSamples) break;
-        }
-      }
+      const clippedBatch = clipSamplesToRadius(rawSamplesArray, threshold);
+      allClippedSamples = allClippedSamples.concat(clippedBatch);
     }
     return allClippedSamples.slice(0, numSamples);
   });

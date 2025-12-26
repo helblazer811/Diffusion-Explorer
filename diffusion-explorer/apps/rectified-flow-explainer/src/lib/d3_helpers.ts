@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import { settings } from './settings';
 
 /**
  * Create D3 scales for plotting source and target distributions.
@@ -20,6 +21,7 @@ export function createSourceTargetScales(
     sourceCenterX?: number;  // Proportion of width (e.g., 0.2)
     targetCenterX?: number;  // Proportion of width (e.g., 0.8)
     yShiftFactor?: number;
+    distributionScaleFactor?: number;  // Override the global scale factor
   }
 ): {
   yScale: d3.ScaleLinear<number, number>;
@@ -36,7 +38,8 @@ export function createSourceTargetScales(
     marginHeight = 20,
     sourceCenterX = 0.2,
     targetCenterX = 0.8,
-    yShiftFactor = 0
+    yShiftFactor = 0,
+    distributionScaleFactor: scaleFactorOverride
   } = options;
 
   // Compute pixel centers for each distribution
@@ -58,10 +61,11 @@ export function createSourceTargetScales(
 
   // Scale factor based purely on height (independent of horizontal positioning)
   const scaleFactor = drawableHeight / (yRange || 1);
-  const xScaleFactor = scaleFactor;
+  const distributionScaleFactor = scaleFactorOverride ?? settings.stylingSettings.scatterPlot.scaleFactor;
+  const xScaleFactor = scaleFactor * distributionScaleFactor;
 
-  // Compute adjusted y range based on scale factor
-  const adjustedYRange = drawableHeight / scaleFactor;
+  // Compute adjusted y range - expand by 1/distributionScaleFactor so data appears smaller
+  const adjustedYRange = drawableHeight / (scaleFactor * distributionScaleFactor);
 
   // Apply vertical offset for labels and yShiftFactor
   const yCenterOffset = -adjustedYRange * 0.07 - yShiftFactor;
