@@ -54,6 +54,9 @@
   export let pointLabelBgOpacity = 0.9;
   export let figureLatexColor = settings.stylingSettings.figureLatex.color;
 
+  // Background visibility
+  export let backgroundVisible = true;
+
   // SVG and scale state
   let svgElement;
   let scales = null;
@@ -85,6 +88,16 @@
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
+  }
+
+  function handleSliderInput() {
+    // Reset timestamp so animation continues smoothly from new slider position
+    lastTimestamp = null;
+    // Exit endpoint pause if we were in one
+    if (isPaused) {
+      isPaused = false;
+      pauseStartTime = null;
+    }
   }
 
   function plotPointLabel() {
@@ -356,7 +369,7 @@
   });
 </script>
 
-<Figure caption={caption} bind:isActive={figureIsActive}>
+<Figure caption={caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
@@ -367,6 +380,7 @@
         min={0}
         max={1}
         onTogglePlay={toggleAnimation}
+        onInput={handleSliderInput}
         color="#f17720"
       />
     </div>

@@ -56,6 +56,10 @@
   export let eulerColor = '#f17720';
   export let lineWidth = 2;
   export let eulerLineWidth = 2;
+
+  // Background visibility
+  export let backgroundVisible = true;
+
   export let marginWidth = 20;
   export let marginHeight = 20;
   export let deltaT = 2.5;
@@ -408,7 +412,7 @@
   });
 </script>
 
-<DoubleFigure {gap} {caption} bind:isActive={figureIsActive}>
+<DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet left()}
     <svg bind:this={leftSvg} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
     </svg>

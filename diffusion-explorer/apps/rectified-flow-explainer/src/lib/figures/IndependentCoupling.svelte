@@ -40,6 +40,9 @@
   export const hoverPointOpacity = 0.9;
   export const dashed = false;
 
+  // Background visibility
+  export let backgroundVisible = true;
+
   let svgElement;
   let scales = null;
   let isInitialized = false;
@@ -290,7 +293,7 @@
   }
 </script>
 
-<Figure {caption}>
+<Figure {caption} {backgroundVisible}>
   {#snippet children()}
     <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
     </svg>

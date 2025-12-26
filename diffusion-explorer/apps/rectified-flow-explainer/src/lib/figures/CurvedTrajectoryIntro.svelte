@@ -55,6 +55,9 @@
   export let trajectoryPointRadius = 4;
   export let trainingObjective = 'Flow Matching';
 
+  // Background visibility
+  export let backgroundVisible = true;
+
   // Visibility controls for each visualization element
   export let showSourceScatter = true;
   export let showTargetScatter = true;
@@ -66,6 +69,7 @@
   let time = 0; // Animation time parameter (0 to 1)
   let animationFrameId = null;
   let trajectoryLengths = new Map(); // Cache total path lengths
+  let animationStartTime = null; // Component-level for slider sync
 
   // Local animation control state
   let isPlaying = playingByDefault;
@@ -91,6 +95,12 @@
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
+  }
+
+  function handleSliderInput() {
+    // Sync animation start time so it continues from the new slider position
+    const now = performance.now();
+    animationStartTime = now - (time * animationDuration);
   }
 
   /**
@@ -348,27 +358,26 @@
   }
 
   function startAnimation() {
-    let startTime = null;
     let isPaused = false;
     let pauseStartTime = null;
     let pausedElapsedTime = 0;
 
     function animate(currentTime) {
       if (isPausedByFigure) {
-        if (startTime !== null && pausedElapsedTime === 0) {
-          pausedElapsedTime = currentTime - startTime;
+        if (animationStartTime !== null && pausedElapsedTime === 0) {
+          pausedElapsedTime = currentTime - animationStartTime;
         }
         animationFrameId = requestAnimationFrame(animate);
         return;
       }
 
       if (pausedElapsedTime > 0) {
-        startTime = currentTime - pausedElapsedTime;
+        animationStartTime = currentTime - pausedElapsedTime;
         pausedElapsedTime = 0;
       }
 
-      if (startTime === null) startTime = currentTime;
-      const elapsed = currentTime - startTime;
+      if (animationStartTime === null) animationStartTime = currentTime;
+      const elapsed = currentTime - animationStartTime;
 
       if (elapsed >= animationDuration) {
         if (!isPaused) {
@@ -378,7 +387,7 @@
           draw();
         }
         if (pauseStartTime && currentTime - pauseStartTime >= animationPauseTime) {
-          startTime = currentTime;
+          animationStartTime = currentTime;
           isPaused = false;
           pauseStartTime = null;
           time = 0;
@@ -426,7 +435,7 @@
   });
 </script>
 
-<Figure {caption} bind:isActive={figureIsActive}>
+<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
@@ -437,6 +446,7 @@
         min={0}
         max={1}
         onTogglePlay={toggleAnimation}
+        onInput={handleSliderInput}
         color="#f17720"
       />
     </div>

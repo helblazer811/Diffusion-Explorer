@@ -56,6 +56,9 @@
   export let intermediatePointOpacity = 0.7; // Higher opacity for intermediate scatter points
   export let trainingObjective = "Flow Matching";
 
+  // Background visibility
+  export let backgroundVisible = true;
+
   // Visibility controls for each visualization element
   export let showSourceScatter = true;
   export let showTargetScatter = true;
@@ -73,6 +76,7 @@
   let scales = null; // Full scales object from createSourceTargetScales
   let time = 0; // Animation time parameter (0 to 1)
   let animationFrameId = null;
+  let animationStartTime = null; // Component-level for slider sync
 
   // Local animation control state
   let isPlaying = playingByDefault;
@@ -99,6 +103,12 @@
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
+  }
+
+  function handleSliderInput() {
+    // Sync animation start time so it continues from the new slider position
+    const now = performance.now();
+    animationStartTime = now - (time * animationDuration);
   }
 
   /**
@@ -416,7 +426,6 @@
    * Start the animation loop
    */
   function startAnimation() {
-    let startTime = null;
     let isPaused = false;
     let pauseStartTime = null;
     let pausedElapsedTime = 0; // Track time when paused by figure button
@@ -425,8 +434,8 @@
       // Check if paused by figure button
       if (isPausedByFigure) {
         // Store the elapsed time when paused
-        if (startTime !== null && pausedElapsedTime === 0) {
-          pausedElapsedTime = currentTime - startTime;
+        if (animationStartTime !== null && pausedElapsedTime === 0) {
+          pausedElapsedTime = currentTime - animationStartTime;
         }
         // Keep requesting frames but don't update time
         animationFrameId = requestAnimationFrame(animate);
@@ -435,15 +444,15 @@
 
       // Resume from pause: adjust startTime to account for paused duration
       if (pausedElapsedTime > 0) {
-        startTime = currentTime - pausedElapsedTime;
+        animationStartTime = currentTime - pausedElapsedTime;
         pausedElapsedTime = 0;
       }
 
-      if (startTime === null) {
-        startTime = currentTime;
+      if (animationStartTime === null) {
+        animationStartTime = currentTime;
       }
 
-      const elapsed = currentTime - startTime;
+      const elapsed = currentTime - animationStartTime;
 
       // Check if we're in pause period (between animation loops)
       if (elapsed >= animationDuration) {
@@ -459,7 +468,7 @@
           currentTime - pauseStartTime >= animationPauseTime
         ) {
           // Reset for next loop
-          startTime = currentTime;
+          animationStartTime = currentTime;
           isPaused = false;
           pauseStartTime = null;
           time = 0;
@@ -517,7 +526,7 @@
   });
 </script>
 
-<Figure {caption} bind:isActive={figureIsActive}>
+<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg
@@ -533,6 +542,7 @@
         min={0}
         max={1}
         onTogglePlay={toggleAnimation}
+        onInput={handleSliderInput}
         color="#f17720"
       />
     </div>

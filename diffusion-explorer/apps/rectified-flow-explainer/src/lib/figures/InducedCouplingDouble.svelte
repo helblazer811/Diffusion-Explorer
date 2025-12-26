@@ -54,6 +54,9 @@
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelColor = settings.stylingSettings.label.color;
 
+  // Background visibility
+  export let backgroundVisible = true;
+
   // Number of samples to show (subsample if too many)
   export let numSamplesToShow = 50;
 
@@ -347,7 +350,7 @@
 </script>
 
 {#if isDataValid}
-  <DoubleFigure {gap} {caption}>
+  <DoubleFigure {gap} {caption} {backgroundVisible}>
     {#snippet left()}
       <svg
         bind:this={leftSvgElement}

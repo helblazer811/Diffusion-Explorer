@@ -70,11 +70,9 @@
   >
     {@render children?.()}
   </div>
-  {#if backgroundVisible}
-    <figcaption class="figure-caption">
-      {@render caption?.()}
-    </figcaption>
-  {/if}
+  <figcaption class="figure-caption">
+    {@render caption?.()}
+  </figcaption>
 </figure>
 
 <style>

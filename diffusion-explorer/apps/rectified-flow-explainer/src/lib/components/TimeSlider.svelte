@@ -9,6 +9,7 @@
   export let color = '#4594e3';
   export let showTicks = true;
   export let onTogglePlay = () => {};
+  export let onInput = () => {};  // Called when user drags slider
 
   // Dynamic background gradient based on current value
   let sliderStyle;
@@ -52,6 +53,7 @@
         style="{sliderStyle}; --slider-color: {color};"
         bind:value
         {disabled}
+        oninput={onInput}
       />
 
       {#if showTicks}
@@ -64,6 +66,8 @@
         </div>
       {/if}
     </div>
+
+    <div class="spacer"></div>
   </div>
 </div>
 
@@ -114,6 +118,12 @@
 
   .play-button svg {
     color: #333;
+  }
+
+  .spacer {
+    width: 32px;
+    margin-left: 12px;
+    flex-shrink: 0;
   }
 
   .slider-wrapper {

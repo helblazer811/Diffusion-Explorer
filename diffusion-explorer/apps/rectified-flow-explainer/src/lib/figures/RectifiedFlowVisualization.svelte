@@ -80,6 +80,9 @@
   // Callback when visualization is initialized
   export let onInitialized = undefined;
 
+  // Background visibility
+  export let backgroundVisible = true;
+
   // Animation state
   let initialized = false;
   let showingAfterRectification = false; // Toggle between before (false) and after (true)
@@ -507,7 +510,7 @@
   });
 </script>
 
-<Figure {caption} bind:isActive={figureIsActive}>
+<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <div style="position: relative; width: 100%; display: flex; justify-content: center;">

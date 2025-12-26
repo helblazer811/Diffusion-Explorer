@@ -57,6 +57,9 @@
   export let sourcePointALabel = 'x_0^a';
   export let sourcePointBLabel = 'x_0^b';
   export let targetPointALabel = 'x_1^a';
+
+  // Background visibility
+  export let backgroundVisible = true;
   export let targetPointBLabel = 'x_1^b';
 
   // LaTeX label offsets
@@ -297,7 +300,7 @@
   });
 </script>
 
-<Figure caption={caption}>
+<Figure caption={caption} {backgroundVisible}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">

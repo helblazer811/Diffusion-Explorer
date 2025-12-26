@@ -67,7 +67,7 @@ export const settings = {
     },
     // Flow matching vector field sampling
     flowMatchingVectorField: {
-      gridResolution: 12,
+      gridResolution: 8,
       numTimeSteps: 200,
       domainRange: { xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 }
     },
@@ -84,7 +84,7 @@ export const settings = {
     },
     // Rectified flow vector field sampling
     rectifiedFlowVectorField: {
-      gridResolution: 12,
+      gridResolution: 8,
       numTimeSteps: 300,
       domainRange: { xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 }
     }

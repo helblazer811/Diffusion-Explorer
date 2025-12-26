@@ -51,6 +51,9 @@
   // Callback when visualization is initialized
   export let onInitialized = undefined;
 
+  // Background visibility
+  export let backgroundVisible = true;
+
   // SVG references
   let leftSvgElement;
   let rightSvgElement;
@@ -309,7 +312,7 @@
 </script>
 
 {#if isDataValid}
-  <DoubleFigure {gap} {caption} bind:isActive={figureIsActive}>
+  <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     {#snippet left()}
       <PlayButton {isPlaying} onclick={togglePlayPause} />
       <svg
