@@ -21,6 +21,7 @@
 
   import IndependentCoupling from "$lib/figures/IndependentCoupling.svelte";
   import FlowModelIntro from "$lib/figures/FlowModelIntro.svelte";
+  import HighlightTrajectory from "$lib/figures/HighlightTrajectory.svelte";
   import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
   import RectifiedFlowVisualization from "$lib/figures/RectifiedFlowVisualization.svelte";
@@ -636,6 +637,20 @@
         source to target distribution.
       </div>
     </FlowModelIntro>
+
+    <HighlightTrajectory
+      width={figureWidth}
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+      {allTimeSamples}
+      {isTraining}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 4:</span>
+        A single sample trajectory <Katex math={"\\psi_t(x)"} /> showing how an
+        individual point moves from the source distribution to the target distribution.
+      </div>
+    </HighlightTrajectory>
   {/if}
 
   <p>
@@ -975,6 +990,8 @@
   </p>
 
   <h1 id="rectified-flows" class="section-heading">Rectified Flows</h1>
+
+  <h2 id="algorithm">Algorithm</h2>
 
   <Figure backgroundVisible={true}>
     {#snippet caption()}

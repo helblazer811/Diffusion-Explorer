@@ -308,7 +308,7 @@
       .text(targetLabelText);
 
     // Math labels (p_0, p_1) below - offset to center (plotKatexInSVG positions from left edge)
-    const katexCenterOffset = 15;
+    const katexCenterOffset = -15;
     plotKatexInSVG(labelsGroup, 'p_0', scales.sourceCenterPixelX - katexCenterOffset, mathLabelY, {
       fontSize: labelFontSize,
       bg: false,
