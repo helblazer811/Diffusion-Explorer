@@ -6,7 +6,8 @@
   import Figure from "$lib/components/Figure.svelte";
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
-  import { plotSourceTargetLabels, createSourceTargetScales } from "$lib/d3_helpers";
+  import { createSourceTargetScales } from "$lib/d3_helpers";
+  import { plotKatexInSVG } from "@diffusion-explorer/ui";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -20,7 +21,7 @@
 
   // Props/Configuration
   export let width = 800;
-  export let height = 275;
+  export let height = 360;
 
   // Styling props for visualization
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
@@ -37,7 +38,8 @@
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
   export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
-  export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
+  export let yShiftFactor = -1.1;
+  export let distributionScaleFactor = 0.6;
 
   // Animation settings
   export let animationDuration = 8000; // Duration in milliseconds
@@ -136,6 +138,7 @@
     svg.append("g").attr("id", "intermediateContour");
     svg.append("g").attr("id", "intermediateScatter");
     svg.append("g").attr("id", "labels");
+    svg.append("g").attr("id", "intermediateLabel");
   }
 
   /**
@@ -265,9 +268,9 @@
   }
 
   /**
-   * Plot distribution labels above source and target
+   * Plot distribution labels above source and target using KaTeX
    */
-  function plotLabels() {
+  function plotKatexLabels() {
     if (!svgElement || !scales) return;
     if (
       sourceDistributionSamples.length === 0 ||
@@ -281,13 +284,75 @@
     // Clear existing labels
     labelsGroup.selectAll("*").remove();
 
-    plotSourceTargetLabels(svg, scales, {
-      sourceLabelText,
-      targetLabelText,
-      labelFontSize,
-      labelColor,
-      outlineColor,
-      outlineOpacity
+    // Compute y positions
+    const yDomain = scales.yScale.domain();
+    const yTop = yDomain[0];
+    const textLabelY = scales.yScale(yTop) + 0.5 * labelFontSize;
+    const mathLabelY = textLabelY + labelFontSize - 5;
+
+    // Text labels (Source/Target Distribution)
+    labelsGroup.append("text")
+      .attr("x", scales.sourceCenterPixelX)
+      .attr("y", textLabelY)
+      .attr("text-anchor", "middle")
+      .attr("font-size", `${labelFontSize}px`)
+      .attr("fill", labelColor)
+      .text(sourceLabelText);
+
+    labelsGroup.append("text")
+      .attr("x", scales.targetCenterPixelX)
+      .attr("y", textLabelY)
+      .attr("text-anchor", "middle")
+      .attr("font-size", `${labelFontSize}px`)
+      .attr("fill", labelColor)
+      .text(targetLabelText);
+
+    // Math labels (p_0, p_1) below - offset to center (plotKatexInSVG positions from left edge)
+    const katexCenterOffset = 15;
+    plotKatexInSVG(labelsGroup, 'p_0', scales.sourceCenterPixelX - katexCenterOffset, mathLabelY, {
+      fontSize: labelFontSize,
+      bg: false,
+      color: labelColor
+    });
+
+    plotKatexInSVG(labelsGroup, 'p_1', scales.targetCenterPixelX - katexCenterOffset, mathLabelY, {
+      fontSize: labelFontSize,
+      bg: false,
+      color: labelColor
+    });
+  }
+
+  /**
+   * Update the moving p_t label position (called every frame)
+   */
+  function updateIntermediateLabel() {
+    if (!svgElement || !scales) return;
+
+    const svg = d3.select(svgElement);
+    const group = svg.select("#intermediateLabel");
+
+    // Hide p_t when too close to endpoints
+    if (time < 0.1 || time > 0.9) {
+      group.selectAll("*").remove();
+      return;
+    }
+
+    // Compute x position (interpolate between source and target centers)
+    const centerPixelX = scales.sourceCenterPixelX + time * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+
+    // Compute y position (same as p_0 and p_1)
+    const yDomain = scales.yScale.domain();
+    const yTop = yDomain[0];
+    const textLabelY = scales.yScale(yTop) + 0.5 * labelFontSize;
+    const mathLabelY = textLabelY + labelFontSize - 5;
+
+    // Clear and re-render - offset to center (plotKatexInSVG positions from left edge)
+    const katexCenterOffset = 15;
+    group.selectAll("*").remove();
+    plotKatexInSVG(group, 'p_t', centerPixelX - katexCenterOffset, mathLabelY, {
+      fontSize: labelFontSize,
+      bg: false,
+      color: labelColor
     });
   }
 
@@ -368,6 +433,9 @@
         }
       }
     }
+
+    // Update the moving p_t label
+    updateIntermediateLabel();
   }
 
   /**
@@ -386,7 +454,7 @@
 
     // 2. Create scales once
     scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
+      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor, distributionScaleFactor
     });
 
     // 3. Initialize scatter plots (creates DOM nodes)
@@ -408,7 +476,7 @@
     }
 
     // 4. Plot labels
-    plotLabels();
+    plotKatexLabels();
   }
 
   /**
