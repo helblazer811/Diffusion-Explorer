@@ -5,7 +5,7 @@
   import * as d3 from 'd3';
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import { settings } from '$lib/settings';
-  import { createSourceTargetScales } from '$lib/d3_helpers';
+  import { createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -27,7 +27,8 @@
   // Layout props
   export let svgWidth = 350;
   export let svgHeight = 250;
-  export let flowWidth = 6;
+  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let marginWidth = 20;
   export let marginHeight = 20;
   export let gap = 30;
@@ -60,8 +61,7 @@
   let rightSvgElement;
 
   // Scales (shared between panels)
-  let xScale = null;
-  let yScale = null;
+  let scales = null;
 
   // State
   let isInitialized = false;
@@ -94,8 +94,8 @@
     shuffledIndicesForLeft = [...indices].sort(() => Math.random() - 0.5);
   }
 
-  function plotScatter(svgElement, points, color, groupId, xShift = 0) {
-    if (!svgElement || !xScale || !yScale || points.length === 0) return;
+  function plotScatter(svgElement, points, color, groupId, isSource = true) {
+    if (!svgElement || !scales || points.length === 0) return;
 
     const svg = d3.select(svgElement);
     svg.select(`#${groupId}`).remove();
@@ -107,8 +107,8 @@
       .enter()
       .append('circle')
       .attr('class', (d, i) => `${groupId}-point point-${i}`)
-      .attr('cx', d => xScale(d[0] + xShift))
-      .attr('cy', d => yScale(d[1]))
+      .attr('cx', d => dataToPixelX(d[0], isSource, scales))
+      .attr('cy', d => scales.yScale(d[1]))
       .attr('r', pointRadius)
       .attr('fill', color)
       .attr('opacity', pointOpacity)
@@ -117,7 +117,7 @@
   }
 
   function plotCouplingEdges(svgElement, sourcePoints, targetPoints, groupId, isInduced = false) {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
 
     const svg = d3.select(svgElement);
     svg.select(`#${groupId}`).remove();
@@ -138,10 +138,10 @@
       .enter()
       .append('line')
       .attr('class', (d, i) => `visible-edge edge-${i}`)
-      .attr('x1', d => xScale(d.source[0]))
-      .attr('y1', d => yScale(d.source[1]))
-      .attr('x2', d => xScale(d.target[0] + flowWidth))
-      .attr('y2', d => yScale(d.target[1]))
+      .attr('x1', d => dataToPixelX(d.source[0], true, scales))
+      .attr('y1', d => scales.yScale(d.source[1]))
+      .attr('x2', d => dataToPixelX(d.target[0], false, scales))
+      .attr('y2', d => scales.yScale(d.target[1]))
       .attr('stroke', edgeColor)
       .attr('stroke-width', edgeWidth)
       .attr('stroke-opacity', edgeOpacity);
@@ -152,10 +152,10 @@
       .enter()
       .append('line')
       .attr('class', (d, i) => `hit-area hit-area-${i}`)
-      .attr('x1', d => xScale(d.source[0]))
-      .attr('y1', d => yScale(d.source[1]))
-      .attr('x2', d => xScale(d.target[0] + flowWidth))
-      .attr('y2', d => yScale(d.target[1]))
+      .attr('x1', d => dataToPixelX(d.source[0], true, scales))
+      .attr('y1', d => scales.yScale(d.source[1]))
+      .attr('x2', d => dataToPixelX(d.target[0], false, scales))
+      .attr('y2', d => scales.yScale(d.target[1]))
       .attr('stroke', 'transparent')
       .attr('stroke-width', edgeWidth * 3)
       .style('cursor', 'pointer')
@@ -297,7 +297,7 @@
   }
 
   function initializePanel(svgElement, label, isInduced) {
-    if (!svgElement || !isDataValid || !xScale || !yScale) return;
+    if (!svgElement || !isDataValid || !scales) return;
 
     const svg = d3.select(svgElement);
     svg.selectAll('*').remove();
@@ -310,8 +310,8 @@
     const couplingData = plotCouplingEdges(svgElement, selectedSource, selectedDest, 'couplingEdges', isInduced);
 
     // Plot scatter points
-    plotScatter(svgElement, selectedSource, sourcePointColor, 'sourcePoints', 0);
-    plotScatter(svgElement, selectedDest, targetPointColor, 'targetPoints', flowWidth);
+    plotScatter(svgElement, selectedSource, sourcePointColor, 'sourcePoints', true);
+    plotScatter(svgElement, selectedDest, targetPointColor, 'targetPoints', false);
 
     // Plot panel label
     plotPanelLabel(svgElement, label);
@@ -326,11 +326,9 @@
     selectSampleIndices();
     const selectedSource = selectedIndices.map(i => sourcePoints[i]);
     const selectedDest = selectedIndices.map(i => destinationPoints[i]);
-    const scales = createSourceTargetScales(selectedSource, selectedDest, {
-      width: svgWidth, height: svgHeight, marginWidth, marginHeight, flowWidth, yShiftFactor
+    scales = createSourceTargetScales(selectedSource, selectedDest, {
+      width: svgWidth, height: svgHeight, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
     });
-    xScale = scales.xScale;
-    yScale = scales.yScale;
     initializePanel(leftSvgElement, leftLabel, false);
     initializePanel(rightSvgElement, rightLabel, true);
     isInitialized = true;

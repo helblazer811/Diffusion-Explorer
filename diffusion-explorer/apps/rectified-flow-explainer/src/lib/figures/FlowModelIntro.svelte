@@ -35,7 +35,8 @@
   export let outlineOpacity = settings.stylingSettings.label.outlineOpacity;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
-  export let flowWidth = 10; // Gap between source and target in data units
+  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
 
   // Animation settings
@@ -69,8 +70,7 @@
   let precomputedIntermediateContours = []; // Array of contours for each timestep
 
   let svgElement;
-  let xScale = null;
-  let yScale = null;
+  let scales = null; // Full scales object from createSourceTargetScales
   let time = 0; // Animation time parameter (0 to 1)
   let animationFrameId = null;
 
@@ -102,6 +102,16 @@
   }
 
   /**
+   * Compute pixel x position for a point at a given time
+   * At t=0, centered at source; at t=1, centered at target
+   */
+  function getPixelX(dataX, dataMeanX, t) {
+    if (!scales) return 0;
+    const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    return centerPixelX + (dataX - dataMeanX) * scales.xScaleFactor;
+  }
+
+  /**
    * Initialize persistent SVG layers (called once)
    */
   function initializeLayers() {
@@ -127,7 +137,7 @@
     groupId,
     opacity = pointOpacity
   ) {
-    if (!svgElement || !xScale || !yScale || points.length === 0) return;
+    if (!svgElement || !scales || points.length === 0) return;
 
     const svg = d3.select(svgElement);
     const group = svg.select(`#${groupId}`);
@@ -144,32 +154,34 @@
 
   /**
    * Update scatter plot positions (called every frame)
+   * @param points - data points
+   * @param groupId - SVG group ID
+   * @param t - time (0 = source position, 1 = target position)
+   * @param meanX - mean x value for centering (typically 0 for normalized data)
    */
-  function updateScatter(points, groupId, time) {
-    if (!svgElement || !xScale || !yScale || points.length === 0) return;
+  function updateScatter(points, groupId, t, meanX = 0) {
+    if (!svgElement || !scales || points.length === 0) return;
 
-    const xShift = time * flowWidth;
     const svg = d3.select(svgElement);
     const group = svg.select(`#${groupId}`);
 
     group
       .selectAll("circle")
       .data(points)
-      .attr("cx", (d) => xScale(d[0] + xShift))
-      .attr("cy", (d) => yScale(d[1]));
+      .attr("cx", (d) => getPixelX(d[0], meanX, t))
+      .attr("cy", (d) => scales.yScale(d[1]));
   }
 
   /**
    * Compute contour density (pure computation, returns GeoJSON)
    */
-  function computeContours(points, time) {
-    if (!xScale || !yScale || points.length === 0) return [];
+  function computeContours(points, t, meanX = 0) {
+    if (!scales || points.length === 0) return [];
 
-    const xShift = time * flowWidth;
-    const shiftedPoints = points.map((p) => [p[0] + xShift, p[1]]);
-    const transformedPoints = shiftedPoints.map((p) => [
-      xScale(p[0]),
-      yScale(p[1]),
+    // Transform points to pixel coordinates
+    const transformedPoints = points.map((p) => [
+      getPixelX(p[0], meanX, t),
+      scales.yScale(p[1]),
     ]);
 
     return d3
@@ -185,7 +197,7 @@
    * Precompute all contours for all timesteps
    */
   function precomputeAllContours() {
-    if (!xScale || !yScale) return;
+    if (!scales) return;
     if (
       sourceDistributionSamples.length === 0 ||
       targetDistributionSamples.length === 0
@@ -195,8 +207,8 @@
     console.log("Precomputing contours...");
 
     // Precompute source and target contours (static)
-    precomputedSourceContours = computeContours(sourceDistributionSamples, 0);
-    precomputedTargetContours = computeContours(targetDistributionSamples, 1);
+    precomputedSourceContours = computeContours(sourceDistributionSamples, 0, scales.sourceMeanX);
+    precomputedTargetContours = computeContours(targetDistributionSamples, 1, scales.targetMeanX);
 
     // Precompute intermediate contours for all timesteps
     const allSamples = $allTimeSamples;
@@ -205,7 +217,9 @@
     for (let i = 0; i < allSamples.length; i++) {
       const samples = allSamples[i];
       const timeValue = i / (allSamples.length - 1); // 0 to 1
-      const contours = computeContours(samples, timeValue);
+      // For intermediate samples, compute their mean x for centering
+      const sampleMeanX = samples.reduce((sum, p) => sum + p[0], 0) / samples.length;
+      const contours = computeContours(samples, timeValue, sampleMeanX);
       precomputedIntermediateContours.push(contours);
     }
 
@@ -244,7 +258,7 @@
    * Plot distribution labels above source and target
    */
   function plotLabels() {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
     if (
       sourceDistributionSamples.length === 0 ||
       targetDistributionSamples.length === 0
@@ -257,8 +271,7 @@
     // Clear existing labels
     labelsGroup.selectAll("*").remove();
 
-    plotSourceTargetLabels(svg, xScale, yScale, {
-      flowWidth,
+    plotSourceTargetLabels(svg, scales, {
       sourceLabelText,
       targetLabelText,
       labelFontSize,
@@ -272,7 +285,7 @@
    * Central drawing function - updates all visualizations (called every frame)
    */
   function draw() {
-    if (!svgElement || !xScale || !yScale) return;
+    if (!svgElement || !scales) return;
     if (
       sourceDistributionSamples.length === 0 ||
       targetDistributionSamples.length === 0
@@ -281,10 +294,10 @@
 
     // Update static distributions scatter plots
     if (showSourceScatter) {
-      updateScatter(sourceDistributionSamples, "sourceScatter", 0);
+      updateScatter(sourceDistributionSamples, "sourceScatter", 0, scales.sourceMeanX);
     }
     if (showTargetScatter) {
-      updateScatter(targetDistributionSamples, "targetScatter", 1);
+      updateScatter(targetDistributionSamples, "targetScatter", 1, scales.targetMeanX);
     }
 
     // Update source and target contours (use precomputed)
@@ -321,7 +334,9 @@
 
       if (intermediateSamples && intermediateSamples.length > 0) {
         if (showIntermediateScatter) {
-          updateScatter(intermediateSamples, "intermediateScatter", time);
+          // Compute mean for current intermediate samples
+          const sampleMeanX = intermediateSamples.reduce((sum, p) => sum + p[0], 0) / intermediateSamples.length;
+          updateScatter(intermediateSamples, "intermediateScatter", time, sampleMeanX);
         }
 
         // Use precomputed intermediate contours
@@ -360,11 +375,9 @@
     initializeLayers();
 
     // 2. Create scales once
-    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
     });
-    xScale = scales.xScale;
-    yScale = scales.yScale;
 
     // 3. Initialize scatter plots (creates DOM nodes)
     if (showSourceScatter) {

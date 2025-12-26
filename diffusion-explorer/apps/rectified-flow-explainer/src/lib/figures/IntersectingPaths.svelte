@@ -7,7 +7,7 @@
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
-  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales } from '$lib/d3_helpers';
+  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -27,7 +27,8 @@
   export let height = 300;
   export let marginWidth = 50;
   export let marginHeight = 20;
-  export let flowWidth = 10;
+  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let lineColor = '#666';
@@ -71,8 +72,7 @@
 
   // SVG and scale state
   let svgElement;
-  let xScale = null;
-  let yScale = null;
+  let scales = null;
   let isInitialized = false;
 
   // Static time value for the disabled slider
@@ -126,10 +126,10 @@
   }
 
   function plotConnectingLine(sourcePoint, targetPoint, lineGroup) {
-    const x1 = xScale(sourcePoint[0]);
-    const y1 = yScale(sourcePoint[1]);
-    const x2 = xScale(targetPoint[0] + flowWidth);
-    const y2 = yScale(targetPoint[1]);
+    const x1 = dataToPixelX(sourcePoint[0], true, scales);
+    const y1 = scales.yScale(sourcePoint[1]);
+    const x2 = dataToPixelX(targetPoint[0], false, scales);
+    const y2 = scales.yScale(targetPoint[1]);
 
     lineGroup.append('line')
       .attr('x1', x1)
@@ -236,15 +236,12 @@
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     initializeLayers();
-    const scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, flowWidth, yShiftFactor
+    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
     });
-    xScale = scales.xScale;
-    yScale = scales.yScale;
 
     const svg = d3.select(svgElement);
-    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, xScale, yScale, {
-      flowWidth,
+    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, scales, {
       sourcePointColor,
       targetPointColor,
       pointRadius,
@@ -253,8 +250,7 @@
 
     // Add distribution labels at top
     svg.append('g').attr('id', 'distributionLabels');
-    plotSourceTargetLabels(svg, xScale, yScale, {
-      flowWidth,
+    plotSourceTargetLabels(svg, scales, {
       sourceLabelText,
       targetLabelText,
       labelFontSize,

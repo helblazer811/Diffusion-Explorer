@@ -2,12 +2,12 @@ import * as d3 from 'd3';
 
 /**
  * Create D3 scales for plotting source and target distributions.
- * Source is positioned at x=0, target at x=flowWidth.
+ * Distributions are positioned at proportional x positions (e.g., source at 0.2, target at 0.8).
  *
  * @param sourcePoints - Array of [x, y] coordinates for source distribution
  * @param targetPoints - Array of [x, y] coordinates for target distribution
  * @param options - Layout and styling options
- * @returns Object containing xScale and yScale
+ * @returns Object containing scales and positioning info
  */
 export function createSourceTargetScales(
   sourcePoints: [number, number][],
@@ -17,88 +17,104 @@ export function createSourceTargetScales(
     height: number;
     marginWidth?: number;
     marginHeight?: number;
-    flowWidth?: number;
+    sourceCenterX?: number;  // Proportion of width (e.g., 0.2)
+    targetCenterX?: number;  // Proportion of width (e.g., 0.8)
     yShiftFactor?: number;
   }
-): { xScale: d3.ScaleLinear<number, number>; yScale: d3.ScaleLinear<number, number> } {
+): {
+  yScale: d3.ScaleLinear<number, number>;
+  xScaleFactor: number;
+  sourceCenterPixelX: number;
+  targetCenterPixelX: number;
+  sourceMeanX: number;
+  targetMeanX: number;
+} {
   const {
     width,
     height,
-    marginWidth = 20,
+    marginWidth = 50,
     marginHeight = 20,
-    flowWidth = 10,
+    sourceCenterX = 0.2,
+    targetCenterX = 0.8,
     yShiftFactor = 0
   } = options;
 
-  const drawableWidth = width - 2 * marginWidth;
+  // Compute pixel centers for each distribution
+  const sourceCenterPixelX = width * sourceCenterX;
+  const targetCenterPixelX = width * targetCenterX;
+
+  // Compute data extents for y (used for scaling)
+  const sourceYExtent = d3.extent(sourcePoints, d => d[1]) as [number, number];
+  const targetYExtent = d3.extent(targetPoints, d => d[1]) as [number, number];
+
+  // Compute y range (combined for both distributions)
+  const yMin = Math.min(sourceYExtent[0], targetYExtent[0]);
+  const yMax = Math.max(sourceYExtent[1], targetYExtent[1]);
+  const yRange = yMax - yMin;
+  const yCenter = (yMin + yMax) / 2;
+
+  // Compute available height
   const drawableHeight = height - 2 * marginHeight;
-  const aspectRatio = drawableHeight / drawableWidth;
 
-  // Shift target points by flowWidth for extent calculation
-  const shiftedTargetPoints = targetPoints.map(p => [p[0] + flowWidth, p[1]] as [number, number]);
-  const allPoints = [...sourcePoints, ...shiftedTargetPoints];
+  // Scale factor based purely on height (independent of horizontal positioning)
+  const scaleFactor = drawableHeight / (yRange || 1);
+  const xScaleFactor = scaleFactor;
 
-  const xExtent = d3.extent(allPoints, d => d[0]) as [number, number];
-  const yExtent = d3.extent(allPoints, d => d[1]) as [number, number];
-  const xRange = xExtent[1] - xExtent[0];
-  const yRange = yExtent[1] - yExtent[0];
-  const xCenter = (xExtent[0] + xExtent[1]) / 2;
-  const yCenter = (yExtent[0] + yExtent[1]) / 2;
-
-  // Adjust ranges to maintain aspect ratio
-  let adjustedXRange = xRange;
-  let adjustedYRange = yRange;
-
-  if (yRange / xRange > aspectRatio) {
-    adjustedXRange = yRange / aspectRatio;
-  } else {
-    adjustedYRange = xRange * aspectRatio;
-  }
+  // Compute adjusted y range based on scale factor
+  const adjustedYRange = drawableHeight / scaleFactor;
 
   // Apply vertical offset for labels and yShiftFactor
   const yCenterOffset = -adjustedYRange * 0.07 - yShiftFactor;
 
-  const xScale = d3.scaleLinear()
-    .domain([xCenter - adjustedXRange / 2, xCenter + adjustedXRange / 2])
-    .range([marginWidth, width - marginWidth]);
-
+  // Create y scale (same for both distributions)
   const yScale = d3.scaleLinear()
     .domain([yCenter - adjustedYRange / 2 - yCenterOffset, yCenter + adjustedYRange / 2 - yCenterOffset])
     .range([marginHeight, height - marginHeight]);
 
-  return { xScale, yScale };
+  // Compute mean x values for centering
+  const sourceMeanX = sourcePoints.reduce((sum, p) => sum + p[0], 0) / sourcePoints.length;
+  const targetMeanX = targetPoints.reduce((sum, p) => sum + p[0], 0) / targetPoints.length;
+
+  return {
+    yScale,
+    xScaleFactor,
+    sourceCenterPixelX,
+    targetCenterPixelX,
+    sourceMeanX,
+    targetMeanX
+  };
 }
 
 /**
- * Plot a scatter plot of points in an SVG group.
+ * Plot a scatter plot of points in an SVG group with explicit pixel positioning.
  *
  * @param svg - D3 selection of the SVG element
  * @param points - Array of [x, y] coordinates
- * @param xScale - D3 linear scale for x-axis
  * @param yScale - D3 linear scale for y-axis
  * @param groupId - ID of the group element to plot into
- * @param options - Styling options
+ * @param options - Styling and positioning options
  */
-export function plotScatter(
+export function plotScatterAtCenter(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
   points: [number, number][],
-  xScale: d3.ScaleLinear<number, number>,
   yScale: d3.ScaleLinear<number, number>,
   groupId: string,
   options: {
+    centerPixelX: number;
+    meanX: number;
+    xScaleFactor: number;
     pointRadius?: number;
     pointOpacity?: number;
     pointColor?: string;
-    xShift?: number;
-    yShiftFactor?: number;
-  } = {}
+  }
 ): void {
   const {
+    centerPixelX,
+    meanX,
+    xScaleFactor,
     pointRadius = 5,
     pointOpacity = 0.25,
-    pointColor = '#3b82f6',
-    xShift = 0,
-    yShiftFactor = 0
+    pointColor = '#3b82f6'
   } = options;
 
   if (!svg || points.length === 0) return;
@@ -109,8 +125,8 @@ export function plotScatter(
   group.selectAll('circle')
     .data(points)
     .join('circle')
-    .attr('cx', (d: [number, number]) => xScale(d[0] + xShift))
-    .attr('cy', (d: [number, number]) => yScale(d[1] + yShiftFactor))
+    .attr('cx', (d: [number, number]) => centerPixelX + (d[0] - meanX) * xScaleFactor)
+    .attr('cy', (d: [number, number]) => yScale(d[1]))
     .attr('r', pointRadius)
     .attr('fill', pointColor)
     .attr('opacity', pointOpacity);
@@ -118,67 +134,58 @@ export function plotScatter(
 
 /**
  * Plot source and target distribution scatter plots.
- * Source is centered at x=0, target is centered at x=flowWidth.
+ * Each distribution is centered at its designated proportional x position.
  *
  * @param svg - D3 selection of the SVG element
  * @param sourcePoints - Array of [x, y] coordinates for source distribution
  * @param targetPoints - Array of [x, y] coordinates for target distribution
- * @param xScale - D3 linear scale for x-axis
- * @param yScale - D3 linear scale for y-axis
+ * @param scales - Scales and positioning info from createSourceTargetScales
  * @param options - Styling options
  */
 export function plotSourceTargetScatter(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
   sourcePoints: [number, number][],
   targetPoints: [number, number][],
-  xScale: d3.ScaleLinear<number, number>,
-  yScale: d3.ScaleLinear<number, number>,
+  scales: {
+    yScale: d3.ScaleLinear<number, number>;
+    xScaleFactor: number;
+    sourceCenterPixelX: number;
+    targetCenterPixelX: number;
+    sourceMeanX: number;
+    targetMeanX: number;
+  },
   options: {
-    flowWidth?: number;
     sourcePointColor?: string;
     targetPointColor?: string;
     pointRadius?: number;
     pointOpacity?: number;
-    yShiftFactor?: number;
-    centerHorizontally?: boolean;
   } = {}
 ): void {
   const {
-    flowWidth = 10,
     sourcePointColor = '#3b82f6',
     targetPointColor = '#3b82f6',
     pointRadius = 5,
-    pointOpacity = 0.25,
-    yShiftFactor = 0,
-    centerHorizontally = true
+    pointOpacity = 0.25
   } = options;
 
-  // Calculate x shifts to center each distribution
-  let sourceXShift = 0;
-  let targetXShift = flowWidth;
+  const { yScale, xScaleFactor, sourceCenterPixelX, targetCenterPixelX, sourceMeanX, targetMeanX } = scales;
 
-  if (centerHorizontally) {
-    // Center source at x=0, target at x=flowWidth
-    const sourceMeanX = sourcePoints.reduce((sum, p) => sum + p[0], 0) / sourcePoints.length;
-    const targetMeanX = targetPoints.reduce((sum, p) => sum + p[0], 0) / targetPoints.length;
-    sourceXShift = -sourceMeanX;
-    targetXShift = flowWidth - targetMeanX;
-  }
-
-  plotScatter(svg, sourcePoints, xScale, yScale, 'sourceScatter', {
+  plotScatterAtCenter(svg, sourcePoints, yScale, 'sourceScatter', {
+    centerPixelX: sourceCenterPixelX,
+    meanX: sourceMeanX,
+    xScaleFactor,
     pointRadius,
     pointOpacity,
-    pointColor: sourcePointColor,
-    xShift: sourceXShift,
-    yShiftFactor
+    pointColor: sourcePointColor
   });
 
-  plotScatter(svg, targetPoints, xScale, yScale, 'targetScatter', {
+  plotScatterAtCenter(svg, targetPoints, yScale, 'targetScatter', {
+    centerPixelX: targetCenterPixelX,
+    meanX: targetMeanX,
+    xScaleFactor,
     pointRadius,
     pointOpacity,
-    pointColor: targetPointColor,
-    xShift: targetXShift,
-    yShiftFactor
+    pointColor: targetPointColor
   });
 }
 
@@ -239,20 +246,20 @@ export function plotLabel(
 
 /**
  * Plot source and target distribution labels.
- * Source label at xScale(0), target label at xScale(flowWidth).
- * Label Y position is computed from yScale domain top + yShiftFactor * labelFontSize.
+ * Labels are positioned at the proportional center positions.
  *
  * @param svg - D3 selection of the SVG element
- * @param xScale - D3 linear scale for x-axis
- * @param yScale - D3 linear scale for y-axis
+ * @param scales - Scales and positioning info from createSourceTargetScales
  * @param options - Styling options
  */
 export function plotSourceTargetLabels(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
-  xScale: d3.ScaleLinear<number, number>,
-  yScale: d3.ScaleLinear<number, number>,
+  scales: {
+    yScale: d3.ScaleLinear<number, number>;
+    sourceCenterPixelX: number;
+    targetCenterPixelX: number;
+  },
   options: {
-    flowWidth?: number;
     sourceLabelText?: string;
     targetLabelText?: string;
     labelFontSize?: number;
@@ -264,7 +271,6 @@ export function plotSourceTargetLabels(
   } = {}
 ): void {
   const {
-    flowWidth = 10,
     sourceLabelText = 'Source Distribution',
     targetLabelText = 'Target Distribution',
     labelFontSize = 22,
@@ -275,6 +281,8 @@ export function plotSourceTargetLabels(
     outlineOpacity = 0.5
   } = options;
 
+  const { yScale, sourceCenterPixelX, targetCenterPixelX } = scales;
+
   const group = svg.select(`#${groupId}`) as d3.Selection<SVGGElement, unknown, null, undefined>;
   if (group.empty()) return;
 
@@ -283,20 +291,40 @@ export function plotSourceTargetLabels(
   const yTop = yDomain[0];
   const labelY = yScale(yTop) + yShiftFactor * labelFontSize;
 
-  const sourceLabelX = xScale(0);
-  const targetLabelX = xScale(flowWidth);
-
-  plotLabel(group, sourceLabelText, sourceLabelX, labelY, {
+  plotLabel(group, sourceLabelText, sourceCenterPixelX, labelY, {
     fontSize: labelFontSize,
     color: labelColor,
     outlineColor,
     outlineOpacity
   });
 
-  plotLabel(group, targetLabelText, targetLabelX, labelY, {
+  plotLabel(group, targetLabelText, targetCenterPixelX, labelY, {
     fontSize: labelFontSize,
     color: labelColor,
     outlineColor,
     outlineOpacity
   });
+}
+
+/**
+ * Compute pixel x position for a data point given scales info.
+ * Useful for figures that need to position individual elements.
+ */
+export function dataToPixelX(
+  dataX: number,
+  isSource: boolean,
+  scales: {
+    xScaleFactor: number;
+    sourceCenterPixelX: number;
+    targetCenterPixelX: number;
+    sourceMeanX: number;
+    targetMeanX: number;
+  }
+): number {
+  const { xScaleFactor, sourceCenterPixelX, targetCenterPixelX, sourceMeanX, targetMeanX } = scales;
+  if (isSource) {
+    return sourceCenterPixelX + (dataX - sourceMeanX) * xScaleFactor;
+  } else {
+    return targetCenterPixelX + (dataX - targetMeanX) * xScaleFactor;
+  }
 }
