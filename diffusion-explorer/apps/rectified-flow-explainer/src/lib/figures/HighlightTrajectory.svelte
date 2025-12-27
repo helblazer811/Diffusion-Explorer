@@ -3,6 +3,7 @@
 <script>
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
+  import { base } from '$app/paths';
   import Figure from '$lib/components/Figure.svelte';
   import { settings } from '$lib/settings';
   import { createSourceTargetScales } from '$lib/d3_helpers';
@@ -50,6 +51,9 @@
   export let annotationColor = '#666';
   export let annotationLineColor = '#888';
 
+  // Interaction props
+  export let draggable = false; // Enable/disable drag handle for trajectory selection
+
   // Selected trajectory index (single trajectory)
   let selectedTrajectoryIndex = null;
   let svgElement;
@@ -58,6 +62,9 @@
   let animationFrameId = null;
   let trajectoryLength = 0; // Cache total path length
   let animationStartTime = null;
+
+  // Drag handle state
+  let dragInitialized = false;
 
   // Local animation control state
   let isPlaying = true;
@@ -88,6 +95,39 @@
     if (!scales) return 0;
     const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
     return centerPixelX + (dataX - dataMeanX) * scales.xScaleFactor;
+  }
+
+  /**
+   * Find the nearest trajectory index based on SVG pixel coordinates.
+   * Converts pixel coords to data coords and finds closest starting point.
+   */
+  function nearestTrajectoryIndex(svgX, svgY) {
+    const allSamples = $allTimeSamples;
+    if (!allSamples || allSamples.length === 0 || !scales) return 0;
+
+    const startingPoints = allSamples[0]; // Time = 0 starting positions
+
+    // Compute combined mean for positioning (same as in generateTrajectoryPath)
+    const allSourceX = sourceDistributionSamples.map(p => p[0]);
+    const allTargetX = targetDistributionSamples.map(p => p[0]);
+    const combinedMeanX = [...allSourceX, ...allTargetX].reduce((a, b) => a + b, 0) / (allSourceX.length + allTargetX.length);
+
+    // Convert SVG coords to data coords (at t=0, use source center)
+    const dataX = (svgX - scales.sourceCenterPixelX) / scales.xScaleFactor + combinedMeanX;
+    const dataY = scales.yScale.invert(svgY);
+
+    // Find nearest starting point
+    let minDist = Infinity;
+    let minIndex = 0;
+    for (let i = 0; i < startingPoints.length; i++) {
+      const [px, py] = startingPoints[i];
+      const dist = Math.sqrt((px - dataX) ** 2 + (py - dataY) ** 2);
+      if (dist < minDist) {
+        minDist = dist;
+        minIndex = i;
+      }
+    }
+    return minIndex;
   }
 
   /**
@@ -271,6 +311,84 @@
   }
 
   /**
+   * Redraw the trajectory and annotation when selection changes.
+   */
+  function redrawTrajectory() {
+    const svg = d3.select(svgElement);
+    svg.select('#trajectories').selectAll('*').remove();
+    svg.select('#annotation').selectAll('*').remove();
+    initTrajectory();
+    initAnnotation();
+    updateTrajectory(time);
+
+    // Update drag handle position to new trajectory start point
+    const startPoint = getTrajectoryPointAt(0);
+    svg.select('#dragHandle .drag-icon')
+      .attr('x', startPoint.x)
+      .attr('y', startPoint.y);
+  }
+
+  /**
+   * Initialize the drag handle on the current trajectory's starting point.
+   * Allows user to drag and select different trajectories in real-time.
+   */
+  function initDragHandle() {
+    if (dragInitialized) return;
+    dragInitialized = true;
+
+    const svg = d3.select(svgElement);
+    const handleGroup = svg.select('#dragHandle');
+
+    // Get current starting point position
+    const startPoint = getTrajectoryPointAt(0);
+
+    // Add the pointer icon image
+    handleGroup.append('image')
+      .attr('class', 'drag-icon')
+      .attr('xlink:href', base + '/PointerIcon.svg')
+      .attr('x', startPoint.x)
+      .attr('y', startPoint.y)
+      .attr('transform', 'translate(-15, -15)') // Center the 30x30 icon
+      .attr('width', 30)
+      .attr('height', 30)
+      .style('cursor', 'grab');
+
+    // Set up drag behavior (real-time trajectory updates during drag)
+    const drag = d3.drag()
+      .on('start', function() { d3.select(this).style('cursor', 'grabbing'); })
+      .on('drag', function(event) {
+        let [x, y] = d3.pointer(event, svg.node());
+
+        // Clamp to SVG bounds (vector field area)
+        x = Math.max(marginWidth, Math.min(x, width - marginWidth));
+        y = Math.max(marginHeight, Math.min(y, height - marginHeight));
+
+        // Update icon position during drag
+        handleGroup.select('.drag-icon')
+          .attr('x', x)
+          .attr('y', y);
+
+        // Real-time: find and select nearest trajectory immediately
+        const newIndex = nearestTrajectoryIndex(x, y);
+        if (newIndex !== selectedTrajectoryIndex) {
+          selectedTrajectoryIndex = newIndex;
+          redrawTrajectory();
+        }
+      })
+      .on('end', function() {
+        // Ensure icon snaps to final trajectory starting point
+        const snapPoint = getTrajectoryPointAt(0);
+        handleGroup.select('.drag-icon')
+          .attr('x', snapPoint.x)
+          .attr('y', snapPoint.y);
+
+        d3.select(this).style('cursor', 'grab');
+      });
+
+    handleGroup.call(drag);
+  }
+
+  /**
    * Update trajectory visualization for current animation time
    */
   function updateTrajectory(time) {
@@ -301,6 +419,7 @@
     svg.append('g').attr('id', 'targetScatter');
     svg.append('g').attr('id', 'trajectories');
     svg.append('g').attr('id', 'annotation');
+    svg.append('g').attr('id', 'dragHandle');
   }
 
   function initScatter(points, color, groupId, opacity = pointOpacity) {
@@ -347,6 +466,9 @@
     initTrajectory();
     draw();
     initAnnotation();
+    if (draggable) {
+      initDragHandle();
+    }
   }
 
   function startAnimation() {
