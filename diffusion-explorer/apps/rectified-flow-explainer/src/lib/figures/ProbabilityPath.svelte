@@ -352,7 +352,7 @@
     plotKatexInSVG(group, 'p_t', centerPixelX - katexCenterOffset, mathLabelY, {
       fontSize: labelFontSize,
       bg: false,
-      color: labelColor
+      color: '#f17720'
     });
   }
 

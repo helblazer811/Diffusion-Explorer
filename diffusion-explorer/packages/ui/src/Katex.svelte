@@ -3,6 +3,7 @@
 	export let math;
 	export let displayMode = false;
 	export let displayFontSize = "1.3em";
+	export let color = null;
 
 	const options = {
 		displayMode: displayMode,
@@ -10,6 +11,7 @@
 	}
 
 	$: katexString = katex.renderToString(math, options);
+	$: colorStyle = color ? `color: ${color};` : '';
 </script>
 
 <svelte:head>
@@ -17,9 +19,9 @@
 </svelte:head>
 
 {#if displayMode}
-	<span class="katex-display-wrapper" style="font-size: {displayFontSize};">
+	<span class="katex-display-wrapper" style="font-size: {displayFontSize}; {colorStyle}">
 		{@html katexString}
 	</span>
 {:else}
-	{@html katexString}
+	<span style={colorStyle}>{@html katexString}</span>
 {/if}

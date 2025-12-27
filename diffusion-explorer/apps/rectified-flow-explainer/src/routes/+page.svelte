@@ -20,7 +20,7 @@
   } from "$lib/citations";
 
   import IndependentCoupling from "$lib/figures/IndependentCoupling.svelte";
-  import FlowModelIntro from "$lib/figures/FlowModelIntro.svelte";
+  import ProbabilityPath from "$lib/figures/ProbabilityPath.svelte";
   import HighlightTrajectory from "$lib/figures/HighlightTrajectory.svelte";
   import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
@@ -32,6 +32,7 @@
   import InducedCouplingDouble from "$lib/figures/InducedCouplingDouble.svelte";
   import VectorFieldCurvatureComparison from "$lib/figures/VectorFieldCurvatureComparison.svelte";
   import ConditionalVelocityField from "$lib/figures/ConditionalVelocityField.svelte";
+  import ConditionalFlowMatching from "$lib/figures/ConditionalFlowMatching.svelte";
   import Figure from "$lib/components/Figure.svelte";
   import Algorithm from "$lib/components/Algorithm.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
@@ -606,7 +607,7 @@
       >
         <div class="caption">
           <span class="figure-number">Figure 2:</span>
-          The curved trajectories produced by a model trained with flow matching.
+          The <span style="color: #f17720;">curved trajectories</span> produced by a model trained with flow matching.
         </div>
       </CurvedTrajectoryIntro>
     </div>
@@ -699,7 +700,7 @@
 
   {#if showOtherFigures}
     <div id="figure-3">
-      <FlowModelIntro
+      <ProbabilityPath
         width={figureWidth}
         sourceDistributionSamples={$sourceDistributionSamples}
         targetDistributionSamples={$targetDistributionSamples}
@@ -710,14 +711,14 @@
       >
         <div class="caption">
           <span class="figure-number">Figure 3:</span>
-          The probability path <Katex math={"p_t"} /> of a continuous normalizing
+          The <span style="color: #f17720;">probability path</span> <Katex math={"p_t"} color="#f17720" /> of a continuous normalizing
           flow as it is transformed from a simple source distribution <Katex
             math={"p_0"}
           /> to a more complex data distribution <Katex math={"p_1 = q"} />. We
           can also see the trajectory of individual samples as they move from
           the source to target distribution.
         </div>
-      </FlowModelIntro>
+      </ProbabilityPath>
     </div>
   {/if}
 
@@ -749,7 +750,7 @@
     >
       <div class="caption">
         <span class="figure-number">Figure 4:</span>
-        A single sample trajectory <Katex math={"\\psi_t(x)"} /> showing how an individual
+        A single <span style="color: #f17720;">sample trajectory</span> <Katex math={"\\psi_t(x)"} color="#f17720" /> showing how an individual
         point moves from the source distribution to the target distribution.
       </div>
     </HighlightTrajectory>
@@ -801,7 +802,7 @@
     <EulerCircularDemo backgroundVisible={false}>
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
-        Euler's method applied to a circular vector field. The arrows show the velocity
+        Euler's method applied to a circular vector field. The <span style="color: #3b82f6;">arrows</span> show the velocity
         field, and the orange path shows the trajectory computed by taking discrete
         steps in the direction of the velocity.
       </div>
@@ -902,7 +903,7 @@
     However, there is a catch: we do not have direct access to the true velocity
     field <Katex math={"v_t(x)"} />! <Katex math={"v_t(x)"} /> is difficult to directly
     construct in practice as it governs the transformations between two high dimensional
-    distributions. So, how can we possibly optimize this objective? 
+    distributions. So, how can we possibly optimize this objective?
   </p>
   <p>
     Luckily, we can create a related but much simpler objective by conditioning
@@ -910,11 +911,7 @@
       math={"x_1 \\sim q"}
     />. This yields the conditional velocity field <Katex
       math={"v_t(x | x_1) = \\frac{x_1 - x}{1 - t}"}
-    />. With this we can create a regression objective called
-    <em>conditional flow matching</em>. Incredibly, the conditional flow
-    matching and the flow matching objectives have the same gradients, meaning
-    we can optimize our tractable conditional flow matching objective and solve
-    the flow matching problem.
+    />.
   </p>
 
   {#if showOtherFigures}
@@ -926,21 +923,57 @@
     >
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
-        The conditional velocity field <Katex math={"v_t(x|x_1) = \\frac{x_1 - x}{1 - t}"} />
-        points from an intermediate sample <Katex math={"x_t"} /> toward the target <Katex math={"x_1"} />.
+        The <span style="color: #f17720;">conditional velocity field</span> <Katex
+          math={"v_t(x|x_1) = \\frac{x_1 - x}{1 - t}"}
+          color="#f17720"
+        />
+        points from an intermediate sample <Katex math={"x_t"} /> toward the target
+        <Katex math={"x_1"} />.
       </div>
     </ConditionalVelocityField>
   {/if}
 
   <p>
-    If we then plug in our specific conditional velocity field for our choice of
-    a linear probability path, we get the remarkably simple training objective:
+    Equipped with this conditional vector field, we can create a regression
+    objective called
+    <em>conditional flow matching</em>. Incredibly, the conditional flow
+    matching and the flow matching objectives have the same gradients
+    <Katex
+      math={"\\nabla_\\theta \\mathcal{L}_{CFM}(\\theta) = \\nabla_\\theta \\mathcal{L}_{FM}(\\theta)"}
+    />
+    , meaning we can optimize our tractable conditional flow matching objective and
+    solve the flow matching problem. If we then plug in our specific conditional
+    velocity field for our choice of a linear probability path, we get the remarkably
+    simple training objective:
   </p>
 
   <Katex
     math={"\\mathcal{L}_{CFM}(\\theta) = \\mathbb{E}_{t, X_0, X_1} ||(X_1 - X_0) - v_t^\\theta(X_t)||^2"}
     displayMode={true}
   />
+  <p>
+    This simply requires us to draw pairs from our source and target distributions
+    <Katex math={"X_0 \\sim p_0"} /> and <Katex math={"X_1 \\sim q"} />, linearly interpolate
+    between them to get <Katex math={"X_t"} />, and then train our velocity field
+    <Katex math={"v_t^\\theta(x)"} /> to predict the straight-line velocity <Katex
+      math={"X_1 - X_0"} />.
+  </p>
+
+  {#if showOtherFigures}
+    <ConditionalFlowMatching
+      width={figureWidth}
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+      backgroundVisible={false}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 6:</span>
+        The <span style="color: #22c55e;">learned velocity field</span> <Katex math={"v_t^\\theta(x)"} color="#22c55e" /> approximates
+        the <span style="color: #f17720;">conditional velocity</span> <Katex math={"v_t(x|x_1)"} color="#f17720" />. The dashed
+        line shows the <span style="color: #ef4444;">error</span> between the true and predicted velocities.
+      </div>
+    </ConditionalFlowMatching>
+  {/if}
 
   <h1 id="the-problem" class="section-heading">The Problem</h1>
 
