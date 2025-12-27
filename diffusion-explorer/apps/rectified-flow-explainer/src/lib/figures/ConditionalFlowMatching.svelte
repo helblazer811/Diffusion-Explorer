@@ -6,8 +6,7 @@
   import { settings } from '$lib/settings';
   import {
     plotSourceTargetScatter,
-    createSourceTargetScales,
-    dataToPixelX
+    createSourceTargetScales
   } from '$lib/d3_helpers';
 
   // ===== CAPTION =====
@@ -70,15 +69,15 @@
   // ===== BACKGROUND =====
   export let backgroundVisible = true;
 
+  // ===== FIXED POINT POSITIONS (pixel coords) =====
+  export let x0Pixel = { x: 180, y: 170 };
+  export let x1Pixel = { x: 620, y: 90 };
+
   // ===== STATE =====
   let svgElement;
   let scales = null;
   let isInitialized = false;
   let figureIsActive;
-
-  // Selected indices
-  let selectedSourceIndex = 0;
-  let selectedTargetIndex = 0;
 
   function initializeLayers() {
     const svg = d3.select(svgElement);
@@ -122,63 +121,30 @@
     svg.append('g').attr('id', 'labels');
   }
 
-  function selectRandomIndices() {
-    // Select a random source point
-    selectedSourceIndex = Math.floor(Math.random() * sourceDistributionSamples.length);
-    // Select a random target point
-    selectedTargetIndex = Math.floor(Math.random() * targetDistributionSamples.length);
-  }
-
-  function interpDataToPixel(dataX, dataY, tVal, scalesObj) {
-    // Interpolate between source and target reference frames for X
-    const sourcePixelX = scalesObj.sourceCenterPixelX + (dataX - scalesObj.sourceMeanX) * scalesObj.xScaleFactor;
-    const targetPixelX = scalesObj.targetCenterPixelX + (dataX - scalesObj.targetMeanX) * scalesObj.xScaleFactor;
-    const pixelX = (1 - tVal) * sourcePixelX + tVal * targetPixelX;
-    const pixelY = scalesObj.yScale(dataY);
-    return { x: pixelX, y: pixelY };
-  }
-
   function plotPathLine() {
-    if (!scales) return;
-
     const svg = d3.select(svgElement);
     const pathGroup = svg.select('#pathLines');
     pathGroup.selectAll('*').remove();
 
-    const sourcePoint = sourceDistributionSamples[selectedSourceIndex];
-    const targetPoint = targetDistributionSamples[selectedTargetIndex];
-
-    const sourceX = dataToPixelX(sourcePoint[0], true, scales);
-    const sourceY = scales.yScale(sourcePoint[1]);
-    const targetX = dataToPixelX(targetPoint[0], false, scales);
-    const targetY = scales.yScale(targetPoint[1]);
-
     pathGroup.append('line')
-      .attr('x1', sourceX)
-      .attr('y1', sourceY)
-      .attr('x2', targetX)
-      .attr('y2', targetY)
+      .attr('x1', x0Pixel.x)
+      .attr('y1', x0Pixel.y)
+      .attr('x2', x1Pixel.x)
+      .attr('y2', x1Pixel.y)
       .attr('stroke', lineColor)
       .attr('stroke-width', lineWidth)
       .attr('stroke-opacity', lineOpacity);
   }
 
   function plotSelectedPoints() {
-    if (!scales) return;
-
     const svg = d3.select(svgElement);
     const selectedGroup = svg.select('#selectedElements');
     const labelGroup = svg.select('#labels');
 
-    // Get source point
-    const sourcePoint = sourceDistributionSamples[selectedSourceIndex];
-    const sourceX = dataToPixelX(sourcePoint[0], true, scales);
-    const sourceY = scales.yScale(sourcePoint[1]);
-
     // Draw selected source point (x_0)
     selectedGroup.append('circle')
-      .attr('cx', sourceX)
-      .attr('cy', sourceY)
+      .attr('cx', x0Pixel.x)
+      .attr('cy', x0Pixel.y)
       .attr('r', selectedPointRadius)
       .attr('fill', selectedPointColor);
 
@@ -186,8 +152,8 @@
     plotKatexInSVG(
       labelGroup,
       'x_0',
-      sourceX - 14,
-      sourceY - katexLabelOffset - 10,
+      x0Pixel.x - 14,
+      x0Pixel.y - katexLabelOffset - 10,
       {
         fontSize: labelFontSize,
         bg: false,
@@ -195,15 +161,10 @@
       }
     );
 
-    // Get target point
-    const targetPoint = targetDistributionSamples[selectedTargetIndex];
-    const targetX = dataToPixelX(targetPoint[0], false, scales);
-    const targetY = scales.yScale(targetPoint[1]);
-
     // Draw selected target point (x_1)
     selectedGroup.append('circle')
-      .attr('cx', targetX)
-      .attr('cy', targetY)
+      .attr('cx', x1Pixel.x)
+      .attr('cy', x1Pixel.y)
       .attr('r', selectedPointRadius)
       .attr('fill', selectedPointColor);
 
@@ -211,8 +172,8 @@
     plotKatexInSVG(
       labelGroup,
       'x_1',
-      targetX - 14,
-      targetY - katexLabelOffset - 10,
+      x1Pixel.x - 14,
+      x1Pixel.y - katexLabelOffset - 10,
       {
         fontSize: labelFontSize,
         bg: false,
@@ -222,40 +183,25 @@
   }
 
   function plotIntermediatePointAndVectors() {
-    if (!scales) return;
-
     const svg = d3.select(svgElement);
     const selectedGroup = svg.select('#selectedElements');
     const vectorGroup = svg.select('#vectors');
     const dashedLineGroup = svg.select('#dashedLine');
     const labelGroup = svg.select('#labels');
 
-    // ===== STEP 1: Compute all positions in DATA coordinates =====
-    const sourcePoint = sourceDistributionSamples[selectedSourceIndex];
-    const targetPoint = targetDistributionSamples[selectedTargetIndex];
-
-    // Intermediate point at time t (data coords)
-    const interpDataX = (1 - t) * sourcePoint[0] + t * targetPoint[0];
-    const interpDataY = (1 - t) * sourcePoint[1] + t * targetPoint[1];
-
-    // ===== STEP 2: Convert positions to PIXEL coordinates =====
-    const interpPixel = interpDataToPixel(interpDataX, interpDataY, t, scales);
-
-    // Convert target point to pixel coords (target is at t=1)
-    const targetPixelX = dataToPixelX(targetPoint[0], false, scales);
-    const targetPixelY = scales.yScale(targetPoint[1]);
+    // Interpolate directly in pixel space
+    const interpX = (1 - t) * x0Pixel.x + t * x1Pixel.x;
+    const interpY = (1 - t) * x0Pixel.y + t * x1Pixel.y;
 
     // Compute vector direction in PIXEL space (from interp toward target)
-    const pixelDx = targetPixelX - interpPixel.x;
-    const pixelDy = targetPixelY - interpPixel.y;
+    const pixelDx = x1Pixel.x - interpX;
+    const pixelDy = x1Pixel.y - interpY;
     const pixelMag = Math.sqrt(pixelDx * pixelDx + pixelDy * pixelDy);
-
-    // ===== STEP 3: Draw everything using pixel coordinates =====
 
     // Draw intermediate point
     selectedGroup.append('circle')
-      .attr('cx', interpPixel.x)
-      .attr('cy', interpPixel.y)
+      .attr('cx', interpX)
+      .attr('cy', interpY)
       .attr('r', intermediatePointRadius)
       .attr('fill', intermediatePointColor);
 
@@ -263,8 +209,8 @@
     plotKatexInSVG(
       labelGroup,
       'x',
-      interpPixel.x - 12,
-      interpPixel.y - katexLabelOffset - 10,
+      interpX - 12,
+      interpY - katexLabelOffset - 10,
       {
         fontSize: labelFontSize,
         bg: false,
@@ -275,13 +221,13 @@
     // Draw vectors (if magnitude is significant)
     if (pixelMag > 0.01) {
       // Scale to desired pixel length for v_t
-      const vtEndX = interpPixel.x + (pixelDx / pixelMag) * vectorScale;
-      const vtEndY = interpPixel.y + (pixelDy / pixelMag) * vectorScale;
+      const vtEndX = interpX + (pixelDx / pixelMag) * vectorScale;
+      const vtEndY = interpY + (pixelDy / pixelMag) * vectorScale;
 
       // Draw v_t(x|x_1) vector
       vectorGroup.append('line')
-        .attr('x1', interpPixel.x)
-        .attr('y1', interpPixel.y)
+        .attr('x1', interpX)
+        .attr('y1', interpY)
         .attr('x2', vtEndX)
         .attr('y2', vtEndY)
         .attr('stroke', vectorColor)
@@ -290,13 +236,13 @@
         .attr('marker-end', 'url(#conditional-flow-arrow)');
 
       // Add v_t(x|x_1) label above center of vector
-      const vtCenterX = (interpPixel.x + vtEndX) / 2;
-      const vtCenterY = (interpPixel.y + vtEndY) / 2;
+      const vtCenterX = (interpX + vtEndX) / 2;
+      const vtCenterY = (interpY + vtEndY) / 2;
       plotKatexInSVG(
         labelGroup,
         'v_t(x|x_1)',
-        vtCenterX,
-        vtCenterY - katexLabelOffset - 10,
+        vtCenterX - 30,
+        vtCenterY - katexLabelOffset + 33,
         {
           fontSize: labelFontSize - 2,
           bg: false,
@@ -310,8 +256,8 @@
 
       // Draw v_t^\theta(x) vector
       vectorGroup.append('line')
-        .attr('x1', interpPixel.x)
-        .attr('y1', interpPixel.y)
+        .attr('x1', interpX)
+        .attr('y1', interpY)
         .attr('x2', vtThetaEndX)
         .attr('y2', vtThetaEndY)
         .attr('stroke', noisyVectorColor)
@@ -320,12 +266,12 @@
         .attr('marker-end', 'url(#noisy-flow-arrow)');
 
       // Add v_t^\theta(x) label above center of noisy vector
-      const vtThetaCenterX = (interpPixel.x + vtThetaEndX) / 2;
-      const vtThetaCenterY = (interpPixel.y + vtThetaEndY) / 2;
+      const vtThetaCenterX = (interpX + vtThetaEndX) / 2;
+      const vtThetaCenterY = (interpY + vtThetaEndY) / 2;
       plotKatexInSVG(
         labelGroup,
         'v_t^\\theta(x)',
-        vtThetaCenterX,
+        vtThetaCenterX - 33,
         vtThetaCenterY - katexLabelOffset - 10,
         {
           fontSize: labelFontSize - 2,
@@ -351,7 +297,6 @@
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
     initializeLayers();
-    selectRandomIndices();
 
     scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
       width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor

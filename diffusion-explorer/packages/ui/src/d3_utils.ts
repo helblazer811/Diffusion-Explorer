@@ -10,6 +10,9 @@ export interface PlotKatexOptions {
   rx?: number;
   ry?: number;
   className?: string;
+  outline?: boolean;
+  outlineColor?: string;
+  outlineWidth?: number;
 }
 
 /**
@@ -32,7 +35,10 @@ export function plotKatexInSVG(
     bgOpacity = 0.9,
     rx = 4,
     ry = 4,
-    className = 'katex-label'
+    className = 'katex-label',
+    outline = false,
+    outlineColor = '#fff',
+    outlineWidth = 1
   } = opts;
 
   const selection = svg instanceof d3.selection
@@ -62,6 +68,15 @@ export function plotKatexInSVG(
   const katexRoot = d3.select(div.node()).select('.katex');
   katexRoot.style('color', color).style('fill', color);
   katexRoot.selectAll('*').style('color', color).style('fill', color);
+
+  // Apply outline using text-shadow
+  if (outline) {
+    const shadow = `${-outlineWidth}px ${-outlineWidth}px 0 ${outlineColor}, ` +
+      `${outlineWidth}px ${-outlineWidth}px 0 ${outlineColor}, ` +
+      `${-outlineWidth}px ${outlineWidth}px 0 ${outlineColor}, ` +
+      `${outlineWidth}px ${outlineWidth}px 0 ${outlineColor}`;
+    katexRoot.style('text-shadow', shadow);
+  }
 
   // Measure AFTER render
   const bbox = (div.node() as HTMLElement).getBoundingClientRect();
