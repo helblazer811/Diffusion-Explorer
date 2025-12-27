@@ -32,6 +32,7 @@
   import InducedCouplingDouble from "$lib/figures/InducedCouplingDouble.svelte";
   import VectorFieldCurvatureComparison from "$lib/figures/VectorFieldCurvatureComparison.svelte";
   import Figure from "$lib/components/Figure.svelte";
+  import Algorithm from "$lib/components/Algorithm.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
   import Bibliography from "$lib/components/Bibliography.svelte";
   import { Katex } from "@diffusion-explorer/ui";
@@ -653,7 +654,7 @@
     matching. Separately, a great introduction to this topic by some of the
     original authors of flow matching can be found here <span class="citation" data-cite="lipman2024flowmatchingguidecode"></span>. If
     you already have some familiarity with flow-based generative models and flow
-    matching feel free to skip ahead to the next section.
+    matching feel free to skip ahead to <a href="#the-problem" class="internal-link">The Problem</a>.
   </p>
 
   <h2 id="flow-based-models">Flow-Based Generative Models</h2>
@@ -783,7 +784,7 @@
     /> is itself the flow <Katex math={"\\psi_t(x)"} />. There are a variety of
     numerical methods for simulating these ODEs which approximate the continuous
     trajectory by taking a series of discrete steps. Perhaps the simplest such
-    method is Euler's method [Wikipedia link], which approximates the trajectory of the flow by
+    method is <a href="https://en.wikipedia.org/wiki/Euler_method" target="_blank" rel="noopener noreferrer">Euler's method</a>, which approximates the trajectory of the flow by
     taking small linear steps in the direction of the velocity field at each
     time step <Katex math={"x_{t + \\Delta t} = x_t + \\Delta t \\cdot v_t(x_t)"} />.
   </p>
@@ -800,26 +801,27 @@
   {/if}
 
   <h2 id="flow-matching">Flow Matching</h2>
-
   <p>
-    So, if we can learn an approximation <Katex math={"v_t^\\theta(x)"} />,
-    parameterized by a neural network, of the velocity field <Katex
-      math={"v_t(x)"}
-    /> then we can construct our flow <Katex math={"\\psi_t(x)"} /> and draw new
-    samples from our data distribution <Katex math="q" /> by simulating a solution
-    to these ODEs. How can we learn this vector field <Katex
-      math={"v_t^\\theta(x)"}
-    />? A solution to this problem is exactly what flow matching provides us
-    with.
+    Now that we are equipped with some background knowledge on flow-based generative
+    models, we can discuss flow matching. The motivation behind flow matching is 
+    to be able to learn our vector field <Katex math={"v_t(x)"} /> without having 
+    to do expensive simulation, meaning without having to use Euler integration or some 
+    other technique to solve ODEs. Flow matching allows us to learn <Katex math={"v_t(x)"} />
+    by solving a simple regression loss! 
   </p>
-
   <p>
-    Flow matching can be broken down into two key steps: (1) we need to define
-    our probability path <Katex math={"p_t(x)"} /> for interpolating between our
-    source <Katex math="p" /> and target distribution <Katex math="q" />, and
-    (2) we need to train a velocity field <Katex math={"v_t^\\theta(x)"} /> that
-    generates the path <Katex math={"p_t"} /> through regression.
+    Flow matching can be broken down into two key steps:
   </p>
+  <ol>
+    <li>
+      We need to define our probability path <Katex math={"p_t(x)"} /> for interpolating
+      between our source <Katex math="p" /> and target distribution <Katex math="q" />.
+    </li>
+    <li>
+      We need to train a velocity field <Katex math={"v_t^\\theta(x)"} /> that
+      generates the path <Katex math={"p_t"} /> through regression.
+    </li>
+  </ol>
 
   <p>
     For our first step, we need to design our probability path <Katex
@@ -899,9 +901,9 @@
     />
   </div>
 
-  <h1 id="curved-trajectories" class="section-heading">
-    The Problem: Curved Trajectories
-  </h1>
+  <h1 id="the-problem" class="section-heading">The Problem</h1>
+
+  <h2 id="curvature">Curvature is the Enemy of Speed</h2>
 
   <p>
     With the fundamentals of flow models and flow matching established, we can
@@ -919,8 +921,6 @@
     why is this an issue? Answering the latter question—why curvature is a problem—is
     more straightforward: the answer is speed.
   </p>
-
-  <h2 id="curvature">Curvature is the Enemy of Speed</h2>
 
   <p>
     When drawing new samples from a flow model we perform numerical integration
@@ -964,9 +964,7 @@
     jointly distributed, which is called their <em>coupling</em>.
   </p>
 
-  <h2 id="coupling">The Problem with an Independent Coupling</h2>
-
-  <h2 id="what-is-coupling">What is a coupling?</h2>
+  <h2 id="problem-coupling">Problem with Independent Coupling</h2>
 
   <p>
     A coupling is what tells us how samples from our source distribution <Katex
@@ -1002,10 +1000,8 @@
   {/if}
 
   <p>
-    So, we created an independent coupling by pairing random source points <Katex
-      math={"x_0 \\sim p"}
-    /> and target points <Katex math={"x_1 \\sim q"} />. We can visualize these
-    points with lines <Katex math={"x_1 - x_0"} />, which is exactly the
+    We can visualize these
+    pairs with lines <Katex math={"x_1 - x_0"} />, which is exactly the
     velocities that we are going to target with our flow matching objective due
     to our choice of linear path.
     <strong
@@ -1066,7 +1062,7 @@
 
   <h2 id="algorithm">Algorithm</h2>
 
-  <Figure backgroundVisible={true}>
+  <Algorithm backgroundVisible={true}>
     {#snippet caption()}
       <div class="caption">
         <span class="figure-number">Algorithm 1:</span>
@@ -1074,70 +1070,48 @@
         the coupling induced by the previous model.
       </div>
     {/snippet}
-    {#snippet children()}
-      <div class="algorithm-box">
-        <div class="algorithm-title">Algorithm: Reflow Procedure</div>
-        <div class="algorithm-content">
-          <div class="algorithm-line">
-            <span class="line-label">Inputs:</span>
-            <span
-              >Source distribution <Katex math={"p"} />, target distribution <Katex
-                math={"q"}
-              />, number of iterations <Katex math={"K"} /></span
-            >
-          </div>
-          <div class="algorithm-line">
-            <span class="line-label">Outputs:</span>
-            <span>Rectified velocity field <Katex math={"v_\\theta^K"} /></span>
-          </div>
-          <div class="algorithm-line">
-            <span class="line-number">1:</span>
-            <span
-              >Sample pairs <Katex math={"(X_0, X_1)"} /> from independent coupling
-              <Katex math={"\\pi_0 = p \\times q"} /></span
-            >
-          </div>
-          <div class="algorithm-line">
-            <span class="line-number">2:</span>
-            <span
-              ><strong>for</strong>
-              <Katex math={"k = 1, 2, \\ldots, K"} /> <strong>do</strong></span
-            >
-          </div>
-          <div class="algorithm-line indented">
-            <span class="line-number">3:</span>
-            <span
-              >Train velocity field <Katex math={"v_\\theta^k"} /> on pairs from
-              <Katex math={"\\pi_{k-1}"} /></span
-            >
-          </div>
-          <div class="algorithm-line indented">
-            <span class="line-number">4:</span>
-            <span
-              >Generate new pairs: <Katex math={"X_1^k = \\psi_1^k(X_0)"} /> by flowing
-              <Katex math={"X_0 \\sim p"} /> through <Katex
-                math={"v_\\theta^k"}
-              /></span
-            >
-          </div>
-          <div class="algorithm-line indented">
-            <span class="line-number">5:</span>
-            <span
-              >Update coupling: <Katex math={"\\pi_k = (X_0, X_1^k)"} /></span
-            >
-          </div>
-          <div class="algorithm-line">
-            <span class="line-number">6:</span>
-            <span><strong>end for</strong></span>
-          </div>
-          <div class="algorithm-line">
-            <span class="line-number">7:</span>
-            <span><strong>return</strong> <Katex math={"v_\\theta^K"} /></span>
-          </div>
-        </div>
+    {#snippet title()}
+      Algorithm: Reflow Procedure
+    {/snippet}
+    {#snippet inputs()}
+      Source distribution <Katex math={"p"} />, target distribution <Katex math={"q"} />, number of iterations <Katex math={"K"} />
+    {/snippet}
+    {#snippet outputs()}
+      Rectified velocity field <Katex math={"v_\\theta^K"} />
+    {/snippet}
+    {#snippet steps()}
+      <div class="algorithm-line">
+        <span class="line-number">1:</span>
+        <span>Sample pairs <Katex math={"(X_0, X_1)"} /> from independent coupling <Katex math={"\\pi_0 = p \\times q"} /></span>
+      </div>
+      <div class="algorithm-line">
+        <span class="line-number">2:</span>
+        <span><strong>for</strong> <Katex math={"k = 1, 2, \\ldots, K"} /> <strong>do</strong></span>
+      </div>
+      <div class="algorithm-line indented">
+        <span class="line-number">3:</span>
+        <span>Train velocity field <Katex math={"v_\\theta^k"} /> on pairs from <Katex math={"\\pi_{k-1}"} /></span>
+      </div>
+      <div class="algorithm-line indented">
+        <span class="line-number">4:</span>
+        <span>Generate new pairs: <Katex math={"X_1^k = \\psi_1^k(X_0)"} /> by flowing <Katex math={"X_0 \\sim p"} /> through <Katex math={"v_\\theta^k"} /></span>
+      </div>
+      <div class="algorithm-line indented">
+        <span class="line-number">5:</span>
+        <span>Update coupling: <Katex math={"\\pi_k = (X_0, X_1^k)"} /></span>
+      </div>
+      <div class="algorithm-line">
+        <span class="line-number">6:</span>
+        <span><strong>end for</strong></span>
+      </div>
+      <div class="algorithm-line">
+        <span class="line-number">7:</span>
+        <span><strong>return</strong> <Katex math={"v_\\theta^K"} /></span>
       </div>
     {/snippet}
-  </Figure>
+  </Algorithm>
+
+  <h2 id="comparisons">Comparisons</h2>
 
   {#if showOtherFigures}
     <RectifiedFlowSuperimposed
@@ -1242,56 +1216,3 @@
   </div>
 </div>
 
-<style>
-  .section-heading {
-    font-size: 1.75rem;
-    font-weight: 600;
-    margin-top: 2.5rem;
-    margin-bottom: 1rem;
-  }
-
-  .section-divider {
-    border: none;
-    border-top: 1px solid rgba(0, 0, 0, 0.15);
-    margin: 2rem 0;
-  }
-
-  .algorithm-box {
-    width: 100%;
-  }
-
-  .algorithm-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #ccc;
-    color: #333;
-  }
-
-  .algorithm-content {
-    font-size: 1.15rem;
-    line-height: 1.8;
-  }
-
-  .algorithm-line {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 0.25rem;
-  }
-
-  .algorithm-line.indented {
-    padding-left: 1.5rem;
-  }
-
-  .line-number {
-    color: #888;
-    min-width: 1.5rem;
-    text-align: right;
-  }
-
-  .line-label {
-    font-weight: 600;
-    min-width: 4.5rem;
-  }
-</style>
