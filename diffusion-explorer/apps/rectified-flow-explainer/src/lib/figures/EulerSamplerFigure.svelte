@@ -9,13 +9,13 @@
   export let width = 400;
   export let height = 450;
   export let gap = 20;
-  export let groundTruthColor = '#000000';
+  export let groundTruthColor = '#888888';
   export let eulerColor = '#f17720';
-  export let lineWidth = 2;
-  export let eulerLineWidth = 2;
+  export let lineWidth = 6;
+  export let eulerLineWidth = 6;
   export let backgroundVisible = true;
-  export let marginWidth = 20;
-  export let marginHeight = 20;
+  export let marginWidth = 80;
+  export let marginHeight = 80;
   export let deltaT = 2.5;
   export let groundTruthDeltaT = 0.05;
   export let domain = [0, 4 * Math.PI];
@@ -28,7 +28,7 @@
   export let repeatDelay = 1000;
   export let labelFontSize = 44;
   export let labelColor = settings.stylingSettings.label.color;
-  export let labelYShiftFactor = 0.5;
+  export let labelYShiftFactor = 0;
   export let highCurvatureLabel = 'Highly Curved Function';
   export let lowCurvatureLabel = 'Approximately Straight Function';
 
@@ -85,23 +85,16 @@
 
   // ODE Functions
   function highCurvatureODE(t, y) {
-    return tf.tidy(() => {
-      const tTensor = tf.scalar(t);
-
-      // Define dy/dt = sin(t) + 0.1 * cos(2*t)
-      const dydt = tf.add(
-        tf.sin(tTensor),
-        tf.mul(tf.scalar(0.1), tf.cos(tf.mul(tTensor, tf.scalar(2))))
-      );
-
-      return dydt.dataSync()[0];
-    });
+    // Downward parabola: y = 0.1 * t * (4*PI - t)
+    // dy/dt = 0.1 * (4*PI - 2*t)
+    const dydt = 0.1 * (4 * Math.PI - 2 * t);
+    return dydt;
   }
 
   function highCurvatureGroundTruth(t) {
-    // y(t) = -cos(t) + 0.05*sin(2*t) + C
-    // With y(0) = 0, C = 1
-    return -Math.cos(t) + 0.05 * Math.sin(2 * t) + 1;
+    // Parabola peaking at t = 2*PI, passing through (0,0) and (4*PI, 0)
+    // y = 0.1 * t * (4*PI - t)
+    return 0.1 * t * (4 * Math.PI - t);
   }
 
   function lowCurvatureODE(t, y) {
@@ -255,15 +248,15 @@
 
     // Define arrow marker
     const defs = svg.select('defs').empty() ? svg.append('defs') : svg.select('defs');
-    defs.selectAll('#arrow-marker').remove();
+    defs.selectAll('#euler-sampler-arrow-marker').remove();
 
     defs.append('marker')
-      .attr('id', 'arrow-marker')
+      .attr('id', 'euler-sampler-arrow-marker')
       .attr('viewBox', '0 0 10 10')
       .attr('refX', 8)
       .attr('refY', 5)
-      .attr('markerWidth', 6)
-      .attr('markerHeight', 6)
+      .attr('markerWidth', 4)
+      .attr('markerHeight', 4)
       .attr('orient', 'auto-start-reverse')
       .append('path')
       .attr('d', 'M 0 0 L 10 5 L 0 10 z')
@@ -309,7 +302,7 @@
             .attr('y2', y1)
             .attr('stroke', eulerColor)
             .attr('stroke-width', eulerLineWidth)
-            .attr('marker-end', 'url(#arrow-marker)')
+            .attr('marker-end', 'url(#euler-sampler-arrow-marker)')
             .attr('class', 'euler-arrow');
 
           // Animate arrow along with the segment
