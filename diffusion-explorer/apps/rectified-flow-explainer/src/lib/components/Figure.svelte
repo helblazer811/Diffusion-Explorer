@@ -63,7 +63,7 @@
   });
 </script>
 
-<figure class="figure" bind:this={figureElement}>
+<figure class="figure" class:no-background-figure={!backgroundVisible} bind:this={figureElement}>
   <div
     class="figure-content"
     class:no-background={!backgroundVisible}
@@ -102,6 +102,10 @@
   .figure-content.no-background {
     background-color: transparent;
     border: none;
+  }
+
+  .figure.no-background-figure {
+    margin-top: 0.5rem;
   }
 
   .figure-caption {

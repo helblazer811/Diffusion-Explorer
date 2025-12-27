@@ -24,6 +24,7 @@
   import HighlightTrajectory from "$lib/figures/HighlightTrajectory.svelte";
   import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
+  import EulerCircularDemo from "$lib/figures/EulerCircularDemo.svelte";
   import RectifiedFlowVisualization from "$lib/figures/RectifiedFlowVisualization.svelte";
   import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
@@ -494,11 +495,24 @@
 </script>
 
 <div class="top-nav">
-  <a href="#" class="nav-link">Other Blogs</a>
-  <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="nav-link">
+  <a href="https://alechelbling.com/blog.html" class="nav-link">Other Blogs</a>
+  <a
+    href="https://github.com/helblazer811/Diffusion-Explorer"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="nav-link"
+  >
     Link to Code
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
+      <path
+        d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+      />
     </svg>
   </a>
 </div>
@@ -544,26 +558,38 @@
 
   <h1 id="introduction" class="section-heading">Introduction</h1>
   <p>
-    Diffusion models [Citation Needed] have shown the incredible ability to
-    generate compelling novel samples of complex data like images and videos.
-    These models learn to gradually transform noise into realistic data through
-    the repeated application of a large neural network. More recently,
-    flow-based generative models <span
+    Flow-based generative models <span
       class="citation"
       data-cite="rezende2016variationalinferencenormalizingflows"
     ></span>
-    have achieved competitive performance with diffusion models, and have desirable
-    additional capabilities like evaluating the likelihood of a sample being drawn
-    from a distribution. The success of flow models is in part due to the innovation
-    of flow matching which allows for the efficient training of flow-based models
-    without the need for computationally expensive simulation
-    <span class="citation" data-cite="lipman2022"></span>. However, a practical
-    barrier to deploying flow models at scale is the need to run large neural
-    networks—often with billions of parameters—many times to generate
-    high-quality samples, incurring high computational cost and latency. Thus,
-    it is desirable to develop methods for accelerating inference of flow-based
-    models, allowing us to sample from them with only a few repeated runs of a
-    neural network.
+    have emerged as a powerful class of models for generating high-quality samples
+    of complex data such as images and videos. These models leverage neural networks
+    to transform random noise into complex data by applying a sequence of invertible
+    transformations, allowing for both novel sample generation and likelihood estimation.
+    <!-- Diffusion models [Citation Needed] have shown the incredible ability to
+    generate compelling novel samples of complex data like images and videos.
+    Diffusion models generate new data by starting from pure noise and
+    iteratively refining it into a realistic sample, guided by patterns learned
+    from training data.  -->
+    The success of flow models is in part due to the introduction of flow matching
+    <span class="citation" data-cite="lipman2022"></span>, which enables the
+    training of flow models without computationally expensive simulation.
+    However, a practical barrier to deploying flow models at scale is the need
+    to run large neural networks—often with billions of parameters—many times to
+    generate high-quality samples. This incurs not just high computational cost
+    but also high latency; in some cases it can take minutes to generate a
+    single sample. Thus, there is a pressing need to develop methods for
+    accelerating flow-based models that minimize the number of necessary neural
+    network passes.
+  </p>
+  <p>
+    A major culprit behind the high cost incurred when sampling from flow models
+    stems from the geometric properties of the learned flows. It can be
+    challenging to reason about high-dimensional data, but fortunately for us,
+    we can gain an intuition about many of the important geometric properties of
+    flows by visualizing them in low-dimensions. In fact, we can use the exact
+    same algorithms used to train large-scale models to train simple 2D flows on
+    toy distributions and reproduce many phenomena of practical interest.
   </p>
   {#if showOtherFigures}
     <div id="figure-2">
@@ -584,24 +610,25 @@
     </div>
   {/if}
   <p>
-    A major culprit behind the high computational cost of sampling from flow
-    models actually stems from the geometric properties of the learned flows. In
-    particular, we observe in <a href="#figure-2" class="internal-link">Figure 2</a> above that models trained with flow
-    matching often produce curved trajectories.
+    Sampling from a flow model involves simulating the trajectory of an abstract
+    particle as it moves from random noise to real data by repeatedly querying a
+    neural network to determine the particle's velocity at each point in time.
+    When these trajectories are highly curved, accurately simulating them
+    requires taking many small steps of our expensive neural network. Shown in <a
+      href="#figure-2"
+      class="internal-link">Figure 2</a
+    >
+    above, we can see that a flow model trained to generate samples from a simple
+    smiley face distribution produces trajectories that are curved.
     <strong
       >This curvature, its consequences, and how to mitigate them are the
       central focus of this article.</strong
     >
-    Sampling from a flow model involves simulating the trajectory of an abstract
-    particle as it moves from random noise to real data by repeatedly querying a
-    neural network to determine the particle's velocity at each point in time. When
-    these trajectories are highly curved, accurately simulating them requires taking
-    many small steps, each requiring a run of the neural network, leading to high
-    computational cost and latency. In this article, we will discuss why trajectories
-    generated by flow models have this curvature, why these trajectories are challenging
-    to efficiently simulate, and how a simple approach called rectified flows
-    <span class="citation" data-cite="liu2022"></span> can remove this curvature
-    leading to straighter models that can be efficiently simulated.
+    We will discuss why trajectories generated by flow models have this geometry,
+    why they are challenging to efficiently simulate, and how a simple approach called
+    rectified flows
+    <span class="citation" data-cite="liu2022"></span> can straighten out the trajectories
+    of flow models to enable faster sampling.
   </p>
 
   <!-- To sample from a flow model we model the
@@ -623,64 +650,78 @@
     Before diving into the details behind why models trained with flow matching
     produce curved trajectories and how rectified flows can help, we will first
     cover some necessary background on flow-based generative models and flow
-    matching.
+    matching. Separately, a great introduction to this topic by some of the
+    original authors of flow matching can be found here [Citation needed]. If
+    you already have some familiarity with flow-based generative models and flow
+    matching feel free to skip ahead to the next section.
   </p>
 
   <h2 id="flow-based-models">Flow-Based Generative Models</h2>
 
+  <p>
+    The broad goal of generative modeling is to draw samples from some complex
+    distribution of data (e.g., natural images) that we have empirical
+    observations from, but where the true distribution is unknown. More
+    concretely, given a finite number of samples <Katex
+      math={"\\mathcal{X} = \\{x_1, \\dots, x_n\\}"}
+    /> from a target distribution
+    <Katex math="q" />, our goal is to learn a model that can generate new
+    samples from <Katex math="q" />.
+  </p>
+
+  <p>
+    A flow model learns to bridge a simple source probability distribution <Katex
+      math={"p"}
+    />
+    that is easy to draw samples from, like a multivariate Gaussian <Katex
+      math={"\\mathcal{N}(0, \\sigma^2 I)"}
+    />, to a complex data distribution <Katex math="q" /> by defining a continuous
+    transformation between the two. We define a continuous sequence of probability
+    distributions, called a
+    <em>probability path</em>
+    <Katex math={"(p_t)_{0 \\leq t \\leq 1}"} />, that smoothly interpolates
+    between our simple source distribution <Katex math={"p_0"} /> and our data distribution
+    <Katex math={"p_1 = q"} /> (see
+    <a href="#figure-3" class="internal-link">Figure 3</a>). We index this path
+    by an abstract time variable <Katex math={"t \\in [0, 1]"} />, where
+    <Katex math={"t=0"} /> corresponds to the source distribution and <Katex
+      math={"t=1"}
+    /> corresponds to the target distribution. By drawing samples from <Katex
+      math={"p_0"}
+    /> and transforming them according to our probability path we can produce samples
+    distributed according to our data distribution <Katex math={"p_1 = q"} />.
+  </p>
+
   {#if showOtherFigures}
-    <FlowModelIntro
-      width={figureWidth}
-      sourceDistributionSamples={$sourceDistributionSamples}
-      targetDistributionSamples={$targetDistributionSamples}
-      {allTimeSamples}
-      {isTraining}
-      playingByDefault={true}
-    >
-      <div class="caption">
-        <span class="figure-number">Figure 3:</span>
-        The probability path <Katex math={"p_t"} /> of a continuous normalizing flow
-        as it is transformed from a simple source distribution <Katex
-          math={"p_0"}
-        /> to a more complex data distribution <Katex math={"p_1 = q"} />. We
-        can also see the trajectory of individual samples as they move from the
-        source to target distribution.
-      </div>
-    </FlowModelIntro>
+    <div id="figure-3">
+      <FlowModelIntro
+        width={figureWidth}
+        sourceDistributionSamples={$sourceDistributionSamples}
+        targetDistributionSamples={$targetDistributionSamples}
+        {allTimeSamples}
+        {isTraining}
+        playingByDefault={true}
+        backgroundVisible={false}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 3:</span>
+          The probability path <Katex math={"p_t"} /> of a continuous normalizing
+          flow as it is transformed from a simple source distribution <Katex
+            math={"p_0"}
+          /> to a more complex data distribution <Katex math={"p_1 = q"} />. We
+          can also see the trajectory of individual samples as they move from
+          the source to target distribution.
+        </div>
+      </FlowModelIntro>
+    </div>
   {/if}
 
   <p>
-    The broad goal of generative models is to draw samples from some complex
-    distribution of data that we only have empirical observations from (e.g.,
-    natural images). Given a finite number of samples <Katex
-      math={"\\mathcal{X} = \\{x_1, \\dots, x_n\\}"}
-    /> where <Katex math={"x_i \\in \\mathbb{R}^d"} /> from a target distribution
-    <Katex math="q" />, our goal is to learn a model that can generate new
-    samples from <Katex math="q" />, which is quite challenging to do directly.
-  </p>
-
-  <p>
-    A continuous normalizing flow models a <em
-      >path of probability distributions</em
-    >
-    <Katex math={"(p_t)_{0 \\leq t \\leq 1}"} /> which are a continuous collection
-    of probability distributions indexed by time <Katex
-      math={"t \\in [0, 1]"}
-    /> that bridge a simple source distribution <Katex math={"p_0"} /> at time <Katex
-      math={"t=0"}
-    /> to our data distribution <Katex math={"p_1 = q"} />. By drawing samples
-    from our simple source distribution, often represented by an easy to sample
-    from multivariate Gaussian <Katex
-      math={"p_0 = \\mathcal{N}(0, \\sigma^2 I)"}
-    />, and transforming them according to our probability path we can produce
-    samples distributed according to our data distribution <Katex
-      math={"p_1 = q"}
-    />.
-  </p>
-
-  <p>
     A <em>flow</em>
-    <Katex math={"\\psi_t(x)"} /> is a time-indexed mapping that specifies
+    <Katex math={"\\psi_t(x)"} /> is a time-indexed mapping from <Katex
+      math={"\\mathbb{R}^d"}
+    /> to <Katex math={"\\mathbb{R}^d"} />
+    that specifies
     <em>trajectories</em>
     of points over time; when applied to our samples <Katex
       math={"X_0 \\sim p_0"}
@@ -710,35 +751,53 @@
   {/if}
 
   <p>
-    Instead of directly modeling our flow, say with a neural network, we instead <em
-      >generate</em
-    >
-    it by modeling a velocity field <Katex math={"v_t(x)"} /> that tells us the velocity
-    of a particle at location <Katex math="x" /> at time <Katex math="t" />. A
-    flow is defined in relation to this velocity field through some simple
-    ordinary differential equations:
+    Perhaps somewhat counterintuitively, rather than directly modeling the flow
+    <Katex math={"\\psi_t(x)"} />, flow-based generative models instead model a
+    time-dependent
+    <em>velocity field</em>
+    <Katex math={"v_t(x)"} /> that "generates" the flow. By taking this velocity
+    field we can solve a set of ordinary differential equations (ODEs) to recover
+    the flow, in a process called <em>simulation</em>. By starting from some
+    initial point <Katex math="x" /> at time <Katex math="t=0" />, we can trace
+    the trajectory of this point over time according to the velocity field <Katex
+      math={"v_t(x)"}
+    /> using the following ODEs
   </p>
-
   <div style="text-align: center; margin: 1.5rem 0;">
     <Katex
       math={"\\frac{d}{dt} \\psi_t(x) = v_t(x), \\quad \\psi_0(x) = x."}
       displayMode={true}
     />
   </div>
-
+  <!-- Notably, the vector field we learn is time-dependent, meaning 
+    that the velocity of a particle at location <Katex math="x" /> can change
+    over time <Katex math="t" />.  -->
   <p>
-    These ordinary differential equations tell us that the derivative of our
+    <!-- These ordinary differential equations tell us that the derivative of our
     flow at time <Katex math="t" /> must match the velocity <Katex
       math={"v_t(x)"}
     /> of our particle <Katex math="x" /> at time <Katex math="t" /> and start from
-    an initial location <Katex math="x" /> when <Katex math={"t=0"} />. The
-    solution to these ordinary differential equations involving <Katex
+    an initial location <Katex math="x" /> when <Katex math={"t=0"} />.  -->
+    The solution to these ordinary differential equations involving <Katex
       math={"v_t(x)"}
-    /> is itself the flow <Katex math={"\\psi_t(x)"} />. Sampling from a
-    flow-based generative model therefore amounts to numerically simulating this
-    differential equation, tracing each sample's trajectory from the source to
-    the target distribution.
+    /> is itself the flow <Katex math={"\\psi_t(x)"} />. There are a variety of
+    numerical methods for simulating these ODEs which approximate the continuous
+    trajectory by taking a series of discrete steps. Perhaps the simplest such
+    method is Euler's method [Wikipedia link], which approximates the trajectory of the flow by
+    taking small linear steps in the direction of the velocity field at each
+    time step <Katex math={"x_{t + \\Delta t} = x_t + \\Delta t \\cdot v_t(x_t)"} />.
   </p>
+
+  {#if showOtherFigures}
+    <EulerCircularDemo backgroundVisible={false}>
+      <div class="caption">
+        <span class="figure-number">Figure 5:</span>
+        Euler's method applied to a circular vector field. The arrows show the velocity
+        field, and the orange path shows the trajectory computed by taking discrete steps
+        in the direction of the velocity.
+      </div>
+    </EulerCircularDemo>
+  {/if}
 
   <h2 id="flow-matching">Flow Matching</h2>
 
