@@ -255,8 +255,8 @@ h2 {
 
 .internal-link:hover {
   text-decoration: none;
-  font-weight: 500;
-  background-image: linear-gradient(to right, rgb(0, 100, 200) 100%, transparent 0%);
+  color: rgb(0, 70, 160);
+  background-image: linear-gradient(to right, rgb(0, 70, 160) 100%, transparent 0%);
 }
 
 .internal-link:visited {
