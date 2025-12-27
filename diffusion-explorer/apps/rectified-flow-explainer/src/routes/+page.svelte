@@ -608,7 +608,8 @@
       >
         <div class="caption">
           <span class="figure-number">Figure 2:</span>
-          The <span style="color: #f17720;">curved trajectories</span> produced by a model trained with flow matching.
+          The <span style="color: #f17720;">curved trajectories</span> produced by
+          a model trained with flow matching.
         </div>
       </CurvedTrajectoryIntro>
     </div>
@@ -712,8 +713,9 @@
       >
         <div class="caption">
           <span class="figure-number">Figure 3:</span>
-          The <span style="color: #f17720;">probability path</span> <Katex math={"p_t"} color="#f17720" /> of a continuous normalizing
-          flow as it is transformed from a simple source distribution <Katex
+          The <span style="color: #f17720;">probability path</span>
+          <Katex math={"p_t"} color="#f17720" /> of a continuous normalizing flow
+          as it is transformed from a simple source distribution <Katex
             math={"p_0"}
           /> to a more complex data distribution <Katex math={"p_1 = q"} />. We
           can also see the trajectory of individual samples as they move from
@@ -751,8 +753,9 @@
     >
       <div class="caption">
         <span class="figure-number">Figure 4:</span>
-        A single <span style="color: #f17720;">sample trajectory</span> <Katex math={"\\psi_t(x)"} color="#f17720" /> showing how an individual
-        point moves from the source distribution to the target distribution.
+        A single <span style="color: #f17720;">sample trajectory</span>
+        <Katex math={"\\psi_t(x)"} color="#f17720" /> showing how an individual point
+        moves from the source distribution to the target distribution.
       </div>
     </HighlightTrajectory>
   {/if}
@@ -803,9 +806,10 @@
     <EulerCircularDemo backgroundVisible={false}>
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
-        Euler's method applied to a circular vector field. The <span style="color: #3b82f6;">arrows</span> show the velocity
-        field, and the orange path shows the trajectory computed by taking discrete
-        steps in the direction of the velocity.
+        Euler's method applied to a circular vector field. The
+        <span style="color: #3b82f6;">arrows</span> show the velocity field, and
+        the orange path shows the trajectory computed by taking discrete steps in
+        the direction of the velocity.
       </div>
     </EulerCircularDemo>
   {/if}
@@ -924,10 +928,8 @@
     >
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
-        The <span style="color: #f17720;">conditional velocity field</span> <Katex
-          math={"v_t(x|x_1) = \\frac{x_1 - x}{1 - t}"}
-          color="#f17720"
-        />
+        The <span style="color: #f17720;">conditional velocity field</span>
+        <Katex math={"v_t(x|x_1) = \\frac{x_1 - x}{1 - t}"} color="#f17720" />
         points from an intermediate sample <Katex math={"x_t"} /> toward the target
         <Katex math={"x_1"} />.
       </div>
@@ -937,13 +939,14 @@
   <p>
     Equipped with this conditional vector field, we can create a regression
     objective called
-    <em>conditional flow matching</em>. Incredibly, the conditional flow
-    matching and the flow matching objectives have the same gradients
-    <Katex
-      math={"\\nabla_\\theta \\mathcal{L}_{CFM}(\\theta) = \\nabla_\\theta \\mathcal{L}_{FM}(\\theta)"}
-    />
-    , meaning we can optimize our tractable conditional flow matching objective and
-    solve the flow matching problem. If we then plug in our specific conditional
+    <em>conditional flow matching</em>. 
+  </p>
+  <Katex
+    math={"\\mathcal{L}_{CFM}(\\theta) = \\mathbb{E}_{t, X_0, X_1} ||v_t(X_t | X_1) - v_t^\\theta(X_t)||^2"}
+    displayMode={true}
+  />
+  <p>
+    If we then plug in our specific conditional
     velocity field for our choice of a linear probability path, we get the remarkably
     simple training objective:
   </p>
@@ -953,11 +956,18 @@
     displayMode={true}
   />
   <p>
-    This simply requires us to draw pairs from our source and target distributions
-    <Katex math={"X_0 \\sim p_0"} /> and <Katex math={"X_1 \\sim q"} />, linearly interpolate
-    between them to get <Katex math={"X_t"} />, and then train our velocity field
-    <Katex math={"v_t^\\theta(x)"} /> to predict the straight-line velocity <Katex
-      math={"X_1 - X_0"} />.
+    Incredibly, the conditional flow
+    matching and the flow matching objectives have the same gradients
+    <Katex
+      math={"\\nabla_\\theta \\mathcal{L}_{CFM}(\\theta) = \\nabla_\\theta \\mathcal{L}_{FM}(\\theta)"}
+    />
+    , meaning we can optimize our tractable conditional flow matching objective and
+    solve the flow matching problem.
+    During training we simply need to draw pairs <Katex math={"(X_0, X_1)"} />
+    from our source and target distributions, interpolate between them to get
+    <Katex math={"X_t"} />, and then train our velocity field <Katex
+      math={"v_t^\\theta(x)"}
+    /> to predict the straight-line velocity <Katex math={"X_1 - X_0"} />.
   </p>
 
   {#if showOtherFigures}
@@ -969,30 +979,53 @@
     >
       <div class="caption">
         <span class="figure-number">Figure 6:</span>
-        The <span style="color: #22c55e;">learned velocity field</span> <Katex math={"v_t^\\theta(x)"} color="#22c55e" /> approximates
-        the <span style="color: #f17720;">conditional velocity</span> <Katex math={"v_t(x|x_1)"} color="#f17720" />. The dashed
-        line shows the <span style="color: #ef4444;">error</span> between the true and predicted velocities.
+        The <span style="color: #22c55e;">learned velocity field</span>
+        <Katex math={"v_t^\\theta(x)"} color="#22c55e" /> approximates the
+        <span style="color: #f17720;">conditional velocity</span>
+        <Katex math={"v_t(x|x_1)"} color="#f17720" />. The dashed line shows the
+        <span style="color: #ef4444;">error</span> between the true and predicted
+        velocities.
       </div>
     </ConditionalFlowMatching>
   {/if}
 
-  <h1 id="the-problem" class="section-heading">The Problem</h1>
+  <p>
+    A critical fact that is worth emphasizing, is that we are matching the
+    conditional velocity
+    <Katex math={"v_t(x|x_1)"} /> which is conditioned on the target point <Katex
+      math={"x_1"}
+    />
+    with our learned velocity field <Katex math={"v_t^\\theta(x)"} /> which
+    <strong>only "knows" about the current <Katex math={"x"} /></strong>. If we
+    were to condition our learned vector field on <Katex math={"x_1"} />
+    as well, then the problem would become trivial as the model could just predict
+    some scaled version of <Katex math={"x_1 - x"} />. So, the model <Katex
+      math={"v_t^\\theta(x)"}
+    />
+    has to identify the likely destination <Katex math={"x_1"} /> using only the
+    information about the location <Katex math={"x"} /> at time <Katex
+      math={"t"}
+    />.
+  </p>
 
-  <h2 id="curvature">Curvature is the Enemy of Speed</h2>
+  <h1 id="the-problem" class="section-heading">The Problem</h1>
 
   <p>
     With the fundamentals of flow models and flow matching established, we can
     now investigate some of their idiosyncrasies—and how they come up in
     practice. As shown above, a model trained with flow matching can learn to
     generate samples resembling our desired target distribution. However, you
-    can see that the trajectories of these samples are curved (see <a href="#figure-2" class="internal-link">Figure 2</a>).
-    If we superimpose
-    the source and target distributions we can see that this curvature is even more extreme
-    (see <a href="#figure-7" class="internal-link">Figure 7</a>).
+    can see that the trajectories of these samples are curved (see <a
+      href="#figure-2"
+      class="internal-link">Figure 2</a
+    >). If we superimpose the source and target distributions we can see that
+    this curvature is even more extreme (see
+    <a href="#figure-7" class="internal-link">Figure 7</a>). Now we will revisit
+    why this is a problem.
   </p>
 
   <CurvedTrajectorySuperimposed
-    trajectories={$allTimeSamples}
+    trajectories={$flowMatchingGridTrajectories}
     sourceDistribution={$sourceDistributionSamples}
     targetDistribution={$targetDistributionSamples}
     playingByDefault={true}
@@ -1000,9 +1033,11 @@
   >
     <div class="caption">
       <span class="figure-number">Figure 7:</span>
-      Curved trajectories with source and target distributions superimposed.
+      <span style="color: #f17720;">Curved trajectories</span> with source and target distributions superimposed.
     </div>
   </CurvedTrajectorySuperimposed>
+
+  <h2 id="curvature">Curvature is the Enemy of Speed</h2>
 
   <p>
     An astute reader might recall that we trained our velocity field <Katex
@@ -1055,7 +1090,32 @@
     jointly distributed, which is called their <em>coupling</em>.
   </p>
 
-  <h2 id="problem-coupling">Problem with Independent Coupling</h2>
+  <h2 id="problem-coupling">Coupling </h2>
+
+  <p>
+    A design choice available to us is also how the source and target points
+    are jointly distributed. This joint distribution <Katex
+      math={"\\pi(x_0, x_1)"} /> is called a <em>coupling</em> between the source
+    and target distributions. Different couplings will lead to different
+    behaviors of the learned flow. The key requirement is that the marginals are the source <Katex 
+      math={"\\pi(x_0) = p_0"} /> and target distributions <Katex math={"\\pi(x_1) = q"} />. 
+    </p>
+    <p>
+      The simplest form of couping is an independent coupling.
+
+
+    The simplest choice is to
+    draw them independently: <Katex math={"X_0 \\sim p_0"} /> and <Katex math={"X_1 \\sim q"} />.
+
+    This simply requires us to draw pairs from our source and target
+    distributions
+    <Katex math={"X_0 \\sim p_0"} /> and <Katex math={"X_1 \\sim q"} />,
+    linearly interpolate between them to get <Katex math={"X_t"} />, and then
+    train our velocity field
+    <Katex math={"v_t^\\theta(x)"} /> to predict the straight-line velocity <Katex
+      math={"X_1 - X_0"}
+    />.
+  </p>
 
   <p>
     A coupling is what tells us how samples from our source distribution <Katex
@@ -1065,6 +1125,8 @@
     />. It is the joint distribution <Katex math={"\\pi(x_0, x_1)"} /> whose marginals
     are <Katex math={"p(x_0)"} /> and <Katex math={"q(x_1)"} /> respectively.
   </p>
+
+  <h2 id="paths-crossing">Our Paths Crossed at the Wrong Time</h2>
 
   <p>
     In this article, we use an independent coupling where the joint distribution

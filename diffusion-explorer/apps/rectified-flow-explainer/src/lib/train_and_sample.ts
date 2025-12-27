@@ -95,7 +95,6 @@ export async function loadTargetDistribution(
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    console.log('Loaded target distribution samples:', numSamples);
     return shuffled.slice(0, numSamples);
   } catch (error) {
     console.error('Failed to load target distribution:', error);
@@ -120,7 +119,6 @@ export async function loadCachedTrajectories(
     }
 
     if (cachedData.length > 0 && cachedData[0]) {
-      console.log('Loaded cached trajectories:', cachedData.length, 'timesteps');
       return {
         trajectories: cachedData,
         sourceDistribution: cachedData[0]
@@ -156,9 +154,6 @@ export async function loadCachedVectorField(
       return null;
     }
 
-    console.log('Loaded cached vector field:',
-                cachedData.timeSteps.length, 'timesteps,',
-                cachedData.gridResolution, 'x', cachedData.gridResolution, 'grid');
     return cachedData;
   } catch (error) {
     console.log('Could not load cached vector field:', error);
@@ -186,8 +181,6 @@ export async function loadCachedRectifiedFlowTrajectories(
       return null;
     }
 
-    console.log('Loaded cached rectified flow:',
-                cachedData.allRectifiedTrajectories.length, 'rectified steps');
     return cachedData;
   } catch (error) {
     console.log('Could not load cached rectified flow:', error);
