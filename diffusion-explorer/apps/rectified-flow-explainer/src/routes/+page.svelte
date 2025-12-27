@@ -651,7 +651,7 @@
     produce curved trajectories and how rectified flows can help, we will first
     cover some necessary background on flow-based generative models and flow
     matching. Separately, a great introduction to this topic by some of the
-    original authors of flow matching can be found here [Citation needed]. If
+    original authors of flow matching can be found here <span class="citation" data-cite="lipman2024flowmatchingguidecode"></span>. If
     you already have some familiarity with flow-based generative models and flow
     matching feel free to skip ahead to the next section.
   </p>
@@ -851,6 +851,7 @@
       sourcePointIndex={5}
       targetPointIndex={10}
       playingByDefault={true}
+      backgroundVisible={false}
     >
       <div class="caption">
         <span class="figure-number">Figure 4:</span>

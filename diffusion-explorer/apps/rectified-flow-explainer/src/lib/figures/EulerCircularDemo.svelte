@@ -27,12 +27,12 @@
   export let margin = 40;
 
   // Vector field props
-  export let gridResolutionX = 10;
-  export let gridResolutionY = 6;
-  export let arrowScale = 30;
+  export let gridResolutionX = 12;
+  export let gridResolutionY = 8;
+  export let arrowScale = 40;
   export let arrowColor = '#3b82f6';
   export let arrowOpacity = 0.7;
-  export let arrowThickness = 2.5;
+  export let arrowThickness = 2.0;
 
   // Trajectory props
   export let startPoint = [2, 0];  // Start on the ellipse (a=2)
