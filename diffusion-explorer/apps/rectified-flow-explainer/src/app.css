@@ -2,6 +2,10 @@
    Reset & Base Styles
    ========================================================================== */
 
+html {
+  scroll-behavior: smooth;
+}
+
 html,
 body {
   position: relative;

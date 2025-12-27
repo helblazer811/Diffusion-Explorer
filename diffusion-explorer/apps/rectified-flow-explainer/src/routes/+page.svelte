@@ -33,6 +33,7 @@
   import VectorFieldCurvatureComparison from "$lib/figures/VectorFieldCurvatureComparison.svelte";
   import ConditionalVelocityField from "$lib/figures/ConditionalVelocityField.svelte";
   import ConditionalFlowMatching from "$lib/figures/ConditionalFlowMatching.svelte";
+  import CurvedTrajectorySuperimposed from "$lib/figures/CurvedTrajectorySuperimposed.svelte";
   import Figure from "$lib/components/Figure.svelte";
   import Algorithm from "$lib/components/Algorithm.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
@@ -984,8 +985,24 @@
     now investigate some of their idiosyncrasies—and how they come up in
     practice. As shown above, a model trained with flow matching can learn to
     generate samples resembling our desired target distribution. However, you
-    can see that the trajectories of these samples are curved.
+    can see that the trajectories of these samples are curved (see <a href="#figure-2" class="internal-link">Figure 2</a>).
+    If we superimpose
+    the source and target distributions we can see that this curvature is even more extreme
+    (see <a href="#figure-7" class="internal-link">Figure 7</a>).
   </p>
+
+  <CurvedTrajectorySuperimposed
+    trajectories={$allTimeSamples}
+    sourceDistribution={$sourceDistributionSamples}
+    targetDistribution={$targetDistributionSamples}
+    playingByDefault={true}
+    backgroundVisible={false}
+  >
+    <div class="caption">
+      <span class="figure-number">Figure 7:</span>
+      Curved trajectories with source and target distributions superimposed.
+    </div>
+  </CurvedTrajectorySuperimposed>
 
   <p>
     An astute reader might recall that we trained our velocity field <Katex
