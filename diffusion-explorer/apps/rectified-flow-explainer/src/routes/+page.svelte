@@ -31,6 +31,7 @@
   import IntersectingPaths from "$lib/figures/IntersectingPaths.svelte";
   import InducedCouplingDouble from "$lib/figures/InducedCouplingDouble.svelte";
   import VectorFieldCurvatureComparison from "$lib/figures/VectorFieldCurvatureComparison.svelte";
+  import ConditionalVelocityField from "$lib/figures/ConditionalVelocityField.svelte";
   import Figure from "$lib/components/Figure.svelte";
   import Algorithm from "$lib/components/Algorithm.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
@@ -652,9 +653,12 @@
     produce curved trajectories and how rectified flows can help, we will first
     cover some necessary background on flow-based generative models and flow
     matching. Separately, a great introduction to this topic by some of the
-    original authors of flow matching can be found here <span class="citation" data-cite="lipman2024flowmatchingguidecode"></span>. If
-    you already have some familiarity with flow-based generative models and flow
-    matching feel free to skip ahead to <a href="#the-problem" class="internal-link">The Problem</a>.
+    original authors of flow matching can be found here <span
+      class="citation"
+      data-cite="lipman2024flowmatchingguidecode"
+    ></span>. If you already have some familiarity with flow-based generative
+    models and flow matching feel free to skip ahead to
+    <a href="#the-problem" class="internal-link">The Problem</a>.
   </p>
 
   <h2 id="flow-based-models">Flow-Based Generative Models</h2>
@@ -764,12 +768,10 @@
       math={"v_t(x)"}
     /> using the following ODEs
   </p>
-  <div style="text-align: center; margin: 1.5rem 0;">
-    <Katex
-      math={"\\frac{d}{dt} \\psi_t(x) = v_t(x), \\quad \\psi_0(x) = x."}
-      displayMode={true}
-    />
-  </div>
+  <Katex
+    math={"\\frac{d}{dt} \\psi_t(x) = v_t(x), \\quad \\psi_0(x) = x."}
+    displayMode={true}
+  />
   <!-- Notably, the vector field we learn is time-dependent, meaning 
     that the velocity of a particle at location <Katex math="x" /> can change
     over time <Katex math="t" />.  -->
@@ -784,9 +786,15 @@
     /> is itself the flow <Katex math={"\\psi_t(x)"} />. There are a variety of
     numerical methods for simulating these ODEs which approximate the continuous
     trajectory by taking a series of discrete steps. Perhaps the simplest such
-    method is <a href="https://en.wikipedia.org/wiki/Euler_method" target="_blank" rel="noopener noreferrer">Euler's method</a>, which approximates the trajectory of the flow by
-    taking small linear steps in the direction of the velocity field at each
-    time step <Katex math={"x_{t + \\Delta t} = x_t + \\Delta t \\cdot v_t(x_t)"} />.
+    method is
+    <a
+      href="https://en.wikipedia.org/wiki/Euler_method"
+      target="_blank"
+      rel="noopener noreferrer">Euler's method</a
+    >, which approximates the trajectory of the flow by taking small linear
+    steps in the direction of the velocity field at each time step <Katex
+      math={"x_{t + \\Delta t} = x_t + \\Delta t \\cdot v_t(x_t)"}
+    />.
   </p>
 
   {#if showOtherFigures}
@@ -794,56 +802,70 @@
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
         Euler's method applied to a circular vector field. The arrows show the velocity
-        field, and the orange path shows the trajectory computed by taking discrete steps
-        in the direction of the velocity.
+        field, and the orange path shows the trajectory computed by taking discrete
+        steps in the direction of the velocity.
       </div>
     </EulerCircularDemo>
   {/if}
 
   <h2 id="flow-matching">Flow Matching</h2>
   <p>
-    Now that we are equipped with some background knowledge on flow-based generative
-    models, we can discuss flow matching. The motivation behind flow matching is 
-    to be able to learn our vector field <Katex math={"v_t(x)"} /> without having 
-    to do expensive simulation, meaning without having to use Euler integration or some 
-    other technique to solve ODEs. Flow matching allows us to learn <Katex math={"v_t(x)"} />
-    by solving a simple regression loss! 
+    Now that we are equipped with some background knowledge on flow-based
+    generative models, we can discuss flow matching. I will only give a high
+    level overview of some of the concepts relevant to rectifed flows. Please
+    check out
+    <span class="citation" data-cite="lipman2024flowmatchingguidecode"></span>
+    for a more thorough introduction.
   </p>
   <p>
-    Flow matching can be broken down into two key steps:
+    The motivation behind flow matching is to be able to learn our vector field <Katex
+      math={"v_t(x)"}
+    /> without having to do expensive simulation, meaning without having to use Euler
+    integration or some other technique to solve ODEs. Flow matching allows us to
+    learn <Katex math={"v_t(x)"} />
+    by solving a simple regression loss!
   </p>
+  <p>Flow matching can be broken down into two key steps:</p>
   <ol>
     <li>
       We need to define our probability path <Katex math={"p_t(x)"} /> for interpolating
-      between our source <Katex math="p" /> and target distribution <Katex math="q" />.
+      between our source <Katex math="p" /> and target distribution <Katex
+        math="q"
+      />.
     </li>
     <li>
-      We need to train a velocity field <Katex math={"v_t^\\theta(x)"} /> that
-      generates the path <Katex math={"p_t"} /> through regression.
+      We need to train a velocity field <Katex math={"v_t^\\theta(x)"} /> that generates
+      the path <Katex math={"p_t"} /> through regression.
     </li>
   </ol>
 
   <p>
-    For our first step, we need to design our probability path <Katex
-      math={"p_t(x)"}
-    />. For the duration of this article, we will specify our source
-    distribution <Katex math={"p_0(x) = \\mathcal{N}(x|0, I)"} /> as a multivariate
-    standard Gaussian distribution. We will then construct the path <Katex
-      math={"p_t(x)"}
-    /> as a mixture of conditional probability paths <Katex
-      math={"p_{t|1}(x|x_1) = \\mathcal{N}(x|t x_1, (1-t)^2 I)"}
-    /> where each is conditioned on data examples <Katex math={"x_1 \\sim q"} />
+    <strong>Step 1: Defining the Probability Path. </strong> We will focus on a
+    specific choice of probability path called the
+    <em>linear path</em>. The linear path can be defined through a simple linear
+    interpolation between our source and target distributions:
+  </p>
+  <Katex math={"X_t = (1-t)X_0 + tX_1 \\sim p_t"} displayMode={true} />
+  <p>
+    In the examples I provide throughout this article, our source distribution
+    <Katex math="p_0" /> is always a standard Gaussian distribution <Katex
+      math={"p_0(x) = \\mathcal{N}(x|0, I)"}
+    />, and our target distribution <Katex math="q" /> is a complex 2D distribution
+    representing a smiley face. However, in general, flow matching affords much more
+    flexibility in the choice of probability paths and source distributions.
+  </p>
+  <!-- <p>
+    We will then construct the path <Katex math={"p_t(x)"} /> as a mixture of conditional
+    probability paths
+    <Katex math={"p_{t|1}(x|x_1) = \\mathcal{N}(x|t x_1, (1-t)^2 I)"} /> where each
+    is conditioned on data examples <Katex math={"x_1 \\sim q"} />
     and has a Gaussian distribution. This is called the <em>linear path</em>,
     and it allows us to construct a random variable <Katex math={"X_t"} /> that is
     distributed according to our path <Katex math={"p_t"} /> through a simple linear
     interpolation between our source random variable <Katex
       math={"X_0 \\sim p_0"}
     /> and target random variable <Katex math={"X_1 \\sim q"} />:
-  </p>
-
-  <div style="text-align: center; margin: 1.5rem 0;">
-    <Katex math={"X_t = (1-t)X_0 + tX_1 \\sim p_t"} displayMode={true} />
-  </div>
+  </p> -->
 
   {#if showOtherFigures}
     <LinearInterpolation
@@ -866,16 +888,22 @@
   {/if}
 
   <p>
+    <strong>Step 2: Regressing the Velocity Field. </strong>
     Now, the second step of flow matching is to "match" the true velocity field <Katex
       math={"v_t(x)"}
     /> with an approximation <Katex math={"v_t^\\theta(x)"} />, parameterized by
-    a neural network, by optimizing a simple regression objective. However, it's
-    challenging to directly optimize this objective because <Katex
-      math={"v_t(x)"}
-    /> is difficult to directly construct in practice as it governs the transformations
-    between two high dimensional distributions.
+    a neural network, by optimizing a simple regression objective.
   </p>
-
+  <Katex
+    math={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, X_t \\sim p_t} ||v_t(X_t) - v_t^\\theta(X_t)||^2"}
+    displayMode={true}
+  />
+  <p>
+    However, there is a catch: we do not have direct access to the true velocity
+    field <Katex math={"v_t(x)"} />! <Katex math={"v_t(x)"} /> is difficult to directly
+    construct in practice as it governs the transformations between two high dimensional
+    distributions. So, how can we possibly optimize this objective? 
+  </p>
   <p>
     Luckily, we can create a related but much simpler objective by conditioning
     our velocity field on a particular instance from our target distribution <Katex
@@ -889,17 +917,30 @@
     the flow matching problem.
   </p>
 
+  {#if showOtherFigures}
+    <ConditionalVelocityField
+      width={figureWidth}
+      sourceDistributionSamples={$sourceDistributionSamples}
+      targetDistributionSamples={$targetDistributionSamples}
+      backgroundVisible={false}
+    >
+      <div class="caption">
+        <span class="figure-number">Figure 5:</span>
+        The conditional velocity field <Katex math={"v_t(x|x_1) = \\frac{x_1 - x}{1 - t}"} />
+        points from an intermediate sample <Katex math={"x_t"} /> toward the target <Katex math={"x_1"} />.
+      </div>
+    </ConditionalVelocityField>
+  {/if}
+
   <p>
     If we then plug in our specific conditional velocity field for our choice of
     a linear probability path, we get the remarkably simple training objective:
   </p>
 
-  <div style="text-align: center; margin: 1.5rem 0;">
-    <Katex
-      math={"\\mathcal{L}_{CFM}(\\theta) = \\mathbb{E}_{t, X_0, X_1} ||(X_1 - X_0) - v_t^\\theta(X_t)||^2"}
-      displayMode={true}
-    />
-  </div>
+  <Katex
+    math={"\\mathcal{L}_{CFM}(\\theta) = \\mathbb{E}_{t, X_0, X_1} ||(X_1 - X_0) - v_t^\\theta(X_t)||^2"}
+    displayMode={true}
+  />
 
   <h1 id="the-problem" class="section-heading">The Problem</h1>
 
@@ -1000,10 +1041,9 @@
   {/if}
 
   <p>
-    We can visualize these
-    pairs with lines <Katex math={"x_1 - x_0"} />, which is exactly the
-    velocities that we are going to target with our flow matching objective due
-    to our choice of linear path.
+    We can visualize these pairs with lines <Katex math={"x_1 - x_0"} />, which
+    is exactly the velocities that we are going to target with our flow matching
+    objective due to our choice of linear path.
     <strong
       >What you might notice about this visualization is that these lines cross
       each other a lot.</strong
@@ -1074,7 +1114,9 @@
       Algorithm: Reflow Procedure
     {/snippet}
     {#snippet inputs()}
-      Source distribution <Katex math={"p"} />, target distribution <Katex math={"q"} />, number of iterations <Katex math={"K"} />
+      Source distribution <Katex math={"p"} />, target distribution <Katex
+        math={"q"}
+      />, number of iterations <Katex math={"K"} />
     {/snippet}
     {#snippet outputs()}
       Rectified velocity field <Katex math={"v_\\theta^K"} />
@@ -1082,19 +1124,35 @@
     {#snippet steps()}
       <div class="algorithm-line">
         <span class="line-number">1:</span>
-        <span>Sample pairs <Katex math={"(X_0, X_1)"} /> from independent coupling <Katex math={"\\pi_0 = p \\times q"} /></span>
+        <span
+          >Sample pairs <Katex math={"(X_0, X_1)"} /> from independent coupling <Katex
+            math={"\\pi_0 = p \\times q"}
+          /></span
+        >
       </div>
       <div class="algorithm-line">
         <span class="line-number">2:</span>
-        <span><strong>for</strong> <Katex math={"k = 1, 2, \\ldots, K"} /> <strong>do</strong></span>
+        <span
+          ><strong>for</strong>
+          <Katex math={"k = 1, 2, \\ldots, K"} /> <strong>do</strong></span
+        >
       </div>
       <div class="algorithm-line indented">
         <span class="line-number">3:</span>
-        <span>Train velocity field <Katex math={"v_\\theta^k"} /> on pairs from <Katex math={"\\pi_{k-1}"} /></span>
+        <span
+          >Train velocity field <Katex math={"v_\\theta^k"} /> on pairs from <Katex
+            math={"\\pi_{k-1}"}
+          /></span
+        >
       </div>
       <div class="algorithm-line indented">
         <span class="line-number">4:</span>
-        <span>Generate new pairs: <Katex math={"X_1^k = \\psi_1^k(X_0)"} /> by flowing <Katex math={"X_0 \\sim p"} /> through <Katex math={"v_\\theta^k"} /></span>
+        <span
+          >Generate new pairs: <Katex math={"X_1^k = \\psi_1^k(X_0)"} /> by flowing
+          <Katex math={"X_0 \\sim p"} /> through <Katex
+            math={"v_\\theta^k"}
+          /></span
+        >
       </div>
       <div class="algorithm-line indented">
         <span class="line-number">5:</span>
@@ -1215,4 +1273,3 @@
       ></pre>
   </div>
 </div>
-
