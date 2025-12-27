@@ -5,6 +5,35 @@
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import { settings } from '$lib/settings';
 
+  // Props
+  export let width = 400;
+  export let height = 450;
+  export let gap = 20;
+  export let groundTruthColor = '#000000';
+  export let eulerColor = '#f17720';
+  export let lineWidth = 2;
+  export let eulerLineWidth = 2;
+  export let backgroundVisible = true;
+  export let marginWidth = 20;
+  export let marginHeight = 20;
+  export let deltaT = 2.5;
+  export let groundTruthDeltaT = 0.05;
+  export let domain = [0, 4 * Math.PI];
+  export let children = undefined;
+  export let animationDuration = 2000;
+  export let animationDelay = 500;
+  export let pathPause = 0;
+  export let perEdgeAnimationDelay = 250;
+  export let repeatAnimation = true;
+  export let repeatDelay = 1000;
+  export let labelFontSize = 44;
+  export let labelColor = settings.stylingSettings.label.color;
+  export let labelYShiftFactor = 0.5;
+  export let highCurvatureLabel = 'Highly Curved Function';
+  export let lowCurvatureLabel = 'Approximately Straight Function';
+
+  $: caption = children;
+
   // Visibility-based animation control
   let figureIsActive;
   let isInitialized = false;
@@ -47,37 +76,6 @@
     activeTimeoutIds.push(id);
     return id;
   }
-
-  // Props
-  export let width = 400;
-  export let height = 450;
-  export let gap = 20;
-  export let groundTruthColor = '#000000';
-  export let eulerColor = '#f17720';
-  export let lineWidth = 2;
-  export let eulerLineWidth = 2;
-
-  // Background visibility
-  export let backgroundVisible = true;
-
-  export let marginWidth = 20;
-  export let marginHeight = 20;
-  export let deltaT = 2.5;
-  export let groundTruthDeltaT = 0.05;
-  export let domain = [0, 4 * Math.PI];
-  // Caption slot (passed as default children)
-  export let children = undefined;
-  $: caption = children;
-  export let animationDuration = 2000; // Duration in milliseconds for the animation
-  export let animationDelay = 500; // Delay before animation starts
-  export let pathPause = 0; // Pause between animating each path
-  export let perEdgeAnimationDelay = 250; // Pause between animating each Euler edge segment
-  export let repeatAnimation = true; // Whether to repeat the animation
-  export let repeatDelay = 1000; // Delay before repeating the animation
-  export let labelFontSize = settings.stylingSettings.label.fontSize;
-  export let labelColor = settings.stylingSettings.label.color;
-  export let highCurvatureLabel = 'Highly Curved Function';
-  export let lowCurvatureLabel = 'Approximately Straight Function';
 
   const highCurvatureYScaleFactor = 1;
   const lowCurvatureYScaleFactor = 5;
@@ -190,15 +188,17 @@
     const xDomain = xScale.domain();
     const xCenter = (xDomain[0] + xDomain[1]) / 2;
 
-    // Calculate top y position
+    // Calculate top y position with shift factor
     const yDomain = yScale.domain();
     const yTop = yDomain[1];
+    const yRange = yDomain[1] - yDomain[0];
+    const yShift = yRange * labelYShiftFactor;
 
-    // Add label at the top center
+    // Add label at the top center, shifted down by labelYShiftFactor
     d3Svg.append('text')
       .attr('class', 'curve-label')
       .attr('x', xScale(xCenter))
-      .attr('y', yScale(yTop) - 5)
+      .attr('y', yScale(yTop - yShift) - 5)
       .attr('text-anchor', 'middle')
       .attr('font-size', `${labelFontSize}px`)
       .attr('fill', labelColor)

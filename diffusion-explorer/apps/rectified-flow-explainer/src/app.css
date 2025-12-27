@@ -1,3 +1,7 @@
+/* ==========================================================================
+   Reset & Base Styles
+   ========================================================================== */
+
 html,
 body {
   position: relative;
@@ -14,6 +18,20 @@ body {
     Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 }
 
+/* ==========================================================================
+   Typography
+   ========================================================================== */
+
+p {
+  font-size: 1.2rem;
+  line-height: 1.6em;
+}
+
+h2 {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
 a {
   color: rgb(0, 100, 200);
   text-decoration: none;
@@ -27,10 +45,67 @@ a:visited {
   color: rgb(0, 80, 160);
 }
 
-p {
+code {
+  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  font-style: normal;
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(27, 31, 35, 0.05);
+  border-radius: 3px;
+}
+
+/* Lists */
+.page-container ol,
+.page-container ul {
   font-size: 1.2rem;
   line-height: 1.6em;
+  margin: 1rem 0;
 }
+
+.page-container ol li,
+.page-container ul li {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ==========================================================================
+   Links
+   ========================================================================== */
+
+.internal-link {
+  color: rgb(0, 100, 200);
+  text-decoration: none;
+  background-image: linear-gradient(to right, rgb(0, 100, 200) 50%, transparent 50%);
+  background-size: 8px 2px;
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+  padding-bottom: 2px;
+}
+
+.internal-link:hover {
+  text-decoration: none;
+  color: rgb(0, 70, 160);
+  background-image: linear-gradient(to right, rgb(0, 70, 160) 100%, transparent 0%);
+}
+
+.internal-link:visited {
+  color: rgb(0, 80, 160);
+  background-image: linear-gradient(to right, rgb(0, 80, 160) 50%, transparent 50%);
+}
+
+.citation {
+  color: rgb(0, 100, 200);
+  cursor: pointer;
+}
+
+.citation:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Form Elements
+   ========================================================================== */
 
 label {
   display: block;
@@ -57,20 +132,6 @@ input[type="range"] {
   height: 0;
 }
 
-code {
-  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
-  font-style: normal;
-  padding: 0.2em 0.4em;
-  margin: 0;
-  font-size: 85%;
-  background-color: rgba(27, 31, 35, 0.05);
-  border-radius: 3px;
-}
-
-.figure-number {
-  font-weight: 600;
-}
-
 button {
   color: #333;
   background-color: #f4f4f4;
@@ -84,6 +145,42 @@ button:active {
 button:focus {
   border-color: #666;
 }
+
+/* ==========================================================================
+   Layout
+   ========================================================================== */
+
+.page-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.top-nav {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.top-nav .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #555;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.top-nav .nav-link:hover {
+  color: rgb(0, 100, 200);
+}
+
+/* ==========================================================================
+   Article Header
+   ========================================================================== */
 
 .title-header-wrapper {
   width: fit-content;
@@ -123,6 +220,35 @@ button:focus {
   font-size: 1.1rem;
 }
 
+/* ==========================================================================
+   Article Sections
+   ========================================================================== */
+
+.section-heading {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.section-divider {
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+  margin: 2rem 0;
+}
+
+/* ==========================================================================
+   Figures
+   ========================================================================== */
+
+.figure-number {
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   References & Citations
+   ========================================================================== */
+
 .acknowledgements p {
   font-size: 1rem;
   line-height: 1.4rem;
@@ -159,10 +285,9 @@ button:focus {
   font-size: inherit;
 }
 
-h2 {
-  margin-top: 1em;
-  margin-bottom: 1em;
-}
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
 
 .visually-hidden {
   position: absolute;
@@ -176,14 +301,9 @@ h2 {
   border: 0;
 }
 
-.citation {
-  color: rgb(0, 100, 200);
-  cursor: pointer;
-}
-
-.citation:hover {
-  text-decoration: underline;
-}
+/* ==========================================================================
+   Icons
+   ========================================================================== */
 
 @font-face {
   font-family: "Material Icons";
@@ -221,54 +341,9 @@ h2 {
   font-feature-settings: "liga";
 }
 
-.top-nav {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 1rem 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.top-nav .nav-link {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #555;
-  text-decoration: none;
-  font-size: 0.95rem;
-}
-
-.top-nav .nav-link:hover {
-  color: rgb(0, 100, 200);
-}
-
-.internal-link {
-  color: rgb(0, 100, 200);
-  text-decoration: none;
-  background-image: linear-gradient(to right, rgb(0, 100, 200) 50%, transparent 50%);
-  background-size: 8px 2px;
-  background-repeat: repeat-x;
-  background-position: 0 100%;
-  padding-bottom: 2px;
-}
-
-.internal-link:hover {
-  text-decoration: none;
-  color: rgb(0, 70, 160);
-  background-image: linear-gradient(to right, rgb(0, 70, 160) 100%, transparent 0%);
-}
-
-.internal-link:visited {
-  color: rgb(0, 80, 160);
-  background-image: linear-gradient(to right, rgb(0, 80, 160) 50%, transparent 50%);
-}
-
-.page-container {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem;
-}
+/* ==========================================================================
+   Media Queries
+   ========================================================================== */
 
 /* Adjust layout when TOC sidebar is visible */
 @media (min-width: 1200px) {
