@@ -33,26 +33,33 @@
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export let targetPointColor = settings.stylingSettings.scatterPlot.color;
 
-  // ===== PATH LINE STYLING =====
-  export let pathLineColor = '#888';
-  export let pathLineOpacity = 0.25;
-  export let pathLineWidth = 3;
-  export let numPathLines = 15;
+  // ===== PATH LINE STYLING (between x_0 and x_1) =====
+  export let lineColor = '#888';
+  export let lineOpacity = 0.25;
+  export let lineWidth = 3;
 
-  // ===== SELECTED TARGET POINT STYLING =====
-  export let selectedTargetColor = '#888';
-  export let selectedTargetRadius = 5;
+  // ===== SELECTED POINT STYLING (x_0 and x_1) =====
+  export let selectedPointColor = '#888';
+  export let selectedPointRadius = 5;
 
   // ===== INTERMEDIATE POINT STYLING =====
   export let intermediatePointColor = '#f17720';
   export let intermediatePointRadius = 6;
 
-  // ===== CONDITIONAL VECTOR STYLING =====
+  // ===== CONDITIONAL VECTOR STYLING (v_t) =====
   export let vectorColor = '#f17720';
   export let vectorOpacity = 1.0;
   export let vectorWidth = 2.5;
-  export let vectorScale = 80;
-  export let t = 0.4;
+  export let vectorScale = 150;
+  export let t = 0.3;
+
+  // ===== NOISY VECTOR STYLING (v_t^\theta) =====
+  export let noisyVectorColor = '#22c55e';
+  export let noiseVector = [15, -90]; // [dx, dy] in pixels
+
+  // ===== DASHED LINE STYLING =====
+  export let dashedLineColor = '#ef4444';
+  export let dashedLineWidth = 2;
 
   // ===== LABEL STYLING =====
   export let labelFontSize = 18;
@@ -70,18 +77,19 @@
   let figureIsActive;
 
   // Selected indices
+  let selectedSourceIndex = 0;
   let selectedTargetIndex = 0;
-  let selectedSourceIndices = [];
-  let selectedPathIndex = 0;
 
   function initializeLayers() {
     const svg = d3.select(svgElement);
     svg.selectAll('*').remove();
 
-    // Create arrow marker for vector
+    // Create arrow markers for vectors
     const defs = svg.append('defs');
+
+    // Orange arrow for v_t
     defs.append('marker')
-      .attr('id', 'conditional-vector-arrow')
+      .attr('id', 'conditional-flow-arrow')
       .attr('viewBox', '0 0 10 10')
       .attr('refX', 8)
       .attr('refY', 5)
@@ -92,30 +100,33 @@
       .attr('d', 'M 0 0 L 10 5 L 0 10 z')
       .attr('fill', vectorColor);
 
+    // Green arrow for v_t^\theta
+    defs.append('marker')
+      .attr('id', 'noisy-flow-arrow')
+      .attr('viewBox', '0 0 10 10')
+      .attr('refX', 8)
+      .attr('refY', 5)
+      .attr('markerWidth', 5)
+      .attr('markerHeight', 5)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M 0 0 L 10 5 L 0 10 z')
+      .attr('fill', noisyVectorColor);
+
     svg.append('g').attr('id', 'pathLines');
     svg.append('g').attr('id', 'sourceScatter');
     svg.append('g').attr('id', 'targetScatter');
     svg.append('g').attr('id', 'selectedElements');
-    svg.append('g').attr('id', 'vector');
+    svg.append('g').attr('id', 'vectors');
+    svg.append('g').attr('id', 'dashedLine');
     svg.append('g').attr('id', 'labels');
   }
 
   function selectRandomIndices() {
+    // Select a random source point
+    selectedSourceIndex = Math.floor(Math.random() * sourceDistributionSamples.length);
     // Select a random target point
     selectedTargetIndex = Math.floor(Math.random() * targetDistributionSamples.length);
-
-    // Select random source points for path lines
-    selectedSourceIndices = [];
-    const sourceCount = sourceDistributionSamples.length;
-    for (let i = 0; i < numPathLines && i < sourceCount; i++) {
-      let idx;
-      do {
-        idx = Math.floor(Math.random() * sourceCount);
-      } while (selectedSourceIndices.includes(idx));
-      selectedSourceIndices.push(idx);
-    }
-
-    // Path selection is done after scales are created in initializeVisualization
   }
 
   function interpDataToPixel(dataX, dataY, tVal, scalesObj) {
@@ -127,83 +138,76 @@
     return { x: pixelX, y: pixelY };
   }
 
-  function selectPathByAngle() {
-    // Get target point in pixel coords
-    const targetPoint = targetDistributionSamples[selectedTargetIndex];
-    const targetPixelX = dataToPixelX(targetPoint[0], false, scales);
-    const targetPixelY = scales.yScale(targetPoint[1]);
-
-    let maxAngle = -Infinity;
-    selectedPathIndex = 0;
-
-    for (let i = 0; i < selectedSourceIndices.length; i++) {
-      const sourcePoint = sourceDistributionSamples[selectedSourceIndices[i]];
-      const sourcePixelX = dataToPixelX(sourcePoint[0], true, scales);
-      const sourcePixelY = scales.yScale(sourcePoint[1]);
-
-      // Compute angle from target to source
-      const dx = sourcePixelX - targetPixelX;
-      const dy = sourcePixelY - targetPixelY;
-      let angle = Math.atan2(dy, dx);
-
-      // Normalize to [0, 2π) for counter-clockwise measurement from radian 0
-      if (angle < 0) {
-        angle += 2 * Math.PI;
-      }
-
-      if (angle > maxAngle) {
-        maxAngle = angle;
-        selectedPathIndex = i;
-      }
-    }
-  }
-
-  function plotPathLines() {
+  function plotPathLine() {
     if (!scales) return;
 
     const svg = d3.select(svgElement);
     const pathGroup = svg.select('#pathLines');
     pathGroup.selectAll('*').remove();
 
+    const sourcePoint = sourceDistributionSamples[selectedSourceIndex];
     const targetPoint = targetDistributionSamples[selectedTargetIndex];
+
+    const sourceX = dataToPixelX(sourcePoint[0], true, scales);
+    const sourceY = scales.yScale(sourcePoint[1]);
     const targetX = dataToPixelX(targetPoint[0], false, scales);
     const targetY = scales.yScale(targetPoint[1]);
 
-    selectedSourceIndices.forEach((sourceIdx) => {
-      const sourcePoint = sourceDistributionSamples[sourceIdx];
-      const sourceX = dataToPixelX(sourcePoint[0], true, scales);
-      const sourceY = scales.yScale(sourcePoint[1]);
-
-      pathGroup.append('line')
-        .attr('x1', sourceX)
-        .attr('y1', sourceY)
-        .attr('x2', targetX)
-        .attr('y2', targetY)
-        .attr('stroke', pathLineColor)
-        .attr('stroke-width', pathLineWidth)
-        .attr('stroke-opacity', pathLineOpacity);
-    });
+    pathGroup.append('line')
+      .attr('x1', sourceX)
+      .attr('y1', sourceY)
+      .attr('x2', targetX)
+      .attr('y2', targetY)
+      .attr('stroke', lineColor)
+      .attr('stroke-width', lineWidth)
+      .attr('stroke-opacity', lineOpacity);
   }
 
-  function plotSelectedTarget() {
+  function plotSelectedPoints() {
     if (!scales) return;
 
     const svg = d3.select(svgElement);
     const selectedGroup = svg.select('#selectedElements');
+    const labelGroup = svg.select('#labels');
 
+    // Get source point
+    const sourcePoint = sourceDistributionSamples[selectedSourceIndex];
+    const sourceX = dataToPixelX(sourcePoint[0], true, scales);
+    const sourceY = scales.yScale(sourcePoint[1]);
+
+    // Draw selected source point (x_0)
+    selectedGroup.append('circle')
+      .attr('cx', sourceX)
+      .attr('cy', sourceY)
+      .attr('r', selectedPointRadius)
+      .attr('fill', selectedPointColor);
+
+    // Add x_0 label above source point (centered)
+    plotKatexInSVG(
+      labelGroup,
+      'x_0',
+      sourceX - 14,
+      sourceY - katexLabelOffset - 10,
+      {
+        fontSize: labelFontSize,
+        bg: false,
+        color: labelColor
+      }
+    );
+
+    // Get target point
     const targetPoint = targetDistributionSamples[selectedTargetIndex];
     const targetX = dataToPixelX(targetPoint[0], false, scales);
     const targetY = scales.yScale(targetPoint[1]);
 
-    // Draw selected target point
+    // Draw selected target point (x_1)
     selectedGroup.append('circle')
       .attr('cx', targetX)
       .attr('cy', targetY)
-      .attr('r', selectedTargetRadius)
-      .attr('fill', selectedTargetColor);
+      .attr('r', selectedPointRadius)
+      .attr('fill', selectedPointColor);
 
-    // Add x_1 label above target point
-    const labelGroup = svg.select('#labels');
+    // Add x_1 label above target point (centered)
     plotKatexInSVG(
       labelGroup,
       'x_1',
@@ -217,17 +221,17 @@
     );
   }
 
-  function plotIntermediatePointAndVector() {
-    if (!scales || selectedSourceIndices.length === 0) return;
+  function plotIntermediatePointAndVectors() {
+    if (!scales) return;
 
     const svg = d3.select(svgElement);
     const selectedGroup = svg.select('#selectedElements');
-    const vectorGroup = svg.select('#vector');
+    const vectorGroup = svg.select('#vectors');
+    const dashedLineGroup = svg.select('#dashedLine');
     const labelGroup = svg.select('#labels');
 
     // ===== STEP 1: Compute all positions in DATA coordinates =====
-    const sourceIdx = selectedSourceIndices[selectedPathIndex];
-    const sourcePoint = sourceDistributionSamples[sourceIdx];
+    const sourcePoint = sourceDistributionSamples[selectedSourceIndex];
     const targetPoint = targetDistributionSamples[selectedTargetIndex];
 
     // Intermediate point at time t (data coords)
@@ -268,36 +272,77 @@
       }
     );
 
-    // Draw vector (if magnitude is significant)
+    // Draw vectors (if magnitude is significant)
     if (pixelMag > 0.01) {
-      // Scale to desired pixel length
-      const scaledEndX = interpPixel.x + (pixelDx / pixelMag) * vectorScale;
-      const scaledEndY = interpPixel.y + (pixelDy / pixelMag) * vectorScale;
+      // Scale to desired pixel length for v_t
+      const vtEndX = interpPixel.x + (pixelDx / pixelMag) * vectorScale;
+      const vtEndY = interpPixel.y + (pixelDy / pixelMag) * vectorScale;
 
+      // Draw v_t(x|x_1) vector
       vectorGroup.append('line')
         .attr('x1', interpPixel.x)
         .attr('y1', interpPixel.y)
-        .attr('x2', scaledEndX)
-        .attr('y2', scaledEndY)
+        .attr('x2', vtEndX)
+        .attr('y2', vtEndY)
         .attr('stroke', vectorColor)
         .attr('stroke-width', vectorWidth)
         .attr('stroke-opacity', vectorOpacity)
-        .attr('marker-end', 'url(#conditional-vector-arrow)');
+        .attr('marker-end', 'url(#conditional-flow-arrow)');
 
       // Add v_t(x|x_1) label above center of vector
-      const vectorCenterX = (interpPixel.x + scaledEndX) / 2;
-      const vectorCenterY = (interpPixel.y + scaledEndY) / 2;
+      const vtCenterX = (interpPixel.x + vtEndX) / 2;
+      const vtCenterY = (interpPixel.y + vtEndY) / 2;
       plotKatexInSVG(
         labelGroup,
         'v_t(x|x_1)',
-        vectorCenterX,
-        vectorCenterY - katexLabelOffset - 10,
+        vtCenterX,
+        vtCenterY - katexLabelOffset - 10,
         {
           fontSize: labelFontSize - 2,
           bg: false,
           color: vectorColor
         }
       );
+
+      // Compute v_t^\theta endpoint by adding noise vector in pixel coords
+      const vtThetaEndX = vtEndX + noiseVector[0];
+      const vtThetaEndY = vtEndY + noiseVector[1];
+
+      // Draw v_t^\theta(x) vector
+      vectorGroup.append('line')
+        .attr('x1', interpPixel.x)
+        .attr('y1', interpPixel.y)
+        .attr('x2', vtThetaEndX)
+        .attr('y2', vtThetaEndY)
+        .attr('stroke', noisyVectorColor)
+        .attr('stroke-width', vectorWidth)
+        .attr('stroke-opacity', vectorOpacity)
+        .attr('marker-end', 'url(#noisy-flow-arrow)');
+
+      // Add v_t^\theta(x) label above center of noisy vector
+      const vtThetaCenterX = (interpPixel.x + vtThetaEndX) / 2;
+      const vtThetaCenterY = (interpPixel.y + vtThetaEndY) / 2;
+      plotKatexInSVG(
+        labelGroup,
+        'v_t^\\theta(x)',
+        vtThetaCenterX,
+        vtThetaCenterY - katexLabelOffset - 10,
+        {
+          fontSize: labelFontSize - 2,
+          bg: false,
+          color: noisyVectorColor
+        }
+      );
+
+      // Draw red dashed line between v_t tip and v_t^\theta tip
+      dashedLineGroup.append('line')
+        .attr('x1', vtEndX)
+        .attr('y1', vtEndY)
+        .attr('x2', vtThetaEndX)
+        .attr('y2', vtThetaEndY)
+        .attr('stroke', dashedLineColor)
+        .attr('stroke-width', dashedLineWidth)
+        .attr('stroke-dasharray', '5,3');
     }
   }
 
@@ -312,9 +357,6 @@
       width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
     });
 
-    // Select path based on angular position (needs scales)
-    selectPathByAngle();
-
     const svg = d3.select(svgElement);
 
     // Plot distributions (with lower opacity for context)
@@ -325,14 +367,14 @@
       pointOpacity: pointOpacity * 0.5
     });
 
-    // Plot path lines
-    plotPathLines();
+    // Plot path line between source and target
+    plotPathLine();
 
-    // Plot selected target with label
-    plotSelectedTarget();
+    // Plot selected source and target points with labels
+    plotSelectedPoints();
 
-    // Plot intermediate point and conditional vector
-    plotIntermediatePointAndVector();
+    // Plot intermediate point and both vectors
+    plotIntermediatePointAndVectors();
 
     // Plot distribution labels using KaTeX
     const labelGroup = svg.select('#labels');
