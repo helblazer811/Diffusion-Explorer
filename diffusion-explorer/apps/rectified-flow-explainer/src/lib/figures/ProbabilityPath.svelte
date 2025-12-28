@@ -58,6 +58,12 @@
   export let intermediatePointOpacity = 0.7; // Higher opacity for intermediate scatter points
   export let trainingObjective = "Flow Matching";
 
+  // KaTeX outline styling
+  export let katexOutline = settings.stylingSettings.figureLatex.outline;
+  export let katexOutlineColor = settings.stylingSettings.figureLatex.outlineColor;
+  export let katexOutlineWidth = settings.stylingSettings.figureLatex.outlineWidth;
+  export let katexOutlineOpacity = settings.stylingSettings.figureLatex.outlineOpacity;
+
   // Background visibility
   export let backgroundVisible = true;
 
@@ -307,18 +313,27 @@
       .attr("fill", labelColor)
       .text(targetLabelText);
 
-    // Math labels (p_0, p_1) below - offset to center (plotKatexInSVG positions from left edge)
-    const katexCenterOffset = 15;
-    plotKatexInSVG(labelsGroup, 'p_0', scales.sourceCenterPixelX - katexCenterOffset, mathLabelY, {
+    // Math labels (p_0, p_1) below
+    plotKatexInSVG(labelsGroup, 'p_0', scales.sourceCenterPixelX, mathLabelY, {
       fontSize: labelFontSize,
       bg: false,
-      color: labelColor
+      color: labelColor,
+      anchor: 'top-center',
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
     });
 
-    plotKatexInSVG(labelsGroup, 'p_1', scales.targetCenterPixelX - katexCenterOffset, mathLabelY, {
+    plotKatexInSVG(labelsGroup, 'p_1', scales.targetCenterPixelX, mathLabelY, {
       fontSize: labelFontSize,
       bg: false,
-      color: labelColor
+      color: labelColor,
+      anchor: 'top-center',
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
     });
   }
 
@@ -346,13 +361,17 @@
     const textLabelY = scales.yScale(yTop) + 0.5 * labelFontSize;
     const mathLabelY = textLabelY + labelFontSize - 10;
 
-    // Clear and re-render - offset to center (plotKatexInSVG positions from left edge)
-    const katexCenterOffset = 15;
+    // Clear and re-render
     group.selectAll("*").remove();
-    plotKatexInSVG(group, 'p_t', centerPixelX - katexCenterOffset, mathLabelY, {
+    plotKatexInSVG(group, 'p_t', centerPixelX, mathLabelY, {
       fontSize: labelFontSize,
       bg: false,
-      color: '#f17720'
+      color: '#f17720',
+      anchor: 'top-center',
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
     });
   }
 

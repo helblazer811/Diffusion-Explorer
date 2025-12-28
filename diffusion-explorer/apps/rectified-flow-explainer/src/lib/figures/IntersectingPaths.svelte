@@ -63,6 +63,15 @@
   export let backgroundVisible = true;
   export let targetPointBLabel = 'x_1^b';
 
+  // KaTeX outline styling
+  export let katexOutline = settings.stylingSettings.figureLatex.outline;
+  export let katexOutlineColor = settings.stylingSettings.figureLatex.outlineColor;
+  export let katexOutlineWidth = settings.stylingSettings.figureLatex.outlineWidth;
+  export let katexOutlineOpacity = settings.stylingSettings.figureLatex.outlineOpacity;
+
+  // Vertical spacing between point and label
+  const labelAbovePointOffset = -5;
+
   // LaTeX label offsets
   export let topArrowLabelOffset = { x: -55, y: -45 };
   export let bottomArrowLabelOffset = { x: -55, y: 8 };
@@ -190,7 +199,17 @@
   }
 
   function plotVectors(intersection, line1, line2, arrowsGroup, labelsGroup) {
-    plotKatexInSVG(labelsGroup, intersectionLabel, intersection.x - 15, intersection.y + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, intersectionLabel, intersection.x, intersection.y, {
+      bg: false,
+      fontSize: latexFontSize,
+      color: figureLatexColor,
+      anchor: 'bottom-center',
+      offsetY: labelAbovePointOffset,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
 
     const dir1 = normalize({ x: line1.x2 - line1.x1, y: line1.y2 - line1.y1 });
     const dir2 = normalize({ x: line2.x2 - line2.x1, y: line2.y2 - line2.y1 });
@@ -216,11 +235,35 @@
     // Label above the arrow (midpoint between intersection and arrow end)
     const arrow1Mid = { x: (intersection.x + arrow1End.x) / 2, y: (intersection.y + arrow1End.y) / 2 };
     const arrow2Mid = { x: (intersection.x + arrow2End.x) / 2, y: (intersection.y + arrow2End.y) / 2 };
-    plotKatexInSVG(labelsGroup, topArrowLabel, arrow1Mid.x + topArrowLabelOffset.x, arrow1Mid.y + topArrowLabelOffset.y, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, topArrowLabel, arrow1Mid.x + topArrowLabelOffset.x, arrow1Mid.y + topArrowLabelOffset.y, {
+      bg: false,
+      fontSize: latexFontSize,
+      color: figureLatexColor,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
     // Label below the arrow
-    plotKatexInSVG(labelsGroup, bottomArrowLabel, arrow2Mid.x + bottomArrowLabelOffset.x, arrow2Mid.y + bottomArrowLabelOffset.y, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, bottomArrowLabel, arrow2Mid.x + bottomArrowLabelOffset.x, arrow2Mid.y + bottomArrowLabelOffset.y, {
+      bg: false,
+      fontSize: latexFontSize,
+      color: figureLatexColor,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
     // Label to the right of mean arrow
-    plotKatexInSVG(labelsGroup, meanArrowLabel, meanEnd.x + meanArrowLabelOffset.x, meanEnd.y + meanArrowLabelOffset.y, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, meanArrowLabel, meanEnd.x + meanArrowLabelOffset.x, meanEnd.y + meanArrowLabelOffset.y, {
+      bg: false,
+      fontSize: latexFontSize,
+      color: figureLatexColor,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
 
     arrowsGroup.append('circle')
       .attr('cx', intersection.x)
@@ -274,10 +317,50 @@
     // Add endpoint labels (all above points)
     // pair1: bottom-left source (x_0^b) -> top-right target (x_1^b)
     // pair2: top-left source (x_0^a) -> bottom-right target (x_1^a)
-    plotKatexInSVG(labelsGroup, sourcePointALabel, line2Coords.x1 - 15, line2Coords.y1 + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
-    plotKatexInSVG(labelsGroup, sourcePointBLabel, line1Coords.x1 - 15, line1Coords.y1 + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
-    plotKatexInSVG(labelsGroup, targetPointBLabel, line1Coords.x2 - 15, line1Coords.y2 + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
-    plotKatexInSVG(labelsGroup, targetPointALabel, line2Coords.x2 - 15, line2Coords.y2 + labelVerticalOffset, { bg: false, fontSize: latexFontSize, color: figureLatexColor });
+    plotKatexInSVG(labelsGroup, sourcePointALabel, line2Coords.x1, line2Coords.y1, {
+      bg: false,
+      fontSize: latexFontSize,
+      color: figureLatexColor,
+      anchor: 'bottom-center',
+      offsetY: labelAbovePointOffset,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
+    plotKatexInSVG(labelsGroup, sourcePointBLabel, line1Coords.x1, line1Coords.y1, {
+      bg: false,
+      fontSize: latexFontSize,
+      color: figureLatexColor,
+      anchor: 'bottom-center',
+      offsetY: labelAbovePointOffset,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
+    plotKatexInSVG(labelsGroup, targetPointBLabel, line1Coords.x2, line1Coords.y2, {
+      bg: false,
+      fontSize: latexFontSize,
+      color: figureLatexColor,
+      anchor: 'bottom-center',
+      offsetY: labelAbovePointOffset,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
+    plotKatexInSVG(labelsGroup, targetPointALabel, line2Coords.x2, line2Coords.y2, {
+      bg: false,
+      fontSize: latexFontSize,
+      color: figureLatexColor,
+      anchor: 'bottom-center',
+      offsetY: labelAbovePointOffset,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
 
     isInitialized = true;
   }

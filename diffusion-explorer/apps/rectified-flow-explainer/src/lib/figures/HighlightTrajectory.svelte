@@ -54,6 +54,15 @@
   // Interaction props
   export let draggable = false; // Enable/disable drag handle for trajectory selection
 
+  // KaTeX outline styling
+  export let katexOutline = settings.stylingSettings.figureLatex.outline;
+  export let katexOutlineColor = settings.stylingSettings.figureLatex.outlineColor;
+  export let katexOutlineWidth = settings.stylingSettings.figureLatex.outlineWidth;
+  export let katexOutlineOpacity = settings.stylingSettings.figureLatex.outlineOpacity;
+
+  // Vertical spacing between point and label
+  const labelAbovePointOffset = -5;
+
   // Selected trajectory index (single trajectory)
   let selectedTrajectoryIndex = null;
   let svgElement;
@@ -285,11 +294,15 @@
       .text(annotationLabel);
 
     // Draw ψ_t(x_0) KaTeX label below "Sample Trajectory" - centered
-    const katexLabelOffsetX = 32; // Offset to center the KaTeX label (approx half width of ψ_t(x_0))
-    plotKatexInSVG(annotationGroup, '\\psi_t(x_0)', labelX - katexLabelOffsetX, labelY + 5, {
+    plotKatexInSVG(annotationGroup, '\\psi_t(x_0)', labelX, labelY + 5, {
       fontSize: annotationFontSize,
       bg: false,
-      color: annotationColor
+      color: annotationColor,
+      anchor: 'top-center',
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
     });
 
     // Draw point at initial location (reuse startPoint from above)
@@ -302,11 +315,16 @@
       .attr('fill', trajectoryColor);
 
     // Draw x_0 KaTeX label above the initial point
-    const katexOffsetX = 12; // Offset to center the KaTeX label
-    plotKatexInSVG(annotationGroup, 'x_0', startPoint.x - katexOffsetX, startPoint.y - 40, {
+    plotKatexInSVG(annotationGroup, 'x_0', startPoint.x, startPoint.y, {
       fontSize: 20,
       bg: false,
-      color: annotationColor
+      color: annotationColor,
+      anchor: 'bottom-center',
+      offsetY: labelAbovePointOffset,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
     });
   }
 
