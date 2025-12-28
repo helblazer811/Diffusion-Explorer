@@ -1,6 +1,11 @@
 import * as d3 from 'd3';
 import katex from 'katex';
 
+export type Anchor =
+  | 'top-left' | 'top-center' | 'top-right'
+  | 'center-left' | 'center' | 'center-right'
+  | 'bottom-left' | 'bottom-center' | 'bottom-right';
+
 export interface PlotKatexOptions {
   fontSize?: number;
   padding?: number;
@@ -13,6 +18,10 @@ export interface PlotKatexOptions {
   outline?: boolean;
   outlineColor?: string;
   outlineWidth?: number;
+  outlineOpacity?: number;
+  anchor?: Anchor;
+  offsetX?: number;  // Additional X offset applied after anchor positioning
+  offsetY?: number;  // Additional Y offset applied after anchor positioning
 }
 
 /**
@@ -38,7 +47,11 @@ export function plotKatexInSVG(
     className = 'katex-label',
     outline = false,
     outlineColor = '#fff',
-    outlineWidth = 1
+    outlineWidth = 1,
+    outlineOpacity = 1,
+    anchor = 'top-left',
+    offsetX = 0,
+    offsetY = 0
   } = opts;
 
   const selection = svg instanceof d3.selection
@@ -68,13 +81,30 @@ export function plotKatexInSVG(
   katexRoot.style('color', color).style('fill', color);
   katexRoot.selectAll('*').style('color', color).style('fill', color);
 
-  // Apply outline using text-shadow
+  // Apply outline using -webkit-text-stroke for clean outlines
   if (outline) {
-    const shadow = `${-outlineWidth}px ${-outlineWidth}px 0 ${outlineColor}, ` +
-      `${outlineWidth}px ${-outlineWidth}px 0 ${outlineColor}, ` +
-      `${-outlineWidth}px ${outlineWidth}px 0 ${outlineColor}, ` +
-      `${outlineWidth}px ${outlineWidth}px 0 ${outlineColor}`;
-    katexRoot.style('text-shadow', shadow);
+    // Convert hex color to rgba if opacity is specified
+    let strokeColor = outlineColor;
+    if (outlineOpacity < 1) {
+      // Parse hex color and convert to rgba
+      let r = 255, g = 255, b = 255;
+      if (outlineColor.startsWith('#')) {
+        const hex = outlineColor.slice(1);
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16);
+          g = parseInt(hex[1] + hex[1], 16);
+          b = parseInt(hex[2] + hex[2], 16);
+        } else if (hex.length === 6) {
+          r = parseInt(hex.slice(0, 2), 16);
+          g = parseInt(hex.slice(2, 4), 16);
+          b = parseInt(hex.slice(4, 6), 16);
+        }
+      }
+      strokeColor = `rgba(${r}, ${g}, ${b}, ${outlineOpacity})`;
+    }
+    // Use text-stroke for a clean outline, with paint-order to draw stroke behind fill
+    katexRoot.style('-webkit-text-stroke', `${outlineWidth}px ${strokeColor}`);
+    katexRoot.style('paint-order', 'stroke fill');
   }
 
   // Measure AFTER render
@@ -85,9 +115,33 @@ export function plotKatexInSVG(
   const width = contentWidth + 2 * padding;
   const height = contentHeight + 2 * padding;
 
+  // Calculate anchor offsets based on the anchor position
+  let anchorOffsetX = 0;
+  let anchorOffsetY = 0;
+
+  // Vertical offset
+  if (anchor.startsWith('center')) {
+    anchorOffsetY = -height / 2;
+  } else if (anchor.startsWith('bottom')) {
+    anchorOffsetY = -height;
+  }
+  // top is default (0)
+
+  // Horizontal offset
+  if (anchor.endsWith('center') || anchor === 'center') {
+    anchorOffsetX = -width / 2;
+  } else if (anchor.endsWith('right')) {
+    anchorOffsetX = -width;
+  }
+  // left is default (0)
+
+  // Apply anchor offsets and user offsets to get final position
+  const finalX = x + anchorOffsetX + offsetX;
+  const finalY = y + anchorOffsetY + offsetY;
+
   // Resize foreignObject with buffer - use explicit x/y for Safari compatibility
-  fo.attr('x', x + padding)
-    .attr('y', y + padding)
+  fo.attr('x', finalX + padding)
+    .attr('y', finalY + padding)
     .attr('width', contentWidth)
     .attr('height', contentHeight);
 
@@ -95,8 +149,8 @@ export function plotKatexInSVG(
   // Use explicit x/y positioning for Safari compatibility
   if (bg !== false) {
     g.insert('rect', ':first-child')
-      .attr('x', x)
-      .attr('y', y)
+      .attr('x', finalX)
+      .attr('y', finalY)
       .attr('width', width)
       .attr('height', height)
       .attr('rx', rx)

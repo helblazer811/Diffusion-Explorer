@@ -139,7 +139,11 @@ export const settings = {
     },
     // Figure LaTeX styling
     figureLatex: {
-      color: '#666'
+      color: '#666',
+      outline: true,
+      outlineColor: '#fff',
+      outlineWidth: 3,
+      outlineOpacity: 0.8
     }
   }
 };

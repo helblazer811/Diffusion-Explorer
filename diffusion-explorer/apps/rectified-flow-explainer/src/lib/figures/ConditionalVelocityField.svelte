@@ -63,6 +63,15 @@
   // ===== BACKGROUND =====
   export let backgroundVisible = true;
 
+  // ===== KATEX OUTLINE STYLING =====
+  export let katexOutline = settings.stylingSettings.figureLatex.outline;
+  export let katexOutlineColor = settings.stylingSettings.figureLatex.outlineColor;
+  export let katexOutlineWidth = settings.stylingSettings.figureLatex.outlineWidth;
+  export let katexOutlineOpacity = settings.stylingSettings.figureLatex.outlineOpacity;
+
+  // Vertical spacing between point and label
+  const labelAbovePointOffset = -5;
+
   // ===== STATE =====
   let svgElement;
   let scales = null;
@@ -207,12 +216,18 @@
     plotKatexInSVG(
       labelGroup,
       'x_1',
-      targetX - 14,
-      targetY - katexLabelOffset - 10,
+      targetX,
+      targetY,
       {
         fontSize: labelFontSize,
         bg: false,
-        color: labelColor
+        color: labelColor,
+        anchor: 'bottom-center',
+        offsetY: labelAbovePointOffset,
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       }
     );
   }
@@ -255,16 +270,22 @@
       .attr('r', intermediatePointRadius)
       .attr('fill', intermediatePointColor);
 
-    // Add x label above intermediate point (shifted left a bit)
+    // Add x label above intermediate point (centered)
     plotKatexInSVG(
       labelGroup,
       'x',
-      interpPixel.x - 12,
-      interpPixel.y - katexLabelOffset - 10,
+      interpPixel.x,
+      interpPixel.y,
       {
         fontSize: labelFontSize,
         bg: false,
-        color: labelColor
+        color: labelColor,
+        anchor: 'bottom-center',
+        offsetY: labelAbovePointOffset,
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       }
     );
 
@@ -295,7 +316,12 @@
         {
           fontSize: labelFontSize - 2,
           bg: false,
-          color: vectorColor
+          color: vectorColor,
+          anchor: 'bottom-center',
+          outline: katexOutline,
+          outlineColor: katexOutlineColor,
+          outlineWidth: katexOutlineWidth,
+          outlineOpacity: katexOutlineOpacity,
         }
       );
     }
@@ -341,30 +367,37 @@
     const yTop = yDomain[0];
     const distributionLabelY = scales.yScale(yTop) + labelYShiftFactor * 22;
 
-    // Offset to center (plotKatexInSVG positions from left edge)
-    const katexCenterOffset = 15;
-
     plotKatexInSVG(
       labelGroup,
       'p_0',
-      scales.sourceCenterPixelX - katexCenterOffset,
+      scales.sourceCenterPixelX,
       distributionLabelY,
       {
         fontSize: 22,
         bg: false,
-        color: '#666'
+        color: '#666',
+        anchor: 'top-center',
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       }
     );
 
     plotKatexInSVG(
       labelGroup,
       'p_1',
-      scales.targetCenterPixelX - katexCenterOffset,
+      scales.targetCenterPixelX,
       distributionLabelY,
       {
         fontSize: 22,
         bg: false,
-        color: '#666'
+        color: '#666',
+        anchor: 'top-center',
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       }
     );
 

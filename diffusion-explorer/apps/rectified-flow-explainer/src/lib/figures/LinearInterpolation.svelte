@@ -1,13 +1,18 @@
 <!-- Visualizes linear interpolation between source and target distributions with an animated dot. -->
 
 <script>
-  import { onMount } from 'svelte';
-  import * as d3 from 'd3';
-  import Figure from '$lib/components/Figure.svelte';
-  import TimeSlider from '$lib/components/TimeSlider.svelte';
-  import { plotKatexInSVG } from '@diffusion-explorer/ui';
-  import { settings } from '$lib/settings';
-  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
+  import { onMount } from "svelte";
+  import * as d3 from "d3";
+  import Figure from "$lib/components/Figure.svelte";
+  import TimeSlider from "$lib/components/TimeSlider.svelte";
+  import { plotKatexInSVG } from "@diffusion-explorer/ui";
+  import { settings } from "$lib/settings";
+  import {
+    plotSourceTargetScatter,
+    plotSourceTargetLabels,
+    createSourceTargetScales,
+    dataToPixelX,
+  } from "$lib/d3_helpers";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -24,8 +29,8 @@
   // Colors
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export let targetPointColor = settings.stylingSettings.scatterPlot.color;
-  export let lineColor = '#f17720';
-  export let animatedDotColor = '#f17720';
+  export let lineColor = "#f17720";
+  export let animatedDotColor = "#f17720";
 
   // Animation
   export let animationDuration = 4000;
@@ -48,11 +53,17 @@
   export let labelColor = settings.stylingSettings.label.color;
   export let outlineColor = settings.stylingSettings.label.outlineColor;
   export let outlineOpacity = settings.stylingSettings.label.outlineOpacity;
-  export let sourceLabelText = 'Source Distribution';
-  export let targetLabelText = 'Target Distribution';
+  export let sourceLabelText = "Source Distribution";
+  export let targetLabelText = "Target Distribution";
   export let pointLabelFontSize = 18;
   export let pointLabelBgOpacity = 0.9;
   export let figureLatexColor = settings.stylingSettings.figureLatex.color;
+
+  // KaTeX outline styling
+  export let katexOutline = settings.stylingSettings.figureLatex.outline;
+  export let katexOutlineColor = settings.stylingSettings.figureLatex.outlineColor;
+  export let katexOutlineWidth = settings.stylingSettings.figureLatex.outlineWidth;
+  export let katexOutlineOpacity = settings.stylingSettings.figureLatex.outlineOpacity;
 
   // Background visibility
   export let backgroundVisible = true;
@@ -100,12 +111,19 @@
     }
   }
 
+  // Vertical spacing between point and label
+  const labelAbovePointOffset = -5;
+
   function plotPointLabel() {
     if (!svgElement || !scales) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
     const svg = d3.select(svgElement);
-    const labelGroup = svg.select('#pointLabels');
+    const labelGroup = svg.select("#pointLabels");
 
     const sourcePoint = sourceDistributionSamples[sourcePointIndex];
     const targetPoint = targetDistributionSamples[targetPointIndex];
@@ -114,31 +132,51 @@
     // x_0 label above source point
     const sourceX = dataToPixelX(sourcePoint[0], true, scales);
     const sourceY = scales.yScale(sourcePoint[1]);
-    plotKatexInSVG(labelGroup, 'x_0', sourceX - 18, sourceY - 50, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
+    plotKatexInSVG(labelGroup, "x_0", sourceX, sourceY, {
+      fontSize: pointLabelFontSize,
+      bg: false,
+      color: figureLatexColor,
+      anchor: "bottom-center",
+      offsetY: labelAbovePointOffset,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
 
     // x_1 label above target point
     const targetX = dataToPixelX(targetPoint[0], false, scales);
     const targetY = scales.yScale(targetPoint[1]);
-    plotKatexInSVG(labelGroup, 'x_1', targetX - 18, targetY - 50, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
+    plotKatexInSVG(labelGroup, "x_1", targetX, targetY, {
+      fontSize: pointLabelFontSize,
+      bg: false,
+      color: figureLatexColor,
+      anchor: "bottom-center",
+      offsetY: labelAbovePointOffset,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
   }
 
   function initializeLayers() {
     const svg = d3.select(svgElement);
-    svg.selectAll('*').remove();
-    svg.append('g').attr('id', 'sourceScatter');
-    svg.append('g').attr('id', 'targetScatter');
-    svg.append('g').attr('id', 'connectionLine');
-    svg.append('g').attr('id', 'animatedDot');
-    svg.append('g').attr('id', 'movingLabel');
-    svg.append('g').attr('id', 'pointLabels');
-    svg.append('g').attr('id', 'labels');
+    svg.selectAll("*").remove();
+    svg.append("g").attr("id", "sourceScatter");
+    svg.append("g").attr("id", "targetScatter");
+    svg.append("g").attr("id", "connectionLine");
+    svg.append("g").attr("id", "animatedDot");
+    svg.append("g").attr("id", "movingLabel");
+    svg.append("g").attr("id", "pointLabels");
+    svg.append("g").attr("id", "labels");
   }
 
   function plotLabels() {
     if (!svgElement || !scales) return;
 
     const svg = d3.select(svgElement);
-    const labelsGroup = svg.select('#labels');
+    const labelsGroup = svg.select("#labels");
 
     // Source and target distribution labels at top
     plotSourceTargetLabels(svg, scales, {
@@ -147,21 +185,40 @@
       labelFontSize,
       labelColor,
       outlineColor,
-      outlineOpacity
+      outlineOpacity,
     });
 
     // Formula at bottom center
     const formulaX = width / 2;
-    const formulaY = height - marginHeight - 10;
-    plotKatexInSVG(labelsGroup, 'x_t \\sim X_t = (1-t)X_0 + tX_1', formulaX - 140, formulaY - 30, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
+    const formulaY = height - marginHeight;
+    plotKatexInSVG(
+      labelsGroup,
+      "x_t \\sim X_t = (1-t)X_0 + tX_1",
+      formulaX,
+      formulaY,
+      {
+        fontSize: pointLabelFontSize,
+        bg: false,
+        color: figureLatexColor,
+        anchor: "bottom-center",
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
+      }
+    );
   }
 
   function plotLine() {
     if (!svgElement || !scales) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
     const svg = d3.select(svgElement);
-    const lineGroup = svg.select('#connectionLine');
+    const lineGroup = svg.select("#connectionLine");
 
     const sourcePoint = sourceDistributionSamples[sourcePointIndex];
     const targetPoint = targetDistributionSamples[targetPointIndex];
@@ -173,36 +230,43 @@
     const x2 = dataToPixelX(targetPoint[0], false, scales);
     const y2 = scales.yScale(targetPoint[1]);
 
-    lineGroup.append('line')
-      .attr('x1', x1)
-      .attr('y1', y1)
-      .attr('x2', x2)
-      .attr('y2', y2)
-      .attr('stroke', lineColor)
-      .attr('stroke-width', lineWidth)
-      .attr('opacity', 0.8);
+    lineGroup
+      .append("line")
+      .attr("x1", x1)
+      .attr("y1", y1)
+      .attr("x2", x2)
+      .attr("y2", y2)
+      .attr("stroke", lineColor)
+      .attr("stroke-width", lineWidth)
+      .attr("opacity", 0.8);
 
     // Orange endpoints on the line
-    lineGroup.append('circle')
-      .attr('cx', x1)
-      .attr('cy', y1)
-      .attr('r', pointRadius)
-      .attr('fill', animatedDotColor);
+    lineGroup
+      .append("circle")
+      .attr("cx", x1)
+      .attr("cy", y1)
+      .attr("r", pointRadius)
+      .attr("fill", animatedDotColor);
 
-    lineGroup.append('circle')
-      .attr('cx', x2)
-      .attr('cy', y2)
-      .attr('r', pointRadius)
-      .attr('fill', animatedDotColor);
+    lineGroup
+      .append("circle")
+      .attr("cx", x2)
+      .attr("cy", y2)
+      .attr("r", pointRadius)
+      .attr("fill", animatedDotColor);
   }
 
   function initAnimatedDot() {
     if (!svgElement || !scales) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
     const svg = d3.select(svgElement);
-    const dotGroup = svg.select('#animatedDot');
-    const labelGroup = svg.select('#movingLabel');
+    const dotGroup = svg.select("#animatedDot");
+    const labelGroup = svg.select("#movingLabel");
 
     const sourcePoint = sourceDistributionSamples[sourcePointIndex];
     if (!sourcePoint) return;
@@ -210,25 +274,46 @@
     const initialX = dataToPixelX(sourcePoint[0], true, scales);
     const initialY = scales.yScale(sourcePoint[1]);
 
-    dotGroup.append('circle')
-      .attr('id', 'movingDot')
-      .attr('cx', initialX)
-      .attr('cy', initialY)
-      .attr('r', animatedDotRadius)
-      .attr('fill', animatedDotColor);
+    dotGroup
+      .append("circle")
+      .attr("id", "movingDot")
+      .attr("cx", initialX)
+      .attr("cy", initialY)
+      .attr("r", animatedDotRadius)
+      .attr("fill", animatedDotColor);
 
-    // x_t label above moving dot
-    const g = plotKatexInSVG(labelGroup, 'x_t', initialX - 18, initialY - 50, { fontSize: pointLabelFontSize, bg: false, color: figureLatexColor });
-    g.attr('id', 'movingLabelGroup');
+    // x_t label above moving dot using bottom-center anchor with offset
+    const g = plotKatexInSVG(labelGroup, "x_t", initialX, initialY, {
+      fontSize: pointLabelFontSize,
+      bg: false,
+      color: figureLatexColor,
+      anchor: "bottom-center",
+      offsetY: labelAbovePointOffset,
+      outline: katexOutline,
+      outlineColor: katexOutlineColor,
+      outlineWidth: katexOutlineWidth,
+      outlineOpacity: katexOutlineOpacity,
+    });
+    g.attr("id", "movingLabelGroup");
+
+    // Store dimensions for position updates (read from foreignObject which has the measured size)
+    const fo = g.select("foreignObject");
+    const foWidth = parseFloat(fo.attr("width")) + 12; // Add back 2*padding
+    const foHeight = parseFloat(fo.attr("height")) + 12;
+    g.attr("data-width", foWidth).attr("data-height", foHeight);
   }
 
   function updateDotPosition(progress) {
     if (!svgElement || !scales) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
     const svg = d3.select(svgElement);
-    const dot = svg.select('#movingDot');
-    const labelGroup = svg.select('#movingLabelGroup');
+    const dot = svg.select("#movingDot");
+    const labelGroup = svg.select("#movingLabelGroup");
 
     const sourcePoint = sourceDistributionSamples[sourcePointIndex];
     const targetPoint = targetDistributionSamples[targetPointIndex];
@@ -243,13 +328,32 @@
     const currentX = x1 + progress * (x2 - x1);
     const currentY = y1 + progress * (y2 - y1);
 
-    dot.attr('cx', currentX).attr('cy', currentY);
+    dot.attr("cx", currentX).attr("cy", currentY);
 
-    // Update x_t label position via transform, hide when outside 0.07-0.93
+    // Update x_t label position using stored dimensions to calculate anchor offsets
     const labelVisible = progress >= 0.07 && progress <= 0.93;
+    const padding = 6; // Default padding from plotKatexInSVG
+
+    // Get stored dimensions
+    const width = parseFloat(labelGroup.attr("data-width")) || 0;
+    const height = parseFloat(labelGroup.attr("data-height")) || 0;
+
+    // Calculate position with bottom-center anchor + offsetY (same logic as plotKatexInSVG)
+    // anchor 'bottom-center': anchorOffsetX = -width/2, anchorOffsetY = -height
+    // Then add offsetY = labelAbovePointOffset
+    const finalX = currentX - width / 2;
+    const finalY = currentY - height + labelAbovePointOffset;
+
+    // Update foreignObject position (has padding offset)
     labelGroup
-      .attr('transform', `translate(${currentX - 18}, ${currentY - 50})`)
-      .attr('opacity', labelVisible ? 1 : 0);
+      .select("foreignObject")
+      .attr("x", finalX + padding)
+      .attr("y", finalY + padding);
+
+    // Update rect position if it exists (no padding offset)
+    labelGroup.select("rect").attr("x", finalX).attr("y", finalY);
+
+    labelGroup.attr("opacity", labelVisible ? 1 : 0);
   }
 
   function animate(timestamp) {
@@ -312,19 +416,39 @@
 
   function initializeVisualization() {
     if (!svgElement) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
     initializeLayers();
-    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
-    });
+    scales = createSourceTargetScales(
+      sourceDistributionSamples,
+      targetDistributionSamples,
+      {
+        width,
+        height,
+        marginWidth,
+        marginHeight,
+        sourceCenterX,
+        targetCenterX,
+        yShiftFactor,
+      }
+    );
     const svg = d3.select(svgElement);
-    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, scales, {
-      sourcePointColor,
-      targetPointColor,
-      pointRadius,
-      pointOpacity
-    });
+    plotSourceTargetScatter(
+      svg,
+      sourceDistributionSamples,
+      targetDistributionSamples,
+      scales,
+      {
+        sourcePointColor,
+        targetPointColor,
+        pointRadius,
+        pointOpacity,
+      }
+    );
     plotLine();
     initAnimatedDot();
     plotPointLabel();
@@ -334,10 +458,12 @@
   }
 
   // Reactive initialization
-  $: if (!isInitialized &&
-         sourceDistributionSamples.length > 0 &&
-         targetDistributionSamples.length > 0 &&
-         svgElement) {
+  $: if (
+    !isInitialized &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples.length > 0 &&
+    svgElement
+  ) {
     initializeVisualization();
     if (isPlaying) startAnimation();
   }
@@ -363,14 +489,26 @@
   });
 </script>
 
-<Figure caption={caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={toggleAnimation}>
+<Figure
+  {caption}
+  {backgroundVisible}
+  bind:isActive={figureIsActive}
+  onContentClick={toggleAnimation}
+>
   {#snippet children()}
-    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
-      <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
+    <div
+      style="display: flex; flex-direction: column; align-items: center; width: 100%;"
+    >
+      <svg
+        bind:this={svgElement}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        style="width: 100%; height: auto; max-width: {width}px;"
+      >
       </svg>
       <TimeSlider
         bind:value={time}
-        bind:isPlaying={isPlaying}
+        bind:isPlaying
         min={0}
         max={1}
         onTogglePlay={toggleAnimation}

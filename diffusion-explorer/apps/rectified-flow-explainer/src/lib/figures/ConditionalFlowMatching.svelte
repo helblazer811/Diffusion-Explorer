@@ -70,9 +70,18 @@
   // ===== BACKGROUND =====
   export let backgroundVisible = true;
 
+  // ===== KATEX OUTLINE STYLING =====
+  export let katexOutline = settings.stylingSettings.figureLatex.outline;
+  export let katexOutlineColor = settings.stylingSettings.figureLatex.outlineColor;
+  export let katexOutlineWidth = settings.stylingSettings.figureLatex.outlineWidth;
+  export let katexOutlineOpacity = settings.stylingSettings.figureLatex.outlineOpacity;
+
   // ===== FIXED POINT POSITIONS (pixel coords) =====
   export let x0Pixel = { x: 180, y: 170 };
   export let x1Pixel = { x: 620, y: 90 };
+
+  // Vertical spacing between point and label
+  const labelAbovePointOffset = -5;
 
   // ===== STATE =====
   let svgElement;
@@ -153,12 +162,18 @@
     plotKatexInSVG(
       labelGroup,
       'x_0',
-      x0Pixel.x - 14,
-      x0Pixel.y - katexLabelOffset - 10,
+      x0Pixel.x,
+      x0Pixel.y,
       {
         fontSize: labelFontSize,
         bg: false,
-        color: labelColor
+        color: labelColor,
+        anchor: 'bottom-center',
+        offsetY: labelAbovePointOffset,
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       }
     );
 
@@ -173,12 +188,18 @@
     plotKatexInSVG(
       labelGroup,
       'x_1',
-      x1Pixel.x - 14,
-      x1Pixel.y - katexLabelOffset - 10,
+      x1Pixel.x,
+      x1Pixel.y,
       {
         fontSize: labelFontSize,
         bg: false,
-        color: labelColor
+        color: labelColor,
+        anchor: 'bottom-center',
+        offsetY: labelAbovePointOffset,
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       }
     );
   }
@@ -206,16 +227,22 @@
       .attr('r', intermediatePointRadius)
       .attr('fill', intermediatePointColor);
 
-    // Add x label above intermediate point (shifted left a bit)
+    // Add x label above intermediate point (centered)
     plotKatexInSVG(
       labelGroup,
       'x',
-      interpX - 12,
-      interpY - katexLabelOffset - 10,
+      interpX,
+      interpY,
       {
         fontSize: labelFontSize,
         bg: false,
-        color: labelColor
+        color: labelColor,
+        anchor: 'bottom-center',
+        offsetY: labelAbovePointOffset,
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       }
     );
 
@@ -247,7 +274,11 @@
         {
           fontSize: labelFontSize - 2,
           bg: false,
-          color: vectorColor
+          color: vectorColor,
+          outline: katexOutline,
+          outlineColor: katexOutlineColor,
+          outlineWidth: katexOutlineWidth,
+          outlineOpacity: katexOutlineOpacity,
         }
       );
 
@@ -272,12 +303,16 @@
       plotKatexInSVG(
         labelGroup,
         'v_t^\\theta(x_t)',
-        vtThetaCenterX - 33,
+        vtThetaCenterX - 50,
         vtThetaCenterY - katexLabelOffset - 10,
         {
           fontSize: labelFontSize - 2,
           bg: false,
-          color: noisyVectorColor
+          color: noisyVectorColor,
+          outline: katexOutline,
+          outlineColor: katexOutlineColor,
+          outlineWidth: katexOutlineWidth,
+          outlineOpacity: katexOutlineOpacity,
         }
       );
 
@@ -329,30 +364,37 @@
     const yTop = yDomain[0];
     const distributionLabelY = scales.yScale(yTop) + labelYShiftFactor * 22;
 
-    // Offset to center (plotKatexInSVG positions from left edge)
-    const katexCenterOffset = 15;
-
     plotKatexInSVG(
       labelGroup,
       'p_0',
-      scales.sourceCenterPixelX - katexCenterOffset,
+      scales.sourceCenterPixelX,
       distributionLabelY,
       {
         fontSize: 22,
         bg: false,
-        color: '#666'
+        color: '#666',
+        anchor: 'top-center',
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       }
     );
 
     plotKatexInSVG(
       labelGroup,
       'p_1',
-      scales.targetCenterPixelX - katexCenterOffset,
+      scales.targetCenterPixelX,
       distributionLabelY,
       {
         fontSize: 22,
         bg: false,
-        color: '#666'
+        color: '#666',
+        anchor: 'top-center',
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       }
     );
 
