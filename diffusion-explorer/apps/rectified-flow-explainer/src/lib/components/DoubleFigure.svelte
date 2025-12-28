@@ -8,7 +8,6 @@
   export let caption = undefined;
   export let gap = 20;
   export let backgroundVisible = true;
-  export let onContentClick = undefined;
 
   // Visibility state - exported so parent can bind to it
   export let isActive = writable(false);
@@ -19,19 +18,9 @@
   let isInViewport = false;
   let isTabVisible = true;
 
-  // Track if we're in mobile width mode (for click-to-toggle)
-  let isMobileWidth = false;
-
   // Update isActive when either visibility state changes
   function updateActiveState() {
     isActive.set(isInViewport && isTabVisible);
-  }
-
-  // Handle content click (only when mobile width and callback provided)
-  function handleContentClick() {
-    if (isMobileWidth && onContentClick) {
-      onContentClick();
-    }
   }
 
   onMount(() => {
@@ -61,16 +50,8 @@
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Track viewport width for mobile click-to-toggle
-    const checkWidth = () => {
-      isMobileWidth = window.innerWidth < 600;
-    };
-    checkWidth();
-    window.addEventListener('resize', checkWidth);
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('resize', checkWidth);
     };
   });
 
@@ -82,12 +63,9 @@
 </script>
 
 <figure class="double-figure" bind:this={figureElement}>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="double-figure-container"
-    class:clickable={onContentClick && isMobileWidth}
     style="gap: {gap}px;"
-    onclick={handleContentClick}
   >
     <div class="figure-content left-figure" class:no-background={!backgroundVisible}>
       {@render left?.()}
@@ -161,9 +139,5 @@
     line-height: 1.5;
     color: #666;
     text-align: left;
-  }
-
-  .double-figure-container.clickable {
-    cursor: pointer;
   }
 </style>

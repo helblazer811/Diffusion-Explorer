@@ -31,7 +31,7 @@
   export let marginHeight = 20;
   export let svgWidth = 350;
   export let svgHeight = 350;
-  export let trajectoryColor = "#f17720"; // Orange
+  export let trajectoryColor = settings.stylingSettings.trajectory.color;
   export let sourceColor = "#3b82f6"; // Blue
   export let targetColor = "#3b82f6"; // Blue
   export let sourceOpacity = 0.35;
@@ -40,10 +40,10 @@
 
   // Trajectory styling
   export let showTrajectoryPreview = false; // Show full trajectory path preview
-  export let trajectoryFullOpacity = 0.3;
-  export let trajectoryProgressOpacity = 0.8;
-  export let trajectoryStrokeWidth = 3;
-  export let trajectoryPointRadius = 5;
+  export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
+  export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
+  export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
+  export let trajectoryPointRadius = settings.stylingSettings.trajectory.pointRadius;
   export let animationDuration = 5000;
   export let playingByDefault = true;
   export let pauseDuration = 1000;
@@ -267,7 +267,7 @@
 </script>
 
 {#if isDataValid}
-  <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={togglePlayPause}>
+  <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     {#snippet children()}
       <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
       <svg

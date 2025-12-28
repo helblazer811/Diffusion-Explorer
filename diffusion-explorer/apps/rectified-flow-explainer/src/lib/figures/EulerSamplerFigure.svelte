@@ -478,7 +478,7 @@
   });
 </script>
 
-<DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={togglePlayPause}>
+<DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet left()}
     <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
     <svg bind:this={leftSvg} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">

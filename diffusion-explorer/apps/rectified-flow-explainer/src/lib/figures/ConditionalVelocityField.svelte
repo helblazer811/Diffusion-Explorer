@@ -305,19 +305,21 @@
         .attr('stroke-opacity', vectorOpacity)
         .attr('marker-end', 'url(#conditional-vector-arrow)');
 
-      // Add v_t(x|x_1) label above center of vector
+      // Add v_t(x|x_1) label near the vector
       const vectorCenterX = (interpPixel.x + scaledEndX) / 2;
       const vectorCenterY = (interpPixel.y + scaledEndY) / 2;
       plotKatexInSVG(
         labelGroup,
         'v_t(x|x_1)',
         vectorCenterX,
-        vectorCenterY - katexLabelOffset - 10,
+        vectorCenterY,
         {
           fontSize: labelFontSize - 2,
           bg: false,
           color: vectorColor,
           anchor: 'bottom-center',
+          offsetX: 25,
+          offsetY: 5,
           outline: katexOutline,
           outlineColor: katexOutlineColor,
           outlineWidth: katexOutlineWidth,

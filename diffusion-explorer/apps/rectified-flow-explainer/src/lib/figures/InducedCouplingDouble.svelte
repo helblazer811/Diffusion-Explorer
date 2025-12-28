@@ -6,7 +6,6 @@
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import { settings } from '$lib/settings';
   import { createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
-  import { clipAllRectifiedTrajectoriesToStartingRadius } from '$lib/utils';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -16,30 +15,21 @@
   export let allRectifiedTrajectories = []; // [rectifiedStep][timestep][sample][dim]
   export let targetDistribution = []; // For displaying target points
 
-  // Clipping props (tighter than global default for smaller SVG)
-  export let clippingRadius = 1.5;
-
-  // Apply clipping internally
-  $: clippedTrajectories = clipAllRectifiedTrajectoriesToStartingRadius(
-    allRectifiedTrajectories ?? [],
-    clippingRadius
-  );
-
   // Data validation
   $: isDataValid =
-    clippedTrajectories &&
-    clippedTrajectories.length > 0 &&
-    clippedTrajectories[0] &&
-    clippedTrajectories[0].length > 0 &&
+    allRectifiedTrajectories &&
+    allRectifiedTrajectories.length > 0 &&
+    allRectifiedTrajectories[0] &&
+    allRectifiedTrajectories[0].length > 0 &&
     targetDistribution &&
     targetDistribution.length > 0;
 
   // Layout props
   export let svgWidth = 350;
   export let svgHeight = 250;
-  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
-  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
-  export let marginWidth = 20;
+  export let sourceCenterX = 0.25;
+  export let targetCenterX = 0.75;
+  export let marginWidth = 50;
   export let marginHeight = 20;
   export let gap = 30;
 
@@ -70,6 +60,9 @@
   // Number of samples to show (subsample if too many)
   export let numSamplesToShow = 50;
 
+  // Clipping radius - only show points within this radius from origin
+  export let clippingRadius = 1.8;
+
   // SVG references
   let leftSvgElement;
   let rightSvgElement;
@@ -83,19 +76,28 @@
   let shuffledIndicesForLeft = [];
 
   // Derived data
-  $: sourcePoints = isDataValid ? clippedTrajectories[0][0] : [];
+  $: sourcePoints = isDataValid ? allRectifiedTrajectories[0][0] : [];
   $: destinationPoints = isDataValid
-    ? clippedTrajectories[0][clippedTrajectories[0].length - 1]
+    ? allRectifiedTrajectories[0][allRectifiedTrajectories[0].length - 1]
     : [];
 
   function selectSampleIndices() {
     if (!isDataValid) return;
 
-    const numAvailable = sourcePoints.length;
-    const numToSelect = Math.min(numSamplesToShow, numAvailable);
+    // Filter to indices where source point is within clipping radius
+    const validIndices = [];
+    for (let i = 0; i < sourcePoints.length; i++) {
+      const [x, y] = sourcePoints[i];
+      const distance = Math.sqrt(x * x + y * y);
+      if (distance <= clippingRadius) {
+        validIndices.push(i);
+      }
+    }
+
+    const numToSelect = Math.min(numSamplesToShow, validIndices.length);
 
     const indices = [];
-    const availableIndices = Array.from({ length: numAvailable }, (_, i) => i);
+    const availableIndices = [...validIndices];
 
     for (let i = 0; i < numToSelect; i++) {
       const randomIndex = Math.floor(Math.random() * availableIndices.length);

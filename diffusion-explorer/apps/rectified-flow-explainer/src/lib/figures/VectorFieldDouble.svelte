@@ -3,6 +3,7 @@
   import * as d3 from 'd3';
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
+  import { settings } from '$lib/settings';
 
   // Data props
   export let vectorFieldData = null;
@@ -17,7 +18,7 @@
   export let arrowWidth = 2;
   export let arrowColor = '#333';
   export let arrowOpacity = 0.5;
-  export let trajectoryColor = '#f17720'; // Orange
+  export let trajectoryColor = settings.stylingSettings.trajectory.color;
   export let targetColor = '#3b82f6';
   export let targetOpacity = 0.35;
   export let targetPointRadius = 5;
@@ -335,7 +336,7 @@
 </script>
 
 {#if vectorFieldData && allTimeSamples.length > 0}
-  <DoubleFigure {caption} onContentClick={togglePlayPause}>
+  <DoubleFigure {caption}>
     {#snippet left()}
       <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
       <svg

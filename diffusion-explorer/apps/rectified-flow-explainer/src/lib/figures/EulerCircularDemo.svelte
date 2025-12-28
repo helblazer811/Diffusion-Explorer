@@ -5,6 +5,7 @@
   import * as d3 from 'd3';
   import Figure from '$lib/components/Figure.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
+  import { settings } from '$lib/settings';
 
   // Elliptical vector field: velocity tangent to ellipse
   function createEllipticalVectorField(a, b) {
@@ -77,10 +78,10 @@
   export let startPoint = [2, 0];  // Start on the ellipse (a=2)
   let stepSize = 0.1;
   export let numSteps = 63;
-  export let trajectoryColor = '#f17720';
-  export let trajectoryWidth = 3;
-  export let pointRadius = 6;
-  export let pointColor = '#f17720';
+  export let trajectoryColor = settings.stylingSettings.trajectory.color;
+  export let trajectoryWidth = settings.stylingSettings.trajectory.strokeWidth;
+  export let pointRadius = settings.stylingSettings.trajectory.pointRadius;
+  export let pointColor = settings.stylingSettings.trajectory.color;
 
   // Animation props
   export let animationDuration = 6000;
@@ -98,6 +99,7 @@
   let animationStartTime = null;
   let isInitialized = false;
   let totalPathLength = 0;
+  let wasJustResumed = false; // Track if we just resumed from pause
 
   // Generate data
   $: vectorFieldData = generateVectorFieldGrid(gridResolutionX, gridResolutionY, domainRange, ellipticalVectorField);
@@ -121,6 +123,9 @@
     : '';
 
   function toggleAnimation() {
+    if (!isPlaying) {
+      wasJustResumed = true; // Mark that we're resuming
+    }
     isPlaying = !isPlaying;
   }
 
@@ -193,7 +198,7 @@
     totalPathLength = progressPath.node().getTotalLength();
 
     progressPath
-      .attr('stroke-dasharray', totalPathLength)
+      .attr('stroke-dasharray', `${totalPathLength} ${totalPathLength}`)
       .attr('stroke-dashoffset', totalPathLength);
 
     // Draw current position marker
@@ -238,7 +243,11 @@
         return;
       }
 
-      if (animationStartTime === null) {
+      // When resuming, recalculate animationStartTime to continue from current time position
+      if (wasJustResumed) {
+        animationStartTime = currentTime - (time * animationDuration);
+        wasJustResumed = false;
+      } else if (animationStartTime === null) {
         animationStartTime = currentTime;
       }
 
@@ -266,7 +275,8 @@
     }
   }
 
-  $: if (isInitialized) {
+  // Update visualization when time changes (e.g., from slider drag while paused)
+  $: if (isInitialized && time !== undefined) {
     updateVisualization();
   }
 
@@ -289,7 +299,7 @@
   });
 </script>
 
-<Figure {caption} {backgroundVisible} onContentClick={toggleAnimation}>
+<Figure {caption} {backgroundVisible}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg

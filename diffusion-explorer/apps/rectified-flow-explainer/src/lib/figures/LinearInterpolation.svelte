@@ -493,7 +493,6 @@
   {caption}
   {backgroundVisible}
   bind:isActive={figureIsActive}
-  onContentClick={toggleAnimation}
 >
   {#snippet children()}
     <div

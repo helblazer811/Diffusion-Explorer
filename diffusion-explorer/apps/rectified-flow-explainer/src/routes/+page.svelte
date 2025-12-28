@@ -602,10 +602,8 @@
         width={figureWidth}
         sourceDistributionSamples={$sourceDistributionSamples}
         targetDistributionSamples={$targetDistributionSamples}
-        {allTimeSamples}
-        {isTraining}
-        playingByDefault={true}
-        backgroundVisible={false}
+        allTimeSamples={$allTimeSamples}
+        isTraining={$isTraining}
       >
         <div class="caption">
           <span class="figure-number">Figure 2:</span>
@@ -749,8 +747,8 @@
       width={figureWidth}
       sourceDistributionSamples={$sourceDistributionSamples}
       targetDistributionSamples={$targetDistributionSamples}
-      {allTimeSamples}
-      {isTraining}
+      allTimeSamples={$allTimeSamples}
+      isTraining={$isTraining}
     >
       <div class="caption">
         <span class="figure-number">Figure 4:</span>

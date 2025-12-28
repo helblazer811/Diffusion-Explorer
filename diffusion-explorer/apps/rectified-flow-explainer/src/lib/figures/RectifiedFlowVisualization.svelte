@@ -37,18 +37,18 @@
   export let numTrajectoriesToShow = 15; // Number of trajectories to visualize
 
   // Styling props (colors)
-  export let trajectoryColor = "#f17720"; // Orange
+  export let trajectoryColor = settings.stylingSettings.trajectory.color;
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export let targetPointColor = settings.stylingSettings.scatterPlot.color;
 
   // Styling props (opacity)
-  export let trajectoryFullOpacity = 0.15; // Background paths (preview)
-  export let trajectoryProgressOpacity = 0.8; // Animated paths
+  export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
+  export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
 
   // Styling props (dimensions)
-  export let trajectoryStrokeWidth = 2;
-  export let trajectoryPointRadius = 4;
+  export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
+  export let trajectoryPointRadius = settings.stylingSettings.trajectory.pointRadius;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
 
   // Layout
@@ -529,6 +529,11 @@
     stopAnimation();
   }
 
+  // Update visualization when time changes (e.g., from slider drag while paused)
+  $: if (initialized && time !== undefined) {
+    updateVisualization();
+  }
+
   onMount(() => {
     // Animation will be started by the reactive statement once isReadyToAnimate becomes true
   });
@@ -538,7 +543,7 @@
   });
 </script>
 
-<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={toggleAnimation}>
+<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <div style="position: relative; width: 100%; display: flex; justify-content: center;">
