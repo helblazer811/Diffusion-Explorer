@@ -39,6 +39,7 @@
   import TableOfContents from "$lib/components/TableOfContents.svelte";
   import Bibliography from "$lib/components/Bibliography.svelte";
   import { Katex } from "@diffusion-explorer/ui";
+  import { base } from "$app/paths";
 
   // ========== DATA MANAGEMENT STATE ==========
 
@@ -80,7 +81,7 @@
 
   async function loadTargetDistribution() {
     const samples = await trainAndSample.loadTargetDistribution(
-      settings.targetDistributionPointsPath,
+      `${base}/${settings.targetDistributionPointsPath}`,
       settings.samplingSettings.flowMatching.numSamples
     );
     if (samples) {
@@ -398,21 +399,21 @@
     // Load flow matching trajectories
     if (settings.cachedFlowMatchingTrajectoriesPath) {
       flowMatchingTrajectoriesLoaded = await loadCachedTrajectories(
-        settings.cachedFlowMatchingTrajectoriesPath
+        `${base}/${settings.cachedFlowMatchingTrajectoriesPath}`
       );
     }
 
     // Load flow matching vector field
     if (settings.cachedFlowMatchingVectorFieldPath) {
       flowMatchingVectorFieldLoaded = await loadCachedVectorField(
-        settings.cachedFlowMatchingVectorFieldPath
+        `${base}/${settings.cachedFlowMatchingVectorFieldPath}`
       );
     }
 
     // Load flow matching grid trajectories
     if (settings.cachedFlowMatchingGridTrajectoriesPath) {
       flowMatchingGridTrajectoriesLoaded = await loadCachedGridTrajectories(
-        settings.cachedFlowMatchingGridTrajectoriesPath,
+        `${base}/${settings.cachedFlowMatchingGridTrajectoriesPath}`,
         false
       );
     }
@@ -421,14 +422,14 @@
     if (settings.cachedRectifiedFlowTrajectoriesPath) {
       rectifiedFlowTrajectoriesLoaded =
         await loadCachedRectifiedFlowTrajectories(
-          settings.cachedRectifiedFlowTrajectoriesPath
+          `${base}/${settings.cachedRectifiedFlowTrajectoriesPath}`
         );
     }
 
     // Load rectified flow grid trajectories
     if (settings.cachedRectifiedFlowGridTrajectoriesPath) {
       rectifiedFlowGridTrajectoriesLoaded = await loadCachedGridTrajectories(
-        settings.cachedRectifiedFlowGridTrajectoriesPath,
+        `${base}/${settings.cachedRectifiedFlowGridTrajectoriesPath}`,
         true
       );
     }
@@ -436,7 +437,7 @@
     // Load rectified flow vector field
     if (settings.cachedRectifiedFlowVectorFieldPath) {
       rectifiedFlowVectorFieldLoaded = await loadCachedRectifiedFlowVectorField(
-        settings.cachedRectifiedFlowVectorFieldPath
+        `${base}/${settings.cachedRectifiedFlowVectorFieldPath}`
       );
     }
 
@@ -487,7 +488,7 @@
     }
 
     // Load bibliography and collect citations
-    bibEntries = await loadBibliography();
+    bibEntries = await loadBibliography(`${base}/bibliography.bib`);
     await tick(); // Ensure DOM is ready
     citations = collectCitations();
 
