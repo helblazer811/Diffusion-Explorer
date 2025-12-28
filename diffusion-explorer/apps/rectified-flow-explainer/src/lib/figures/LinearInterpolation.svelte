@@ -187,19 +187,13 @@
       .attr('cx', x1)
       .attr('cy', y1)
       .attr('r', pointRadius)
-      .attr('fill', animatedDotColor)
-      .attr('stroke', 'white')
-      .attr('stroke-width', 2)
-      .attr('stroke-opacity', 0.5);
+      .attr('fill', animatedDotColor);
 
     lineGroup.append('circle')
       .attr('cx', x2)
       .attr('cy', y2)
       .attr('r', pointRadius)
-      .attr('fill', animatedDotColor)
-      .attr('stroke', 'white')
-      .attr('stroke-width', 2)
-      .attr('stroke-opacity', 0.5);
+      .attr('fill', animatedDotColor);
   }
 
   function initAnimatedDot() {
@@ -369,7 +363,7 @@
   });
 </script>
 
-<Figure caption={caption} {backgroundVisible} bind:isActive={figureIsActive}>
+<Figure caption={caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={toggleAnimation}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">

@@ -285,7 +285,7 @@
 </script>
 
 {#if isDataValid}
-  <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+  <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={togglePlayPause}>
     {#snippet children()}
       <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
       <svg

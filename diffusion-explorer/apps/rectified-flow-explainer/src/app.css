@@ -224,6 +224,27 @@ button:focus {
   font-size: 1.1rem;
 }
 
+@media (max-width: 600px) {
+  .page-container {
+    padding: 0 1rem 2rem;
+  }
+
+  .byline-dateline-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25em;
+  }
+
+  .katex {
+    font-size: 0.85em;
+  }
+
+  .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+}
+
 /* ==========================================================================
    Article Sections
    ========================================================================== */

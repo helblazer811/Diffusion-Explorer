@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
   import Figure from '$lib/components/Figure.svelte';
+  import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
   import {
@@ -224,7 +225,7 @@
       const vtEndX = interpX + (pixelDx / pixelMag) * vectorScale;
       const vtEndY = interpY + (pixelDy / pixelMag) * vectorScale;
 
-      // Draw v_t(x|x_1) vector
+      // Draw v_t(x_t|x_1) vector
       vectorGroup.append('line')
         .attr('x1', interpX)
         .attr('y1', interpY)
@@ -235,12 +236,12 @@
         .attr('stroke-opacity', vectorOpacity)
         .attr('marker-end', 'url(#conditional-flow-arrow)');
 
-      // Add v_t(x|x_1) label above center of vector
+      // Add v_t(x_t|x_1) label above center of vector
       const vtCenterX = (interpX + vtEndX) / 2;
       const vtCenterY = (interpY + vtEndY) / 2;
       plotKatexInSVG(
         labelGroup,
-        'v_t(x|x_1)',
+        'v_t(x_t|x_1)',
         vtCenterX - 30,
         vtCenterY - katexLabelOffset + 33,
         {
@@ -254,7 +255,7 @@
       const vtThetaEndX = vtEndX + noiseVector[0];
       const vtThetaEndY = vtEndY + noiseVector[1];
 
-      // Draw v_t^\theta(x) vector
+      // Draw v_t^\theta(x_t) vector
       vectorGroup.append('line')
         .attr('x1', interpX)
         .attr('y1', interpY)
@@ -265,12 +266,12 @@
         .attr('stroke-opacity', vectorOpacity)
         .attr('marker-end', 'url(#noisy-flow-arrow)');
 
-      // Add v_t^\theta(x) label above center of noisy vector
+      // Add v_t^\theta(x_t) label above center of noisy vector
       const vtThetaCenterX = (interpX + vtThetaEndX) / 2;
       const vtThetaCenterY = (interpY + vtThetaEndY) / 2;
       plotKatexInSVG(
         labelGroup,
-        'v_t^\\theta(x)',
+        'v_t^\\theta(x_t)',
         vtThetaCenterX - 33,
         vtThetaCenterY - katexLabelOffset - 10,
         {
@@ -374,12 +375,21 @@
 
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
-    <svg
-      bind:this={svgElement}
-      viewBox="0 0 {width} {height}"
-      preserveAspectRatio="xMidYMid meet"
-      style="width: 100%; height: auto; max-width: {width}px;"
-    >
-    </svg>
+    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+      <svg
+        bind:this={svgElement}
+        viewBox="0 0 {width} {height}"
+        preserveAspectRatio="xMidYMid meet"
+        style="width: 100%; height: auto; max-width: {width}px;"
+      >
+      </svg>
+      <TimeSlider
+        bind:value={t}
+        min={0}
+        max={1}
+        disabled={true}
+        color="#888"
+      />
+    </div>
   {/snippet}
 </Figure>

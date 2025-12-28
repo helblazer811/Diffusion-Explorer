@@ -343,7 +343,7 @@
 </script>
 
 {#if isDataValid}
-  <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+  <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={toggleAnimation}>
     {#snippet left()}
       <svg
         bind:this={leftSvgElement}

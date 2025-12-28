@@ -152,7 +152,8 @@
       display: block;
       position: fixed;
       left: calc(max(280px, (100vw - 900px) / 2) - 250px);
-      top: 180px;
+      top: 50%;
+      transform: translateY(-50%);
       width: 220px;
       max-height: calc(100vh - 200px);
       overflow-y: auto;

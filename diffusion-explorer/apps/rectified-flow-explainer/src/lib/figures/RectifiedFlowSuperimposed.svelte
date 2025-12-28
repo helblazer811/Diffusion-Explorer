@@ -41,8 +41,8 @@
   export let animationDuration = 5000; // ms per full loop
   export let playingByDefault = true;
   export let pauseDuration = 1000; // ms pause at end of animation
-  export let leftLabel = "Before Rectification";
-  export let rightLabel = "After Rectification";
+  export let leftLabel = "Flow Matching";
+  export let rightLabel = "Rectified Flow";
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelColor = settings.stylingSettings.label.color;
   export let gap = 50;
@@ -142,15 +142,12 @@
         .attr("opacity", trajectoryProgressOpacity);
     }
 
-    // Add label at top center with background rectangle
+    // Add label at top center
     const labelGroup = svg.append("g").attr("class", "label-group");
     const labelX = svgWidth / 2;
     const labelY = marginHeight / 2 + labelFontSize / 2;
-    const labelPaddingX = 10;
-    const labelPaddingY = 4;
 
-    // Add text first to measure it
-    const textElement = labelGroup
+    labelGroup
       .append("text")
       .attr("class", "panel-label")
       .attr("x", labelX)
@@ -159,17 +156,6 @@
       .attr("font-size", `${labelFontSize}px`)
       .attr("fill", labelColor)
       .text(label);
-
-    // Get text bounding box and add background rect
-    const bbox = textElement.node().getBBox();
-    labelGroup
-      .insert("rect", "text")
-      .attr("x", bbox.x - labelPaddingX)
-      .attr("y", bbox.y - labelPaddingY)
-      .attr("width", bbox.width + 2 * labelPaddingX)
-      .attr("height", bbox.height + 2 * labelPaddingY)
-      .attr("fill", "#f9f9f9")
-      .attr("opacity", 0.9);
   }
 
   function initializeVisualization() {
@@ -314,7 +300,7 @@
 </script>
 
 {#if isDataValid}
-  <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+  <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={togglePlayPause}>
     {#snippet left()}
       <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
       <svg
