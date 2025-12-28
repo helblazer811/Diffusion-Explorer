@@ -16,8 +16,8 @@
   export let allRectifiedTrajectories = []; // [rectifiedStep][timestep][sample][dim]
   export let targetDistribution = []; // For displaying target points
 
-  // Clipping props
-  export let clippingRadius = settings.stylingSettings.scatterPlot.clippingRadius;
+  // Clipping props (tighter than global default for smaller SVG)
+  export let clippingRadius = 1.5;
 
   // Apply clipping internally
   $: clippedTrajectories = clipAllRectifiedTrajectoriesToStartingRadius(
