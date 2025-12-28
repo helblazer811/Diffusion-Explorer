@@ -6,6 +6,7 @@
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import { settings } from '$lib/settings';
   import { createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
+  import { clipAllRectifiedTrajectoriesToStartingRadius } from '$lib/utils';
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -15,12 +16,21 @@
   export let allRectifiedTrajectories = []; // [rectifiedStep][timestep][sample][dim]
   export let targetDistribution = []; // For displaying target points
 
+  // Clipping props
+  export let clippingRadius = settings.stylingSettings.scatterPlot.clippingRadius;
+
+  // Apply clipping internally
+  $: clippedTrajectories = clipAllRectifiedTrajectoriesToStartingRadius(
+    allRectifiedTrajectories ?? [],
+    clippingRadius
+  );
+
   // Data validation
   $: isDataValid =
-    allRectifiedTrajectories &&
-    allRectifiedTrajectories.length > 0 &&
-    allRectifiedTrajectories[0] &&
-    allRectifiedTrajectories[0].length > 0 &&
+    clippedTrajectories &&
+    clippedTrajectories.length > 0 &&
+    clippedTrajectories[0] &&
+    clippedTrajectories[0].length > 0 &&
     targetDistribution &&
     targetDistribution.length > 0;
 
@@ -73,9 +83,9 @@
   let shuffledIndicesForLeft = [];
 
   // Derived data
-  $: sourcePoints = isDataValid ? allRectifiedTrajectories[0][0] : [];
+  $: sourcePoints = isDataValid ? clippedTrajectories[0][0] : [];
   $: destinationPoints = isDataValid
-    ? allRectifiedTrajectories[0][allRectifiedTrajectories[0].length - 1]
+    ? clippedTrajectories[0][clippedTrajectories[0].length - 1]
     : [];
 
   function selectSampleIndices() {

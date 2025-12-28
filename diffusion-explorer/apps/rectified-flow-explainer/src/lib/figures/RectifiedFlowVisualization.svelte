@@ -42,7 +42,7 @@
   export let targetPointColor = settings.stylingSettings.scatterPlot.color;
 
   // Styling props (opacity)
-  export let trajectoryFullOpacity = 0.3; // Background paths
+  export let trajectoryFullOpacity = 0.15; // Background paths (preview)
   export let trajectoryProgressOpacity = 0.8; // Animated paths
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
 

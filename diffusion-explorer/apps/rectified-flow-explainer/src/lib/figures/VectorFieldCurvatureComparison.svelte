@@ -40,9 +40,9 @@
 
   // Arrow styling
   export let arrowColor = '#f17720';
-  export let arrowScale = 35;
-  export let arrowWidth = 2;
-  export let arrowOpacity = 0.7;
+  export let arrowScale = 45;
+  export let arrowWidth = 2.5;
+  export let arrowOpacity = 1.0;
   export let normalizeVectors = false;
 
   // Animation settings

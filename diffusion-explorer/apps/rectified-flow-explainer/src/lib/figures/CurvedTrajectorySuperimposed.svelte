@@ -14,8 +14,8 @@
   export let sourceDistribution = []; // source distribution points
   export let targetDistribution = []; // target distribution points
 
-  // How many trajectories to display
-  export let numTrajectoriesToShow = 25;
+  // Total number of trajectories (derived from data)
+  $: numTrajectories = isDataValid ? (trajectories[0]?.length || 0) : 0;
 
   // Data validation
   $: isDataValid =
@@ -39,6 +39,7 @@
   export let distributionPointRadius = 5;
 
   // Trajectory styling
+  export let showTrajectoryPreview = false; // Show full trajectory path preview
   export let trajectoryFullOpacity = 0.3;
   export let trajectoryProgressOpacity = 0.8;
   export let trajectoryStrokeWidth = 3;
@@ -64,8 +65,6 @@
   let animationFrameId = null;
   let isInitialized = false;
 
-  // Selected trajectory indices
-  let selectedIndices = [];
 
   // Visibility-based animation control
   let figureIsActive;
@@ -87,23 +86,6 @@
     }
   }
 
-  function selectTrajectoryIndices() {
-    if (!isDataValid) return;
-
-    const numAvailable = trajectories[0]?.length || 0;
-    const numToSelect = Math.min(numTrajectoriesToShow, numAvailable);
-
-    // Random selection without replacement
-    const indices = [];
-    const availableIndices = Array.from({ length: numAvailable }, (_, i) => i);
-
-    for (let i = 0; i < numToSelect; i++) {
-      const randomIndex = Math.floor(Math.random() * availableIndices.length);
-      indices.push(availableIndices.splice(randomIndex, 1)[0]);
-    }
-
-    selectedIndices = indices;
-  }
 
   function initializeScales() {
     if (!isDataValid) return;
@@ -143,9 +125,9 @@
     // Add trajectory path group
     svg.append("g").attr("id", "trajectory-group");
 
-    // Add current position markers for each selected trajectory
+    // Add current position markers for each trajectory
     const markersGroup = svg.append("g").attr("id", "markers-group");
-    for (let i = 0; i < selectedIndices.length; i++) {
+    for (let i = 0; i < numTrajectories; i++) {
       markersGroup
         .append("circle")
         .attr("class", `current-position-${i}`)
@@ -158,7 +140,6 @@
   function initializeVisualization() {
     if (!svgElement || !isDataValid) return;
 
-    selectTrajectoryIndices();
     initializeScales();
     initializeSvg();
     updateVisualization(currentTimeIndex);
@@ -179,26 +160,27 @@
     const trajectoryGroup = svg.select("#trajectory-group");
     trajectoryGroup.selectAll("*").remove();
 
-    // Draw selected trajectories
-    for (let i = 0; i < selectedIndices.length; i++) {
-      const trajIdx = selectedIndices[i];
-      const trajectoryPoints = trajectories.map((timestep) => timestep[trajIdx]);
+    // Draw all trajectories
+    for (let i = 0; i < numTrajectories; i++) {
+      const trajectoryPoints = trajectories.map((timestep) => timestep[i]);
 
-      // Draw full trajectory path (lighter)
-      const fullPath = trajectoryPoints
-        .map((point, j) => {
-          const [x, y] = point;
-          return `${j === 0 ? "M" : "L"} ${xScale(x)},${yScale(y)}`;
-        })
-        .join(" ");
+      // Draw full trajectory path preview (lighter) - only if enabled
+      if (showTrajectoryPreview) {
+        const fullPath = trajectoryPoints
+          .map((point, j) => {
+            const [x, y] = point;
+            return `${j === 0 ? "M" : "L"} ${xScale(x)},${yScale(y)}`;
+          })
+          .join(" ");
 
-      trajectoryGroup
-        .append("path")
-        .attr("d", fullPath)
-        .attr("fill", "none")
-        .attr("stroke", trajectoryColor)
-        .attr("stroke-width", trajectoryStrokeWidth)
-        .attr("opacity", trajectoryFullOpacity);
+        trajectoryGroup
+          .append("path")
+          .attr("d", fullPath)
+          .attr("fill", "none")
+          .attr("stroke", trajectoryColor)
+          .attr("stroke-width", trajectoryStrokeWidth)
+          .attr("opacity", trajectoryFullOpacity);
+      }
 
       // Draw animated trajectory path (up to current time)
       const animatedPath = trajectoryPoints

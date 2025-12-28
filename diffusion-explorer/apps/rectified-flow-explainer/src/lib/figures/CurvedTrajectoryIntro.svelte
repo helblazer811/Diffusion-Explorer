@@ -49,7 +49,7 @@
 
   // Trajectory styling props
   export let trajectoryColor = '#f17720'; // Orange
-  export let trajectoryFullOpacity = 0.4;
+  export let trajectoryFullOpacity = 0.15;
   export let trajectoryProgressOpacity = 0.8;
   export let trajectoryStrokeWidth = 2;
   export let trajectoryPointRadius = 4;
