@@ -69,6 +69,7 @@
   let time = 0;
   let animationFrameId = null;
   let animationStartTime = null;
+  let pausedElapsedTime = 0; // Component-level for slider sync
   let isPlaying = playingByDefault;
   let isPausedByFigure = false;
   let isInitialized = false;
@@ -99,6 +100,7 @@
     // Sync animation start time so it continues from the new slider position
     const now = performance.now();
     animationStartTime = now - (time * animationDuration);
+    pausedElapsedTime = 0; // Reset so animation doesn't restore old position
   }
 
   function initializeScales(vectorFieldData) {
@@ -268,7 +270,6 @@
   function startAnimation() {
     let isPaused = false;
     let pauseStartTime = null;
-    let pausedElapsedTime = 0;
 
     function animate(currentTime) {
       if (isPausedByFigure) {
@@ -322,8 +323,8 @@
     }
   }
 
-  // Update visualization when time changes (e.g., from slider drag)
-  $: if (isInitialized) {
+  // Update visualization when time changes (e.g., from slider drag while paused)
+  $: if (isInitialized && time !== undefined) {
     draw();
   }
 
@@ -343,7 +344,7 @@
 </script>
 
 {#if isDataValid}
-  <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={toggleAnimation}>
+  <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     {#snippet left()}
       <svg
         bind:this={leftSvgElement}

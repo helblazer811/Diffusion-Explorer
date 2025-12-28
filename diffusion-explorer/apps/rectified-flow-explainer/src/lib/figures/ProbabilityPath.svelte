@@ -60,9 +60,12 @@
 
   // KaTeX outline styling
   export let katexOutline = settings.stylingSettings.figureLatex.outline;
-  export let katexOutlineColor = settings.stylingSettings.figureLatex.outlineColor;
-  export let katexOutlineWidth = settings.stylingSettings.figureLatex.outlineWidth;
-  export let katexOutlineOpacity = settings.stylingSettings.figureLatex.outlineOpacity;
+  export let katexOutlineColor =
+    settings.stylingSettings.figureLatex.outlineColor;
+  export let katexOutlineWidth =
+    settings.stylingSettings.figureLatex.outlineWidth;
+  export let katexOutlineOpacity =
+    settings.stylingSettings.figureLatex.outlineOpacity;
 
   // Background visibility
   export let backgroundVisible = true;
@@ -85,6 +88,7 @@
   let time = 0; // Animation time parameter (0 to 1)
   let animationFrameId = null;
   let animationStartTime = null; // Component-level for slider sync
+  let pausedElapsedTime = 0; // Component-level for slider sync
 
   // Local animation control state
   let isPlaying = playingByDefault;
@@ -116,7 +120,8 @@
   function handleSliderInput() {
     // Sync animation start time so it continues from the new slider position
     const now = performance.now();
-    animationStartTime = now - (time * animationDuration);
+    animationStartTime = now - time * animationDuration;
+    pausedElapsedTime = 0; // Reset so animation doesn't restore old position
   }
 
   /**
@@ -125,7 +130,9 @@
    */
   function getPixelX(dataX, dataMeanX, t) {
     if (!scales) return 0;
-    const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    const centerPixelX =
+      scales.sourceCenterPixelX +
+      t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
     return centerPixelX + (dataX - dataMeanX) * scales.xScaleFactor;
   }
 
@@ -150,12 +157,7 @@
   /**
    * Initialize scatter plot (called once per distribution)
    */
-  function initScatter(
-    points,
-    color,
-    groupId,
-    opacity = pointOpacity
-  ) {
+  function initScatter(points, color, groupId, opacity = pointOpacity) {
     if (!svgElement || !scales || points.length === 0) return;
 
     const svg = d3.select(svgElement);
@@ -226,8 +228,16 @@
     console.log("Precomputing contours...");
 
     // Precompute source and target contours (static)
-    precomputedSourceContours = computeContours(sourceDistributionSamples, 0, scales.sourceMeanX);
-    precomputedTargetContours = computeContours(targetDistributionSamples, 1, scales.targetMeanX);
+    precomputedSourceContours = computeContours(
+      sourceDistributionSamples,
+      0,
+      scales.sourceMeanX
+    );
+    precomputedTargetContours = computeContours(
+      targetDistributionSamples,
+      1,
+      scales.targetMeanX
+    );
 
     // Precompute intermediate contours for all timesteps
     const allSamples = $allTimeSamples;
@@ -237,7 +247,8 @@
       const samples = allSamples[i];
       const timeValue = i / (allSamples.length - 1); // 0 to 1
       // For intermediate samples, compute their mean x for centering
-      const sampleMeanX = samples.reduce((sum, p) => sum + p[0], 0) / samples.length;
+      const sampleMeanX =
+        samples.reduce((sum, p) => sum + p[0], 0) / samples.length;
       const contours = computeContours(samples, timeValue, sampleMeanX);
       precomputedIntermediateContours.push(contours);
     }
@@ -252,12 +263,7 @@
   /**
    * Update contour paths (DOM update only, called every frame)
    */
-  function updateContour(
-    groupId,
-    contours,
-    color,
-    opacity = contourOpacity
-  ) {
+  function updateContour(groupId, contours, color, opacity = contourOpacity) {
     if (!svgElement) return;
 
     const svg = d3.select(svgElement);
@@ -297,7 +303,8 @@
     const mathLabelY = textLabelY + labelFontSize - 10;
 
     // Text labels (Source/Target Distribution)
-    labelsGroup.append("text")
+    labelsGroup
+      .append("text")
       .attr("x", scales.sourceCenterPixelX)
       .attr("y", textLabelY)
       .attr("text-anchor", "middle")
@@ -305,7 +312,8 @@
       .attr("fill", labelColor)
       .text(sourceLabelText);
 
-    labelsGroup.append("text")
+    labelsGroup
+      .append("text")
       .attr("x", scales.targetCenterPixelX)
       .attr("y", textLabelY)
       .attr("text-anchor", "middle")
@@ -314,22 +322,22 @@
       .text(targetLabelText);
 
     // Math labels (p_0, p_1) below
-    plotKatexInSVG(labelsGroup, 'p_0', scales.sourceCenterPixelX, mathLabelY, {
+    plotKatexInSVG(labelsGroup, "p_0", scales.sourceCenterPixelX, mathLabelY, {
       fontSize: labelFontSize,
       bg: false,
       color: labelColor,
-      anchor: 'top-center',
+      anchor: "top-center",
       outline: katexOutline,
       outlineColor: katexOutlineColor,
       outlineWidth: katexOutlineWidth,
       outlineOpacity: katexOutlineOpacity,
     });
 
-    plotKatexInSVG(labelsGroup, 'p_1', scales.targetCenterPixelX, mathLabelY, {
+    plotKatexInSVG(labelsGroup, "p_1", scales.targetCenterPixelX, mathLabelY, {
       fontSize: labelFontSize,
       bg: false,
       color: labelColor,
-      anchor: 'top-center',
+      anchor: "top-center",
       outline: katexOutline,
       outlineColor: katexOutlineColor,
       outlineWidth: katexOutlineWidth,
@@ -353,7 +361,9 @@
     }
 
     // Compute x position (interpolate between source and target centers)
-    const centerPixelX = scales.sourceCenterPixelX + time * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    const centerPixelX =
+      scales.sourceCenterPixelX +
+      time * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
 
     // Compute y position (same as p_0 and p_1)
     const yDomain = scales.yScale.domain();
@@ -363,11 +373,11 @@
 
     // Clear and re-render
     group.selectAll("*").remove();
-    plotKatexInSVG(group, 'p_t', centerPixelX, mathLabelY, {
+    plotKatexInSVG(group, "p_t", centerPixelX, mathLabelY, {
       fontSize: labelFontSize,
       bg: false,
-      color: '#f17720',
-      anchor: 'top-center',
+      color: "#f17720",
+      anchor: "top-center",
       outline: katexOutline,
       outlineColor: katexOutlineColor,
       outlineWidth: katexOutlineWidth,
@@ -388,10 +398,20 @@
 
     // Update static distributions scatter plots
     if (showSourceScatter) {
-      updateScatter(sourceDistributionSamples, "sourceScatter", 0, scales.sourceMeanX);
+      updateScatter(
+        sourceDistributionSamples,
+        "sourceScatter",
+        0,
+        scales.sourceMeanX
+      );
     }
     if (showTargetScatter) {
-      updateScatter(targetDistributionSamples, "targetScatter", 1, scales.targetMeanX);
+      updateScatter(
+        targetDistributionSamples,
+        "targetScatter",
+        1,
+        scales.targetMeanX
+      );
     }
 
     // Update source and target contours (use precomputed)
@@ -429,8 +449,15 @@
       if (intermediateSamples && intermediateSamples.length > 0) {
         if (showIntermediateScatter) {
           // Compute mean for current intermediate samples
-          const sampleMeanX = intermediateSamples.reduce((sum, p) => sum + p[0], 0) / intermediateSamples.length;
-          updateScatter(intermediateSamples, "intermediateScatter", time, sampleMeanX);
+          const sampleMeanX =
+            intermediateSamples.reduce((sum, p) => sum + p[0], 0) /
+            intermediateSamples.length;
+          updateScatter(
+            intermediateSamples,
+            "intermediateScatter",
+            time,
+            sampleMeanX
+          );
         }
 
         // Use precomputed intermediate contours
@@ -472,9 +499,20 @@
     initializeLayers();
 
     // 2. Create scales once
-    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor, distributionScaleFactor
-    });
+    scales = createSourceTargetScales(
+      sourceDistributionSamples,
+      targetDistributionSamples,
+      {
+        width,
+        height,
+        marginWidth,
+        marginHeight,
+        sourceCenterX,
+        targetCenterX,
+        yShiftFactor,
+        distributionScaleFactor,
+      }
+    );
 
     // 3. Initialize scatter plots (creates DOM nodes)
     if (showSourceScatter) {
@@ -517,7 +555,6 @@
   function startAnimation() {
     let isPaused = false;
     let pauseStartTime = null;
-    let pausedElapsedTime = 0; // Track time when paused by figure button
 
     function animate(currentTime) {
       // Check if paused by figure button
@@ -584,8 +621,8 @@
     }
   }
 
-  // Update visualization when time changes (e.g., from slider drag)
-  $: if (isInitialized) {
+  // Update visualization when time changes (e.g., from slider drag while paused)
+  $: if (isInitialized && time !== undefined) {
     draw();
   }
 
@@ -615,9 +652,15 @@
   });
 </script>
 
-<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={toggleAnimation}>
+<Figure
+  {caption}
+  {backgroundVisible}
+  bind:isActive={figureIsActive}
+>
   {#snippet children()}
-    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+    <div
+      style="display: flex; flex-direction: column; align-items: center; width: 100%;"
+    >
       <svg
         bind:this={svgElement}
         viewBox={`0 0 ${width} ${height}`}
@@ -627,7 +670,7 @@
       </svg>
       <TimeSlider
         bind:value={time}
-        bind:isPlaying={isPlaying}
+        bind:isPlaying
         min={0}
         max={1}
         onTogglePlay={toggleAnimation}
