@@ -229,6 +229,9 @@
     // Clear existing content
     d3Svg.selectAll("*").remove();
 
+    // Add defs section for clipPaths
+    d3Svg.append("defs");
+
     // Create scales using proportional positioning
     scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
       width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
@@ -294,25 +297,53 @@
       trajectoryLengths.set(rectStep, lengthsForStep);
     }
 
-    // Initialize trajectory SVG elements (full paths + progress paths + markers)
+    // Initialize trajectory SVG elements (geometry paths + clipPaths + full paths + progress paths + markers)
+    const defs = d3Svg.select("defs");
+
     for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
+      const fullPath = generateTrajectoryPath(currentRectifiedStep, idx, null);
+
+      // Geometry path (hidden, for getPointAtLength - cross-browser fix)
+      trajectoriesGroup
+        .append("path")
+        .attr("class", `trajectory-geometry-${idx}`)
+        .attr("d", fullPath)
+        .attr("fill", "none")
+        .attr("stroke", "none");
+
+      // ClipPath with rectangle for progress reveal
+      const clipPath = defs
+        .append("clipPath")
+        .attr("id", `trajectory-clip-${idx}`);
+
+      clipPath
+        .append("rect")
+        .attr("class", `trajectory-clip-rect-${idx}`)
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", 0)
+        .attr("height", height);
+
       // Full path (background)
       trajectoriesGroup
         .append("path")
         .attr("class", `trajectory-full-${idx}`)
+        .attr("d", fullPath)
         .attr("fill", "none")
         .attr("stroke", trajectoryColor)
         .attr("stroke-width", trajectoryStrokeWidth)
         .attr("opacity", trajectoryFullOpacity);
 
-      // Progress path (animated) with stroke-dasharray
+      // Progress path (animated) - clipped by growing rectangle
       trajectoriesGroup
         .append("path")
         .attr("class", `trajectory-progress-${idx}`)
+        .attr("d", fullPath)
         .attr("fill", "none")
         .attr("stroke", trajectoryColor)
         .attr("stroke-width", trajectoryStrokeWidth)
-        .attr("opacity", trajectoryProgressOpacity);
+        .attr("opacity", trajectoryProgressOpacity)
+        .attr("clip-path", `url(#trajectory-clip-${idx})`);
 
       // Circle marker
       trajectoriesGroup
@@ -345,6 +376,8 @@
     for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
       const fullPathElement = d3Svg.select(`.trajectory-full-${idx}`);
       const progressPathElement = d3Svg.select(`.trajectory-progress-${idx}`);
+      const geometryPathElement = d3Svg.select(`.trajectory-geometry-${idx}`);
+      const clipRect = d3Svg.select(`.trajectory-clip-rect-${idx}`);
 
       // Only regenerate paths when rectified step changes
       if (stepChanged) {
@@ -354,28 +387,23 @@
           null
         );
         fullPathElement.attr("d", fullPath);
-        progressPathElement.attr("d", fullPath); // Same path as full
-
-        // Get total length for this trajectory at current rectified step
-        const totalLength = lengthsForStep?.get(idx) || 0;
-
-        // Set up dasharray for this rectified step
-        progressPathElement
-          .attr("stroke-dasharray", totalLength)
-          .attr("stroke-dashoffset", totalLength);
+        progressPathElement.attr("d", fullPath);
+        geometryPathElement.attr("d", fullPath);
       }
 
-      // Always update dashoffset based on current time using linear interpolation
+      // Get total length and compute visible length
       const totalLength = lengthsForStep?.get(idx) || 0;
       const visibleLength = totalLength * time;
 
-      // Reveal path proportional to time
-      progressPathElement.attr("stroke-dashoffset", totalLength - visibleLength);
+      // Use geometry path for getPointAtLength (cross-browser fix)
+      const geometryPath = geometryPathElement.node();
+      if (geometryPath && totalLength > 0) {
+        const point = geometryPath.getPointAtLength(visibleLength);
 
-      // Update circle marker at the end of the visible path
-      const pathNode = progressPathElement.node();
-      if (pathNode && totalLength > 0) {
-        const point = pathNode.getPointAtLength(visibleLength);
+        // Sync clip rectangle width with marker X position
+        clipRect.attr("width", point.x + trajectoryStrokeWidth);
+
+        // Update marker position
         d3Svg
           .select(`.trajectory-point-${idx}`)
           .attr("cx", point.x)
