@@ -45,10 +45,9 @@ export function plotKatexInSVG(
     ? svg
     : d3.select(svg);
 
-  // Group everything so positioning is easy
+  // Group everything for organization (but don't use transform - Safari has issues with foreignObject inside transformed groups)
   const g = selection.append('g')
-    .attr('class', className)
-    .attr('transform', `translate(${x}, ${y})`);
+    .attr('class', className);
 
   // foreignObject (initially size-less)
   const fo = g.append('foreignObject');
@@ -86,17 +85,18 @@ export function plotKatexInSVG(
   const width = contentWidth + 2 * padding;
   const height = contentHeight + 2 * padding;
 
-  // Resize foreignObject with buffer
-  fo.attr('x', padding)
-    .attr('y', padding)
+  // Resize foreignObject with buffer - use explicit x/y for Safari compatibility
+  fo.attr('x', x + padding)
+    .attr('y', y + padding)
     .attr('width', contentWidth)
     .attr('height', contentHeight);
 
   // SVG background rect (inserted behind fo) - only if bg is not false
+  // Use explicit x/y positioning for Safari compatibility
   if (bg !== false) {
     g.insert('rect', ':first-child')
-      .attr('x', 0)
-      .attr('y', 0)
+      .attr('x', x)
+      .attr('y', y)
       .attr('width', width)
       .attr('height', height)
       .attr('rx', rx)
