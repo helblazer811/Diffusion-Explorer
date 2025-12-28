@@ -229,6 +229,10 @@ button:focus {
     padding: 0 1rem 2rem;
   }
 
+  .top-nav {
+    padding: 1rem;
+  }
+
   .byline-dateline-container {
     flex-direction: column;
     align-items: flex-start;

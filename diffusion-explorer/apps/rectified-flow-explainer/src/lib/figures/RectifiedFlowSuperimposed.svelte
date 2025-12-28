@@ -34,6 +34,7 @@
   export let targetPointRadius = 5;
 
   // Trajectory styling (matching RectifiedFlowVisualization)
+  export let showTrajectoryPreview = false; // Show full trajectory path preview
   export let trajectoryFullOpacity = 0.3; // Background paths
   export let trajectoryProgressOpacity = 0.8; // Animated paths
   export let trajectoryStrokeWidth = 3;
@@ -188,21 +189,23 @@
     for (let i = 0; i < numTrajectories; i++) {
       const trajectoryPoints = trajectories.map((timestep) => timestep[i]);
 
-      // Draw full trajectory path (lighter)
-      const fullPath = trajectoryPoints
-        .map((point, j) => {
-          const [x, y] = point;
-          return `${j === 0 ? "M" : "L"} ${xScale(x)},${yScale(y)}`;
-        })
-        .join(" ");
+      // Draw full trajectory path preview (lighter) - only if enabled
+      if (showTrajectoryPreview) {
+        const fullPath = trajectoryPoints
+          .map((point, j) => {
+            const [x, y] = point;
+            return `${j === 0 ? "M" : "L"} ${xScale(x)},${yScale(y)}`;
+          })
+          .join(" ");
 
-      trajectoryGroup
-        .append("path")
-        .attr("d", fullPath)
-        .attr("fill", "none")
-        .attr("stroke", trajectoryColor)
-        .attr("stroke-width", trajectoryStrokeWidth)
-        .attr("opacity", trajectoryFullOpacity);
+        trajectoryGroup
+          .append("path")
+          .attr("d", fullPath)
+          .attr("fill", "none")
+          .attr("stroke", trajectoryColor)
+          .attr("stroke-width", trajectoryStrokeWidth)
+          .attr("opacity", trajectoryFullOpacity);
+      }
 
       // Draw animated trajectory path (up to current time)
       const animatedPath = trajectoryPoints

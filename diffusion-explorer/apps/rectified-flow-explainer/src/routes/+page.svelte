@@ -909,7 +909,8 @@
     However, there is a catch: we do not have direct access to the true velocity
     field <Katex math={"v_t(x_t)"} />! <Katex math={"v_t(x_t)"} /> is difficult to
     directly construct in practice as it governs the transformations between two
-    high dimensional distributions. So, how can we possibly optimize this objective?
+    jointly distributed high dimensional distributions. So, how can we optimize this
+    objective?
   </p>
   <p>
     Luckily, we can create a related but much simpler objective by conditioning
@@ -1017,13 +1018,13 @@
   <p>
     With the fundamentals of flow models and flow matching established, we can
     now investigate some of their idiosyncrasies—and how they come up in
-    practice. As shown above, a model trained with flow matching can learn to
-    generate samples resembling our desired target distribution. However, you
-    can see that the trajectories of these samples are curved (see <a
+    practice. We showed above that the trajectories produced by a flow model
+    trained with flow matching are curved (see <a
       href="#figure-2"
       class="internal-link">Figure 2</a
-    >). If we superimpose the source and target distributions we can see that
-    this curvature is even more extreme (see
+    >). To further illustrate this point, if we superimpose the source and
+    target distributions we can see that this curvature is even more extreme
+    (see
     <a href="#figure-9" class="internal-link">Figure 9</a>).
   </p>
 
@@ -1037,8 +1038,8 @@
     >
       <div class="caption">
         <span class="figure-number">Figure 9:</span>
-        <span style="color: #f17720;">Curved trajectories</span> with source and target
-        distributions superimposed.
+        <span style="color: #f17720;">Curved trajectories</span> with source and
+        target distributions superimposed.
       </div>
     </CurvedTrajectorySuperimposed>
   </div>
@@ -1263,48 +1264,36 @@
     inherited by the coupling induced by integrating the flow.
   </p>
   <p>
-    When we generate new pairs <Katex
-      math={"(X_0, X_1^k)"} /> by flowing samples from our source distribution
-    through our learned flow model, we are guaranteed to get a coupling where
-    trajectories do not intersect. By retraining on this coupling, we are
-    effectively removing the conflicting velocities at intersection points that
-    caused curvature in the first place. As we repeat this process, the
+    When we generate new pairs <Katex math={"(X_0, X_1^k)"} /> by flowing samples
+    from our source distribution through our learned flow model, we are guaranteed
+    to get a coupling where trajectories do not intersect. By retraining on this
+    coupling, we are effectively removing the conflicting velocities at intersection
+    points that caused curvature in the first place. As we repeat this process, the
     trajectories become progressively straighter.
-  </p>
-  <h2 id="comparisons">Comparisons</h2>
-  <p>
-    To illustrate the benefits of rectified flows, we can compare the couplings
-    produced by an independent coupling versus the induced coupling from a
-    rectified flow model (see
-    <a href="#figure-13" class="internal-link">Figure 13</a>
-    ). The induced coupling connects each source point to where it actually
-    flows, resulting in less tangled paths. 
   </p>
   {#if showOtherFigures}
     <div id="figure-13">
       <InducedCouplingDouble
-        allRectifiedTrajectories={clipAllRectifiedTrajectoriesToStartingRadius(
-          $rectifiedFlowData?.allRectifiedTrajectories ?? [],
-          settings.stylingSettings.scatterPlot.clippingRadius
-        )}
+        allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
         targetDistribution={$targetDistributionSamples}
         backgroundVisible={false}
       >
         <div class="caption">
           <span class="figure-number">Figure 13:</span>
-          Comparison of independent coupling (left) vs induced coupling from the flow
-          model (right). The induced coupling connects each source point to where it
-          actually flows, resulting in less tangled paths.
+          Comparison of independent coupling (left) vs induced coupling from the
+          flow model (right). The induced coupling connects each source point to
+          where it actually flows, resulting in less tangled paths.
         </div>
       </InducedCouplingDouble>
     </div>
   {/if}
+  <h2 id="comparisons">Comparisons</h2>
   <p>
     We can also compare the trajectories learned by a standard flow matching
     model versus a rectified flow model (see
     <a href="#figure-14" class="internal-link">Figure 14</a>
-    ). The rectified flow model learns significantly straighter trajectories,
-    which are easier to simulate with fewer steps.
+    ). The rectified flow model learns significantly straighter trajectories, which
+    are easier to simulate with fewer steps.
   </p>
   {#if showOtherFigures}
     <div id="figure-14">
@@ -1320,8 +1309,8 @@
       >
         <div class="caption">
           <span class="figure-number">Figure 14:</span>
-          A rectified flow learns straighter paths. Left: Before rectification - curved
-          trajectories. Right: After rectification - straighter trajectories.
+          A rectified flow learns straighter paths. Left: Before rectification -
+          curved trajectories. Right: After rectification - straighter trajectories.
         </div>
       </RectifiedFlowSuperimposed>
     </div>
@@ -1330,8 +1319,8 @@
     Finally, we can compare the vector fields learned by a standard flow
     matching model versus a rectified flow model (see
     <a href="#figure-15" class="internal-link">Figure 15</a>
-    ). The rectified flow model learns vector field that is more consistent over time, 
-    meaning the model has lower curvature in its trajectories.
+    ). The rectified flow model learns vector field that is more consistent over
+    time, meaning the model has lower curvature in its trajectories.
   </p>
   {#if showOtherFigures}
     <div id="figure-15">
