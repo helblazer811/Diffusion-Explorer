@@ -198,50 +198,54 @@
   function initTrajectories() {
     const svg = d3.select(svgElement);
     const trajectoryGroup = svg.select('#trajectories');
+    const defs = svg.select('defs');
 
-    // Create full path (background) and progress path (foreground) for each trajectory
     selectedTrajectoryIndices.forEach(idx => {
-      // Generate the full trajectory path once
+      // Generate path string ONCE
       const fullPath = generateTrajectoryPath(idx, null);
 
-      // Full trajectory path (lighter, always complete)
-      trajectoryGroup
-        .append('path')
+      // Geometry path (hidden, for getPointAtLength - cross-browser fix)
+      const geometryPath = trajectoryGroup.append('path')
+        .attr('class', `trajectory-geometry-${idx}`)
+        .attr('d', fullPath)
+        .attr('fill', 'none')
+        .attr('stroke', 'none');
+
+      // Measure total length from geometry path
+      const totalLength = geometryPath.node().getTotalLength();
+      trajectoryLengths.set(idx, totalLength);
+
+      // ClipPath with rectangle for progress reveal (no dasharray!)
+      const clipPath = defs.append('clipPath')
+        .attr('id', `trajectory-clip-${idx}`);
+      clipPath.append('rect')
+        .attr('class', `trajectory-clip-rect-${idx}`)
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', 0)
+        .attr('height', height);
+
+      // Full trajectory path (background)
+      trajectoryGroup.append('path')
         .attr('class', `trajectory-full-${idx}`)
         .attr('d', fullPath)
         .attr('stroke', trajectoryColor)
         .attr('stroke-width', trajectoryStrokeWidth)
         .attr('stroke-opacity', trajectoryFullOpacity)
-        .attr('fill', 'none')
-        .attr('stroke-linecap', 'round')
-        .attr('stroke-linejoin', 'round');
+        .attr('fill', 'none');
 
-      // Animated progress path using stroke-dasharray
-      const progressPath = trajectoryGroup
-        .append('path')
+      // Progress path - solid stroke, clipped by growing rectangle
+      trajectoryGroup.append('path')
         .attr('class', `trajectory-progress-${idx}`)
-        .attr('d', fullPath)  // Same path as background
+        .attr('d', fullPath)
         .attr('stroke', trajectoryColor)
         .attr('stroke-width', trajectoryStrokeWidth)
         .attr('stroke-opacity', trajectoryProgressOpacity)
         .attr('fill', 'none')
-        .attr('stroke-linecap', 'round')
-        .attr('stroke-linejoin', 'round');
+        .attr('clip-path', `url(#trajectory-clip-${idx})`);
 
-      // Get the total path length for dasharray animation
-      const totalLength = progressPath.node().getTotalLength();
-
-      // Cache the path length for performance
-      trajectoryLengths.set(idx, totalLength);
-
-      // Set up stroke-dasharray animation
-      progressPath
-        .attr('stroke-dasharray', totalLength)
-        .attr('stroke-dashoffset', totalLength);  // Start hidden
-
-      // Current position marker
-      trajectoryGroup
-        .append('circle')
+      // Marker
+      trajectoryGroup.append('circle')
         .attr('class', `trajectory-point-${idx}`)
         .attr('r', trajectoryPointRadius)
         .attr('fill', trajectoryColor)
@@ -258,24 +262,21 @@
    */
   function updateTrajectories(time) {
     const svg = d3.select(svgElement);
-    const allSamples = $allTimeSamples;
-    if (!allSamples || allSamples.length === 0) return;
 
     selectedTrajectoryIndices.forEach(idx => {
-      // Get the total path length for this trajectory
+      const geometryPath = svg.select(`.trajectory-geometry-${idx}`).node();
+      const clipRect = svg.select(`.trajectory-clip-rect-${idx}`);
       const totalLength = trajectoryLengths.get(idx) || 0;
-
-      // Linear interpolation: reveal path proportional to time
       const visibleLength = totalLength * time;
 
-      // dashoffset = totalLength - visibleLength reveals visibleLength of the path
-      svg.select(`.trajectory-progress-${idx}`)
-        .attr('stroke-dashoffset', totalLength - visibleLength);
+      // Use geometry path for getPointAtLength (cross-browser fix)
+      if (geometryPath && totalLength > 0) {
+        const point = geometryPath.getPointAtLength(visibleLength);
 
-      // Update current position marker at the end of the visible path
-      const pathElement = svg.select(`.trajectory-progress-${idx}`).node();
-      if (pathElement && totalLength > 0) {
-        const point = pathElement.getPointAtLength(visibleLength);
+        // Sync clip rectangle width with marker X position
+        clipRect.attr('width', point.x + trajectoryStrokeWidth);
+
+        // Update marker position
         svg.select(`.trajectory-point-${idx}`)
           .attr('cx', point.x)
           .attr('cy', point.y);
@@ -287,6 +288,7 @@
   function initializeLayers() {
     const svg = d3.select(svgElement);
     svg.selectAll('*').remove();
+    svg.append('defs'); // For clipPaths
     svg.append('g').attr('id', 'sourceScatter');
     svg.append('g').attr('id', 'targetScatter');
     svg.append('g').attr('id', 'trajectories');
