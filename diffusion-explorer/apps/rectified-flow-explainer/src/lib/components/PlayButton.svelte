@@ -101,4 +101,10 @@
     color: #333;
     display: block;
   }
+
+  @media (max-width: 600px) {
+    .play-button-container {
+      display: none;
+    }
+  }
 </style>

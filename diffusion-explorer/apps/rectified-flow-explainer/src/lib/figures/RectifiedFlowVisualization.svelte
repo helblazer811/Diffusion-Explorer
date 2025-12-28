@@ -510,7 +510,7 @@
   });
 </script>
 
-<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={toggleAnimation}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <div style="position: relative; width: 100%; display: flex; justify-content: center;">

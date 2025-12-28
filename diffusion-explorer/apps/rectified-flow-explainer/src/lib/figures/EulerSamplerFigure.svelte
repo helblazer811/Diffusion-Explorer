@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
+  import PlayButton from '$lib/components/PlayButton.svelte';
   import { settings } from '$lib/settings';
 
   // Props
@@ -41,18 +42,64 @@
   let shouldAnimate = true;
   let activeTimeoutIds = [];
 
+  // Play button state
+  let isPlaying = true;
+  let normalizedTime = 0;
+  let animationStartTime = 0;
+  let timeTrackingFrameId = null;
+
+  // Calculate total cycle duration
+  $: numSegments = Math.ceil((domain[1] - domain[0]) / deltaT);
+  $: segmentDuration = animationDuration / numSegments;
+  $: totalCycleDuration = animationDelay + numSegments * (segmentDuration + perEdgeAnimationDelay) - perEdgeAnimationDelay;
+
+  function startTimeTracking() {
+    animationStartTime = performance.now();
+    trackTime();
+  }
+
+  function trackTime() {
+    if (!isPlaying) {
+      timeTrackingFrameId = null;
+      return;
+    }
+
+    const elapsed = performance.now() - animationStartTime;
+    const cycleTime = totalCycleDuration + repeatDelay;
+    const timeInCycle = elapsed % cycleTime;
+
+    // During animation (not in repeat delay)
+    if (timeInCycle < totalCycleDuration) {
+      normalizedTime = Math.min(1, (timeInCycle - animationDelay) / (totalCycleDuration - animationDelay));
+      if (normalizedTime < 0) normalizedTime = 0;
+    } else {
+      // During repeat delay, show full circle
+      normalizedTime = 1;
+    }
+
+    timeTrackingFrameId = requestAnimationFrame(trackTime);
+  }
+
+  function togglePlayPause() {
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      shouldAnimate = true;
+      restartAnimations();
+    } else {
+      shouldAnimate = false;
+      stopAllAnimations();
+    }
+  }
+
   // Pause animation when figure goes off-screen, resume when back
   $: if (figureIsActive && isInitialized) {
     if (!$figureIsActive && shouldAnimate) {
       wasAnimatingBeforeHidden = true;
       shouldAnimate = false;
-      // Cancel any pending timeouts
-      activeTimeoutIds.forEach(id => clearTimeout(id));
-      activeTimeoutIds = [];
+      stopAllAnimations();
     } else if ($figureIsActive && wasAnimatingBeforeHidden) {
       wasAnimatingBeforeHidden = false;
       shouldAnimate = true;
-      // Restart animations
       restartAnimations();
     }
   }
@@ -60,11 +107,31 @@
   // Store animation data for restart
   let animationData = null;
 
+  function stopAllAnimations() {
+    // Cancel all pending timeouts
+    activeTimeoutIds.forEach(id => clearTimeout(id));
+    activeTimeoutIds = [];
+    // Interrupt all D3 transitions
+    if (leftSvg) d3.select(leftSvg).selectAll('*').interrupt();
+    if (rightSvg) d3.select(rightSvg).selectAll('*').interrupt();
+    // Stop time tracking
+    if (timeTrackingFrameId) {
+      cancelAnimationFrame(timeTrackingFrameId);
+      timeTrackingFrameId = null;
+    }
+  }
+
   function restartAnimations() {
     if (!animationData) return;
+    // Stop any existing animations first
+    stopAllAnimations();
     const { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler } = animationData;
     plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, 'left', highCurvatureYScaleFactor, highCurvatureLabel, 0);
     plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, 'right', lowCurvatureYScaleFactor, lowCurvatureLabel, 0);
+    // Restart time tracking
+    if (isPlaying) {
+      startTimeTracking();
+    }
   }
 
   function scheduleTimeout(fn, delay) {
@@ -397,16 +464,23 @@
 
     isInitialized = true;
 
+    // Start time tracking for play button circle
+    startTimeTracking();
+
     // Cleanup timeouts on unmount
     return () => {
       activeTimeoutIds.forEach(id => clearTimeout(id));
       activeTimeoutIds = [];
+      if (timeTrackingFrameId) {
+        cancelAnimationFrame(timeTrackingFrameId);
+      }
     };
   });
 </script>
 
-<DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+<DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive} onContentClick={togglePlayPause}>
   {#snippet left()}
+    <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
     <svg bind:this={leftSvg} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
     </svg>
   {/snippet}

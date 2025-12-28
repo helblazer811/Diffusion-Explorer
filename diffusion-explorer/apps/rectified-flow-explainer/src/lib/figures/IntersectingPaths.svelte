@@ -31,7 +31,8 @@
   export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
-  export let lineColor = '#666';
+  export let lineColor = '#888';
+  export let lineOpacity = 0.25;
   export let lineWidth = 3;
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export let targetPointColor = settings.stylingSettings.scatterPlot.color;
@@ -141,25 +142,19 @@
       .attr('y2', y2)
       .attr('stroke', lineColor)
       .attr('stroke-width', lineWidth)
-      .attr('opacity', 0.8);
+      .attr('stroke-opacity', lineOpacity);
 
     lineGroup.append('circle')
       .attr('cx', x1)
       .attr('cy', y1)
       .attr('r', pointRadius)
-      .attr('fill', lineColor)
-      .attr('stroke', 'white')
-      .attr('stroke-width', 2)
-      .attr('stroke-opacity', 0.5);
+      .attr('fill', lineColor);
 
     lineGroup.append('circle')
       .attr('cx', x2)
       .attr('cy', y2)
       .attr('r', pointRadius)
-      .attr('fill', lineColor)
-      .attr('stroke', 'white')
-      .attr('stroke-width', 2)
-      .attr('stroke-opacity', 0.5);
+      .attr('fill', lineColor);
 
     return { x1, y1, x2, y2 };
   }

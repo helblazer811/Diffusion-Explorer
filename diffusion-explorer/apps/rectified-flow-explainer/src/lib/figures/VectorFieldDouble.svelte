@@ -335,7 +335,7 @@
 </script>
 
 {#if vectorFieldData && allTimeSamples.length > 0}
-  <DoubleFigure {caption}>
+  <DoubleFigure {caption} onContentClick={togglePlayPause}>
     {#snippet left()}
       <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
       <svg

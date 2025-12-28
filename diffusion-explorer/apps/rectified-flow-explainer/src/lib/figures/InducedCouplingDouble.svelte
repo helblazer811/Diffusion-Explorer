@@ -206,10 +206,8 @@
     const labelGroup = svg.append('g').attr('class', 'panel-label');
     const labelX = svgWidth / 2;
     const labelY = 1.2 * labelFontSize;
-    const labelPaddingX = 10;
-    const labelPaddingY = 4;
 
-    const textElement = labelGroup
+    labelGroup
       .append('text')
       .attr('x', labelX)
       .attr('y', labelY)
@@ -217,16 +215,6 @@
       .attr('font-size', `${labelFontSize}px`)
       .attr('fill', labelColor)
       .text(label);
-
-    const bbox = textElement.node().getBBox();
-    labelGroup
-      .insert('rect', 'text')
-      .attr('x', bbox.x - labelPaddingX)
-      .attr('y', bbox.y - labelPaddingY)
-      .attr('width', bbox.width + 2 * labelPaddingX)
-      .attr('height', bbox.height + 2 * labelPaddingY)
-      .attr('fill', '#f9f9f9')
-      .attr('opacity', 0.9);
   }
 
   function setupPointHoverHandlers(svgElement, couplingData) {

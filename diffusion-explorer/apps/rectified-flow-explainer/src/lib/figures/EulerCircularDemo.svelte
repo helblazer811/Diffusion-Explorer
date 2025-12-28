@@ -250,7 +250,7 @@
   });
 </script>
 
-<Figure {caption} {backgroundVisible}>
+<Figure {caption} {backgroundVisible} onContentClick={toggleAnimation}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <svg
