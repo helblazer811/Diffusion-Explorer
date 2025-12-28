@@ -133,4 +133,11 @@
     outline: 2px solid var(--active-color);
     outline-offset: 2px;
   }
+
+  @media (max-width: 600px) {
+    .toggle-option {
+      font-size: 14px;
+      padding: 6px 12px;
+    }
+  }
 </style>

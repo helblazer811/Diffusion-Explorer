@@ -5,12 +5,51 @@
   import * as d3 from 'd3';
   import Figure from '$lib/components/Figure.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
-  import {
-    createEllipticalVectorField,
-    generateEulerTrajectory,
-    generateVectorFieldGrid,
-    computeMaxVelocity
-  } from '$lib/euler_circle';
+
+  // Elliptical vector field: velocity tangent to ellipse
+  function createEllipticalVectorField(a, b) {
+    return (x, y) => [-y * a / b, x * b / a];
+  }
+
+  // Generate trajectory using Euler's method
+  function generateEulerTrajectory(startPoint, stepSize, numSteps, vectorField) {
+    const trajectory = [[...startPoint]];
+    let [x, y] = startPoint;
+    for (let i = 0; i < numSteps; i++) {
+      const [vx, vy] = vectorField(x, y);
+      x = x + stepSize * vx;
+      y = y + stepSize * vy;
+      trajectory.push([x, y]);
+    }
+    return trajectory;
+  }
+
+  // Generate grid points and velocities for vector field
+  function generateVectorFieldGrid(xRes, yRes, domain, vectorField) {
+    const gridPoints = [];
+    const velocities = [];
+    const xStep = (domain.xMax - domain.xMin) / (xRes - 1);
+    const yStep = (domain.yMax - domain.yMin) / (yRes - 1);
+    for (let j = 0; j < yRes; j++) {
+      for (let i = 0; i < xRes; i++) {
+        const x = domain.xMin + i * xStep;
+        const y = domain.yMin + j * yStep;
+        gridPoints.push([x, y]);
+        velocities.push(vectorField(x, y));
+      }
+    }
+    return { gridPoints, velocities };
+  }
+
+  // Compute max velocity magnitude
+  function computeMaxVelocity(velocities) {
+    let maxMag = 0;
+    for (const [vx, vy] of velocities) {
+      const mag = Math.sqrt(vx * vx + vy * vy);
+      if (mag > maxMag) maxMag = mag;
+    }
+    return maxMag;
+  }
 
   // Ellipse parameters (semi-major axis a=2, semi-minor axis b=1)
   const ellipseA = 2;

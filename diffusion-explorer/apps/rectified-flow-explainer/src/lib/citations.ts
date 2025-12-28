@@ -55,9 +55,10 @@ export function parseBibTeX(content: string): Map<string, BibEntry> {
 
 /**
  * Load and parse the bibliography.bib file
+ * @param bibPath - Full path to the bibliography file (should include base path)
  */
-export async function loadBibliography(): Promise<Map<string, BibEntry>> {
-  const response = await fetch('/bibliography.bib');
+export async function loadBibliography(bibPath: string): Promise<Map<string, BibEntry>> {
+  const response = await fetch(bibPath);
   const content = await response.text();
   return parseBibTeX(content);
 }

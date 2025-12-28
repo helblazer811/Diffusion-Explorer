@@ -11,6 +11,9 @@ const config = {
 		adapter: adapter(),
 		paths: {
 			base: dev ? '' : '/blog/rectified-flow'
+		},
+		prerender: {
+			handleMissingId: 'ignore'
 		}
 	}
 };

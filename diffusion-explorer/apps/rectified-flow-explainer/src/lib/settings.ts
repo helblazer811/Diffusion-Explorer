@@ -33,10 +33,11 @@ export interface TrainingSettings {
 // ========== SETTINGS OBJECT ==========
 
 export const settings = {
-  // Target distribution
-  targetDistributionPointsPath: '/data/smiley_face.json',
+  // Target distribution (relative path - base will be prepended at runtime)
+  targetDistributionPointsPath: 'data/smiley_face.json',
 
   // Cached data paths (null means generate fresh, string path means try to load)
+  // These are relative paths - base will be prepended at runtime
   cachedFlowMatchingTrajectoriesPath: "cached_samples/flow_matching_trajectories.json" as string | null,
   cachedFlowMatchingVectorFieldPath: "cached_samples/flow_matching_vector_field.json" as string | null,
   cachedFlowMatchingGridTrajectoriesPath: "cached_samples/flow_matching_grid_trajectories.json" as string | null,
