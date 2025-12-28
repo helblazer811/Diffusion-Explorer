@@ -1,93 +1,103 @@
-<!-- This figure highlights a single trajectory with low-opacity distributions and a label annotation. -->
-
 <script>
-  import { onMount } from 'svelte';
-  import * as d3 from 'd3';
-  import { base } from '$app/paths';
-  import Figure from '$lib/components/Figure.svelte';
-  import { settings } from '$lib/settings';
-  import { createSourceTargetScales } from '$lib/d3_helpers';
-  import { plotKatexInSVG } from '@diffusion-explorer/ui';
+  import { onMount, onDestroy } from "svelte";
+  import * as d3 from "d3";
+  import Figure from "$lib/components/Figure.svelte";
+  import PlayButton from "$lib/components/PlayButton.svelte";
+  import { plotKatexInSVG } from "@diffusion-explorer/ui";
+  import { settings } from "$lib/settings";
+  import {
+    createSourceTargetScales,
+    plotScatterAtCenter,
+  } from "$lib/d3_helpers";
+
+  // Data props (from parent +page.svelte)
+  export let sourceDistributionSamples = [];
+  export let targetDistributionSamples = [];
+  export let allTimeSamples; // [timestep][sample][dim]
+  export let isTraining;
+
+  // Data validation
+  $: isDataValid =
+    allTimeSamples &&
+    allTimeSamples.length > 0 &&
+    allTimeSamples[0] &&
+    allTimeSamples[0].length > 0 &&
+    sourceDistributionSamples &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples &&
+    targetDistributionSamples.length > 0;
+
+  // Animation props
+  export let animationDuration = 6000; // Duration of animation (ms)
+  export let playingByDefault = true;
+  export let pauseBeforeRestart = 1000; // Pause before looping animation (ms)
+
+  // Trajectory selection
+  export let numTrajectoriesToShow = 15; // Number of trajectories to visualize
+
+  // Styling props (colors)
+  export let trajectoryColor = "#f17720"; // Orange
+  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
+  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
+
+  // Styling props (opacity)
+  export let trajectoryFullOpacity = 0.15; // Background paths (preview)
+  export let trajectoryProgressOpacity = 0.8; // Animated paths
+  export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
+
+  // Styling props (dimensions)
+  export let trajectoryStrokeWidth = 2;
+  export let trajectoryPointRadius = 4;
+  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
+
+  // Layout
+  export let width = 750;
+  export let height = 275;
+  export let marginWidth = 50;
+  export let marginHeight = 20;
+  export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
+  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
+
+  // KaTeX label props
+  export let figureLatexColor = settings.stylingSettings.figureLatex.color;
+  export let pointLabelFontSize = settings.stylingSettings.figureLatex.fontSize;
+  export let labelAbovePointOffset = 0;
+  export let katexOutline = settings.stylingSettings.figureLatex.outline;
+  export let katexOutlineColor =
+    settings.stylingSettings.figureLatex.outlineColor;
+  export let katexOutlineWidth =
+    settings.stylingSettings.figureLatex.outlineWidth;
+  export let katexOutlineOpacity =
+    settings.stylingSettings.figureLatex.outlineOpacity;
 
   // Caption slot (passed as default children)
   export let children = undefined;
   $: caption = children;
 
-  // Data props (from parent +page.svelte)
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
-  export let allTimeSamples;
-  export let isTraining;
+  // Callback when visualization is initialized
+  export let onInitialized = undefined;
 
-  // Props/Configuration
-  export let width = 750;
-  export let height = 275;
+  // Background visibility
+  export let backgroundVisible = false;
 
-  // Styling props for visualization
-  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
-  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
-  export let marginWidth = 50;
-  export let marginHeight = 20;
-  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
-  export let pointOpacity = 0.1; // Very low opacity for distributions
-  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
-  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
-  export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
-
-  // Animation settings
-  export let animationDuration = 8000; // Duration in milliseconds
-  export let animationPauseTime = 1000; // Pause time between loops in milliseconds
-
-  // Trajectory styling props
-  export let trajectoryColor = '#f17720'; // Orange
-  export let trajectoryFullOpacity = 0.4;
-  export let trajectoryProgressOpacity = 0.8;
-  export let trajectoryStrokeWidth = 3;
-  export let trajectoryPointRadius = 5;
-
-  // Annotation styling props
-  export let annotationLabel = 'Sample Trajectory';
-  export let annotationFontSize = 22;
-  export let annotationColor = '#666';
-  export let annotationLineColor = '#888';
-
-  // Interaction props
-  export let draggable = false; // Enable/disable drag handle for trajectory selection
-
-  // KaTeX outline styling
-  export let katexOutline = settings.stylingSettings.figureLatex.outline;
-  export let katexOutlineColor = settings.stylingSettings.figureLatex.outlineColor;
-  export let katexOutlineWidth = settings.stylingSettings.figureLatex.outlineWidth;
-  export let katexOutlineOpacity = settings.stylingSettings.figureLatex.outlineOpacity;
-
-  // Vertical spacing between point and label
-  const labelAbovePointOffset = -5;
-
-  // Selected trajectory index (single trajectory)
-  let selectedTrajectoryIndex = null;
-  let svgElement;
-  let scales = null;
-  let time = 0; // Animation time parameter (0 to 1)
+  // Animation state
+  let initialized = false;
+  let pathsInitialized = false; // Track if paths have been set up
+  let time = 0; // Normalized time (0-1)
+  let isPlaying = playingByDefault;
+  let selectedTrajectoryIndices = [];
   let animationFrameId = null;
-  let trajectoryLength = 0; // Cache total path length
-  let animationStartTime = null;
-
-  // Drag handle state
-  let dragInitialized = false;
-
-  // Local animation control state
-  let isPlaying = true;
-  let isPausedByFigure = false;
+  let lastTimestamp = null;
+  let isPaused = false;
+  let pauseStartTime = null;
 
   // Visibility-based animation control
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
 
-  // Update isPausedByFigure when isPlaying changes
-  $: isPausedByFigure = !isPlaying;
-
   // Pause animation when figure goes off-screen, resume when back
-  $: if (figureIsActive && isInitialized) {
+  $: if (figureIsActive && initialized) {
     if (!$figureIsActive && isPlaying) {
       wasPlayingBeforeHidden = true;
       isPlaying = false;
@@ -97,442 +107,411 @@
     }
   }
 
+  // SVG elements
+  let svg;
+  let scales;
+
+  // Cache for trajectory lengths
+  // Map structure: Map<trajectoryIdx, totalLength>
+  let trajectoryLengths = new Map();
+
   /**
-   * Compute pixel x position for a data point at a given time.
+   * Toggle animation play/pause
    */
-  function getPixelX(dataX, dataMeanX, t) {
-    if (!scales) return 0;
-    const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
-    return centerPixelX + (dataX - dataMeanX) * scales.xScaleFactor;
+  function toggleAnimation() {
+    isPlaying = !isPlaying;
   }
 
   /**
-   * Find the nearest trajectory index based on SVG pixel coordinates.
-   * Converts pixel coords to data coords and finds closest starting point.
+   * Select a single trajectory index, filtering by clipping radius
    */
-  function nearestTrajectoryIndex(svgX, svgY) {
-    const allSamples = $allTimeSamples;
-    if (!allSamples || allSamples.length === 0 || !scales) return 0;
+  function selectTrajectoryIndices() {
+    if (!isDataValid) return;
 
-    const startingPoints = allSamples[0]; // Time = 0 starting positions
-
-    // Compute combined mean for positioning (same as in generateTrajectoryPath)
-    const allSourceX = sourceDistributionSamples.map(p => p[0]);
-    const allTargetX = targetDistributionSamples.map(p => p[0]);
-    const combinedMeanX = [...allSourceX, ...allTargetX].reduce((a, b) => a + b, 0) / (allSourceX.length + allTargetX.length);
-
-    // Convert SVG coords to data coords (at t=0, use source center)
-    const dataX = (svgX - scales.sourceCenterPixelX) / scales.xScaleFactor + combinedMeanX;
-    const dataY = scales.yScale.invert(svgY);
-
-    // Find nearest starting point
-    let minDist = Infinity;
-    let minIndex = 0;
-    for (let i = 0; i < startingPoints.length; i++) {
-      const [px, py] = startingPoints[i];
-      const dist = Math.sqrt((px - dataX) ** 2 + (py - dataY) ** 2);
-      if (dist < minDist) {
-        minDist = dist;
-        minIndex = i;
-      }
-    }
-    return minIndex;
-  }
-
-  /**
-   * Select a single trajectory index within clipping radius.
-   */
-  function selectTrajectoryIndex(allSamples, clippingRadius) {
-    if (!allSamples || allSamples.length === 0) return null;
-
-    const startingPoints = allSamples[0]; // Timestep 0
+    const clippingRadius = settings.stylingSettings.scatterPlot.clippingRadius;
+    const startingPoints = allTimeSamples[0];
 
     // Filter to indices within clipping radius
+    const validIndices = [];
     for (let i = 0; i < startingPoints.length; i++) {
       const [x, y] = startingPoints[i];
       const distance = Math.sqrt(x * x + y * y);
       if (distance <= clippingRadius) {
-        return i; // Return first valid index
+        validIndices.push(i);
       }
     }
-    return 0; // Fallback to first index
+
+    // Select just 1 trajectory
+    if (validIndices.length > 0) {
+      selectedTrajectoryIndices = [validIndices[0]];
+    }
   }
 
   /**
-   * Generate SVG path data for a trajectory
+   * Get trajectory data for a specific sample index
+   */
+  function getTrajectoryData(sampleIndex) {
+    return allTimeSamples.map((timestep) => timestep[sampleIndex]); // [timestep][dim]
+  }
+
+  /**
+   * Compute pixel x position for a data point at a given time.
+   * At t=0, positions are centered at sourceCenterPixelX.
+   * At t=1, positions are centered at targetCenterPixelX.
+   */
+  function getPixelX(dataX, dataMeanX, t) {
+    if (!scales) return 0;
+    const centerPixelX =
+      scales.sourceCenterPixelX +
+      t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    return centerPixelX + (dataX - dataMeanX) * scales.xScaleFactor;
+  }
+
+  /**
+   * Generate SVG path for a trajectory
+   * Applies position interpolation to create source-to-target flow effect
    */
   function generateTrajectoryPath(trajectoryIndex) {
-    const allSamples = $allTimeSamples;
-    if (!allSamples || allSamples.length === 0 || !scales) return '';
+    if (!scales) return "";
+
+    const trajectoryData = getTrajectoryData(
+      selectedTrajectoryIndices[trajectoryIndex]
+    );
+    const numPoints = trajectoryData.length;
 
     // Compute combined mean for positioning
-    const allSourceX = sourceDistributionSamples.map(p => p[0]);
-    const allTargetX = targetDistributionSamples.map(p => p[0]);
-    const combinedMeanX = [...allSourceX, ...allTargetX].reduce((a, b) => a + b, 0) / (allSourceX.length + allTargetX.length);
+    const allSourceX = sourceDistributionSamples.map((p) => p[0]);
+    const allTargetX = targetDistributionSamples.map((p) => p[0]);
+    const combinedMeanX =
+      [...allSourceX, ...allTargetX].reduce((a, b) => a + b, 0) /
+      (allSourceX.length + allTargetX.length);
 
-    const pathData = [];
+    let path = "";
+    for (let i = 0; i < numPoints; i++) {
+      const [x, y] = trajectoryData[i];
 
-    for (let step = 0; step < allSamples.length; step++) {
-      const samples = allSamples[step];
-      if (!samples || !samples[trajectoryIndex]) continue;
-
-      const [x, y] = samples[trajectoryIndex];
-      const timeAtStep = step / (allSamples.length - 1);
+      // Compute time at this step for interpolation
+      const timeAtStep = i / (numPoints - 1);
 
       const svgX = getPixelX(x, combinedMeanX, timeAtStep);
       const svgY = scales.yScale(y);
 
-      if (step === 0) {
-        pathData.push(`M ${svgX},${svgY}`);
+      if (i === 0) {
+        path += `M ${svgX},${svgY}`;
       } else {
-        pathData.push(`L ${svgX},${svgY}`);
+        path += ` L ${svgX},${svgY}`;
       }
     }
 
-    return pathData.join(' ');
+    return path;
   }
 
   /**
-   * Get a point on the trajectory at a given normalized position (0-1)
+   * Initialize the visualization (lightweight setup)
    */
-  function getTrajectoryPointAt(normalizedPosition) {
-    const svg = d3.select(svgElement);
-    const pathElement = svg.select('.trajectory-progress').node();
-    if (pathElement && trajectoryLength > 0) {
-      const length = trajectoryLength * normalizedPosition;
-      return pathElement.getPointAtLength(length);
+  function initializeVisualization() {
+    if (!svg || !isDataValid || selectedTrajectoryIndices.length === 0) return;
+
+    const d3Svg = d3.select(svg);
+
+    // Clear existing content
+    d3Svg.selectAll("*").remove();
+
+    // Add defs section for clipPaths
+    d3Svg.append("defs");
+
+    // Create scales using proportional positioning
+    scales = createSourceTargetScales(
+      sourceDistributionSamples,
+      targetDistributionSamples,
+      {
+        width,
+        height,
+        marginWidth,
+        marginHeight,
+        sourceCenterX,
+        targetCenterX,
+        yShiftFactor,
+      }
+    );
+
+    // Create groups (order matters for layering)
+    d3Svg.append("g").attr("id", "sourceScatter");
+    d3Svg.append("g").attr("id", "targetScatter");
+    d3Svg.append("g").attr("class", "trajectories");
+    d3Svg.append("g").attr("id", "katexLabels");
+
+    // Plot scatter plots
+    plotScatterAtCenter(
+      d3Svg,
+      sourceDistributionSamples,
+      scales.yScale,
+      "sourceScatter",
+      {
+        centerPixelX: scales.sourceCenterPixelX,
+        meanX: scales.sourceMeanX,
+        xScaleFactor: scales.xScaleFactor,
+        pointRadius,
+        pointOpacity,
+        pointColor: sourcePointColor,
+      }
+    );
+
+    plotScatterAtCenter(
+      d3Svg,
+      targetDistributionSamples,
+      scales.yScale,
+      "targetScatter",
+      {
+        centerPixelX: scales.targetCenterPixelX,
+        meanX: scales.targetMeanX,
+        xScaleFactor: scales.xScaleFactor,
+        pointRadius,
+        pointOpacity,
+        pointColor: targetPointColor,
+      }
+    );
+  }
+
+  /**
+   * Initialize trajectories (trajectory elements + total path length)
+   */
+  function initializeTrajectories() {
+    if (!svg || !isDataValid || selectedTrajectoryIndices.length === 0) return;
+
+    const d3Svg = d3.select(svg);
+    const trajectoriesGroup = d3Svg.select(".trajectories");
+    const katexLabelsGroup = d3Svg.select("#katexLabels");
+
+    // Compute combined mean for positioning (needed for start point)
+    const allSourceX = sourceDistributionSamples.map((p) => p[0]);
+    const allTargetX = targetDistributionSamples.map((p) => p[0]);
+    const combinedMeanX =
+      [...allSourceX, ...allTargetX].reduce((a, b) => a + b, 0) /
+      (allSourceX.length + allTargetX.length);
+
+    // Pre-compute total path lengths for all trajectories
+    for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
+      const fullPath = generateTrajectoryPath(idx);
+
+      // Create temporary path to measure total length
+      const tempFullPath = trajectoriesGroup.append("path").attr("d", fullPath);
+      const totalLength = tempFullPath.node().getTotalLength();
+      trajectoryLengths.set(idx, totalLength);
+      tempFullPath.remove();
     }
-    return { x: width / 2, y: height / 2 };
-  }
 
-  /**
-   * Initialize trajectory path in the SVG
-   */
-  function initTrajectory() {
-    const svg = d3.select(svgElement);
-    const trajectoryGroup = svg.select('#trajectories');
+    // Initialize trajectory SVG elements (geometry paths + clipPaths + progress paths + markers)
+    const defs = d3Svg.select("defs");
 
-    if (selectedTrajectoryIndex === null) return;
+    for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
+      const fullPath = generateTrajectoryPath(idx);
+      const totalLength = trajectoryLengths.get(idx) || 0;
 
-    const fullPath = generateTrajectoryPath(selectedTrajectoryIndex);
+      // Geometry path (hidden, never dashed, used only for getPointAtLength)
+      const geometryPath = trajectoriesGroup
+        .append("path")
+        .attr("class", `trajectory-geometry-${idx}`)
+        .attr("d", fullPath)
+        .attr("fill", "none")
+        .attr("stroke", "none");
 
-    // Full trajectory path (lighter, always complete)
-    trajectoryGroup
-      .append('path')
-      .attr('class', 'trajectory-full')
-      .attr('d', fullPath)
-      .attr('stroke', trajectoryColor)
-      .attr('stroke-width', trajectoryStrokeWidth)
-      .attr('stroke-opacity', trajectoryFullOpacity)
-      .attr('fill', 'none')
-      .attr('stroke-linecap', 'round')
-      .attr('stroke-linejoin', 'round');
+      // ClipPath with rectangle for progress reveal (no dasharray!)
+      const clipPath = defs
+        .append("clipPath")
+        .attr("id", `trajectory-clip-${idx}`);
 
-    // Animated progress path using stroke-dasharray
-    const progressPath = trajectoryGroup
-      .append('path')
-      .attr('class', 'trajectory-progress')
-      .attr('d', fullPath)
-      .attr('stroke', trajectoryColor)
-      .attr('stroke-width', trajectoryStrokeWidth)
-      .attr('stroke-opacity', trajectoryProgressOpacity)
-      .attr('fill', 'none')
-      .attr('stroke-linecap', 'round')
-      .attr('stroke-linejoin', 'round');
+      // Rectangle that grows horizontally to reveal the path
+      clipPath
+        .append("rect")
+        .attr("class", `trajectory-clip-rect-${idx}`)
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", 0)
+        .attr("height", height);
 
-    // Get the total path length for dasharray animation
-    trajectoryLength = progressPath.node().getTotalLength();
+      // Full path (background/preview) - shows complete trajectory at lower opacity
+      trajectoriesGroup
+        .append("path")
+        .attr("class", `trajectory-full-${idx}`)
+        .attr("d", fullPath)
+        .attr("fill", "none")
+        .attr("stroke", trajectoryColor)
+        .attr("stroke-width", trajectoryStrokeWidth)
+        .attr("opacity", trajectoryFullOpacity);
 
-    // Set up stroke-dasharray animation
-    progressPath
-      .attr('stroke-dasharray', trajectoryLength)
-      .attr('stroke-dashoffset', trajectoryLength);
+      // Progress path (animated) - solid stroke, clipped by growing rectangle
+      trajectoriesGroup
+        .append("path")
+        .attr("class", `trajectory-progress-${idx}`)
+        .attr("d", fullPath)
+        .attr("fill", "none")
+        .attr("stroke", trajectoryColor)
+        .attr("stroke-width", trajectoryStrokeWidth)
+        .attr("opacity", trajectoryProgressOpacity)
+        .attr("clip-path", `url(#trajectory-clip-${idx})`);
 
-    // Current position marker
-    trajectoryGroup
-      .append('circle')
-      .attr('class', 'trajectory-point')
-      .attr('r', trajectoryPointRadius)
-      .attr('fill', trajectoryColor)
-      .attr('fill-opacity', trajectoryProgressOpacity);
+      // Circle marker (moving dot)
+      trajectoriesGroup
+        .append("circle")
+        .attr("class", `trajectory-point-${idx}`)
+        .attr("r", trajectoryPointRadius)
+        .attr("fill", trajectoryColor)
+        .attr("opacity", trajectoryProgressOpacity);
 
-    // Initial render at time=0
-    updateTrajectory(0);
-  }
+      // Start point dot (fixed at t=0 position)
+      const trajectoryData = getTrajectoryData(selectedTrajectoryIndices[idx]);
+      const startPoint = trajectoryData[0];
+      const startX = getPixelX(startPoint[0], combinedMeanX, 0);
+      const startY = scales.yScale(startPoint[1]);
 
-  /**
-   * Initialize the annotation (label and dashed line)
-   */
-  function initAnnotation() {
-    const svg = d3.select(svgElement);
-    const annotationGroup = svg.select('#annotation');
+      trajectoriesGroup
+        .append("circle")
+        .attr("class", "start-point")
+        .attr("cx", startX)
+        .attr("cy", startY)
+        .attr("r", trajectoryPointRadius)
+        .attr("fill", trajectoryColor);
 
-    // Get trajectory start and end points to find x center
-    const startPoint = getTrajectoryPointAt(0);
-    const endPoint = getTrajectoryPointAt(1);
-    const trajectoryCenterX = (startPoint.x + endPoint.x) / 2;
-
-    // Get trajectory midpoint for y positioning
-    const midpoint = getTrajectoryPointAt(0.5);
-
-    // Label position: centered over trajectory's x center, above trajectory
-    const labelX = trajectoryCenterX;
-    const labelY = midpoint.y - 60; // Position closer to trajectory
-
-    // Draw label text and KaTeX together, centered
-    // "Sample Trajectory" on top, "ψ_t(x_0)" below
-    const labelOffsetX = 10; // Shift labels to the right
-    annotationGroup
-      .append('text')
-      .attr('class', 'annotation-label')
-      .attr('x', labelX + labelOffsetX)
-      .attr('y', labelY)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', annotationFontSize)
-      .attr('fill', annotationColor)
-      .attr('font-family', 'sans-serif')
-      .text(annotationLabel);
-
-    // Draw ψ_t(x_0) KaTeX label below "Sample Trajectory" - centered
-    plotKatexInSVG(annotationGroup, '\\psi_t(x_0)', labelX, labelY + 5, {
-      fontSize: annotationFontSize,
-      bg: false,
-      color: annotationColor,
-      anchor: 'top-center',
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
-    });
-
-    // Draw point at initial location (reuse startPoint from above)
-    annotationGroup
-      .append('circle')
-      .attr('class', 'start-point')
-      .attr('cx', startPoint.x)
-      .attr('cy', startPoint.y)
-      .attr('r', 5)
-      .attr('fill', trajectoryColor);
-
-    // Draw x_0 KaTeX label above the initial point
-    plotKatexInSVG(annotationGroup, 'x_0', startPoint.x, startPoint.y, {
-      fontSize: 20,
-      bg: false,
-      color: annotationColor,
-      anchor: 'bottom-center',
-      offsetY: labelAbovePointOffset,
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
-    });
-  }
-
-  /**
-   * Redraw the trajectory and annotation when selection changes.
-   */
-  function redrawTrajectory() {
-    const svg = d3.select(svgElement);
-    svg.select('#trajectories').selectAll('*').remove();
-    svg.select('#annotation').selectAll('*').remove();
-    initTrajectory();
-    initAnnotation();
-    updateTrajectory(time);
-
-    // Update drag handle position to new trajectory start point
-    const startPoint = getTrajectoryPointAt(0);
-    svg.select('#dragHandle .drag-icon')
-      .attr('x', startPoint.x)
-      .attr('y', startPoint.y);
-  }
-
-  /**
-   * Initialize the drag handle on the current trajectory's starting point.
-   * Allows user to drag and select different trajectories in real-time.
-   */
-  function initDragHandle() {
-    if (dragInitialized) return;
-    dragInitialized = true;
-
-    const svg = d3.select(svgElement);
-    const handleGroup = svg.select('#dragHandle');
-
-    // Get current starting point position
-    const startPoint = getTrajectoryPointAt(0);
-
-    // Add the pointer icon image
-    handleGroup.append('image')
-      .attr('class', 'drag-icon')
-      .attr('xlink:href', base + '/PointerIcon.svg')
-      .attr('x', startPoint.x)
-      .attr('y', startPoint.y)
-      .attr('transform', 'translate(-15, -15)') // Center the 30x30 icon
-      .attr('width', 30)
-      .attr('height', 30)
-      .style('cursor', 'grab');
-
-    // Set up drag behavior (real-time trajectory updates during drag)
-    const drag = d3.drag()
-      .on('start', function() { d3.select(this).style('cursor', 'grabbing'); })
-      .on('drag', function(event) {
-        let [x, y] = d3.pointer(event, svg.node());
-
-        // Clamp to SVG bounds (vector field area)
-        x = Math.max(marginWidth, Math.min(x, width - marginWidth));
-        y = Math.max(marginHeight, Math.min(y, height - marginHeight));
-
-        // Update icon position during drag
-        handleGroup.select('.drag-icon')
-          .attr('x', x)
-          .attr('y', y);
-
-        // Real-time: find and select nearest trajectory immediately
-        const newIndex = nearestTrajectoryIndex(x, y);
-        if (newIndex !== selectedTrajectoryIndex) {
-          selectedTrajectoryIndex = newIndex;
-          redrawTrajectory();
-        }
-      })
-      .on('end', function() {
-        // Ensure icon snaps to final trajectory starting point
-        const snapPoint = getTrajectoryPointAt(0);
-        handleGroup.select('.drag-icon')
-          .attr('x', snapPoint.x)
-          .attr('y', snapPoint.y);
-
-        d3.select(this).style('cursor', 'grab');
+      // KaTeX label "x" above start point
+      plotKatexInSVG(katexLabelsGroup, "x", startX, startY, {
+        fontSize: pointLabelFontSize,
+        bg: false,
+        color: figureLatexColor,
+        anchor: "bottom-center",
+        offsetY: labelAbovePointOffset,
+        outline: katexOutline,
+        outlineColor: katexOutlineColor,
+        outlineWidth: katexOutlineWidth,
+        outlineOpacity: katexOutlineOpacity,
       });
 
-    handleGroup.call(drag);
+      // KaTeX label "ψ_t(x)" above trajectory midpoint
+      const midLength = totalLength / 2;
+      const geometryPathNode = geometryPath.node();
+      if (geometryPathNode) {
+        const midPoint = geometryPathNode.getPointAtLength(midLength);
+        plotKatexInSVG(katexLabelsGroup, "\\psi_t(x)", midPoint.x, midPoint.y, {
+          fontSize: pointLabelFontSize,
+          bg: false,
+          color: figureLatexColor,
+          anchor: "bottom-center",
+          offsetX: 20,
+          offsetY: labelAbovePointOffset,
+          outline: katexOutline,
+          outlineColor: katexOutlineColor,
+          outlineWidth: katexOutlineWidth,
+          outlineOpacity: katexOutlineOpacity,
+        });
+      }
+    }
+
+    pathsInitialized = true;
+
+    // Initial update
+    updateVisualization();
   }
 
   /**
-   * Update trajectory visualization for current animation time
+   * Update visualization based on current state
    */
-  function updateTrajectory(time) {
-    const svg = d3.select(svgElement);
-    const allSamples = $allTimeSamples;
-    if (!allSamples || allSamples.length === 0) return;
+  function updateVisualization() {
+    if (
+      !svg ||
+      !isDataValid ||
+      selectedTrajectoryIndices.length === 0 ||
+      !pathsInitialized
+    )
+      return;
 
-    // Linear interpolation: reveal path proportional to time
-    const visibleLength = trajectoryLength * time;
+    const d3Svg = d3.select(svg);
 
-    svg.select('.trajectory-progress')
-      .attr('stroke-dashoffset', trajectoryLength - visibleLength);
+    // Update trajectories
+    for (let idx = 0; idx < selectedTrajectoryIndices.length; idx++) {
+      const geometryPath = d3Svg.select(`.trajectory-geometry-${idx}`).node();
+      const clipRect = d3Svg.select(`.trajectory-clip-rect-${idx}`);
 
-    // Update current position marker at the end of the visible path
-    const pathElement = svg.select('.trajectory-progress').node();
-    if (pathElement && trajectoryLength > 0) {
-      const point = pathElement.getPointAtLength(visibleLength);
-      svg.select('.trajectory-point')
-        .attr('cx', point.x)
-        .attr('cy', point.y);
+      const totalLength = trajectoryLengths.get(idx) || 0;
+      const visibleLength = totalLength * time;
+
+      // Use the hidden geometry path for getPointAtLength (cross-browser fix)
+      if (geometryPath && totalLength > 0) {
+        const point = geometryPath.getPointAtLength(visibleLength);
+
+        // Sync clip rectangle width with marker's X position
+        clipRect.attr("width", point.x + trajectoryStrokeWidth);
+
+        // Update marker position
+        d3Svg
+          .select(`.trajectory-point-${idx}`)
+          .attr("cx", point.x)
+          .attr("cy", point.y);
+      }
     }
   }
 
-  function initializeLayers() {
-    const svg = d3.select(svgElement);
-    svg.selectAll('*').remove();
-    svg.append('g').attr('id', 'sourceScatter');
-    svg.append('g').attr('id', 'targetScatter');
-    svg.append('g').attr('id', 'trajectories');
-    svg.append('g').attr('id', 'annotation');
-    svg.append('g').attr('id', 'dragHandle');
-  }
-
-  function initScatter(points, color, groupId, opacity = pointOpacity) {
-    if (!svgElement || !scales || points.length === 0) return;
-    const svg = d3.select(svgElement);
-    const group = svg.select(`#${groupId}`);
-    group.selectAll('circle').data(points).enter().append('circle')
-      .attr('r', pointRadius).attr('fill', color).attr('opacity', opacity);
-  }
-
-  function updateScatter(points, groupId, isSource) {
-    if (!svgElement || !scales || points.length === 0) return;
-    const svg = d3.select(svgElement);
-    const group = svg.select(`#${groupId}`);
-    const { yScale, xScaleFactor, sourceCenterPixelX, targetCenterPixelX, sourceMeanX, targetMeanX } = scales;
-    const centerPixelX = isSource ? sourceCenterPixelX : targetCenterPixelX;
-    const meanX = isSource ? sourceMeanX : targetMeanX;
-    group.selectAll('circle').data(points)
-      .attr('cx', d => centerPixelX + (d[0] - meanX) * xScaleFactor)
-      .attr('cy', d => yScale(d[1]));
-  }
-
-  function draw() {
-    if (!svgElement || !scales) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
-    updateScatter(sourceDistributionSamples, 'sourceScatter', true);
-    updateScatter(targetDistributionSamples, 'targetScatter', false);
-    updateTrajectory(time);
-  }
-
-  function initializeVisualization() {
-    if (!svgElement) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
-
-    initializeLayers();
-    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
-    });
-
-    initScatter(sourceDistributionSamples, sourcePointColor, 'sourceScatter');
-    initScatter(targetDistributionSamples, targetPointColor, 'targetScatter');
-
-    selectedTrajectoryIndex = selectTrajectoryIndex($allTimeSamples, settings.stylingSettings.scatterPlot.clippingRadius);
-    initTrajectory();
-    draw();
-    initAnnotation();
-    if (draggable) {
-      initDragHandle();
+  /**
+   * Animation loop
+   */
+  function animate(timestamp) {
+    if (!isPlaying) {
+      animationFrameId = null;
+      return;
     }
-  }
 
-  function startAnimation() {
-    let isPaused = false;
-    let pauseStartTime = null;
-    let pausedElapsedTime = 0;
+    if (lastTimestamp === null) {
+      lastTimestamp = timestamp;
+    }
 
-    function animate(currentTime) {
-      if (isPausedByFigure) {
-        if (animationStartTime !== null && pausedElapsedTime === 0) {
-          pausedElapsedTime = currentTime - animationStartTime;
-        }
-        animationFrameId = requestAnimationFrame(animate);
-        return;
+    const elapsed = timestamp - lastTimestamp;
+
+    // Handle pause before restart
+    if (isPaused && pauseStartTime !== null) {
+      const pauseElapsed = timestamp - pauseStartTime;
+
+      if (pauseElapsed >= pauseBeforeRestart) {
+        // Pause complete - restart animation
+        isPaused = false;
+        pauseStartTime = null;
+        lastTimestamp = null;
+        time = 0;
+        updateVisualization();
       }
 
-      if (pausedElapsedTime > 0) {
-        animationStartTime = currentTime - pausedElapsedTime;
-        pausedElapsedTime = 0;
-      }
-
-      if (animationStartTime === null) animationStartTime = currentTime;
-      const elapsed = currentTime - animationStartTime;
-
-      if (elapsed >= animationDuration) {
-        if (!isPaused) {
-          isPaused = true;
-          pauseStartTime = currentTime;
-          time = 1;
-          draw();
-        }
-        if (pauseStartTime && currentTime - pauseStartTime >= animationPauseTime) {
-          animationStartTime = currentTime;
-          isPaused = false;
-          pauseStartTime = null;
-          time = 0;
-        }
-      } else {
-        time = Math.min(elapsed / animationDuration, 1);
-        draw();
-      }
       animationFrameId = requestAnimationFrame(animate);
+      return;
     }
+
+    // Update time
+    time += elapsed / animationDuration;
+
+    if (time >= 1.0) {
+      time = 1.0;
+      updateVisualization();
+
+      // Start pause before restarting
+      isPaused = true;
+      pauseStartTime = timestamp;
+    } else {
+      updateVisualization();
+    }
+
+    lastTimestamp = timestamp;
     animationFrameId = requestAnimationFrame(animate);
   }
 
+  /**
+   * Start animation
+   */
+  function startAnimation() {
+    if (animationFrameId !== null) return;
+    lastTimestamp = null;
+    animationFrameId = requestAnimationFrame(animate);
+  }
+
+  /**
+   * Stop animation
+   */
   function stopAnimation() {
     if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
@@ -540,38 +519,75 @@
     }
   }
 
-  // Reactive initialization flag
-  let isInitialized = false;
-
-  // Update visualization when time changes
-  $: if (isInitialized) {
-    draw();
+  // Reactive statements - only initialize and animate when fully ready
+  $: if (
+    isDataValid &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples.length > 0 &&
+    svg
+  ) {
+    selectTrajectoryIndices();
+    initializeVisualization(); // Lightweight: scatter plots + labels
+    // TODO: fix this, this is super jank but makes the rendering order work
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        initializeTrajectories(); // Heavy: arc length computation
+        requestAnimationFrame(() => {
+          initialized = true;
+          onInitialized?.(); // Yield control to other figures
+        });
+      });
+    });
   }
 
-  // React to data changes and initialize visualization once
-  $: if (!isInitialized &&
-         sourceDistributionSamples.length > 0 &&
-         targetDistributionSamples.length > 0 &&
-         $allTimeSamples.length > 0 &&
-         svgElement) {
-    initializeVisualization();
+  $: if (
+    isPlaying &&
+    !animationFrameId &&
+    svg &&
+    isDataValid &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples.length > 0 &&
+    selectedTrajectoryIndices.length > 0 &&
+    initialized
+  ) {
     startAnimation();
-    isInitialized = true;
   }
 
-  // Cleanup on component destroy
+  $: if (!isPlaying && animationFrameId) {
+    stopAnimation();
+  }
+
   onMount(() => {
-    return () => {
-      stopAnimation();
-    };
+    // Animation will be started by the reactive statement once isReadyToAnimate becomes true
+  });
+
+  onDestroy(() => {
+    stopAnimation();
   });
 </script>
 
-<Figure {caption} backgroundVisible={false} bind:isActive={figureIsActive}>
+<Figure
+  {caption}
+  {backgroundVisible}
+  bind:isActive={figureIsActive}
+  onContentClick={toggleAnimation}
+>
   {#snippet children()}
-    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
-      <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
-      </svg>
+    <div
+      style="display: flex; flex-direction: column; align-items: center; width: 100%;"
+    >
+      <div
+        style="position: relative; width: 100%; display: flex; justify-content: center;"
+      >
+        <PlayButton {isPlaying} onclick={toggleAnimation} {time} />
+        <svg
+          bind:this={svg}
+          viewBox="0 0 {width} {height}"
+          preserveAspectRatio="xMidYMid meet"
+          style="width: 100%; height: auto; max-width: {width}px; aspect-ratio: {width} / {height};"
+        >
+        </svg>
+      </div>
     </div>
   {/snippet}
 </Figure>
