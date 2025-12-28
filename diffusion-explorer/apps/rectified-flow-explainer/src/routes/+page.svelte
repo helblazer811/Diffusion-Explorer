@@ -34,8 +34,8 @@
   import ConditionalVelocityField from "$lib/figures/ConditionalVelocityField.svelte";
   import ConditionalFlowMatching from "$lib/figures/ConditionalFlowMatching.svelte";
   import CurvedTrajectorySuperimposed from "$lib/figures/CurvedTrajectorySuperimposed.svelte";
+  import ReflowAlgorithm from "$lib/figures/ReflowAlgorithm.svelte";
   import Figure from "$lib/components/Figure.svelte";
-  import Algorithm from "$lib/components/Algorithm.svelte";
   import TableOfContents from "$lib/components/TableOfContents.svelte";
   import Bibliography from "$lib/components/Bibliography.svelte";
   import { Katex } from "@diffusion-explorer/ui";
@@ -1217,87 +1217,28 @@
   <h2 id="algorithm">The Algorithm</h2>
 
   <p>
-    Rectified flows straighten out the trajectories of flows
-    by replacing the naive independent <em>coupling</em> used in vanilla
-    flow-matching training with one induced by the model itself. 
-    First, we train a model with flow matching using an independent coupling.
-    Next, we generate new pairs <Katex math={"(X_0, X_1^1)"} /> by drawing <Katex
-      math={"X_0 \\sim p"}
-    /> and applying our learned flow model to get <Katex
-      math={"X_1^1 = \\psi_1^1(X_0)"}
-    />. This new coupling <Katex math={"\\pi_1 = (X_0, X_1^1)"} /> is then used to
-    retrain a new flow model
+    Rectified flows straighten out the trajectories of flows by replacing the
+    naive independent <em>coupling</em> used in vanilla flow-matching training
+    with one induced by the model itself. First, we train a model with flow
+    matching using an independent coupling. Next, we generate new pairs <Katex
+      math={"(X_0, X_1^1)"}
+    /> by drawing <Katex math={"X_0 \\sim p"} /> and applying our learned flow model
+    to get <Katex math={"X_1^1 = \\psi_1^1(X_0)"} />. This new coupling <Katex
+      math={"\\pi_1 = (X_0, X_1^1)"}
+    /> is then used to retrain a new flow model
     <Katex math={"v_\\theta^2"} />. By repeating this process multiple times we
     can progressively straighten out the trajectories of our flow model. The
     full procedure is outlined in the
     <a href="#algorithm-1" class="internal-link">algorithm below</a>.
   </p>
   <div id="algorithm-1">
-    <Algorithm backgroundVisible={true}>
-      {#snippet caption()}
-        <div class="caption">
-          <span class="figure-number">Algorithm 1:</span>
-          The Reflow procedure iteratively straightens trajectories by retraining
-          on the coupling induced by the previous model.
-        </div>
-      {/snippet}
-      {#snippet title()}
-        Algorithm: Reflow Procedure
-      {/snippet}
-      {#snippet inputs()}
-        Source distribution <Katex math={"p"} />, target distribution <Katex
-          math={"q"}
-        />, number of iterations <Katex math={"K"} />
-      {/snippet}
-      {#snippet outputs()}
-        Rectified velocity field <Katex math={"v_\\theta^K"} />
-      {/snippet}
-      {#snippet steps()}
-        <div class="algorithm-line">
-          <span class="line-number">1:</span>
-          <span
-            >Sample pairs <Katex math={"(X_0, X_1)"} /> from independent coupling
-            <Katex math={"\\pi_0 = p \\times q"} /></span
-          >
-        </div>
-        <div class="algorithm-line">
-          <span class="line-number">2:</span>
-          <span
-            ><strong>for</strong>
-            <Katex math={"k = 1, 2, \\ldots, K"} /> <strong>do</strong></span
-          >
-        </div>
-        <div class="algorithm-line indented">
-          <span class="line-number">3:</span>
-          <span
-            >Train velocity field <Katex math={"v_\\theta^k"} /> on pairs from <Katex
-              math={"\\pi_{k-1}"}
-            /></span
-          >
-        </div>
-        <div class="algorithm-line indented">
-          <span class="line-number">4:</span>
-          <span
-            >Generate new pairs: <Katex math={"X_1^k = \\psi_1^k(X_0)"} /> by flowing
-            <Katex math={"X_0 \\sim p"} /> through <Katex
-              math={"v_\\theta^k"}
-            /></span
-          >
-        </div>
-        <div class="algorithm-line indented">
-          <span class="line-number">5:</span>
-          <span>Update coupling: <Katex math={"\\pi_k = (X_0, X_1^k)"} /></span>
-        </div>
-        <div class="algorithm-line">
-          <span class="line-number">6:</span>
-          <span><strong>end for</strong></span>
-        </div>
-        <div class="algorithm-line">
-          <span class="line-number">7:</span>
-          <span><strong>return</strong> <Katex math={"v_\\theta^K"} /></span>
-        </div>
-      {/snippet}
-    </Algorithm>
+    <ReflowAlgorithm backgroundVisible={true}>
+      <div class="caption">
+        <span class="figure-number">Algorithm 1:</span>
+        The Reflow procedure iteratively straightens trajectories by retraining
+        on the coupling induced by the previous model.
+      </div>
+    </ReflowAlgorithm>
   </div>
 
   <h2 id="why-reflow-works">Why it Works</h2>
@@ -1311,16 +1252,15 @@
   />
   <p>
     This forms a deterministic flow, where it is guaranteed that trajectories
-    <Katex math={"\\psi_t(x)"}/> are unique (under some mild regularity conditions).
-    This uniqueness property is crucial to understanding why rectified flows
-    work. The uniqueness of trajectories in deterministic flows means that two
-    distinct trajectories cannot intersect at the same point in space and time 
-    <Katex math={"(x,t)"} />.
-    If this did happen, then the two trajectories would have to coincide for all times,
-    contradicting the assumption that they are distinct. 
-    Deterministic flows therefore forbid crossing, branching, or merging of trajectories.
-    The deterministic nature of these flows is inherited by the coupling
-    induced by integrating the flow. 
+    <Katex math={"\\psi_t(x)"} /> are unique (under some mild regularity conditions).
+    This uniqueness property is crucial to understanding why rectified flows work.
+    The uniqueness of trajectories in deterministic flows means that two distinct
+    trajectories cannot intersect at the same point in space and time
+    <Katex math={"(x,t)"} />. If this did happen, then the two trajectories
+    would have to coincide for all times, contradicting the assumption that they
+    are distinct. Deterministic flows therefore forbid crossing, branching, or
+    merging of trajectories. The deterministic nature of these flows is
+    inherited by the coupling induced by integrating the flow.
   </p>
   <p>
     When we generate new pairs <Katex

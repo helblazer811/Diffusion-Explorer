@@ -1,8 +1,12 @@
 <script>
+  import { setContext } from 'svelte';
   import Figure from './Figure.svelte';
 
   // Slots: title, inputs, outputs, steps, caption
   let { title, inputs, outputs, steps, caption, backgroundVisible = true } = $props();
+
+  // Set up line counter context for AlgorithmLine auto-numbering
+  setContext('algorithm-line-counter', { value: 0 });
 </script>
 
 <Figure {backgroundVisible} {caption}>
