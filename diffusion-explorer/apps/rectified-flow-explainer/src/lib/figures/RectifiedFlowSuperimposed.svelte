@@ -5,7 +5,7 @@
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/canvas/plotting";
-  import { drawTrajectories } from "$lib/canvas/trajectories";
+  import { drawTrajectoriesWithOpacityGradient } from "$lib/canvas/trajectories";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -42,6 +42,7 @@
   export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
   export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
   export let trajectoryPointRadius = settings.stylingSettings.trajectory.pointRadius;
+  export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory to show with fading opacity
   export let animationDuration = 8000; // ms per full loop
   export let playingByDefault = true;
   export let pauseDuration = 1000; // ms pause at end of animation
@@ -183,15 +184,15 @@
     // Draw target distribution scatter (behind trajectories)
     drawScatterPlot(ctx, targetDistribution, xScale, yScale, targetPointRadius, targetColor, targetOpacity);
 
-    // Draw trajectories
-    drawTrajectories(ctx, trajectories, segmentIndex, xScale, yScale, {
+    // Draw trajectories with opacity gradient
+    drawTrajectoriesWithOpacityGradient(ctx, trajectories, segmentIndex, xScale, yScale, {
       strokeWidth: trajectoryStrokeWidth,
       color: trajectoryColor,
       progressOpacity: trajectoryProgressOpacity,
       pointRadius: trajectoryPointRadius,
       showPreview: showTrajectoryPreview,
       previewOpacity: trajectoryFullOpacity
-    });
+    }, alphaTimeWindow);
   }
 
   function initializeVisualization() {
