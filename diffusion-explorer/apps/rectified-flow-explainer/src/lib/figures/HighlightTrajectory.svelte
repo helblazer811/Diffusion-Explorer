@@ -18,6 +18,7 @@
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let numTrajectoriesToShow = 1;
+  export let caption = undefined;
 
   // Canvas state
   let canvas;
@@ -401,28 +402,30 @@
   onDestroy(() => stopAnimation());
 </script>
 
-<Figure bind:isActive={figureIsActive} backgroundVisible={false}>
-  <div
-    style="display:flex;flex-direction:column;align-items:center;width:100%;"
-  >
-    <div style="position:relative;width:100%;max-width:{width}px;">
-      <canvas
-        bind:this={canvas}
-        style="width:100%;height:auto;aspect-ratio:{width}/{height};"
-      ></canvas>
-      <svg
-        bind:this={svgOverlay}
-        style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"
-        viewBox="0 0 {width} {height}"
-      ></svg>
+<Figure {caption} bind:isActive={figureIsActive} backgroundVisible={false}>
+  {#snippet children()}
+    <div
+      style="display:flex;flex-direction:column;align-items:center;width:100%;"
+    >
+      <div style="position:relative;width:100%;max-width:{width}px;">
+        <canvas
+          bind:this={canvas}
+          style="width:100%;height:auto;aspect-ratio:{width}/{height};"
+        ></canvas>
+        <svg
+          bind:this={svgOverlay}
+          style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"
+          viewBox="0 0 {width} {height}"
+        ></svg>
+      </div>
+      <TimeSlider
+        bind:value={time}
+        bind:isPlaying
+        min={0}
+        max={1}
+        onTogglePlay={toggleAnimation}
+        color="#f17720"
+      />
     </div>
-    <TimeSlider
-      bind:value={time}
-      bind:isPlaying
-      min={0}
-      max={1}
-      onTogglePlay={toggleAnimation}
-      color="#f17720"
-    />
-  </div>
+  {/snippet}
 </Figure>
