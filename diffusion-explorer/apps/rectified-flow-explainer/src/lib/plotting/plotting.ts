@@ -1,3 +1,45 @@
+export interface TextStyleOptions {
+  font?: string;           // Default: '22px Helvetica, Arial, sans-serif'
+  color?: string;          // Default: '#666'
+  align?: 'left' | 'center' | 'right';  // Default: 'center'
+  baseline?: 'top' | 'middle' | 'bottom';  // Default: 'top'
+  offsetX?: number;        // Default: 0
+  offsetY?: number;        // Default: 0
+}
+
+/**
+ * Draws text on the canvas at a given position
+ * @param ctx - Canvas 2D rendering context
+ * @param text - The text to draw
+ * @param x - X coordinate (before offset)
+ * @param y - Y coordinate (before offset)
+ * @param options - Styling options
+ */
+export function drawText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  options?: TextStyleOptions
+): void {
+  const {
+    font = '22px Helvetica, Arial, sans-serif',
+    color = '#666',
+    align = 'center',
+    baseline = 'top',
+    offsetX = 0,
+    offsetY = 0
+  } = options ?? {};
+
+  ctx.save();
+  ctx.font = font;
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.textBaseline = baseline;
+  ctx.fillText(text, x + offsetX, y + offsetY);
+  ctx.restore();
+}
+
 export interface VectorFieldStyleOptions {
   arrowScale: number;      // How much to scale normalized velocities
   strokeWidth: number;     // Line width

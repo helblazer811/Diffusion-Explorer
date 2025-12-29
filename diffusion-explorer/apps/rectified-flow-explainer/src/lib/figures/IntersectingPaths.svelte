@@ -4,7 +4,6 @@
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
   import Figure from '$lib/components/Figure.svelte';
-  import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { plotKatexInSVG } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
   import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
@@ -87,9 +86,6 @@
   let svgElement;
   let scales = null;
   let isInitialized = false;
-
-  // Static time value for the disabled slider
-  let time = 0.5;
 
   function normalize(v) {
     const len = Math.hypot(v.x, v.y);
@@ -380,16 +376,7 @@
 
 <Figure caption={caption} {backgroundVisible}>
   {#snippet children()}
-    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
-      <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
-      </svg>
-      <TimeSlider
-        bind:value={time}
-        min={0}
-        max={1}
-        disabled={true}
-        color="#888"
-      />
-    </div>
+    <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
+    </svg>
   {/snippet}
 </Figure>

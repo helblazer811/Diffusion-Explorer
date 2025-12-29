@@ -18,7 +18,9 @@
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let numTrajectoriesToShow = 1;
-  export let caption = undefined;
+  // Caption slot (passed as default children)
+  export let children = undefined;
+  $: caption = children;
 
   // Canvas state
   let canvas;
