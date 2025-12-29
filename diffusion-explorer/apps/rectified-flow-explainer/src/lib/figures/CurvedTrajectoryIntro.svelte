@@ -1,14 +1,11 @@
 <script>
   import { onDestroy } from "svelte";
-  import * as d3 from "d3";
   import Figure from "$lib/components/Figure.svelte";
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
-  import {
-    createSourceTargetScales,
-    plotScatterAtCenter,
-    plotSourceTargetLabels,
-  } from "$lib/d3_helpers";
+  import { createSourceTargetScales } from "$lib/d3_helpers";
+  import { drawScatterPlot } from "$lib/canvas/plotting";
+  import { drawTrajectoriesWithPreview } from "$lib/canvas/trajectories";
 
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
@@ -22,8 +19,12 @@
   export let marginHeight = 20;
   export let numTrajectoriesToShow = 10;
 
-  let svg;
-  let scales;
+  // Canvas state
+  let canvas;
+  let ctx;
+  let dpr = 1;
+
+  // Animation state
   let time = 0;
   let isPlaying = playingByDefault;
   let animationFrameId = null;
@@ -32,23 +33,23 @@
   let pauseStartTime = null;
   let initialized = false;
 
+  // Pre-computed data (computed once on mount/data change)
+  let scales = null;
+  let transformedTrajectories = []; // [trajectory][timestep][x,y in pixels]
+  let sourcePixelCoords = []; // [point][x,y] in pixel space
+  let targetPixelCoords = []; // [point][x,y] in pixel space
   let selectedTrajectoryIndices = [];
-  let trajectoryLengths = new Map();
-  let pathsInitialized = false;
-  let figureIsActive = true;
-  let wasPlayingBeforeHidden = false;
+  let combinedMeanX = 0;
 
+  // Derived values
+  $: numSegments = allTimeSamples?.length - 1 || 0;
 
-  // Pick trajectories (simplest: first N samples)
+  // Pick trajectories (first N samples)
   function selectTrajectoryIndices() {
     if (!allTimeSamples || allTimeSamples.length === 0) return;
     selectedTrajectoryIndices = [...Array(numTrajectoriesToShow).keys()].filter(
       (i) => i < allTimeSamples[0].length
     );
-  }
-
-  function getTrajectoryData(sampleIndex) {
-    return allTimeSamples.map((t) => t[sampleIndex]);
   }
 
   function getPixelX(dataX, meanX, t) {
@@ -58,29 +59,62 @@
     return centerPixelX + (dataX - meanX) * scales.xScaleFactor;
   }
 
-  function generateTrajectoryPath(idx) {
-    const trajData = getTrajectoryData(selectedTrajectoryIndices[idx]);
+  // Pre-compute all trajectory pixel coordinates
+  function precomputeTrajectories() {
+    if (!allTimeSamples || allTimeSamples.length === 0 || !scales) return;
+
     const allX = [
       ...sourceDistributionSamples.map((p) => p[0]),
       ...targetDistributionSamples.map((p) => p[0]),
     ];
-    const combinedMeanX = allX.reduce((a, b) => a + b, 0) / allX.length;
-    let path = "";
-    trajData.forEach(([x, y], i) => {
-      const tStep = i / (trajData.length - 1);
-      const svgX = getPixelX(x, combinedMeanX, tStep);
-      const svgY = scales.yScale(y);
-      path += i === 0 ? `M ${svgX},${svgY}` : ` L ${svgX},${svgY}`;
+    combinedMeanX = allX.reduce((a, b) => a + b, 0) / allX.length;
+
+    transformedTrajectories = selectedTrajectoryIndices.map((sampleIdx) => {
+      return allTimeSamples.map((timestep, tIdx) => {
+        const point = timestep[sampleIdx];
+        const t = tIdx / (allTimeSamples.length - 1);
+        const pixelX = getPixelX(point[0], combinedMeanX, t);
+        const pixelY = scales.yScale(point[1]);
+        return [pixelX, pixelY];
+      });
     });
-    return path;
   }
 
-  function initializeVisualization() {
-    if (!svg) return;
-    const d3Svg = d3.select(svg);
-    d3Svg.selectAll("*").remove();
-    d3Svg.append("defs");
+  // Pre-compute scatter plot pixel coordinates
+  function precomputeScatterCoords() {
+    if (!scales) return;
 
+    sourcePixelCoords = sourceDistributionSamples.map((point) => {
+      const pixelX =
+        scales.sourceCenterPixelX +
+        (point[0] - scales.sourceMeanX) * scales.xScaleFactor;
+      const pixelY = scales.yScale(point[1]);
+      return [pixelX, pixelY];
+    });
+
+    targetPixelCoords = targetDistributionSamples.map((point) => {
+      const pixelX =
+        scales.targetCenterPixelX +
+        (point[0] - scales.targetMeanX) * scales.xScaleFactor;
+      const pixelY = scales.yScale(point[1]);
+      return [pixelX, pixelY];
+    });
+  }
+
+  // Initialize canvas
+  function initializeCanvas() {
+    if (!canvas) return;
+
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+
+    ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+  }
+
+  // Initialize scales and pre-compute all data
+  function initializeData() {
     scales = createSourceTargetScales(
       sourceDistributionSamples,
       targetDistributionSamples,
@@ -95,153 +129,51 @@
       }
     );
 
-    d3Svg.append("g").attr("id", "sourceScatter");
-    d3Svg.append("g").attr("id", "targetScatter");
-    d3Svg.append("g").attr("class", "trajectories");
-    d3Svg.append("g").attr("id", "labels");
+    selectTrajectoryIndices();
+    precomputeScatterCoords();
+    precomputeTrajectories();
+  }
 
-    plotScatterAtCenter(
-      d3Svg,
-      sourceDistributionSamples,
-      scales.yScale,
-      "sourceScatter",
-      {
-        centerPixelX: scales.sourceCenterPixelX,
-        meanX: scales.sourceMeanX,
-        xScaleFactor: scales.xScaleFactor,
-        pointRadius: settings.stylingSettings.scatterPlot.radius,
-        pointOpacity: settings.stylingSettings.scatterPlot.opacity,
-        pointColor: settings.stylingSettings.scatterPlot.color,
-      }
+  // Main draw function
+  function draw() {
+    if (!ctx || !initialized) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw source scatter (left)
+    drawScatterPlot(
+      ctx,
+      sourcePixelCoords,
+      settings.stylingSettings.scatterPlot.radius,
+      settings.stylingSettings.scatterPlot.color,
+      settings.stylingSettings.scatterPlot.opacity
     );
 
-    plotScatterAtCenter(
-      d3Svg,
-      targetDistributionSamples,
-      scales.yScale,
-      "targetScatter",
-      {
-        centerPixelX: scales.targetCenterPixelX,
-        meanX: scales.targetMeanX,
-        xScaleFactor: scales.xScaleFactor,
-        pointRadius: settings.stylingSettings.scatterPlot.radius,
-        pointOpacity: settings.stylingSettings.scatterPlot.opacity,
-        pointColor: settings.stylingSettings.scatterPlot.color,
-      }
+    // Draw target scatter (right)
+    drawScatterPlot(
+      ctx,
+      targetPixelCoords,
+      settings.stylingSettings.scatterPlot.radius,
+      settings.stylingSettings.scatterPlot.color,
+      settings.stylingSettings.scatterPlot.opacity
     );
-  }
 
-  function initializeTrajectories() {
-    if (!svg) return;
-    const d3Svg = d3.select(svg);
-    const trajGroup = d3Svg.select(".trajectories");
-    const defs = d3Svg.select("defs");
+    // Calculate current segment index from normalized time
+    const segmentIndex = Math.floor(time * numSegments);
 
-    selectedTrajectoryIndices.forEach((_, idx) => {
-      const fullPath = generateTrajectoryPath(idx);
-
-      // Measure total length
-      const tempPath = trajGroup.append("path").attr("d", fullPath);
-      const totalLength = tempPath.node().getTotalLength();
-      trajectoryLengths.set(idx, totalLength);
-      tempPath.remove();
-
-      const trajData = getTrajectoryData(selectedTrajectoryIndices[idx]);
-      const allX = [
-        ...sourceDistributionSamples.map((p) => p[0]),
-        ...targetDistributionSamples.map((p) => p[0]),
-      ];
-      const combinedMeanX = allX.reduce((a, b) => a + b, 0) / allX.length;
-      const startX = getPixelX(trajData[0][0], combinedMeanX, 0);
-
-      // Clip path for progress animation
-      defs
-        .append("clipPath")
-        .attr("id", `trajectory-mask-${idx}`)
-        .attr("clipPathUnits", "userSpaceOnUse")
-        .append("rect")
-        .attr("x", startX)
-        .attr("y", 0)
-        .attr("width", 0)
-        .attr("height", height)
-        .attr("fill", "white");
-
-      // Full trajectory path
-      trajGroup
-        .append("path")
-        .attr("class", `trajectory-full-${idx}`)
-        .attr("d", fullPath)
-        .attr("fill", "none")
-        .attr("stroke", settings.stylingSettings.trajectory.color)
-        .attr("stroke-width", settings.stylingSettings.trajectory.strokeWidth)
-        .attr("opacity", settings.stylingSettings.trajectory.fullOpacity);
-
-      // Progress path (clipped)
-      trajGroup
-        .append("path")
-        .attr("class", `trajectory-progress-${idx}`)
-        .attr("d", fullPath)
-        .attr("fill", "none")
-        .attr("stroke", settings.stylingSettings.trajectory.color)
-        .attr("stroke-width", settings.stylingSettings.trajectory.strokeWidth)
-        .attr("opacity", settings.stylingSettings.trajectory.progressOpacity)
-        .attr("clip-path", `url(#trajectory-mask-${idx})`);
-
-      // Moving marker
-      trajGroup
-        .append("circle")
-        .attr("class", `trajectory-point-${idx}`)
-        .attr("r", settings.stylingSettings.trajectory.pointRadius)
-        .attr("fill", settings.stylingSettings.trajectory.color)
-        .attr("opacity", settings.stylingSettings.trajectory.progressOpacity);
-    });
-
-    // Add source and target distribution labels
-    plotSourceTargetLabels(d3Svg, scales, {
-      sourceLabelText: "Source Distribution",
-      targetLabelText: "Target Distribution",
-      labelFontSize: settings.stylingSettings.label.fontSize,
-      labelColor: settings.stylingSettings.label.color,
-      outlineColor: settings.stylingSettings.label.outlineColor,
-      outlineOpacity: settings.stylingSettings.label.outlineOpacity,
-    });
-
-    pathsInitialized = true;
-    updateVisualization();
-  }
-
-  function updateVisualization() {
-    if (!svg || !pathsInitialized) return;
-    const d3Svg = d3.select(svg);
-
-    selectedTrajectoryIndices.forEach((_, idx) => {
-      const trajData = getTrajectoryData(selectedTrajectoryIndices[idx]);
-      const allX = [
-        ...sourceDistributionSamples.map((p) => p[0]),
-        ...targetDistributionSamples.map((p) => p[0]),
-      ];
-      const combinedMeanX = allX.reduce((a, b) => a + b, 0) / allX.length;
-      const startX = getPixelX(trajData[0][0], combinedMeanX, 0);
-      const endX = getPixelX(
-        trajData[trajData.length - 1][0],
-        combinedMeanX,
-        1
-      );
-      const maskWidth = startX + (endX - startX) * time - startX;
-
-      d3Svg.select(`#trajectory-mask-${idx} rect`).attr("width", maskWidth);
-
-      // Marker position
-      const pathNode = d3Svg.select(`.trajectory-progress-${idx}`).node();
-      const totalLength = trajectoryLengths.get(idx);
-      const point = pathNode.getPointAtLength(totalLength * time);
-      d3Svg
-        .select(`.trajectory-point-${idx}`)
-        .attr("cx", point.x)
-        .attr("cy", point.y);
+    // Draw trajectories with preview
+    drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
+      strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+      color: settings.stylingSettings.trajectory.color,
+      progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+      pointRadius: settings.stylingSettings.trajectory.pointRadius,
+      showPreview: true,
+      previewOpacity: settings.stylingSettings.trajectory.fullOpacity,
     });
   }
 
+  // Animation functions
   function animate(ts) {
     if (!isPlaying) {
       animationFrameId = null;
@@ -256,7 +188,7 @@
         pauseStartTime = null;
         lastTimestamp = null;
         time = 0;
-        updateVisualization();
+        draw();
       }
       animationFrameId = requestAnimationFrame(animate);
       return;
@@ -265,10 +197,12 @@
     time += elapsed / animationDuration;
     if (time >= 1) {
       time = 1;
-      updateVisualization();
+      draw();
       isPaused = true;
       pauseStartTime = ts;
-    } else updateVisualization();
+    } else {
+      draw();
+    }
     lastTimestamp = ts;
     animationFrameId = requestAnimationFrame(animate);
   }
@@ -278,12 +212,14 @@
     lastTimestamp = null;
     animationFrameId = requestAnimationFrame(animate);
   }
+
   function stopAnimation() {
     if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
     }
   }
+
   function toggleAnimation() {
     isPlaying = !isPlaying;
     if (!isPlaying) {
@@ -291,47 +227,58 @@
     }
   }
 
-  $: if (initialized && figureIsActive !== undefined) {
-    if (!figureIsActive && isPlaying) {
-      wasPlayingBeforeHidden = true;
-      isPlaying = false; // pause when offscreen
-    } else if (figureIsActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      isPlaying = true; // resume when back
-    }
+  // Initialize when canvas and data are ready
+  $: if (
+    canvas &&
+    allTimeSamples &&
+    allTimeSamples.length > 0 &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples.length > 0 &&
+    !initialized
+  ) {
+    initializeCanvas();
+    initializeData();
+    initialized = true;
+    draw();
+    if (isPlaying) startAnimation();
   }
 
-  $: if (svg && allTimeSamples && allTimeSamples.length > 0) {
-    selectTrajectoryIndices();
-    initializeVisualization();
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        initializeTrajectories();
-        requestAnimationFrame(() => {
-          initialized = true;
-        });
-      });
-    });
-  }
-
+  // Animation control
   $: if (isPlaying && initialized && !animationFrameId) startAnimation();
   $: if (!isPlaying && animationFrameId) stopAnimation();
-  // Update visualization when time changes (e.g., when slider is dragged while paused)
-  $: if (pathsInitialized && time !== undefined) updateVisualization();
+
+  // Redraw when time changes (e.g., slider drag)
+  $: if (initialized && time !== undefined) draw();
 
   onDestroy(() => stopAnimation());
 </script>
 
-<Figure bind:isActive={figureIsActive} backgroundVisible={false}>
+<Figure backgroundVisible={false}>
   <div
     style="display:flex;flex-direction:column;align-items:center;width:100%;"
   >
-    <svg
-      bind:this={svg}
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="xMidYMid meet"
-      style="width:100%;height:auto;max-width:${width}px;aspect-ratio:${width}/${height};"
-    ></svg>
+    <div class="canvas-container" style="max-width:{width}px;">
+      <canvas
+        bind:this={canvas}
+        style="width:100%;height:auto;aspect-ratio:{width}/{height};"
+      ></canvas>
+      <div class="labels-overlay">
+        {#if scales}
+          <span
+            class="label"
+            style="left: {scales.sourceCenterPixelX / width * 100}%; top: {marginHeight / 2 / height * 100}%;"
+          >
+            Source Distribution
+          </span>
+          <span
+            class="label"
+            style="left: {scales.targetCenterPixelX / width * 100}%; top: {marginHeight / 2 / height * 100}%;"
+          >
+            Target Distribution
+          </span>
+        {/if}
+      </div>
+    </div>
     <TimeSlider
       bind:value={time}
       bind:isPlaying
@@ -342,3 +289,28 @@
     />
   </div>
 </Figure>
+
+<style>
+  .canvas-container {
+    position: relative;
+    width: 100%;
+  }
+
+  .labels-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .label {
+    position: absolute;
+    transform: translateX(-50%);
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 22px;
+    color: #333;
+    white-space: nowrap;
+  }
+</style>
