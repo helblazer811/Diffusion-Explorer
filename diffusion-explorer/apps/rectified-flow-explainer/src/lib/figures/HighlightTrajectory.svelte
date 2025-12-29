@@ -224,10 +224,11 @@
 
   // Pre-render MathJax SVG labels
   async function preRenderLabels() {
+    const latexColor = settings.stylingSettings.figureLatex.color;
     try {
       [xLabelSvg, psiLabelSvg] = await Promise.all([
-        latexToSvgElement("x"),
-        latexToSvgElement("\\psi_t(x)"),
+        latexToSvgElement("x", { color: latexColor }),
+        latexToSvgElement("\\psi_t(x)", { color: latexColor }),
       ]);
     } catch (e) {
       console.warn("Failed to pre-render MathJax labels:", e);
@@ -246,11 +247,11 @@
       const currentPoint = getPointAtProgress(idx, time);
 
       if (xLabelSvg) {
-        placeMathjaxSVG(xLabelSvg.cloneNode(true), svgOverlay, startPoint[0], startPoint[1], 0, -10);
+        placeMathjaxSVG(xLabelSvg.cloneNode(true), svgOverlay, startPoint[0], startPoint[1], 0, -8, 50, 1.4);
       }
 
       if (time >= 0.05 && psiLabelSvg) {
-        placeMathjaxSVG(psiLabelSvg.cloneNode(true), svgOverlay, currentPoint[0], currentPoint[1], 0, -10);
+        placeMathjaxSVG(psiLabelSvg.cloneNode(true), svgOverlay, currentPoint[0], currentPoint[1], 0, -8, 50, 1.4);
       }
     }
   }

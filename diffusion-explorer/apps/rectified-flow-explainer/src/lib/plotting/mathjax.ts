@@ -139,6 +139,7 @@ export async function latexToSvgElement(latex: string, options: LatexToSvgOption
  * @param offsetX - Optional horizontal offset
  * @param offsetY - Optional vertical offset
  * @param scaleFactor - Scale factor for the SVG dimensions (default 50)
+ * @param sizeMultiplier - Visual scale multiplier (default 1, e.g., 1.5 = 50% larger)
  */
 export function placeMathjaxSVG(
   svgElement: SVGSVGElement,
@@ -147,7 +148,8 @@ export function placeMathjaxSVG(
   anchorY: number,
   offsetX = 0,
   offsetY = 0,
-  scaleFactor = 50
+  scaleFactor = 50,
+  sizeMultiplier = 1
 ): void {
   // Append temporarily off-screen to measure
   svgElement.setAttribute("x", "-1000");
@@ -156,8 +158,8 @@ export function placeMathjaxSVG(
 
   // Get bounding box now that it's in the DOM
   const bbox = svgElement.getBBox();
-  const scaledWidth = bbox.width / scaleFactor;
-  const scaledHeight = bbox.height / scaleFactor;
+  const scaledWidth = (bbox.width / scaleFactor) * sizeMultiplier;
+  const scaledHeight = (bbox.height / scaleFactor) * sizeMultiplier;
 
   // Compute bottom-center translation
   const translateX = anchorX - scaledWidth / 2 + offsetX;
@@ -171,6 +173,13 @@ export function placeMathjaxSVG(
   parentSvg.removeChild(svgElement);
   svgElement.removeAttribute("x");
   svgElement.removeAttribute("y");
+
+  // Apply visual scale transform
+  if (sizeMultiplier !== 1) {
+    svgElement.setAttribute("transform-origin", "0 0");
+    svgElement.setAttribute("transform", `scale(${sizeMultiplier})`);
+  }
+
   g.appendChild(svgElement);
   parentSvg.appendChild(g);
 }
