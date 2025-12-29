@@ -11,6 +11,10 @@ export interface LatexToSvgOptions {
   width?: number;
   height?: number;
   display?: boolean;
+  // Styling options
+  color?: string;           // Fill color (e.g., "#333", "red")
+  stroke?: string;          // Outline color
+  strokeWidth?: number;     // Outline width in pixels
 }
 
 /**
@@ -45,6 +49,30 @@ export async function loadMathJax(): Promise<void> {
 }
 
 /**
+ * Applies fill and stroke styles to all paths in an SVG element
+ */
+function applyStylesToSvg(
+  svg: SVGSVGElement,
+  options: { color?: string; stroke?: string; strokeWidth?: number }
+): void {
+  const { color, stroke, strokeWidth } = options;
+
+  // MathJax renders text as <path> elements
+  const paths = svg.querySelectorAll('path');
+  paths.forEach(path => {
+    if (color) {
+      path.setAttribute('fill', color);
+    }
+    if (stroke) {
+      path.setAttribute('stroke', stroke);
+      path.setAttribute('stroke-width', String(strokeWidth ?? 1));
+      // Ensure stroke is painted behind fill
+      path.setAttribute('paint-order', 'stroke fill');
+    }
+  });
+}
+
+/**
  * Renders a LaTeX equation to an SVG string
  * @param latex - The LaTeX equation string
  * @param options - Optional settings { width, height, display }
@@ -53,7 +81,7 @@ export async function loadMathJax(): Promise<void> {
 export async function latexToSvg(latex: string, options: LatexToSvgOptions = {}): Promise<string> {
   await loadMathJax();
 
-  const { width, height, display = false } = options;
+  const { width, height, display = false, color, stroke, strokeWidth } = options;
 
   const node = await window.MathJax.tex2svgPromise(latex, { display });
   const svg = node.querySelector('svg');
@@ -67,6 +95,9 @@ export async function latexToSvg(latex: string, options: LatexToSvgOptions = {})
   if (width) svg.setAttribute('width', String(width));
   if (height) svg.setAttribute('height', String(height));
 
+  // Apply styling
+  applyStylesToSvg(svg, { color, stroke, strokeWidth });
+
   return svg.outerHTML;
 }
 
@@ -79,7 +110,7 @@ export async function latexToSvg(latex: string, options: LatexToSvgOptions = {})
 export async function latexToSvgElement(latex: string, options: LatexToSvgOptions = {}): Promise<SVGSVGElement> {
   await loadMathJax();
 
-  const { width, height, display = false } = options;
+  const { width, height, display = false, color, stroke, strokeWidth } = options;
 
   const node = await window.MathJax.tex2svgPromise(latex, { display });
   const svg = node.querySelector('svg') as SVGSVGElement;
@@ -92,6 +123,9 @@ export async function latexToSvgElement(latex: string, options: LatexToSvgOption
   svg.removeAttribute('style');
   if (width) svg.setAttribute('width', String(width));
   if (height) svg.setAttribute('height', String(height));
+
+  // Apply styling
+  applyStylesToSvg(svg, { color, stroke, strokeWidth });
 
   return svg;
 }

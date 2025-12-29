@@ -13,8 +13,8 @@
 		"deploy": "npm run build && node scripts/deploy.js"
 	},
 	"devDependencies": {
-		"@diffusion-explorer/ui": "*", 
-		"@diffusion-explorer/diffusion": "*", 
+		"@diffusion-explorer/diffusion": "*",
+		"@diffusion-explorer/ui": "*",
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.49.1",
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
@@ -24,11 +24,12 @@
 		"vite": "^7.2.6"
 	},
 	"dependencies": {
-		"fs-extra": "^11.2.0",
 		"@tensorflow/tfjs": "^4.22.0",
 		"@tensorflow/tfjs-backend-wasm": "^4.22.0",
 		"@tensorflow/tfjs-core": "^4.22.0",
 		"@tensorflow/tfjs-node": "^4.22.0",
-		"d3": "^7.9.0"
+		"d3": "^7.9.0",
+		"fs-extra": "^11.2.0",
+		"mathjax-full": "^3.2.1"
 	}
 }

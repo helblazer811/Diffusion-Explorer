@@ -6,7 +6,7 @@
   import DoubleFigure from '$lib/components/DoubleFigure.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { settings } from '$lib/settings';
-  import { drawVectorField } from '$lib/canvas/plotting';
+  import { drawVectorField } from '$lib/plotting/plotting';
 
   // ===== PROPS =====
 

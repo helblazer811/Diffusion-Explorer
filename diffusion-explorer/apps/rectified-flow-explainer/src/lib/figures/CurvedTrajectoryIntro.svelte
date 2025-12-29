@@ -4,7 +4,7 @@
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
-  import { drawScatterPlot } from "$lib/plotting/plotting";
+  import { drawScatterPlot, drawText } from "$lib/plotting/plotting";
   import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
 
   export let sourceDistributionSamples = [];
@@ -18,7 +18,10 @@
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let numTrajectoriesToShow = 10;
-  export let caption = undefined;
+
+  // Caption slot (passed as default children)
+  export let children = undefined;
+  $: caption = children;
 
   // Canvas state
   let canvas;
@@ -164,6 +167,11 @@
       settings.stylingSettings.scatterPlot.opacity
     );
 
+    // Draw distribution labels
+    const labelColor = settings.stylingSettings.label.color;
+    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, { color: labelColor });
+    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor });
+
     // Calculate current segment index from normalized time
     const segmentIndex = Math.floor(time * numSegments);
 
@@ -278,28 +286,10 @@
     <div
       style="display:flex;flex-direction:column;align-items:center;width:100%;"
     >
-      <div class="canvas-container" style="max-width:{width}px;">
-        <canvas
-          bind:this={canvas}
-          style="width:100%;height:auto;aspect-ratio:{width}/{height};"
-        ></canvas>
-        <div class="labels-overlay">
-          {#if scales}
-            <span
-              class="label"
-              style="left: {scales.sourceCenterPixelX / width * 100}%; top: {marginHeight / 2 / height * 100}%;"
-            >
-              Source Distribution
-            </span>
-            <span
-              class="label"
-              style="left: {scales.targetCenterPixelX / width * 100}%; top: {marginHeight / 2 / height * 100}%;"
-            >
-              Target Distribution
-            </span>
-          {/if}
-        </div>
-      </div>
+      <canvas
+        bind:this={canvas}
+        style="width:100%;height:auto;max-width:{width}px;aspect-ratio:{width}/{height};"
+      ></canvas>
       <TimeSlider
         bind:value={time}
         bind:isPlaying
@@ -311,28 +301,3 @@
     </div>
   {/snippet}
 </Figure>
-
-<style>
-  .canvas-container {
-    position: relative;
-    width: 100%;
-  }
-
-  .labels-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
-
-  .label {
-    position: absolute;
-    transform: translateX(-50%);
-    font-family: Helvetica, Arial, sans-serif;
-    font-size: 22px;
-    color: #333;
-    white-space: nowrap;
-  }
-</style>
