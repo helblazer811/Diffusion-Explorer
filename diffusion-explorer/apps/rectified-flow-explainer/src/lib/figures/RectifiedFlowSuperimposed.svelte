@@ -4,8 +4,8 @@
   import DoubleFigure from "$lib/components/DoubleFigure.svelte";
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
-  import { drawScatterPlot } from "$lib/canvas/plotting";
-  import { drawTrajectoriesWithOpacityGradient } from "$lib/canvas/trajectories";
+  import { drawScatterPlot } from "$lib/plotting/plotting";
+  import { drawTrajectoriesWithOpacityGradient } from "$lib/plotting/trajectories";
 
   // ===== PROPS =====
 
@@ -90,6 +90,11 @@
   let isInitialized = false;
   let pathsInitialized = false;
 
+  // Pre-computed pixel coordinates (scaled once upfront)
+  let scaledTargetDistribution = [];  // [point][x,y] in pixels
+  let scaledLeftTrajectories = [];    // [trajectory][timestep][x,y] in pixels
+  let scaledRightTrajectories = [];   // [trajectory][timestep][x,y] in pixels
+
   // Visibility
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
@@ -131,18 +136,39 @@
     }
   }
 
-  // Draw scatter plot + trajectories
-  function draw(ctx, trajectories, segmentIndex) {
-    if (!ctx || !xScale || !yScale) return;
+  // Transpose trajectories from [timestep][sample][dim] to [sample][timestep][x,y] and scale to pixels
+  function transposeAndScale(trajectories) {
+    if (!xScale || !yScale || !trajectories || trajectories.length === 0) return [];
+    const numSamples = trajectories[0]?.length || 0;
+    return Array.from({ length: numSamples }, (_, i) =>
+      trajectories.map(ts => [xScale(ts[i][0]), yScale(ts[i][1])])
+    );
+  }
+
+  // Pre-compute all coordinates in pixel space (called once after scales are initialized)
+  function precomputeCoordinates() {
+    if (!xScale || !yScale) return;
+
+    // Scale target distribution
+    scaledTargetDistribution = targetDistribution.map(p => [xScale(p[0]), yScale(p[1])]);
+
+    // Scale and transpose trajectories
+    scaledLeftTrajectories = transposeAndScale(leftTrajectories);
+    scaledRightTrajectories = transposeAndScale(rightTrajectories);
+  }
+
+  // Draw scatter plot + trajectories (using pre-scaled pixel coordinates)
+  function draw(ctx, scaledTrajectories, segmentIndex) {
+    if (!ctx) return;
 
     // Clear previous frame
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
     // Draw target distribution scatter (behind trajectories)
-    drawScatterPlot(ctx, targetDistribution, xScale, yScale, targetPointRadius, targetColor, targetOpacity);
+    drawScatterPlot(ctx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
 
     // Draw trajectories with opacity gradient
-    drawTrajectoriesWithOpacityGradient(ctx, trajectories, segmentIndex, xScale, yScale, {
+    drawTrajectoriesWithOpacityGradient(ctx, scaledTrajectories, segmentIndex, {
       strokeWidth: trajectoryStrokeWidth,
       color: trajectoryColor,
       progressOpacity: trajectoryProgressOpacity,
@@ -157,6 +183,7 @@
 
     initializeScales();
     initializeCanvas();
+    precomputeCoordinates();
     pathsInitialized = true;
     updateVisualization();
     isInitialized = true;
@@ -166,8 +193,8 @@
   function updateVisualization() {
     if (!isDataValid || !leftCtx || !rightCtx) return;
 
-    draw(leftCtx, leftTrajectories, currentSegmentIndex);
-    draw(rightCtx, rightTrajectories, currentSegmentIndex);
+    draw(leftCtx, scaledLeftTrajectories, currentSegmentIndex);
+    draw(rightCtx, scaledRightTrajectories, currentSegmentIndex);
   }
 
   function animate(ts) {
@@ -244,6 +271,16 @@
     updateVisualization();
   }
 
+  function handleVisibilityChange(isActive) {
+    if (!isActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+    } else if (isActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+    }
+  }
+
   // ===== REACTIVE EFFECTS =====
 
   $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
@@ -252,6 +289,11 @@
 
   $: if (isPlaying && pathsInitialized && !animationFrameId) startAnimation();
   $: if (!isPlaying && animationFrameId) stopAnimation();
+
+  // Handle visibility changes (pause when off-screen, resume when back)
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
+  }
 
   // ===== LIFECYCLE =====
 

@@ -4,8 +4,8 @@
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
-  import { drawScatterPlot } from "$lib/canvas/plotting";
-  import { drawTrajectoriesWithPreview } from "$lib/canvas/trajectories";
+  import { drawScatterPlot } from "$lib/plotting/plotting";
+  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
 
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
@@ -32,6 +32,10 @@
   let isPaused = false;
   let pauseStartTime = null;
   let initialized = false;
+
+  // Visibility tracking
+  let figureIsActive;
+  let wasPlayingBeforeHidden = false;
 
   // Pre-computed data (computed once on mount/data change)
   let scales = null;
@@ -227,6 +231,16 @@
     }
   }
 
+  function handleVisibilityChange(isActive) {
+    if (!isActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+    } else if (isActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+    }
+  }
+
   // Initialize when canvas and data are ready
   $: if (
     canvas &&
@@ -247,13 +261,18 @@
   $: if (isPlaying && initialized && !animationFrameId) startAnimation();
   $: if (!isPlaying && animationFrameId) stopAnimation();
 
+  // Handle visibility changes (pause when off-screen, resume when back)
+  $: if (figureIsActive !== undefined && initialized) {
+    handleVisibilityChange($figureIsActive);
+  }
+
   // Redraw when time changes (e.g., slider drag)
   $: if (initialized && time !== undefined) draw();
 
   onDestroy(() => stopAnimation());
 </script>
 
-<Figure backgroundVisible={false}>
+<Figure backgroundVisible={false} bind:isActive={figureIsActive}>
   <div
     style="display:flex;flex-direction:column;align-items:center;width:100%;"
   >

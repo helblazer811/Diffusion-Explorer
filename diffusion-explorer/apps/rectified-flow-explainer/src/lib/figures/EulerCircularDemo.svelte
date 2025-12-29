@@ -6,8 +6,8 @@
   import Figure from '$lib/components/Figure.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { settings } from '$lib/settings';
-  import { drawVectorField } from '$lib/canvas/plotting';
-  import { drawTrajectoriesWithPreview } from '$lib/canvas/trajectories';
+  import { drawVectorField } from '$lib/plotting/plotting';
+  import { drawTrajectoriesWithPreview } from '$lib/plotting/trajectories';
 
   // ===== PROPS =====
 
@@ -58,6 +58,10 @@
   let animationStartTime = null;
   let isInitialized = false;
   let wasJustResumed = false;
+
+  // Visibility tracking
+  let figureIsActive;
+  let wasPlayingBeforeHidden = false;
 
   // Pre-computed coordinates
   let scaledTrajectory = [];      // [[x,y], ...] in pixels
@@ -257,6 +261,16 @@
     stepSize = parseFloat(event.target.value);
   }
 
+  function handleVisibilityChange(isActive) {
+    if (!isActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+    } else if (isActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+    }
+  }
+
   // ===== REACTIVE EFFECTS =====
 
   // Redraw when time changes (e.g., from slider drag while paused)
@@ -268,6 +282,11 @@
   $: if (isInitialized && trajectory) {
     precomputeCoordinates();
     draw();
+  }
+
+  // Handle visibility changes (pause when off-screen, resume when back)
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
   }
 
   // ===== LIFECYCLE =====
@@ -282,7 +301,7 @@
   });
 </script>
 
-<Figure {caption} {backgroundVisible}>
+<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
       <canvas
