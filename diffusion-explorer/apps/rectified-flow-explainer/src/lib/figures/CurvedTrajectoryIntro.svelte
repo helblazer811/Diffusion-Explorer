@@ -18,6 +18,7 @@
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let numTrajectoriesToShow = 10;
+  export let caption = undefined;
 
   // Canvas state
   let canvas;
@@ -272,41 +273,43 @@
   onDestroy(() => stopAnimation());
 </script>
 
-<Figure backgroundVisible={false} bind:isActive={figureIsActive}>
-  <div
-    style="display:flex;flex-direction:column;align-items:center;width:100%;"
-  >
-    <div class="canvas-container" style="max-width:{width}px;">
-      <canvas
-        bind:this={canvas}
-        style="width:100%;height:auto;aspect-ratio:{width}/{height};"
-      ></canvas>
-      <div class="labels-overlay">
-        {#if scales}
-          <span
-            class="label"
-            style="left: {scales.sourceCenterPixelX / width * 100}%; top: {marginHeight / 2 / height * 100}%;"
-          >
-            Source Distribution
-          </span>
-          <span
-            class="label"
-            style="left: {scales.targetCenterPixelX / width * 100}%; top: {marginHeight / 2 / height * 100}%;"
-          >
-            Target Distribution
-          </span>
-        {/if}
+<Figure {caption} backgroundVisible={false} bind:isActive={figureIsActive}>
+  {#snippet children()}
+    <div
+      style="display:flex;flex-direction:column;align-items:center;width:100%;"
+    >
+      <div class="canvas-container" style="max-width:{width}px;">
+        <canvas
+          bind:this={canvas}
+          style="width:100%;height:auto;aspect-ratio:{width}/{height};"
+        ></canvas>
+        <div class="labels-overlay">
+          {#if scales}
+            <span
+              class="label"
+              style="left: {scales.sourceCenterPixelX / width * 100}%; top: {marginHeight / 2 / height * 100}%;"
+            >
+              Source Distribution
+            </span>
+            <span
+              class="label"
+              style="left: {scales.targetCenterPixelX / width * 100}%; top: {marginHeight / 2 / height * 100}%;"
+            >
+              Target Distribution
+            </span>
+          {/if}
+        </div>
       </div>
+      <TimeSlider
+        bind:value={time}
+        bind:isPlaying
+        min={0}
+        max={1}
+        onTogglePlay={toggleAnimation}
+        color="#f17720"
+      />
     </div>
-    <TimeSlider
-      bind:value={time}
-      bind:isPlaying
-      min={0}
-      max={1}
-      onTogglePlay={toggleAnimation}
-      color="#f17720"
-    />
-  </div>
+  {/snippet}
 </Figure>
 
 <style>
