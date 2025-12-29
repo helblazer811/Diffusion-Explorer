@@ -2,8 +2,10 @@
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
   import DoubleFigure from "$lib/components/DoubleFigure.svelte";
-  import PlayButton from "$lib/components/PlayButton.svelte";
+  import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
+  import { drawScatterPlot } from "$lib/canvas/plotting";
+  import { drawTrajectories } from "$lib/canvas/trajectories";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -25,9 +27,10 @@
 
   // Configuration props
   export let marginWidth = 20;
-  export let marginHeight = 20;
-  export let svgWidth = 300;
-  export let svgHeight = 300;
+  export let marginHeight = 30;
+  export let topPadding = 20; // Extra space below label
+  export let svgWidth = 400;
+  export let svgHeight = 400;
   export let trajectoryColor = settings.stylingSettings.trajectory.color;
   export let targetColor = "#3b82f6"; // Blue
   export let targetOpacity = 0.35;
@@ -39,14 +42,14 @@
   export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
   export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
   export let trajectoryPointRadius = settings.stylingSettings.trajectory.pointRadius;
-  export let animationDuration = 5000; // ms per full loop
+  export let animationDuration = 8000; // ms per full loop
   export let playingByDefault = true;
   export let pauseDuration = 1000; // ms pause at end of animation
   export let leftLabel = "Flow Matching";
   export let rightLabel = "Rectified Flow";
-  export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelFontSize = 24;
   export let labelColor = settings.stylingSettings.label.color;
-  export let gap = 50;
+  export let gap = 20;
   export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
 
   // Callback when visualization is initialized
@@ -59,36 +62,57 @@
   let leftSvgElement;
   let rightSvgElement;
 
+  // Canvas references
+  let leftCanvas;
+  let rightCanvas;
+  let leftCtx;
+  let rightCtx;
+
+  // DPI scaling for high-resolution displays
+  let dpr = 1;
+
   // Scales
   let xScale;
   let yScale;
 
   // Animation state
-  let currentTimeIndex = 0;
+  let currentSegmentIndex = 0; // Integer: 0 to numSegments
+  let segmentAccumulator = 0;  // Accumulates elapsed time for sub-segment precision
   let isPlaying = playingByDefault;
   let animationFrameId = null;
+  let lastTimestamp = null;
+  let isPaused = false;
+  let pauseStartTime = null;
   let isInitialized = false;
+
+  // Canvas initialization state
+  let pathsInitialized = false;
 
   // Total number of trajectories (derived from data)
   $: numTrajectories = isDataValid ? (leftTrajectories[0]?.length || 0) : 0;
 
-  // Normalized time for timing circle (0-1)
+  // Number of time steps and segments in the data
   $: numTimeSteps = isDataValid ? leftTrajectories.length : 1;
-  $: normalizedTime = numTimeSteps > 1 ? currentTimeIndex / (numTimeSteps - 1) : 0;
+  $: numSegments = numTimeSteps - 1;
+
+  // Time per segment for animation pacing
+  $: msPerSegment = numSegments > 0 ? animationDuration / numSegments : animationDuration;
+
+  // Time for slider display (0-1) - kept in sync with currentSegmentIndex
+  let time = 0;
 
   // Visibility-based animation control
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
 
   // Pause animation when figure goes off-screen, resume when back
-  $: if (figureIsActive && isInitialized) {
+  $: if (figureIsActive && pathsInitialized) {
     if (!$figureIsActive && isPlaying) {
       wasPlayingBeforeHidden = true;
       isPlaying = false;
     } else if ($figureIsActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
       isPlaying = true;
-      startAnimation();
     }
   }
 
@@ -106,42 +130,14 @@
     yScale = d3
       .scaleLinear()
       .domain([yMin, yMax])
-      .range([marginHeight, svgHeight - marginHeight]);
+      .range([marginHeight + topPadding, svgHeight - marginHeight]);
   }
 
-  function initializeSvg(svgElement, targetDistribution, label) {
-    if (!svgElement || !xScale || !yScale) return;
+  function initializeSvg(svgElement, label) {
+    if (!svgElement) return;
 
     const svg = d3.select(svgElement);
     svg.selectAll("*").remove();
-
-    // Add target distribution scatter
-    const targetGroup = svg.append("g").attr("id", "target-scatter");
-
-    targetGroup
-      .selectAll("circle")
-      .data(targetDistribution)
-      .enter()
-      .append("circle")
-      .attr("cx", d => xScale(d[0]))
-      .attr("cy", d => yScale(d[1]))
-      .attr("r", targetPointRadius)
-      .attr("fill", targetColor)
-      .attr("opacity", targetOpacity);
-
-    // Add trajectory path group
-    svg.append("g").attr("id", "trajectory-group");
-
-    // Add current position markers for each trajectory
-    const markersGroup = svg.append("g").attr("id", "markers-group");
-    for (let i = 0; i < numTrajectories; i++) {
-      markersGroup
-        .append("circle")
-        .attr("class", `current-position-${i}`)
-        .attr("r", trajectoryPointRadius)
-        .attr("fill", trajectoryColor)
-        .attr("opacity", trajectoryProgressOpacity);
-    }
 
     // Add label at top center
     const labelGroup = svg.append("g").attr("class", "label-group");
@@ -159,137 +155,150 @@
       .text(label);
   }
 
+  // Initialize canvas contexts with high-DPI support
+  function initializeCanvas() {
+    dpr = window.devicePixelRatio || 1;
+
+    if (leftCanvas) {
+      leftCanvas.width = svgWidth * dpr;
+      leftCanvas.height = svgHeight * dpr;
+      leftCtx = leftCanvas.getContext("2d");
+      leftCtx.scale(dpr, dpr);
+    }
+    if (rightCanvas) {
+      rightCanvas.width = svgWidth * dpr;
+      rightCanvas.height = svgHeight * dpr;
+      rightCtx = rightCanvas.getContext("2d");
+      rightCtx.scale(dpr, dpr);
+    }
+  }
+
+  // Draw a panel (scatter plot + trajectories)
+  function drawPanel(ctx, trajectories, segmentIndex) {
+    if (!ctx || !xScale || !yScale) return;
+
+    // Clear previous frame
+    ctx.clearRect(0, 0, svgWidth, svgHeight);
+
+    // Draw target distribution scatter (behind trajectories)
+    drawScatterPlot(ctx, targetDistribution, xScale, yScale, targetPointRadius, targetColor, targetOpacity);
+
+    // Draw trajectories
+    drawTrajectories(ctx, trajectories, segmentIndex, xScale, yScale, {
+      strokeWidth: trajectoryStrokeWidth,
+      color: trajectoryColor,
+      progressOpacity: trajectoryProgressOpacity,
+      pointRadius: trajectoryPointRadius,
+      showPreview: showTrajectoryPreview,
+      previewOpacity: trajectoryFullOpacity
+    });
+  }
+
   function initializeVisualization() {
     if (!leftSvgElement || !rightSvgElement || !isDataValid) return;
 
     initializeScales();
-    initializeSvg(leftSvgElement, targetDistribution, leftLabel);
-    initializeSvg(rightSvgElement, targetDistribution, rightLabel);
-    updateVisualization(currentTimeIndex);
-    isInitialized = true;
-    onInitialized?.();
+    initializeSvg(leftSvgElement, leftLabel);
+    initializeSvg(rightSvgElement, rightLabel);
+
+    // Initialize canvas after SVG structure is ready
+    requestAnimationFrame(() => {
+      initializeCanvas();
+      pathsInitialized = true;
+      updateVisualization();
+      isInitialized = true;
+      onInitialized?.();
+    });
   }
 
-  function updatePanel(svgElement, trajectories, timeIndex) {
-    if (!svgElement || !isDataValid || !xScale || !yScale) return;
+  function updateVisualization() {
+    if (!isDataValid || !leftCtx || !rightCtx) return;
 
-    const svg = d3.select(svgElement);
-    const numTimeSteps = trajectories.length;
+    drawPanel(leftCtx, leftTrajectories, currentSegmentIndex);
+    drawPanel(rightCtx, rightTrajectories, currentSegmentIndex);
+  }
 
-    // Map timeIndex to trajectory timestep
-    const trajectoryTimeIndex = Math.floor(
-      (timeIndex / (numTimeSteps - 1)) * (numTimeSteps - 1)
-    );
-
-    // Update trajectory paths
-    const trajectoryGroup = svg.select("#trajectory-group");
-    trajectoryGroup.selectAll("*").remove();
-
-    // Draw all trajectories from the grid
-    for (let i = 0; i < numTrajectories; i++) {
-      const trajectoryPoints = trajectories.map((timestep) => timestep[i]);
-
-      // Draw full trajectory path preview (lighter) - only if enabled
-      if (showTrajectoryPreview) {
-        const fullPath = trajectoryPoints
-          .map((point, j) => {
-            const [x, y] = point;
-            return `${j === 0 ? "M" : "L"} ${xScale(x)},${yScale(y)}`;
-          })
-          .join(" ");
-
-        trajectoryGroup
-          .append("path")
-          .attr("d", fullPath)
-          .attr("fill", "none")
-          .attr("stroke", trajectoryColor)
-          .attr("stroke-width", trajectoryStrokeWidth)
-          .attr("opacity", trajectoryFullOpacity);
-      }
-
-      // Draw animated trajectory path (up to current time)
-      const animatedPath = trajectoryPoints
-        .slice(0, trajectoryTimeIndex + 1)
-        .map((point, j) => {
-          const [x, y] = point;
-          return `${j === 0 ? "M" : "L"} ${xScale(x)},${yScale(y)}`;
-        })
-        .join(" ");
-
-      if (animatedPath) {
-        trajectoryGroup
-          .append("path")
-          .attr("d", animatedPath)
-          .attr("fill", "none")
-          .attr("stroke", trajectoryColor)
-          .attr("stroke-width", trajectoryStrokeWidth)
-          .attr("opacity", trajectoryProgressOpacity);
-      }
-
-      // Update current position marker
-      if (trajectoryTimeIndex < trajectoryPoints.length) {
-        const [currentX, currentY] = trajectoryPoints[trajectoryTimeIndex];
-        svg
-          .select(`.current-position-${i}`)
-          .attr("cx", xScale(currentX))
-          .attr("cy", yScale(currentY));
-      }
+  function animate(ts) {
+    if (!isPlaying) {
+      animationFrameId = null;
+      return;
     }
-  }
+    if (lastTimestamp === null) lastTimestamp = ts;
+    const elapsed = ts - lastTimestamp;
+    lastTimestamp = ts;
 
-  function updateVisualization(timeIndex) {
-    if (!isDataValid) return;
-
-    const numTimeSteps = leftTrajectories.length;
-    const clampedTimeIndex = Math.min(timeIndex, numTimeSteps - 1);
-
-    updatePanel(leftSvgElement, leftTrajectories, clampedTimeIndex);
-    updatePanel(rightSvgElement, rightTrajectories, clampedTimeIndex);
-  }
-
-  function startAnimation() {
-    if (!isDataValid) return;
-
-    const numSteps = leftTrajectories.length;
-    const stepDuration = animationDuration / numSteps;
-
-    function animate() {
-      if (!isPlaying) {
-        animationFrameId = null;
-        return;
+    if (isPaused && pauseStartTime !== null) {
+      if (ts - pauseStartTime >= pauseDuration) {
+        isPaused = false;
+        pauseStartTime = null;
+        currentSegmentIndex = 0;
+        segmentAccumulator = 0;
+        time = 0;
+        updateVisualization();
       }
+      animationFrameId = requestAnimationFrame(animate);
+      return;
+    }
 
-      updateVisualization(currentTimeIndex);
+    // Accumulate time and advance segments one at a time
+    segmentAccumulator += elapsed;
+    while (segmentAccumulator >= msPerSegment && currentSegmentIndex < numSegments) {
+      segmentAccumulator -= msPerSegment;
+      currentSegmentIndex += 1;
+    }
 
-      const isLastFrame = currentTimeIndex === numSteps - 1;
-      const delay = isLastFrame ? stepDuration + pauseDuration : stepDuration;
+    // Keep time in sync for slider display
+    time = numSegments > 0 ? currentSegmentIndex / numSegments : 0;
 
-      // Move to next frame
-      const nextTimeIndex = (currentTimeIndex + 1) % numSteps;
-      currentTimeIndex = nextTimeIndex;
+    updateVisualization();
 
-      setTimeout(() => {
-        animationFrameId = requestAnimationFrame(animate);
-      }, delay);
+    if (currentSegmentIndex >= numSegments) {
+      isPaused = true;
+      pauseStartTime = ts;
     }
 
     animationFrameId = requestAnimationFrame(animate);
   }
 
-  function togglePlayPause() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else if (animationFrameId) {
+  function startAnimation() {
+    if (animationFrameId !== null) return;
+    lastTimestamp = null;
+    animationFrameId = requestAnimationFrame(animate);
+  }
+
+  function stopAnimation() {
+    if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
     }
   }
 
+  function togglePlayPause() {
+    isPlaying = !isPlaying;
+    if (!isPlaying) {
+      stopAnimation();
+    }
+  }
+
+  function handleSliderInput() {
+    // When user drags the slider, stop playback
+    if (isPlaying) {
+      isPlaying = false;
+      stopAnimation();
+    }
+    // Convert slider time value to segment index
+    currentSegmentIndex = Math.round(time * numSegments);
+    segmentAccumulator = 0;
+    updateVisualization();
+  }
+
   $: if (isDataValid && leftSvgElement && rightSvgElement && !isInitialized) {
     initializeVisualization();
-    if (isPlaying) startAnimation();
   }
+
+  // Start animation once paths are initialized
+  $: if (isPlaying && pathsInitialized && !animationFrameId) startAnimation();
+  $: if (!isPlaying && animationFrameId) stopAnimation();
 
   onMount(() => {
     // Scales and animation are handled by the reactive statement
@@ -305,24 +314,47 @@
 {#if isDataValid}
   <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     {#snippet left()}
-      <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
-      <svg
-        bind:this={leftSvgElement}
-        viewBox="0 0 {svgWidth} {svgHeight}"
-        preserveAspectRatio="xMidYMid meet"
-        style="width: 100%; height: auto; max-width: {svgWidth}px;"
-      >
-      </svg>
+      <div class="panel-container" style="max-width: {svgWidth}px;">
+        <svg
+          bind:this={leftSvgElement}
+          viewBox="0 0 {svgWidth} {svgHeight}"
+          preserveAspectRatio="xMidYMid meet"
+          style="width: 100%; height: auto;"
+        >
+        </svg>
+        <canvas
+          bind:this={leftCanvas}
+          class="canvas-overlay"
+        ></canvas>
+      </div>
     {/snippet}
 
     {#snippet right()}
-      <svg
-        bind:this={rightSvgElement}
-        viewBox="0 0 {svgWidth} {svgHeight}"
-        preserveAspectRatio="xMidYMid meet"
-        style="width: 100%; height: auto; max-width: {svgWidth}px;"
-      >
-      </svg>
+      <div class="panel-container" style="max-width: {svgWidth}px;">
+        <svg
+          bind:this={rightSvgElement}
+          viewBox="0 0 {svgWidth} {svgHeight}"
+          preserveAspectRatio="xMidYMid meet"
+          style="width: 100%; height: auto;"
+        >
+        </svg>
+        <canvas
+          bind:this={rightCanvas}
+          class="canvas-overlay"
+        ></canvas>
+      </div>
+    {/snippet}
+
+    {#snippet footer()}
+      <TimeSlider
+        bind:value={time}
+        {isPlaying}
+        min={0}
+        max={1}
+        onTogglePlay={togglePlayPause}
+        onInput={handleSliderInput}
+        color="#f17720"
+      />
     {/snippet}
   </DoubleFigure>
 {:else}
@@ -335,14 +367,18 @@
 {/if}
 
 <style>
-  .caption {
-    font-size: 1.1rem;
-    line-height: 1.5;
-    color: #555;
+  .panel-container {
+    position: relative;
+    width: 100%;
   }
 
-  .figure-number {
-    font-weight: 600;
+  .canvas-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
   }
 
   .placeholder {
