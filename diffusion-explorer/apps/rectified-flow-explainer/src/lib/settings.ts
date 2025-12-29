@@ -46,8 +46,8 @@ export const settings = {
   cachedRectifiedFlowVectorFieldPath: "cached_samples/rectified_flow_vector_field.json" as string | null,
 
   // Worker URLs
-  trainWorkerUrl: 'src/lib/flow_matching_workers/train.worker.js',
-  samplingWorkerUrl: 'src/lib/flow_matching_workers/sampling.worker.js',
+  trainWorkerUrl: 'src/lib/flow_matching/workers/train.worker.js',
+  samplingWorkerUrl: 'src/lib/flow_matching/workers/sampling.worker.js',
 
   // Model paths (null means train from scratch, otherwise load from path)
   flowMatchingModelPath: null as string | null,

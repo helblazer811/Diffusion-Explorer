@@ -5,13 +5,14 @@
     downloadJSON,
     clipSamplesToRadius,
     clipAllRectifiedTrajectoriesToStartingRadius,
-  } from "$lib/utils";
+  } from "$lib/flow_matching/utils";
   import {
     settings,
     type VectorFieldData,
     type RectifiedFlowData,
   } from "$lib/settings";
-  import * as trainAndSample from "$lib/train_and_sample";
+  import * as train from "$lib/flow_matching/train";
+  import * as sample from "$lib/flow_matching/sample";
   import {
     loadBibliography,
     collectCitations,
@@ -25,7 +26,6 @@
   import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
   import EulerCircularDemo from "$lib/figures/EulerCircularDemo.svelte";
-  import RectifiedFlowVisualization from "$lib/figures/RectifiedFlowVisualization.svelte";
   import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
   import IntersectingPaths from "$lib/figures/IntersectingPaths.svelte";
@@ -80,7 +80,7 @@
   // ========== WRAPPER FUNCTIONS ==========
 
   async function loadTargetDistribution() {
-    const samples = await trainAndSample.loadTargetDistribution(
+    const samples = await sample.loadTargetDistribution(
       `${base}/${settings.targetDistributionPointsPath}`,
       settings.samplingSettings.flowMatching.numSamples
     );
@@ -92,7 +92,7 @@
   }
 
   async function loadCachedTrajectories(path: string) {
-    const result = await trainAndSample.loadCachedTrajectories(path);
+    const result = await sample.loadCachedTrajectories(path);
     if (result) {
       allTimeSamples.set(result.trajectories);
       sourceDistributionSamples.set(
@@ -107,7 +107,7 @@
   }
 
   async function loadCachedVectorField(path: string) {
-    const result = await trainAndSample.loadCachedVectorField(path);
+    const result = await sample.loadCachedVectorField(path);
     if (result) {
       vectorFieldData.set(result);
       return true;
@@ -117,7 +117,7 @@
 
   async function loadCachedRectifiedFlowTrajectories(path: string) {
     const result =
-      await trainAndSample.loadCachedRectifiedFlowTrajectories(path);
+      await sample.loadCachedRectifiedFlowTrajectories(path);
     if (result) {
       rectifiedFlowData.set(result);
       return true;
@@ -132,7 +132,7 @@
     if (isRectifiedFlow) {
       // Rectified flow grid is stored in RectifiedFlowData format: { allRectifiedTrajectories, modelPath }
       const rfResult =
-        await trainAndSample.loadCachedRectifiedFlowTrajectories(path);
+        await sample.loadCachedRectifiedFlowTrajectories(path);
       if (rfResult) {
         rectifiedFlowGridTrajectories.set(rfResult.allRectifiedTrajectories);
         return true;
@@ -140,7 +140,7 @@
       return false;
     } else {
       // Flow matching grid is stored as raw array format
-      const result = await trainAndSample.loadCachedTrajectories(path);
+      const result = await sample.loadCachedTrajectories(path);
       if (result) {
         flowMatchingGridTrajectories.set(result.trajectories);
         return true;
@@ -150,7 +150,7 @@
   }
 
   async function loadCachedRectifiedFlowVectorField(path: string) {
-    const result = await trainAndSample.loadCachedVectorField(path);
+    const result = await sample.loadCachedVectorField(path);
     if (result) {
       rectifiedFlowVectorFieldData.set(result);
       return true;
@@ -159,7 +159,7 @@
   }
 
   async function trainModel() {
-    const result = await trainAndSample.trainModel(
+    const result = await train.trainModel(
       settings.trainingSettings,
       settings.trainWorkerUrl,
       () => isTraining.set(true),
@@ -170,7 +170,7 @@
   }
 
   async function generateSamples(modelPath: string) {
-    const result = await trainAndSample.generateSamples(
+    const result = await sample.generateSamples(
       modelPath,
       settings.samplingSettings.flowMatching.numSamples,
       settings.samplingSettings.flowMatching.numSteps,
@@ -189,7 +189,7 @@
   }
 
   async function generateVectorField(modelPath: string) {
-    const result = await trainAndSample.generateVectorField(
+    const result = await sample.generateVectorField(
       modelPath,
       settings.samplingSettings.flowMatchingVectorField.gridResolution,
       settings.samplingSettings.flowMatchingVectorField.numTimeSteps,
@@ -202,7 +202,7 @@
   }
 
   async function trainRectifiedFlow() {
-    const result = await trainAndSample.trainRectifiedFlow(
+    const result = await train.trainRectifiedFlow(
       settings.trainingSettings,
       settings.trainWorkerUrl
     );
@@ -213,7 +213,7 @@
   }
 
   async function generateFlowMatchingGridSamples(modelPath: string) {
-    const result = await trainAndSample.generateSamplesUniformGrid(
+    const result = await sample.generateSamplesUniformGrid(
       modelPath,
       settings.samplingSettings.flowMatchingGrid.gridResolution,
       settings.samplingSettings.flowMatchingGrid.gridDomainRange,
@@ -232,7 +232,7 @@
     const gridTrajectories: number[][][][] = [];
 
     // For the "before" visualization, use the flow matching model (step 0)
-    const beforeResult = await trainAndSample.generateSamplesUniformGrid(
+    const beforeResult = await sample.generateSamplesUniformGrid(
       modelPath, // This should be the final rectified model
       settings.samplingSettings.rectifiedFlowGrid.gridResolution,
       settings.samplingSettings.rectifiedFlowGrid.gridDomainRange,
@@ -252,7 +252,7 @@
   }
 
   async function generateRectifiedFlowVectorField(modelPath: string) {
-    const result = await trainAndSample.generateVectorField(
+    const result = await sample.generateVectorField(
       modelPath,
       settings.samplingSettings.rectifiedFlowVectorField.gridResolution,
       settings.samplingSettings.rectifiedFlowVectorField.numTimeSteps,
@@ -536,28 +536,28 @@
     </div>
   </div>
 
-  <RectifiedFlowVisualization
+  <RectifiedFlowSuperimposed
     width={figureWidth}
-    allRectifiedTrajectories={clipAllRectifiedTrajectoriesToStartingRadius(
-      $rectifiedFlowData?.allRectifiedTrajectories ?? [],
-      settings.stylingSettings.scatterPlot.clippingRadius
-    )}
+    leftTrajectories={$flowMatchingGridTrajectories ?? []}
+    rightTrajectories={$rectifiedFlowGridTrajectories?.[
+      $rectifiedFlowGridTrajectories.length - 1
+    ] ?? []}
     targetDistribution={$targetDistributionSamples}
     playingByDefault={true}
+    backgroundVisible={false}
     onInitialized={() => {
       showOtherFigures = true;
       console.log(
-        "RectifiedFlowVisualization initialized, showing other figures."
+        "RectifiedFlowSuperimposed initialized, showing other figures."
       );
     }}
   >
     <div class="caption">
       <span class="figure-number">Figure 1:</span>
-      Watch how paths become straighter with each rectification step. Each step retrains
-      the model using trajectories from the previous step, progressively reducing
-      curvature.
+      A rectified flow learns straighter paths. Left: Before rectification -
+      curved trajectories. Right: After rectification - straighter trajectories.
     </div>
-  </RectifiedFlowVisualization>
+  </RectifiedFlowSuperimposed>
 
   <hr class="section-divider" />
 
