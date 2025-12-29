@@ -155,7 +155,7 @@
       top: 50%;
       transform: translateY(-50%);
       width: 220px;
-      max-height: calc(100vh - 200px);
+      max-height: calc(100vh - 100px);
       overflow-y: auto;
     }
   }
