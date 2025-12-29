@@ -2,90 +2,87 @@
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
   import Figure from "$lib/components/Figure.svelte";
-  import PlayButton from "$lib/components/PlayButton.svelte";
+  import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
+  import { drawScatterPlot } from "$lib/canvas/plotting";
+  import { drawTrajectoriesWithPreview } from "$lib/canvas/trajectories";
 
-  // Caption slot (passed as default children)
+  // ===== PROPS =====
+
+  // Caption slot
   export let children = undefined;
-  $: caption = children;
 
-  // Data props
-  export let trajectories = []; // [timestep][sample][dim] - allTimeSamples
-  export let sourceDistribution = []; // source distribution points
-  export let targetDistribution = []; // target distribution points
+  // Data
+  export let trajectories = []; // [timestep][sample][dim]
+  export let targetDistribution = [];
 
-  // Total number of trajectories (derived from data)
-  $: numTrajectories = isDataValid ? (trajectories[0]?.length || 0) : 0;
-
-  // Data validation
-  $: isDataValid =
-    trajectories &&
-    trajectories.length > 0 &&
-    sourceDistribution &&
-    sourceDistribution.length > 0 &&
-    targetDistribution &&
-    targetDistribution.length > 0;
-
-  // Configuration props
+  // Layout
   export let marginWidth = 20;
   export let marginHeight = 20;
-  export let svgWidth = 350;
-  export let svgHeight = 350;
-  export let trajectoryColor = settings.stylingSettings.trajectory.color;
-  export let sourceColor = "#3b82f6"; // Blue
-  export let targetColor = "#3b82f6"; // Blue
-  export let sourceOpacity = 0.35;
+  export let canvasWidth = 350;
+  export let canvasHeight = 350;
+  export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
+
+  // Target distribution styling
+  export let targetColor = "#3b82f6";
   export let targetOpacity = 0.35;
   export let distributionPointRadius = 5;
 
   // Trajectory styling
-  export let showTrajectoryPreview = false; // Show full trajectory path preview
-  export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
-  export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
+  export let trajectoryColor = settings.stylingSettings.trajectory.color;
   export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
   export let trajectoryPointRadius = settings.stylingSettings.trajectory.pointRadius;
-  export let animationDuration = 5000;
-  export let playingByDefault = true;
-  export let pauseDuration = 1000;
-  export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
+  export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
+  export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
+  export let showTrajectoryPreview = false;
 
-  // Background visibility
+  // Animation
+  export let animationDuration = 5000;
+  export let pauseDuration = 1000;
+  export let playingByDefault = true;
+
+  // Background
   export let backgroundVisible = true;
 
-  // SVG reference
-  let svgElement;
+  // ===== DERIVED =====
+
+  $: caption = children;
+  $: isDataValid =
+    trajectories?.length > 0 &&
+    targetDistribution?.length > 0;
+  $: numTimeSteps = isDataValid ? trajectories.length : 1;
+  $: numSegments = numTimeSteps - 1;
+  $: msPerSegment = numSegments > 0 ? animationDuration / numSegments : animationDuration;
+
+  // ===== STATE =====
+
+  // Canvas
+  let canvas;
+  let ctx;
+  let dpr = 1;
 
   // Scales
   let xScale;
   let yScale;
 
-  // Animation state
-  let currentTimeIndex = 0;
+  // Animation
+  let time = 0;
+  let currentSegmentIndex = 0;
+  let segmentAccumulator = 0;
   let isPlaying = playingByDefault;
   let animationFrameId = null;
+  let lastTimestamp = null;
+  let isPaused = false;
+  let pauseStartTime = null;
+
+  // Initialization
   let isInitialized = false;
 
+  // Pre-computed coordinates
+  let scaledTargetDistribution = [];
+  let scaledTrajectories = [];
 
-  // Visibility-based animation control
-  let figureIsActive;
-  let wasPlayingBeforeHidden = false;
-
-  // Derived values
-  $: numTimeSteps = isDataValid ? trajectories.length : 1;
-  $: normalizedTime = numTimeSteps > 1 ? currentTimeIndex / (numTimeSteps - 1) : 0;
-
-  // Pause animation when figure goes off-screen
-  $: if (figureIsActive && isInitialized) {
-    if (!$figureIsActive && isPlaying) {
-      wasPlayingBeforeHidden = true;
-      isPlaying = false;
-    } else if ($figureIsActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      isPlaying = true;
-      startAnimation();
-    }
-  }
-
+  // ===== FUNCTIONS =====
 
   function initializeScales() {
     if (!isDataValid) return;
@@ -95,165 +92,148 @@
     xScale = d3
       .scaleLinear()
       .domain([xMin, xMax])
-      .range([marginWidth, svgWidth - marginWidth]);
+      .range([marginWidth, canvasWidth - marginWidth]);
 
     yScale = d3
       .scaleLinear()
       .domain([yMin, yMax])
-      .range([marginHeight, svgHeight - marginHeight]);
+      .range([marginHeight, canvasHeight - marginHeight]);
   }
 
-  function initializeSvg() {
-    if (!svgElement || !xScale || !yScale) return;
+  function initializeCanvas() {
+    if (!canvas) return;
 
-    const svg = d3.select(svgElement);
-    svg.selectAll("*").remove();
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = canvasWidth * dpr;
+    canvas.height = canvasHeight * dpr;
+    ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+  }
 
-    // Add target distribution scatter
-    const targetGroup = svg.append("g").attr("id", "target-scatter");
-    targetGroup
-      .selectAll("circle")
-      .data(targetDistribution)
-      .enter()
-      .append("circle")
-      .attr("cx", d => xScale(d[0]))
-      .attr("cy", d => yScale(d[1]))
-      .attr("r", distributionPointRadius)
-      .attr("fill", targetColor)
-      .attr("opacity", targetOpacity);
+  function transposeAndScale(traj) {
+    if (!xScale || !yScale || !traj?.length) return [];
+    const numSamples = traj[0]?.length || 0;
+    return Array.from({ length: numSamples }, (_, i) =>
+      traj.map(ts => [xScale(ts[i][0]), yScale(ts[i][1])])
+    );
+  }
 
-    // Add trajectory path group
-    svg.append("g").attr("id", "trajectory-group");
+  function precomputeCoordinates() {
+    if (!xScale || !yScale) return;
 
-    // Add current position markers for each trajectory
-    const markersGroup = svg.append("g").attr("id", "markers-group");
-    for (let i = 0; i < numTrajectories; i++) {
-      markersGroup
-        .append("circle")
-        .attr("class", `current-position-${i}`)
-        .attr("r", trajectoryPointRadius)
-        .attr("fill", trajectoryColor)
-        .attr("opacity", trajectoryProgressOpacity);
-    }
+    scaledTargetDistribution = targetDistribution.map(p => [xScale(p[0]), yScale(p[1])]);
+    scaledTrajectories = transposeAndScale(trajectories);
+  }
+
+  function draw() {
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Draw target distribution
+    drawScatterPlot(ctx, scaledTargetDistribution, distributionPointRadius, targetColor, targetOpacity);
+
+    // Draw trajectories
+    drawTrajectoriesWithPreview(ctx, scaledTrajectories, currentSegmentIndex, {
+      strokeWidth: trajectoryStrokeWidth,
+      color: trajectoryColor,
+      progressOpacity: trajectoryProgressOpacity,
+      pointRadius: trajectoryPointRadius,
+      showPreview: showTrajectoryPreview,
+      previewOpacity: trajectoryFullOpacity
+    });
   }
 
   function initializeVisualization() {
-    if (!svgElement || !isDataValid) return;
+    if (!canvas || !isDataValid) return;
 
     initializeScales();
-    initializeSvg();
-    updateVisualization(currentTimeIndex);
+    initializeCanvas();
+    precomputeCoordinates();
     isInitialized = true;
+    draw();
   }
 
-  function updateVisualization(timeIndex) {
-    if (!svgElement || !isDataValid || !xScale || !yScale) return;
-
-    const svg = d3.select(svgElement);
-    const numSteps = trajectories.length;
-
-    const trajectoryTimeIndex = Math.floor(
-      (timeIndex / (numSteps - 1)) * (numSteps - 1)
-    );
-
-    // Update trajectory paths
-    const trajectoryGroup = svg.select("#trajectory-group");
-    trajectoryGroup.selectAll("*").remove();
-
-    // Draw all trajectories
-    for (let i = 0; i < numTrajectories; i++) {
-      const trajectoryPoints = trajectories.map((timestep) => timestep[i]);
-
-      // Draw full trajectory path preview (lighter) - only if enabled
-      if (showTrajectoryPreview) {
-        const fullPath = trajectoryPoints
-          .map((point, j) => {
-            const [x, y] = point;
-            return `${j === 0 ? "M" : "L"} ${xScale(x)},${yScale(y)}`;
-          })
-          .join(" ");
-
-        trajectoryGroup
-          .append("path")
-          .attr("d", fullPath)
-          .attr("fill", "none")
-          .attr("stroke", trajectoryColor)
-          .attr("stroke-width", trajectoryStrokeWidth)
-          .attr("opacity", trajectoryFullOpacity);
-      }
-
-      // Draw animated trajectory path (up to current time)
-      const animatedPath = trajectoryPoints
-        .slice(0, trajectoryTimeIndex + 1)
-        .map((point, j) => {
-          const [x, y] = point;
-          return `${j === 0 ? "M" : "L"} ${xScale(x)},${yScale(y)}`;
-        })
-        .join(" ");
-
-      if (animatedPath) {
-        trajectoryGroup
-          .append("path")
-          .attr("d", animatedPath)
-          .attr("fill", "none")
-          .attr("stroke", trajectoryColor)
-          .attr("stroke-width", trajectoryStrokeWidth)
-          .attr("opacity", trajectoryProgressOpacity);
-      }
-
-      // Update current position marker
-      if (trajectoryTimeIndex < trajectoryPoints.length) {
-        const [currentX, currentY] = trajectoryPoints[trajectoryTimeIndex];
-        svg
-          .select(`.current-position-${i}`)
-          .attr("cx", xScale(currentX))
-          .attr("cy", yScale(currentY));
-      }
+  function animate(ts) {
+    if (!isPlaying) {
+      animationFrameId = null;
+      return;
     }
-  }
 
-  function startAnimation() {
-    if (!isDataValid) return;
+    if (lastTimestamp === null) lastTimestamp = ts;
+    const elapsed = ts - lastTimestamp;
+    lastTimestamp = ts;
 
-    const numSteps = trajectories.length;
-    const stepDuration = animationDuration / numSteps;
-
-    function animate() {
-      if (!isPlaying) {
-        animationFrameId = null;
-        return;
+    if (isPaused && pauseStartTime !== null) {
+      if (ts - pauseStartTime >= pauseDuration) {
+        isPaused = false;
+        pauseStartTime = null;
+        currentSegmentIndex = 0;
+        segmentAccumulator = 0;
+        time = 0;
+        draw();
       }
+      animationFrameId = requestAnimationFrame(animate);
+      return;
+    }
 
-      updateVisualization(currentTimeIndex);
+    segmentAccumulator += elapsed;
+    while (segmentAccumulator >= msPerSegment && currentSegmentIndex < numSegments) {
+      segmentAccumulator -= msPerSegment;
+      currentSegmentIndex += 1;
+    }
 
-      const isLastFrame = currentTimeIndex === numSteps - 1;
-      const delay = isLastFrame ? stepDuration + pauseDuration : stepDuration;
+    time = numSegments > 0 ? currentSegmentIndex / numSegments : 0;
+    draw();
 
-      const nextTimeIndex = (currentTimeIndex + 1) % numSteps;
-      currentTimeIndex = nextTimeIndex;
-
-      setTimeout(() => {
-        animationFrameId = requestAnimationFrame(animate);
-      }, delay);
+    if (currentSegmentIndex >= numSegments) {
+      isPaused = true;
+      pauseStartTime = ts;
     }
 
     animationFrameId = requestAnimationFrame(animate);
   }
 
-  function togglePlayPause() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else if (animationFrameId) {
+  function startAnimation() {
+    if (animationFrameId !== null) return;
+    lastTimestamp = null;
+    animationFrameId = requestAnimationFrame(animate);
+  }
+
+  function stopAnimation() {
+    if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
     }
   }
 
-  $: if (isDataValid && svgElement && !isInitialized) {
-    initializeVisualization();
-    if (isPlaying) startAnimation();
+  function togglePlayPause() {
+    isPlaying = !isPlaying;
+    if (!isPlaying) {
+      stopAnimation();
+    }
   }
+
+  function handleSliderInput() {
+    if (isPlaying) {
+      isPlaying = false;
+      stopAnimation();
+    }
+    currentSegmentIndex = Math.round(time * numSegments);
+    segmentAccumulator = 0;
+    draw();
+  }
+
+  // ===== REACTIVE EFFECTS =====
+
+  $: if (isDataValid && canvas && !isInitialized) {
+    initializeVisualization();
+  }
+
+  $: if (isPlaying && isInitialized && !animationFrameId) startAnimation();
+  $: if (!isPlaying && animationFrameId) stopAnimation();
+
+  // ===== LIFECYCLE =====
 
   onMount(() => {
     // Initialization handled by reactive statement
@@ -267,16 +247,23 @@
 </script>
 
 {#if isDataValid}
-  <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+  <Figure {caption} {backgroundVisible}>
     {#snippet children()}
-      <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
-      <svg
-        bind:this={svgElement}
-        viewBox="0 0 {svgWidth} {svgHeight}"
-        preserveAspectRatio="xMidYMid meet"
-        style="width: 100%; height: auto; max-width: {svgWidth}px;"
-      >
-      </svg>
+      <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+        <canvas
+          bind:this={canvas}
+          style="width: 100%; height: auto; max-width: {canvasWidth}px; aspect-ratio: {canvasWidth}/{canvasHeight};"
+        ></canvas>
+        <TimeSlider
+          bind:value={time}
+          {isPlaying}
+          min={0}
+          max={1}
+          onTogglePlay={togglePlayPause}
+          onInput={handleSliderInput}
+          color={trajectoryColor}
+        />
+      </div>
     {/snippet}
   </Figure>
 {:else}
