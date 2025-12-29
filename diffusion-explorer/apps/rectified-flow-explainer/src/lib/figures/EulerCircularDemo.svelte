@@ -1,28 +1,94 @@
 <!-- Visualizes Euler's method on a circular vector field -->
 
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import * as d3 from 'd3';
   import Figure from '$lib/components/Figure.svelte';
   import TimeSlider from '$lib/components/TimeSlider.svelte';
   import { settings } from '$lib/settings';
+  import { drawVectorField } from '$lib/canvas/plotting';
+  import { drawTrajectoriesWithPreview } from '$lib/canvas/trajectories';
+
+  // ===== PROPS =====
+
+  // Caption slot
+  export let children = undefined;
+
+  // Layout
+  export let width = 600;
+  export let height = 400;
+  export let margin = 40;
+
+  // Vector field
+  export let gridResolutionX = 12;
+  export let gridResolutionY = 8;
+  export let arrowScale = 40;
+  export let arrowColor = '#3b82f6';
+  export let arrowOpacity = 0.7;
+  export let arrowThickness = 3.0;
+
+  // Trajectory
+  export let startPoint = [2, 0];  // Start on the ellipse (a=2)
+  export let numSteps = 63;
+  export let trajectoryColor = settings.stylingSettings.trajectory.color;
+  export let trajectoryWidth = settings.stylingSettings.trajectory.strokeWidth;
+  export let pointRadius = settings.stylingSettings.trajectory.pointRadius;
+
+  // Animation
+  export let animationDuration = 6000;
+  export let playingByDefault = true;
+  export let backgroundVisible = true;
+
+  // ===== STATE =====
+
+  // Canvas
+  let canvas;
+  let ctx;
+  let dpr = 1;
+
+  // Scales
+  let xScale;
+  let yScale;
+
+  // Animation
+  let time = 0;
+  let stepSize = 0.1;
+  let isPlaying = playingByDefault;
+  let animationFrameId = null;
+  let animationStartTime = null;
+  let isInitialized = false;
+  let wasJustResumed = false;
+
+  // Pre-computed coordinates
+  let scaledTrajectory = [];      // [[x,y], ...] in pixels
+  let scaledGridPositions = [];   // [[x,y], ...] in pixels
+  let scaledVelocities = [];      // [[vx,vy], ...] (scaled for display)
+
+  // ===== HELPERS =====
+
+  // Constants
+  const ellipseA = 2;
+  const ellipseB = 1;
+  const domainRange = { xMin: -4, xMax: 4, yMin: -2, yMax: 2 };
 
   // Elliptical vector field: velocity tangent to ellipse
   function createEllipticalVectorField(a, b) {
     return (x, y) => [-y * a / b, x * b / a];
   }
 
+  const ellipticalVectorField = createEllipticalVectorField(ellipseA, ellipseB);
+
   // Generate trajectory using Euler's method
-  function generateEulerTrajectory(startPoint, stepSize, numSteps, vectorField) {
-    const trajectory = [[...startPoint]];
-    let [x, y] = startPoint;
-    for (let i = 0; i < numSteps; i++) {
+  function generateEulerTrajectory(startPt, step, steps, vectorField) {
+    const traj = [[...startPt]];
+    let [x, y] = startPt;
+    for (let i = 0; i < steps; i++) {
       const [vx, vy] = vectorField(x, y);
-      x = x + stepSize * vx;
-      y = y + stepSize * vy;
-      trajectory.push([x, y]);
+      x = x + step * vx;
+      y = y + step * vy;
+      traj.push([x, y]);
     }
-    return trajectory;
+    return traj;
   }
 
   // Generate grid points and velocities for vector field
@@ -52,219 +118,119 @@
     return maxMag;
   }
 
-  // Ellipse parameters (semi-major axis a=2, semi-minor axis b=1)
-  const ellipseA = 2;
-  const ellipseB = 1;
-  const ellipticalVectorField = createEllipticalVectorField(ellipseA, ellipseB);
-
-  // Caption slot
-  export let children = undefined;
+  // Derived data
   $: caption = children;
-
-  // Layout props
-  export let width = 600;
-  export let height = 400;
-  export let margin = 40;
-
-  // Vector field props
-  export let gridResolutionX = 12;
-  export let gridResolutionY = 8;
-  export let arrowScale = 40;
-  export let arrowColor = '#3b82f6';
-  export let arrowOpacity = 0.7;
-  export let arrowThickness = 2.0;
-
-  // Trajectory props
-  export let startPoint = [2, 0];  // Start on the ellipse (a=2)
-  let stepSize = 0.1;
-  export let numSteps = 63;
-  export let trajectoryColor = settings.stylingSettings.trajectory.color;
-  export let trajectoryWidth = settings.stylingSettings.trajectory.strokeWidth;
-  export let pointRadius = settings.stylingSettings.trajectory.pointRadius;
-  export let pointColor = settings.stylingSettings.trajectory.color;
-
-  // Animation props
-  export let animationDuration = 6000;
-  export let playingByDefault = true;
-  export let backgroundVisible = true;
-
-  // Domain range (wider for ellipse)
-  const domainRange = { xMin: -4, xMax: 4, yMin: -2, yMax: 2 };
-
-  // State
-  let svgElement;
-  let time = 0;
-  let isPlaying = playingByDefault;
-  let animationFrameId = null;
-  let animationStartTime = null;
-  let isInitialized = false;
-  let totalPathLength = 0;
-  let wasJustResumed = false; // Track if we just resumed from pause
-
-  // Generate data
   $: vectorFieldData = generateVectorFieldGrid(gridResolutionX, gridResolutionY, domainRange, ellipticalVectorField);
   $: trajectory = generateEulerTrajectory(startPoint, stepSize, numSteps, ellipticalVectorField);
   $: maxVelocity = computeMaxVelocity(vectorFieldData.velocities);
+  $: numSegments = trajectory.length - 1;
 
-  // Scales
-  $: xScale = d3.scaleLinear()
-    .domain([domainRange.xMin, domainRange.xMax])
-    .range([margin, width - margin]);
+  // ===== INITIALIZATION =====
 
-  $: yScale = d3.scaleLinear()
-    .domain([domainRange.yMin, domainRange.yMax])
-    .range([height - margin, margin]);
+  function initializeScales() {
+    xScale = d3.scaleLinear()
+      .domain([domainRange.xMin, domainRange.xMax])
+      .range([margin, width - margin]);
 
-  // Generate SVG path from trajectory
-  $: trajectoryPath = trajectory.length > 0
-    ? d3.line()
-        .x(d => xScale(d[0]))
-        .y(d => yScale(d[1]))(trajectory)
-    : '';
-
-  function toggleAnimation() {
-    if (!isPlaying) {
-      wasJustResumed = true; // Mark that we're resuming
-    }
-    isPlaying = !isPlaying;
+    yScale = d3.scaleLinear()
+      .domain([domainRange.yMin, domainRange.yMax])
+      .range([height - margin, margin]);
   }
 
-  function handleSliderInput() {
-    const now = performance.now();
-    animationStartTime = now - (time * animationDuration);
+  function initializeCanvas() {
+    if (!canvas) return;
+
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+
+    ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+  }
+
+  function precomputeCoordinates() {
+    if (!xScale || !yScale) return;
+
+    // Scale trajectory points
+    scaledTrajectory = trajectory.map(p => [xScale(p[0]), yScale(p[1])]);
+
+    // Scale vector field grid positions
+    scaledGridPositions = vectorFieldData.gridPoints.map(p => [xScale(p[0]), yScale(p[1])]);
+
+    // Y-flip velocities for canvas coords (canvas Y increases downward)
+    // Let drawVectorField handle magnitude normalization and scaling
+    scaledVelocities = vectorFieldData.velocities.map(([vx, vy]) => [vx, -vy]);
   }
 
   function initializeVisualization() {
-    if (!svgElement) return;
+    if (!canvas) return;
 
-    const svg = d3.select(svgElement);
-    svg.selectAll('*').remove();
-
-    // Add arrow marker definition
-    const defs = svg.append('defs');
-    defs.append('marker')
-      .attr('id', 'arrow-marker')
-      .attr('viewBox', '0 -5 10 10')
-      .attr('refX', 8)
-      .attr('refY', 0)
-      .attr('markerWidth', 4)
-      .attr('markerHeight', 4)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M0,-5L10,0L0,5')
-      .attr('fill', arrowColor);
-
-    // Draw vector field arrows
-    const arrowsGroup = svg.append('g').attr('id', 'arrows');
-
-    vectorFieldData.gridPoints.forEach((point, i) => {
-      const [x, y] = point;
-      const [vx, vy] = vectorFieldData.velocities[i];
-      const mag = Math.sqrt(vx * vx + vy * vy);
-
-      if (mag > 0.01) {
-        const scale = arrowScale / maxVelocity;
-        arrowsGroup.append('line')
-          .attr('x1', xScale(x))
-          .attr('y1', yScale(y))
-          .attr('x2', xScale(x) + vx * scale)
-          .attr('y2', yScale(y) - vy * scale)  // Negative because SVG y is flipped
-          .attr('stroke', arrowColor)
-          .attr('stroke-width', arrowThickness)
-          .attr('stroke-opacity', arrowOpacity)
-          .attr('marker-end', 'url(#arrow-marker)');
-      }
-    });
-
-    // Draw trajectory background (full path, lighter)
-    svg.append('path')
-      .attr('id', 'trajectory-bg')
-      .attr('d', trajectoryPath)
-      .attr('fill', 'none')
-      .attr('stroke', trajectoryColor)
-      .attr('stroke-width', trajectoryWidth)
-      .attr('stroke-opacity', 0.2);
-
-    // Draw trajectory progress (animated)
-    const progressPath = svg.append('path')
-      .attr('id', 'trajectory-progress')
-      .attr('d', trajectoryPath)
-      .attr('fill', 'none')
-      .attr('stroke', trajectoryColor)
-      .attr('stroke-width', trajectoryWidth)
-      .attr('stroke-linecap', 'round');
-
-    // Get total path length for animation
-    totalPathLength = progressPath.node().getTotalLength();
-
-    progressPath
-      .attr('stroke-dasharray', `${totalPathLength} ${totalPathLength}`)
-      .attr('stroke-dashoffset', totalPathLength);
-
-    // Draw current position marker
-    svg.append('circle')
-      .attr('id', 'position-marker')
-      .attr('r', pointRadius)
-      .attr('fill', pointColor)
-      .attr('cx', xScale(trajectory[0][0]))
-      .attr('cy', yScale(trajectory[0][1]));
-
+    initializeScales();
+    initializeCanvas();
+    precomputeCoordinates();
     isInitialized = true;
+    draw();
   }
 
-  function updateVisualization() {
-    if (!svgElement || !isInitialized) return;
+  // ===== DRAWING =====
 
-    const svg = d3.select(svgElement);
-    const visibleLength = totalPathLength * time;
+  function draw() {
+    if (!ctx) return;
 
-    // Update trajectory progress
-    svg.select('#trajectory-progress')
-      .attr('stroke-dashoffset', totalPathLength - visibleLength);
+    ctx.clearRect(0, 0, width, height);
 
-    // Update position marker
-    const pathElement = svg.select('#trajectory-progress').node();
-    if (pathElement && visibleLength > 0) {
-      const point = pathElement.getPointAtLength(visibleLength);
-      svg.select('#position-marker')
-        .attr('cx', point.x)
-        .attr('cy', point.y);
-    } else {
-      svg.select('#position-marker')
-        .attr('cx', xScale(trajectory[0][0]))
-        .attr('cy', yScale(trajectory[0][1]));
+    // Draw vector field
+    drawVectorField(ctx, scaledGridPositions, scaledVelocities, {
+      arrowScale: arrowScale,
+      strokeWidth: arrowThickness,
+      color: arrowColor,
+      opacity: arrowOpacity,
+      normalizeVectors: false
+    });
+
+    // Draw trajectory with preview
+    const segmentIndex = Math.floor(time * numSegments);
+    drawTrajectoriesWithPreview(ctx, [scaledTrajectory], segmentIndex, {
+      strokeWidth: trajectoryWidth,
+      color: trajectoryColor,
+      progressOpacity: 1.0,
+      pointRadius: pointRadius,
+      showPreview: true,
+      previewOpacity: 0.2
+    });
+  }
+
+  // ===== ANIMATION =====
+
+  function animate(currentTime) {
+    if (!isPlaying) {
+      animationFrameId = requestAnimationFrame(animate);
+      return;
     }
+
+    // When resuming, recalculate animationStartTime to continue from current position
+    if (wasJustResumed) {
+      animationStartTime = currentTime - (time * animationDuration);
+      wasJustResumed = false;
+    } else if (animationStartTime === null) {
+      animationStartTime = currentTime;
+    }
+
+    const elapsed = currentTime - animationStartTime;
+    time = Math.min(elapsed / animationDuration, 1);
+
+    if (time >= 1) {
+      // Reset animation with random step size
+      animationStartTime = currentTime;
+      time = 0;
+      stepSize = Math.round((0.01 + Math.random() * (0.15 - 0.01)) * 100) / 100;
+    }
+
+    draw();
+    animationFrameId = requestAnimationFrame(animate);
   }
 
   function startAnimation() {
-    function animate(currentTime) {
-      if (!isPlaying) {
-        animationFrameId = requestAnimationFrame(animate);
-        return;
-      }
-
-      // When resuming, recalculate animationStartTime to continue from current time position
-      if (wasJustResumed) {
-        animationStartTime = currentTime - (time * animationDuration);
-        wasJustResumed = false;
-      } else if (animationStartTime === null) {
-        animationStartTime = currentTime;
-      }
-
-      const elapsed = currentTime - animationStartTime;
-      time = Math.min(elapsed / animationDuration, 1);
-
-      if (time >= 1) {
-        // Reset animation with random step size
-        animationStartTime = currentTime;
-        time = 0;
-        stepSize = Math.round((0.01 + Math.random() * (0.15 - 0.01)) * 100) / 100;
-      }
-
-      updateVisualization();
-      animationFrameId = requestAnimationFrame(animate);
-    }
-
     animationFrameId = requestAnimationFrame(animate);
   }
 
@@ -275,40 +241,54 @@
     }
   }
 
-  // Update visualization when time changes (e.g., from slider drag while paused)
-  $: if (isInitialized && time !== undefined) {
-    updateVisualization();
+  function toggleAnimation() {
+    if (!isPlaying) {
+      wasJustResumed = true;
+    }
+    isPlaying = !isPlaying;
   }
 
-  // Reinitialize when stepSize changes
-  $: if (isInitialized && stepSize) {
-    initializeVisualization();
+  function handleSliderInput() {
+    const now = performance.now();
+    animationStartTime = now - (time * animationDuration);
   }
 
   function handleStepSizeInput(event) {
     stepSize = parseFloat(event.target.value);
   }
 
+  // ===== REACTIVE EFFECTS =====
+
+  // Redraw when time changes (e.g., from slider drag while paused)
+  $: if (isInitialized && time !== undefined) {
+    draw();
+  }
+
+  // Recompute coordinates when trajectory changes (stepSize updates trigger this)
+  $: if (isInitialized && trajectory) {
+    precomputeCoordinates();
+    draw();
+  }
+
+  // ===== LIFECYCLE =====
+
   onMount(() => {
     initializeVisualization();
     startAnimation();
+  });
 
-    return () => {
-      stopAnimation();
-    };
+  onDestroy(() => {
+    stopAnimation();
   });
 </script>
 
 <Figure {caption} {backgroundVisible}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
-      <svg
-        bind:this={svgElement}
-        viewBox="0 0 {width} {height}"
-        preserveAspectRatio="xMidYMid meet"
-        style="width: 100%; height: auto; max-width: {width}px;"
-      >
-      </svg>
+      <canvas
+        bind:this={canvas}
+        style="width: 100%; height: auto; max-width: {width}px; aspect-ratio: {width}/{height};"
+      ></canvas>
       <TimeSlider
         bind:value={time}
         bind:isPlaying={isPlaying}
