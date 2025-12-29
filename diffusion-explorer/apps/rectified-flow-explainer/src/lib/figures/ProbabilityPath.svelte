@@ -152,10 +152,11 @@
   }
 
   async function preRenderLabels() {
+    const latexColor = settings.stylingSettings.figureLatex.color;
     try {
       [p0LabelSvg, p1LabelSvg, ptLabelSvg] = await Promise.all([
-        latexToSvgElement("p_0"),
-        latexToSvgElement("p_1"),
+        latexToSvgElement("p_0", { color: latexColor }),
+        latexToSvgElement("p_1", { color: latexColor }),
         latexToSvgElement("p_t", { color: intermediatePointColor }),
       ]);
     } catch (e) {
@@ -173,15 +174,16 @@
     const textLabelY = scales.yScale(yTop) + 0.5 * labelFontSize;
     const mathLabelY = textLabelY + labelFontSize;
 
+    const labelOffsetY = 8;
     if (p0LabelSvg) {
-      placeMathjaxSVG(p0LabelSvg.cloneNode(true), svgOverlay, scales.sourceCenterPixelX, mathLabelY, 0, 0);
+      placeMathjaxSVG(p0LabelSvg.cloneNode(true), svgOverlay, scales.sourceCenterPixelX, mathLabelY, 0, labelOffsetY, 50, 1.4);
     }
     if (p1LabelSvg) {
-      placeMathjaxSVG(p1LabelSvg.cloneNode(true), svgOverlay, scales.targetCenterPixelX, mathLabelY, 0, 0);
+      placeMathjaxSVG(p1LabelSvg.cloneNode(true), svgOverlay, scales.targetCenterPixelX, mathLabelY, 0, labelOffsetY, 50, 1.4);
     }
     if (time >= 0.1 && time <= 0.9 && ptLabelSvg) {
       const centerX = scales.sourceCenterPixelX + time * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
-      placeMathjaxSVG(ptLabelSvg.cloneNode(true), svgOverlay, centerX, mathLabelY, 0, 0);
+      placeMathjaxSVG(ptLabelSvg.cloneNode(true), svgOverlay, centerX, mathLabelY, 0, labelOffsetY, 50, 1.4);
     }
   }
 
