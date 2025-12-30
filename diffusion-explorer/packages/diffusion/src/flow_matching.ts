@@ -15,7 +15,7 @@ export class FlowModel extends Model {
      * @param batchSize number of samples to use in each batch
      * @param updateInterval number of epochs to wait before updating the model
      * @param stopTraining function to check if training should stop
-     * @param endEpochCallback function to call at the end of each epoch
+     * @param endEpochCallback function to call at the end of each epoch with (epoch, samples, loss)
      * @param source_distribution tf.Tensor2D | null - source distribution. If null, generates random noise each batch
      * @returns Promise<void>
      */
@@ -25,7 +25,7 @@ export class FlowModel extends Model {
         batchSize: number = 32,
         updateInterval: number = 50,
         stopTraining: () => boolean = () => { return false; },
-        endEpochCallback: (epoch: number, intermediateSamples: number[][] | null) => void = () => { },
+        endEpochCallback: (epoch: number, intermediateSamples: number[][] | null, loss?: number) => void = () => { },
         source_distribution: tf.Tensor2D | null = null,
     ): Promise<void> {
         // Run training
@@ -46,9 +46,13 @@ export class FlowModel extends Model {
             // Shuffle indices for each epoch
             const indices = tf.util.createShuffledIndices(numSamples);
 
+            // Track epoch loss
+            let epochLoss = 0;
+            let batchCount = 0;
+
             // Iterate over batches
             for (let batchIdx = 0; batchIdx < numBatches; batchIdx++) {
-                tf.tidy(() => {
+                const batchLoss = tf.tidy(() => {
                     // Get batch indices
                     const batchIndicesArray = indices.slice(
                         batchIdx * batchSize,
@@ -77,14 +81,22 @@ export class FlowModel extends Model {
                     const x_t = x_0.mul(tf.sub(1, t)).add(x_1.mul(t));
                     const dx_t = x_1.sub(x_0) // dx_t = x_1 - x_0
 
-                    // Run the optimizer with the mse loss
+                    // Run the optimizer with the mse loss and capture loss value
+                    let lossValue = 0;
                     optimizer.minimize(() => {
                         const pred = this.forward(x_t, t);
                         const loss = lossFn(pred, dx_t);
+                        lossValue = loss.dataSync()[0];
                         return loss;
                     });
+                    return lossValue;
                 });
+                epochLoss += batchLoss;
+                batchCount++;
             }
+
+            // Compute average epoch loss
+            const avgEpochLoss = epochLoss / batchCount;
 
             // Run intermediate sampling
             let intermediateSamples = null;
@@ -99,9 +111,8 @@ export class FlowModel extends Model {
                 const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0); // shape [num_samples, dim]
                 intermediateSamples = lastTimeStep.arraySync();
             }
-            // Run the end epoch callback
-            // TODO: add the loss
-            endEpochCallback(epoch, intermediateSamples);
+            // Run the end epoch callback with loss
+            endEpochCallback(epoch, intermediateSamples, avgEpochLoss);
             // Yield control to the worker event loop to handle stop events
             await tf.nextFrame();
             // Check if the training should continue
@@ -134,7 +145,7 @@ export class FlowModel extends Model {
         batchSize: number = 32,
         num_simulation_steps: number = 200,
         stopTraining: () => boolean = () => false,
-        endEpochCallback: (epoch: number, rectifiedStep: number, intermediateSamples: number[][] | null) => void = () => {},
+        endEpochCallback: (epoch: number, rectifiedStep: number, intermediateSamples: number[][] | null, loss?: number) => void = () => {},
         endRectifiedStepCallback: (rectifiedStep: number, intermediateSamples: number[][] | null) => void = () => {}
     ): Promise<void> {
         const numSamples = data.shape[0];
@@ -167,8 +178,8 @@ export class FlowModel extends Model {
 
             // Train flow matching with current coupling using the standard train method
             // Wrap the endEpochCallback to include the rectifiedStep parameter
-            const wrappedCallback = (epoch: number, intermediateSamples: number[][] | null) => {
-                endEpochCallback(epoch, rectifiedStep, intermediateSamples);
+            const wrappedCallback = (epoch: number, intermediateSamples: number[][] | null, loss?: number) => {
+                endEpochCallback(epoch, rectifiedStep, intermediateSamples, loss);
             };
 
             // Call the train method with the coupling

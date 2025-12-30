@@ -47,7 +47,7 @@
   export let vectorColor = "#f17720";
   export let vectorOpacity = 1.0;
   export let vectorWidth = 4.5;
-  export let vectorScale = 180;
+  export let vectorScale = 110;
   export let t = 0.4;
 
   // ===== LABEL STYLING =====

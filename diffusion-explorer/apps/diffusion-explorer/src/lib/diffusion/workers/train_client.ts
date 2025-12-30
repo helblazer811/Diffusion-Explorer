@@ -8,6 +8,12 @@ export function callTrainingWorkerThread(
     finishCallback: Function,
     epochCallback: Function
 ) {
+    // Assert worker URL exists
+    if (!trainWorkerUrl) {
+        throw new Error(`Training worker URL is undefined or null: ${trainWorkerUrl}`);
+    }
+    console.log('Creating training worker with URL:', trainWorkerUrl);
+
     // Create the worker
     const trainingWorker = new Worker(
         trainWorkerUrl,
@@ -29,6 +35,7 @@ export function callTrainingWorkerThread(
     };
     // Call the dummy worker thread 
     // Send a message
+    console.log('Sending training config to worker thread...');
     trainingWorker.postMessage({
         type: 'train',
         data: {

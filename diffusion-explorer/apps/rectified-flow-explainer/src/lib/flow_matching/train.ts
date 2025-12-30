@@ -44,7 +44,8 @@ export async function trainModel(
   console.log('Starting model training...');
   const modelConfig = settings.modelConfig;
   const trainingConfig = settings.flowMatchingTrainingConfig;
-  const datasetPath = globalSettings.targetDistributionPointsPath;
+  // Build absolute URL for worker to fetch (workers don't have same base URL context)
+  const datasetPath = new URL('/' + globalSettings.targetDistributionPointsPath, window.location.origin).href;
 
   onTrainingStart?.();
 
@@ -63,7 +64,9 @@ export async function trainModel(
         await downloadModelFromIndexedDB(tfModelPath, 'flow_matching_model');
         resolve({ modelPath: tfModelPath, worker });
       },
-      () => console.log("Intermediate epoch callback")
+      (epoch: number, _samples: unknown, loss: number) => {
+        console.log(`Epoch ${epoch}: loss = ${loss?.toFixed(6) ?? 'N/A'}`);
+      }
     );
   });
 }
@@ -77,7 +80,8 @@ export async function trainRectifiedFlow(
   console.log('Starting rectified flow training...');
   const modelConfig = settings.modelConfig;
   const rectifiedFlowConfig = settings.rectifiedFlowTrainingConfig;
-  const datasetPath = globalSettings.targetDistributionPointsPath;
+  // Build absolute URL for worker to fetch (workers don't have same base URL context)
+  const datasetPath = new URL('/' + globalSettings.targetDistributionPointsPath, window.location.origin).href;
 
   return new Promise((resolve) => {
     console.log("Starting rectified flow training worker thread...");
@@ -103,8 +107,8 @@ export async function trainRectifiedFlow(
         resolve({ data, worker });
       },
       // Epoch callback
-      (epoch: number, rectifiedStep: number, _intermediateSamples: number[][] | null) => {
-        console.log(`Rectified step ${rectifiedStep}, epoch ${epoch}`);
+      (epoch: number, rectifiedStep: number, _intermediateSamples: number[][] | null, loss?: number) => {
+        console.log(`Rectified step ${rectifiedStep}, epoch ${epoch}: loss = ${loss?.toFixed(6) ?? 'N/A'}`);
         onEpochCallback?.(epoch, rectifiedStep);
       },
       // Rectified step callback

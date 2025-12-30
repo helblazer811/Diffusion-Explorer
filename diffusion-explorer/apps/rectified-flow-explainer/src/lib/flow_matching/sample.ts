@@ -168,6 +168,37 @@ export async function loadCachedRectifiedFlowTrajectories(
 
 // ========== SAMPLING FUNCTIONS ==========
 
+/**
+ * Validates that a model path exists by checking for model.json
+ * @throws Error if the model path does not exist
+ */
+async function validateModelPath(modelPath: string): Promise<void> {
+  // Determine the model.json URL - if path already ends with .json, use it directly
+  // Otherwise append /model.json
+  const modelJsonPath = modelPath.endsWith('.json')
+    ? modelPath
+    : modelPath.endsWith('/')
+      ? `${modelPath}model.json`
+      : `${modelPath}/model.json`;
+
+  try {
+    const response = await fetch(modelJsonPath);
+    if (!response.ok) {
+      throw new Error(`Model not found at path: ${modelPath} (HTTP ${response.status} for ${modelJsonPath})`);
+    }
+    // Verify it's valid JSON
+    const data = await response.json();
+    if (!data.modelTopology && !data.weightsManifest) {
+      throw new Error(`Invalid model.json format at: ${modelJsonPath}`);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Model not found')) {
+      throw error;
+    }
+    throw new Error(`Failed to validate model at path: ${modelPath} - ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
 export async function generateSamples(
   modelPath: string,
   numSamples: number,
@@ -175,6 +206,9 @@ export async function generateSamples(
   settings: TrainingSettings,
   samplingWorkerUrl: string
 ): Promise<{ allTimeSamples: number[][][]; sourceDistribution: number[][] }> {
+  // Validate model path exists
+  await validateModelPath(modelPath);
+
   const modelConfig = settings.modelConfig;
   const initialPoints = generateClippedGaussianSamples(numSamples);
 
@@ -206,6 +240,9 @@ export async function generateSamplesUniformGrid(
   settings: TrainingSettings,
   samplingWorkerUrl: string
 ): Promise<{ allTimeSamples: number[][][]; sourceDistribution: number[][] }> {
+  // Validate model path exists
+  await validateModelPath(modelPath);
+
   const modelConfig = settings.modelConfig;
   const initialPoints = generateUniformGridSamples(gridResolution, gridDomainRange);
 
@@ -237,6 +274,9 @@ export async function generateVectorField(
   settings: TrainingSettings,
   samplingWorkerUrl: string
 ): Promise<VectorFieldData> {
+  // Validate model path exists
+  await validateModelPath(modelPath);
+
   console.log('Generating vector field...');
   const modelConfig = settings.modelConfig;
 

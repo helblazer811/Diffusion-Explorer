@@ -5,7 +5,6 @@
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/plotting/plotting";
-  import { drawTrajectoriesWithOpacityGradient } from "$lib/plotting/trajectories";
 
   // ===== PROPS =====
 
@@ -20,7 +19,7 @@
   export let marginWidth = 10;
   export let marginHeight = 10;
   export let gap = 20;
-  export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
+  export let domainRange = { xMin: -1.9, xMax: 1.9, yMin: -1.9, yMax: 1.9 };
 
   // Labels
   export let leftLabel = "Flow Matching";
@@ -49,8 +48,8 @@
   export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory visible with fade
 
   // Animation
-  export let leftAnimationDuration = 12000;
-  export let rightAnimationDuration = 3000;
+  export let leftAnimationDuration = 10000;
+  export let rightAnimationDuration = 5000;
   export let pauseDuration = 2000;
   export let playingByDefault = true;
 
@@ -109,7 +108,7 @@
   let pathsInitialized = false;
 
   // Pre-computed pixel coordinates (scaled once upfront)
-  let scaledTargetDistribution = [];  // [point][x,y] in pixels
+  let scaledTargetDistribution = [];  // [point][x,y] in pixels - target distribution
   let scaledLeftTrajectories = [];    // [trajectory][timestep][x,y] in pixels
   let scaledRightTrajectories = [];   // [trajectory][timestep][x,y] in pixels
 
@@ -167,12 +166,12 @@
   function precomputeCoordinates() {
     if (!xScale || !yScale) return;
 
-    // Scale target distribution
-    scaledTargetDistribution = targetDistribution.map(p => [xScale(p[0]), yScale(p[1])]);
-
     // Scale and transpose trajectories
     scaledLeftTrajectories = transposeAndScale(leftTrajectories);
     scaledRightTrajectories = transposeAndScale(rightTrajectories);
+
+    // Scale target distribution
+    scaledTargetDistribution = targetDistribution.map(p => [xScale(p[0]), yScale(p[1])]);
   }
 
   // Draw scatter plot + trajectories (using pre-scaled pixel coordinates)
@@ -182,19 +181,29 @@
     // Clear previous frame
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw target distribution scatter (behind trajectories)
+    // Draw target distribution as scatter (behind trajectories)
     drawScatterPlot(ctx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
 
-    // Draw trajectories with opacity gradient
-    drawTrajectoriesWithOpacityGradient(ctx, scaledTrajectories, segmentIndex, {
-      strokeWidth: trajectoryStrokeWidth,
-      color: trajectoryColor,
-      progressOpacity: trajectoryProgressOpacity,
-      pointRadius: trajectoryPointRadius,
-      showPreview: showTrajectoryPreview,
-      previewOpacity: trajectoryFullOpacity,
-      showHeadMarker: false
-    }, alphaTimeWindow);
+    // Draw trajectories as simple lines up to segmentIndex
+    ctx.strokeStyle = trajectoryColor;
+    ctx.lineWidth = trajectoryStrokeWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.globalAlpha = trajectoryProgressOpacity;
+
+    for (const trajectory of scaledTrajectories) {
+      const endIdx = Math.min(segmentIndex + 1, trajectory.length);
+      if (endIdx < 2) continue;
+
+      ctx.beginPath();
+      ctx.moveTo(trajectory[0][0], trajectory[0][1]);
+      for (let i = 1; i < endIdx; i++) {
+        ctx.lineTo(trajectory[i][0], trajectory[i][1]);
+      }
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1.0;
   }
 
   function initializeVisualization() {

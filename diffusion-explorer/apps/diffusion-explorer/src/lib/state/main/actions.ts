@@ -65,8 +65,8 @@ export function createMainStateHandlers(MainState: any) {
         const domainRange = settings.domainRange;
 
         if (!(datasetNameVal in datasetDictVal)) {
-            throw new Error(`Dataset name ${datasetNameVal} not found in dataset dictionary`);
-        }   
+            throw new Error(`Dataset name ${datasetNameVal} not found in dataset dictionary. Available keys: ${Object.keys(datasetDictVal).join(', ')}`);
+        }
         const pointData = datasetDictVal[datasetNameVal];
         if (!pointData) {
             throw new Error(`No data found for dataset ${datasetNameVal}`);
@@ -116,8 +116,11 @@ export function createMainStateHandlers(MainState: any) {
         if (!settings.trainingObjectiveToSamplers[trainingObjectiveVal].includes(samplerVal)) {
             sampler.set(settings.trainingObjectiveToSamplers[trainingObjectiveVal][0]);
         }
+        if (!datasetDictVal) {
+            throw new Error('Dataset dictionary is undefined');
+        }
         if (!(datasetNameVal in datasetDictVal)) {
-            throw new Error(`Dataset name ${datasetNameVal} not found in dataset dictionary`);
+            throw new Error(`Dataset name ${datasetNameVal} not found in dataset dictionary. Available keys: ${Object.keys(datasetDictVal).join(', ')}`);
         }
         const pointsData = datasetDictVal[datasetNameVal];
         const translatedData = convertDataToDisplayCoordinateFrame(

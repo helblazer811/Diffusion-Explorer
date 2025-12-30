@@ -87,12 +87,13 @@ self.onmessage = async (e) => {
         () => {
           return trainingStopped;
         },
-        (epoch, intermediateSamples) => {
-          // Send the intermediate samples to the main thread
+        (epoch, intermediateSamples, loss) => {
+          // Send the intermediate samples and loss to the main thread
           self.postMessage({
             type: "epoch_chunk",
             epoch: epoch,
             intermediateSamples: intermediateSamples,
+            loss: loss,
           });
         }
       );
@@ -111,12 +112,13 @@ self.onmessage = async (e) => {
         () => {
           return trainingStopped;
         },
-        (epoch, intermediateSamples) => {
-          // Send the intermediate samples to the main thread
+        (epoch, intermediateSamples, loss) => {
+          // Send the intermediate samples and loss to the main thread
           self.postMessage({
             type: "epoch_chunk",
             epoch: epoch,
             intermediateSamples: intermediateSamples,
+            loss: loss,
           });
         }
       );
@@ -176,16 +178,17 @@ self.onmessage = async (e) => {
       // Stop training function
       () => trainingStopped,
       // End epoch callback
-      (epoch, rectifiedStep, intermediateSamples) => {
+      (epoch: number, rectifiedStep: number, intermediateSamples: number[][] | null, loss?: number) => {
         self.postMessage({
           type: "epoch_chunk",
           epoch: epoch,
           rectifiedStep: rectifiedStep,
           intermediateSamples: intermediateSamples,
+          loss: loss,
         });
       },
       // End rectified step callback
-      (rectifiedStep, trajectories) => {
+      (rectifiedStep: number, trajectories: number[][][] | null) => {
         // Store the trajectories for this rectified step
         if (trajectories) {
           allRectifiedTrajectories.push(trajectories);
