@@ -2,12 +2,14 @@
 
 <script>
   import { onMount, onDestroy } from "svelte";
+  import * as d3 from "d3";
   import Figure from "$lib/components/Figure.svelte";
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
   import { drawScatterPlot, drawText } from "$lib/plotting/plotting";
   import { latexToSvgElement, placeMathjaxSVG } from "$lib/plotting/mathjax";
+  import { computeContours, plotContours } from "$lib/plotting/contours";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -55,6 +57,14 @@
   export let showSourceScatter = true;
   export let showTargetScatter = true;
   export let showIntermediateScatter = true;
+
+  // Contour plot options for P_t
+  export let showContours = false;
+  export let contourBandwidth = 15;
+  export let contourThresholds = 3;
+  export let contourOpacity = 0.3;
+  export let contourFillColor = "#f17720"; // Single color for all contours (matches intermediate point color)
+  export let contourBlendMode = undefined; // No blend mode - denser regions drawn on top appear more saturated
 
   // Canvas state
   let canvas;
@@ -216,14 +226,39 @@
       drawScatterPlot(ctx, targetPixelCoords, pointRadius, targetPointColor, pointOpacity);
     }
 
-    // Draw intermediate scatter (compute coords each frame since it changes)
-    if (showIntermediateScatter) {
-      const allSamples = $allTimeSamples;
-      if (allSamples && allSamples.length > 0) {
-        const currentStep = Math.round(time * (allSamples.length - 1));
-        const samples = allSamples[currentStep];
-        if (samples && samples.length > 0) {
-          const meanX = samples.reduce((s, p) => s + p[0], 0) / samples.length;
+    // Draw intermediate distribution (contours and/or scatter)
+    const allSamples = $allTimeSamples;
+    if (allSamples && allSamples.length > 0) {
+      const currentStep = Math.round(time * (allSamples.length - 1));
+      const samples = allSamples[currentStep];
+      if (samples && samples.length > 0) {
+        const meanX = samples.reduce((s, p) => s + p[0], 0) / samples.length;
+
+        // Draw contours for P_t (behind scatter points)
+        if (showContours) {
+          // Create scale functions for contour plotting
+          const xScaleForContour = (dataX) => getPixelX(dataX, meanX, time);
+          const yScaleForContour = (dataY) => scales.yScale(dataY);
+
+          // Compute and plot contours
+          const contourData = computeContours(samples, {
+            bandwidth: contourBandwidth,
+            thresholds: contourThresholds,
+          });
+
+          plotContours(ctx, contourData, {
+            xScale: xScaleForContour,
+            yScale: yScaleForContour,
+            fillColor: contourFillColor,
+            opacity: contourOpacity,
+            blendMode: contourBlendMode,
+            fill: true,
+            stroke: false,
+          });
+        }
+
+        // Draw intermediate scatter
+        if (showIntermediateScatter) {
           const coords = samples.map((p) => [
             getPixelX(p[0], meanX, time),
             scales.yScale(p[1]),
