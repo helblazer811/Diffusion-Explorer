@@ -6,7 +6,7 @@
   import { settings } from "$lib/settings";
   import { createSourceTargetScales, dataToPixelX } from "$lib/d3_helpers";
   import { drawScatterPlot, drawArrow, drawText } from "$lib/plotting/plotting";
-  import { latexToSvgElement, placeMathjaxSVG } from "$lib/plotting/mathjax";
+  import { drawMathjaxOnCanvas } from "$lib/plotting/mathjax";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -18,7 +18,7 @@
 
   // Arrow styling
   export let arrowColor = "#f17720";
-  export let arrowLength = 0.4;
+  export let arrowLength = 0.3;
   export let meanVectorColor = "#22c55e";
 
   // Layout/Styling
@@ -47,7 +47,7 @@
   // LaTeX label offsets
   export let topArrowLabelOffset = { x: -55, y: -45 };
   export let bottomArrowLabelOffset = { x: -55, y: 8 };
-  export let meanArrowLabelOffset = { x: 10, y: -18 };
+  export let meanArrowLabelOffset = { x: 30, y: -18 };
 
   // Hardcoded line endpoint coordinates
   export let sourcePointA = [-0.2, -0.8];
@@ -60,13 +60,12 @@
 
   // LaTeX label styling
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
-  export let latexSizeMultiplier = 1.4;
+  export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
-  // Canvas/SVG state
+  // Canvas state
   let canvas;
   let ctx;
   let dpr = 1;
-  let svgOverlay = null;
   let scales = null;
   let isInitialized = false;
 
@@ -78,16 +77,6 @@
   let line1Coords = null; // sourcePointB -> targetPointB
   let line2Coords = null; // sourcePointA -> targetPointA
   let intersection = null;
-
-  // Pre-rendered MathJax labels
-  let xLabelSvg = null;
-  let topArrowLabelSvg = null;
-  let bottomArrowLabelSvg = null;
-  let meanArrowLabelSvg = null;
-  let x0aLabelSvg = null;
-  let x0bLabelSvg = null;
-  let x1aLabelSvg = null;
-  let x1bLabelSvg = null;
 
   function normalize(v) {
     const len = Math.hypot(v.x, v.y);
@@ -178,193 +167,11 @@
     computeLineCoords();
   }
 
-  async function preRenderLabels() {
-    const latexColor = settings.stylingSettings.figureLatex.color;
-    try {
-      [
-        xLabelSvg,
-        topArrowLabelSvg,
-        bottomArrowLabelSvg,
-        meanArrowLabelSvg,
-        x0aLabelSvg,
-        x0bLabelSvg,
-        x1aLabelSvg,
-        x1bLabelSvg,
-      ] = await Promise.all([
-        latexToSvgElement("x", { color: latexColor }),
-        latexToSvgElement("v_t(x|x_0^a, x_1^a)", { color: arrowColor }),
-        latexToSvgElement("v_t(x|x_0^b, x_1^b)", { color: arrowColor }),
-        latexToSvgElement("v_t^\\theta(x) = \\mathbb{E}[X_1 - X_0 | x_t = x]", {
-          color: meanVectorColor,
-        }),
-        latexToSvgElement("x_0^a", { color: latexColor }),
-        latexToSvgElement("x_0^b", { color: latexColor }),
-        latexToSvgElement("x_1^a", { color: latexColor }),
-        latexToSvgElement("x_1^b", { color: latexColor }),
-      ]);
-    } catch (e) {
-      console.warn("Failed to pre-render MathJax labels:", e);
-    }
-  }
-
-  function updateLabelPositions() {
-    if (!svgOverlay || !scales || !intersection) return;
-    svgOverlay.innerHTML = "";
-
-    // Intersection label 'x'
-    if (xLabelSvg) {
-      placeMathjaxSVG(
-        xLabelSvg.cloneNode(true),
-        svgOverlay,
-        intersection.x,
-        intersection.y,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // Endpoint labels
-    if (x0aLabelSvg) {
-      placeMathjaxSVG(
-        x0aLabelSvg.cloneNode(true),
-        svgOverlay,
-        line2Coords.x1,
-        line2Coords.y1,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-    if (x0bLabelSvg) {
-      placeMathjaxSVG(
-        x0bLabelSvg.cloneNode(true),
-        svgOverlay,
-        line1Coords.x1,
-        line1Coords.y1,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-    if (x1aLabelSvg) {
-      placeMathjaxSVG(
-        x1aLabelSvg.cloneNode(true),
-        svgOverlay,
-        line2Coords.x2,
-        line2Coords.y2,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-    if (x1bLabelSvg) {
-      placeMathjaxSVG(
-        x1bLabelSvg.cloneNode(true),
-        svgOverlay,
-        line1Coords.x2,
-        line1Coords.y2,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // Arrow direction calculations
-    const dir1 = normalize({
-      x: line1Coords.x2 - line1Coords.x1,
-      y: line1Coords.y2 - line1Coords.y1,
-    });
-    const dir2 = normalize({
-      x: line2Coords.x2 - line2Coords.x1,
-      y: line2Coords.y2 - line2Coords.y1,
-    });
-    const meanDir = normalize({
-      x: (dir1.x + dir2.x) / 2,
-      y: (dir1.y + dir2.y) / 2,
-    });
-
-    const lineLength1 = Math.hypot(
-      line1Coords.x2 - line1Coords.x1,
-      line1Coords.y2 - line1Coords.y1
-    );
-    const lineLength2 = Math.hypot(
-      line2Coords.x2 - line2Coords.x1,
-      line2Coords.y2 - line2Coords.y1
-    );
-    const arrowScale = arrowLength * Math.min(lineLength1, lineLength2);
-
-    // Arrow endpoint positions
-    const arrow1End = {
-      x: intersection.x + dir1.x * arrowScale,
-      y: intersection.y + dir1.y * arrowScale,
-    };
-    const arrow2End = {
-      x: intersection.x + dir2.x * arrowScale,
-      y: intersection.y + dir2.y * arrowScale,
-    };
-    const meanEnd = {
-      x: intersection.x + meanDir.x * arrowScale,
-      y: intersection.y + meanDir.y * arrowScale,
-    };
-
-    // Arrow midpoints for labels
-    const arrow1Mid = {
-      x: (intersection.x + arrow1End.x) / 2,
-      y: (intersection.y + arrow1End.y) / 2,
-    };
-    const arrow2Mid = {
-      x: (intersection.x + arrow2End.x) / 2,
-      y: (intersection.y + arrow2End.y) / 2,
-    };
-
-    // Arrow labels
-    if (topArrowLabelSvg) {
-      placeMathjaxSVG(
-        topArrowLabelSvg.cloneNode(true),
-        svgOverlay,
-        arrow2Mid.x + topArrowLabelOffset.x,
-        arrow2Mid.y + topArrowLabelOffset.y,
-        60,
-        100,
-        50,
-        latexSizeMultiplier
-      );
-    }
-    if (bottomArrowLabelSvg) {
-      placeMathjaxSVG(
-        bottomArrowLabelSvg.cloneNode(true),
-        svgOverlay,
-        arrow1Mid.x + bottomArrowLabelOffset.x,
-        arrow1Mid.y + bottomArrowLabelOffset.y,
-        60,
-        -35,
-        50,
-        latexSizeMultiplier
-      );
-    }
-    if (meanArrowLabelSvg) {
-      placeMathjaxSVG(
-        meanArrowLabelSvg.cloneNode(true),
-        svgOverlay,
-        meanEnd.x + meanArrowLabelOffset.x,
-        meanEnd.y + meanArrowLabelOffset.y,
-        150,
-        30,
-        55,
-        latexSizeMultiplier
-      );
-    }
-  }
-
-  function draw() {
+  async function draw() {
     if (!ctx || !scales) return;
     ctx.clearRect(0, 0, width, height);
+
+    const latexColor = settings.stylingSettings.figureLatex.color;
 
     // Draw scatter plots
     drawScatterPlot(
@@ -468,19 +275,26 @@
       );
       const arrowScale = arrowLength * Math.min(lineLength1, lineLength2);
 
+      // Calculate arrow endpoints
+      const arrow1End = {
+        x: intersection.x + dir1.x * arrowScale,
+        y: intersection.y + dir1.y * arrowScale,
+      };
+      const arrow2End = {
+        x: intersection.x + dir2.x * arrowScale,
+        y: intersection.y + dir2.y * arrowScale,
+      };
+      const meanEnd = {
+        x: intersection.x + meanDir.x * arrowScale,
+        y: intersection.y + meanDir.y * arrowScale,
+      };
+
       // Arrow 1 (dir1 - orange)
       ctx.save();
       ctx.strokeStyle = arrowColor;
       ctx.fillStyle = arrowColor;
       ctx.lineWidth = arrowWidth;
-      drawArrow(
-        ctx,
-        intersection.x,
-        intersection.y,
-        intersection.x + dir1.x * arrowScale,
-        intersection.y + dir1.y * arrowScale,
-        6
-      );
+      drawArrow(ctx, intersection.x, intersection.y, arrow1End.x, arrow1End.y, 6);
       ctx.restore();
 
       // Arrow 2 (dir2 - orange)
@@ -488,14 +302,7 @@
       ctx.strokeStyle = arrowColor;
       ctx.fillStyle = arrowColor;
       ctx.lineWidth = arrowWidth;
-      drawArrow(
-        ctx,
-        intersection.x,
-        intersection.y,
-        intersection.x + dir2.x * arrowScale,
-        intersection.y + dir2.y * arrowScale,
-        6
-      );
+      drawArrow(ctx, intersection.x, intersection.y, arrow2End.x, arrow2End.y, 6);
       ctx.restore();
 
       // Mean arrow (green)
@@ -503,14 +310,7 @@
       ctx.strokeStyle = meanVectorColor;
       ctx.fillStyle = meanVectorColor;
       ctx.lineWidth = arrowWidth;
-      drawArrow(
-        ctx,
-        intersection.x,
-        intersection.y,
-        intersection.x + meanDir.x * arrowScale,
-        intersection.y + meanDir.y * arrowScale,
-        6
-      );
+      drawArrow(ctx, intersection.x, intersection.y, meanEnd.x, meanEnd.y, 6);
       ctx.restore();
 
       // Draw intersection point
@@ -518,10 +318,66 @@
       ctx.arc(intersection.x, intersection.y, pointRadius, 0, 2 * Math.PI);
       ctx.fillStyle = lineColor;
       ctx.fill();
+
+      // Arrow midpoints for labels
+      const arrow1Mid = {
+        x: (intersection.x + arrow1End.x) / 2,
+        y: (intersection.y + arrow1End.y) / 2,
+      };
+      const arrow2Mid = {
+        x: (intersection.x + arrow2End.x) / 2,
+        y: (intersection.y + arrow2End.y) / 2,
+      };
+
+      // Draw arrow labels
+      await drawMathjaxOnCanvas(
+        ctx, "v_t(x|x_0^a, x_1^a)",
+        arrow2Mid.x + topArrowLabelOffset.x,
+        arrow2Mid.y + topArrowLabelOffset.y,
+        latexFontSize, 60, 100, { color: arrowColor }
+      );
+
+      await drawMathjaxOnCanvas(
+        ctx, "v_t(x|x_0^b, x_1^b)",
+        arrow1Mid.x + bottomArrowLabelOffset.x,
+        arrow1Mid.y + bottomArrowLabelOffset.y,
+        latexFontSize, 60, -35, { color: arrowColor }
+      );
+
+      await drawMathjaxOnCanvas(
+        ctx, "v_t^\\theta(x) = \\mathbb{E}[X_1 - X_0 | x_t = x]",
+        meanEnd.x + meanArrowLabelOffset.x,
+        meanEnd.y + meanArrowLabelOffset.y,
+        latexFontSize, 150, 30, { color: meanVectorColor }
+      );
+
+      // Draw intersection label 'x'
+      await drawMathjaxOnCanvas(
+        ctx, "x", intersection.x, intersection.y,
+        latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+      );
     }
 
-    // Update SVG overlay labels
-    updateLabelPositions();
+    // Draw endpoint labels
+    await drawMathjaxOnCanvas(
+      ctx, "x_0^a", line2Coords.x1, line2Coords.y1,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    await drawMathjaxOnCanvas(
+      ctx, "x_0^b", line1Coords.x1, line1Coords.y1,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    await drawMathjaxOnCanvas(
+      ctx, "x_1^a", line2Coords.x2, line2Coords.y2,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    await drawMathjaxOnCanvas(
+      ctx, "x_1^b", line1Coords.x2, line1Coords.y2,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
   }
 
   $: if (
@@ -533,7 +389,7 @@
     initializeCanvas();
     initializeData();
     isInitialized = true;
-    preRenderLabels().then(() => draw());
+    draw();
   }
 
   onMount(() => {
@@ -543,16 +399,11 @@
 
 <Figure {caption} {backgroundVisible}>
   {#snippet children()}
-    <div style="position:relative;width:100%;max-width:{width}px;">
+    <div style="width:100%;max-width:{width}px;">
       <canvas
         bind:this={canvas}
         style="width:100%;height:auto;aspect-ratio:{width}/{height};"
       ></canvas>
-      <svg
-        bind:this={svgOverlay}
-        style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"
-        viewBox="0 0 {width} {height}"
-      ></svg>
     </div>
   {/snippet}
 </Figure>

@@ -7,7 +7,7 @@
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
   import { drawScatterPlot, drawText } from "$lib/plotting/plotting";
-  import { latexToSvgElement, placeMathjaxSVG } from "$lib/plotting/mathjax";
+  import { drawMathjaxOnCanvas } from "$lib/plotting/mathjax";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -55,13 +55,12 @@
 
   // LaTeX label styling
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
-  export let latexSizeMultiplier = settings.stylingSettings.figureLatex.sizeMultiplier;
+  export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
   // Canvas state
   let canvas;
   let ctx;
   let dpr = 1;
-  let svgOverlay = null;
 
   // Scales and pre-computed coordinates
   let scales = null;
@@ -69,12 +68,6 @@
   let targetPixelCoords = [];
   let sourcePointPixel = [0, 0];
   let targetPointPixel = [0, 0];
-
-  // Pre-rendered MathJax labels
-  let x0LabelSvg = null;
-  let x1LabelSvg = null;
-  let xtLabelSvg = null;
-  let formulaLabelSvg = null;
 
   // Animation state
   let isPlaying = playingByDefault;
@@ -156,21 +149,6 @@
     }
   }
 
-  // Pre-render MathJax labels
-  async function preRenderLabels() {
-    const latexColor = settings.stylingSettings.figureLatex.color;
-    try {
-      [x0LabelSvg, x1LabelSvg, xtLabelSvg, formulaLabelSvg] = await Promise.all([
-        latexToSvgElement("x_0", { color: latexColor }),
-        latexToSvgElement("x_1", { color: latexColor }),
-        latexToSvgElement("x_t", { color: lineColor }),
-        latexToSvgElement("x_t \\sim X_t = (1-t)X_0 + tX_1", { color: latexColor }),
-      ]);
-    } catch (e) {
-      console.warn("Failed to pre-render MathJax labels:", e);
-    }
-  }
-
   // Canvas drawing helpers
   function drawLine(x1, y1, x2, y2, color, lineW, opacity = 1) {
     ctx.save();
@@ -194,71 +172,8 @@
     ctx.restore();
   }
 
-  // Update SVG overlay labels
-  function updateLabelPositions(dotX, dotY) {
-    if (!svgOverlay || !scales) return;
-    svgOverlay.innerHTML = "";
-
-    // x_0 above source point
-    if (x0LabelSvg) {
-      placeMathjaxSVG(
-        x0LabelSvg.cloneNode(true),
-        svgOverlay,
-        sourcePointPixel[0],
-        sourcePointPixel[1],
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // x_1 above target point
-    if (x1LabelSvg) {
-      placeMathjaxSVG(
-        x1LabelSvg.cloneNode(true),
-        svgOverlay,
-        targetPointPixel[0],
-        targetPointPixel[1],
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // x_t above animated dot (visible when not at endpoints)
-    const labelVisible = time >= 0.07 && time <= 0.93;
-    if (xtLabelSvg && labelVisible) {
-      placeMathjaxSVG(
-        xtLabelSvg.cloneNode(true),
-        svgOverlay,
-        dotX,
-        dotY,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // Formula at bottom center
-    if (formulaLabelSvg) {
-      placeMathjaxSVG(
-        formulaLabelSvg.cloneNode(true),
-        svgOverlay,
-        width / 2,
-        height - marginHeight,
-        0,
-        25,
-        50,
-        latexSizeMultiplier
-      );
-    }
-  }
-
   // Main draw function
-  function draw() {
+  async function draw() {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -301,8 +216,34 @@
     const currentY = sourcePointPixel[1] + time * (targetPointPixel[1] - sourcePointPixel[1]);
     drawCircle(currentX, currentY, animatedDotRadius, animatedDotColor);
 
-    // Update SVG overlay labels
-    updateLabelPositions(currentX, currentY);
+    // Draw LaTeX labels directly on canvas
+    const latexColor = settings.stylingSettings.figureLatex.color;
+
+    // x_0 above source point
+    await drawMathjaxOnCanvas(
+      ctx, "x_0", sourcePointPixel[0], sourcePointPixel[1],
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    // x_1 above target point
+    await drawMathjaxOnCanvas(
+      ctx, "x_1", targetPointPixel[0], targetPointPixel[1],
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    // x_t above animated dot (visible when not at endpoints)
+    if (time >= 0.07 && time <= 0.93) {
+      await drawMathjaxOnCanvas(
+        ctx, "x_t", currentX, currentY,
+        latexFontSize, 0, latexLabelOffsetY, { color: lineColor }
+      );
+    }
+
+    // Formula at bottom center
+    await drawMathjaxOnCanvas(
+      ctx, "x_t \\sim X_t = (1-t)X_0 + tX_1", width / 2, height - marginHeight,
+      latexFontSize, 0, 15, { color: latexColor }
+    );
   }
 
   // Animation
@@ -394,11 +335,9 @@
     canvas
   ) {
     initializeVisualization();
-    preRenderLabels().then(() => {
-      isInitialized = true;
-      draw();
-      if (isPlaying) startAnimation();
-    });
+    isInitialized = true;
+    draw();
+    if (isPlaying) startAnimation();
   }
 
   // Handle play/pause changes
@@ -423,16 +362,11 @@
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
-      <div class="canvas-container" style="max-width: {width}px;">
+      <div style="width: 100%; max-width: {width}px;">
         <canvas
           bind:this={canvas}
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
-        <svg
-          bind:this={svgOverlay}
-          style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"
-          viewBox="0 0 {width} {height}"
-        ></svg>
       </div>
       <TimeSlider
         bind:value={time}
@@ -446,10 +380,3 @@
     </div>
   {/snippet}
 </Figure>
-
-<style>
-  .canvas-container {
-    position: relative;
-    width: 100%;
-  }
-</style>
