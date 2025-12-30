@@ -404,7 +404,7 @@
           bind:this={leftCanvas}
           class="panel-canvas"
         ></canvas>
-        <div style="padding-left: 30px;">
+        <div class="slider-wrapper">
           <TimeSlider
             bind:value={leftTime}
             isPlaying={isPlaying}
@@ -413,11 +413,11 @@
             onTogglePlay={togglePlayPause}
             color="#f17720"
             showTicks={false}
-            showTimeLabel={true}
-            timeLabel="Sampling Duration"
+            showTimeLabel={false}
             dragEnabled={false}
           />
         </div>
+        <div class="duration-label">Sampling Duration</div>
       </div>
     {/snippet}
 
@@ -433,7 +433,7 @@
           bind:this={rightCanvas}
           class="panel-canvas"
         ></canvas>
-        <div style="padding-left: 30px;">
+        <div class="slider-wrapper">
           <TimeSlider
             bind:value={rightTime}
             isPlaying={isPlaying}
@@ -442,11 +442,11 @@
             onTogglePlay={togglePlayPause}
             color="#f17720"
             showTicks={false}
-            showTimeLabel={true}
-            timeLabel="Sampling Duration"
+            showTimeLabel={false}
             dragEnabled={false}
           />
         </div>
+        <div class="duration-label">Sampling Duration</div>
       </div>
     {/snippet}
   </DoubleFigure>
@@ -467,18 +467,33 @@
   .panel-label {
     text-align: center;
     padding-bottom: 4px;
+    font-weight: 500;
   }
 
   .panel-subtitle {
     text-align: center;
     white-space: nowrap;
-    font-weight: 300;
+    font-weight: 200;
+  }
+
+  .duration-label {
+    text-align: center;
+    font-size: 16px;
+    font-family: Helvetica, sans-serif;
+    color: #7b7b7b;
+    opacity: 0.6;
+    padding-left: 25px;
+    margin-top: -14px;
   }
 
   .panel-canvas {
     width: 100%;
     height: auto;
     display: block;
+  }
+
+  .slider-wrapper {
+    padding-left: 30px;
   }
 
   .placeholder {
@@ -496,6 +511,9 @@
     }
     .panel-subtitle {
       font-size: 13px !important;
+    }
+    .slider-wrapper {
+      padding-left: 0;
     }
   }
 
