@@ -55,7 +55,7 @@
   export let playingByDefault = true;
 
   // Interactive sampling
-  export let samplingSteps = 100;
+  export let samplingSteps = 200;
   export let highlightedTrajectoryOpacity = 1.0;
   export let dimmedTrajectoryOpacity = 0.15;
 
@@ -126,8 +126,6 @@
   let leftClickedTrajectory = null;   // [timestep][x,y] in pixels
   let rightClickedTrajectory = null;
   let hasClickedTrajectory = false;
-  let leftClickedLoaded = false;
-  let rightClickedLoaded = false;
 
   // ===== FUNCTIONS =====
 
@@ -419,39 +417,30 @@
     sampleFromPoint([domainX, domainY]);
   }
 
-  // Check if both trajectories are loaded and start animation
-  function checkAndStartAnimation() {
-    if (leftClickedLoaded && rightClickedLoaded) {
-      // Reset animation state
-      leftCurrentSegmentIndex = 0;
-      rightCurrentSegmentIndex = 0;
-      leftSegmentAccumulator = 0;
-      rightSegmentAccumulator = 0;
-      leftTime = 0;
-      rightTime = 0;
-      leftFinished = false;
-      rightFinished = false;
-      restartPauseStartTime = null;
-      leftLastTimestamp = null;
-      rightLastTimestamp = null;
-
-      // Start animation
-      isPlaying = true;
-      updateLeftVisualization();
-      updateRightVisualization();
-    }
-  }
-
-  // Sample trajectory from a specific point using both models
+  // Sample trajectory from a specific point using both models (streaming)
   function sampleFromPoint(point) {
     hasClickedTrajectory = true;
-    leftClickedLoaded = false;
-    rightClickedLoaded = false;
 
-    // Pause animation while loading
-    isPlaying = false;
+    // Initialize trajectories with the initial click point (scaled to pixels)
+    const initialPixelPoint = [xScale(point[0]), yScale(point[1])];
+    leftClickedTrajectory = [initialPixelPoint];
+    rightClickedTrajectory = [initialPixelPoint];
 
-    // Sample from left model (Flow Matching)
+    // Reset and start animation immediately
+    leftCurrentSegmentIndex = 0;
+    rightCurrentSegmentIndex = 0;
+    leftSegmentAccumulator = 0;
+    rightSegmentAccumulator = 0;
+    leftTime = 0;
+    rightTime = 0;
+    leftFinished = false;
+    rightFinished = false;
+    restartPauseStartTime = null;
+    leftLastTimestamp = null;
+    rightLastTimestamp = null;
+    isPlaying = true;
+
+    // Sample from left model (Flow Matching) with streaming
     callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.flowMatchingModelPath,
@@ -459,16 +448,17 @@
       settings.trainingSettings.modelConfig,
       [point],
       samplingSteps,
-      (allSamples) => {
-        // allSamples is [timestep][1][2], extract and scale to pixels
-        leftClickedTrajectory = allSamples.map(ts => [xScale(ts[0][0]), yScale(ts[0][1])]);
-        leftClickedLoaded = true;
-        checkAndStartAnimation();
-      },
-      settings.trainingSettings.domainRange
+      () => {}, // onComplete - not used since we build trajectory via onStep
+      settings.trainingSettings.domainRange,
+      {},
+      // onStep callback - append each new point as it arrives
+      (_step, x_t) => {
+        const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
+        leftClickedTrajectory = [...leftClickedTrajectory, newPoint];
+      }
     );
 
-    // Sample from right model (Rectified Flow)
+    // Sample from right model (Rectified Flow) with streaming
     callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.rectifiedFlowModelPath,
@@ -476,13 +466,14 @@
       settings.trainingSettings.modelConfig,
       [point],
       samplingSteps,
-      (allSamples) => {
-        // allSamples is [timestep][1][2], extract and scale to pixels
-        rightClickedTrajectory = allSamples.map(ts => [xScale(ts[0][0]), yScale(ts[0][1])]);
-        rightClickedLoaded = true;
-        checkAndStartAnimation();
-      },
-      settings.trainingSettings.domainRange
+      () => {}, // onComplete - not used since we build trajectory via onStep
+      settings.trainingSettings.domainRange,
+      {},
+      // onStep callback - append each new point as it arrives
+      (_step, x_t) => {
+        const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
+        rightClickedTrajectory = [...rightClickedTrajectory, newPoint];
+      }
     );
   }
 

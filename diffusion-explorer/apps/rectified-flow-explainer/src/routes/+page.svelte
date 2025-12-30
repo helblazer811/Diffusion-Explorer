@@ -562,6 +562,7 @@
       </strong> Both models are trained to generate samples from the same <span style="color: #3b82f6;">target distribution</span>. The
       rectified flow's straighter paths allow for accurate numerical integration with
       fewer steps, reducing the computational cost of simulation and lowering latency.
+Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);" /> to generate a sample.
     </div>
   </CrownJewel>
 

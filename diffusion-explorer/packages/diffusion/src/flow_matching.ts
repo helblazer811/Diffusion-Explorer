@@ -287,30 +287,39 @@ export class FlowModel extends Model {
      * @param num_samples number of samples to draw
      * @param t timestep to draw samples at in [0, num_total_steps]
      * @param num_total_steps number of total steps to simulate the ODE
+     * @param options Optional parameters for future extensibility
+     * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
      * @returns tf.Tensor2D of shape [num_total_steps, num_samples, dim]
      */
     sample(
-        num_samples: number, 
+        num_samples: number,
         num_total_steps: number = 100,
-        options: {} = {}
+        options: {} = {},
+        perStepCallback?: (step: number, x_t: number[][]) => void
     ): tf.Tensor3D {
         // Draw initial samples from a Gaussian distribution
         const initial_points = tf.randomNormal([num_samples, this.dim]);
-        
+
         // Delegate to sample_from_initial_points
-        return this.sample_from_initial_points(initial_points, num_total_steps);
+        return this.sample_from_initial_points(initial_points, num_total_steps, options, perStepCallback);
     }
 
-    /** 
+    /**
     * Draw samples from the model using the given initial points
     * @param initial_points tf.Tensor2D of shape [num_samples, dim]
-    * @param num_total_steps 
+    * @param num_total_steps Number of integration steps
     * @param options Optional parameters for future extensibility
+    * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
     */
-    sample_from_initial_points(initial_points: tf.Tensor2D, num_total_steps: number = 100, options: {} = {}): tf.Tensor3D {
+    sample_from_initial_points(
+        initial_points: tf.Tensor2D,
+        num_total_steps: number = 100,
+        options: {} = {},
+        perStepCallback?: (step: number, x_t: number[][]) => void
+    ): tf.Tensor3D {
         return tf.tidy(() => {
-            // Draw some initial samples from the source distribution 
-            const num_samples = initial_points.shape[0]; 
+            // Draw some initial samples from the source distribution
+            const num_samples = initial_points.shape[0];
             const x_0 = initial_points;
             // Draw some linear spaced timesteps in [0, 1]
             const t_steps = tf.linspace(0, 1, num_total_steps + 1);
@@ -326,32 +335,40 @@ export class FlowModel extends Model {
                 // Do the step using the midpoint method
                 x_t = this.step(x_t, t_i_repeated, t_next_repeated);
                 // Store the result in the all_step_data tensor
-                all_step_data.push(x_t)
+                all_step_data.push(x_t);
+
+                // Call per-step callback if provided
+                if (perStepCallback) {
+                    const x_t_array = x_t.arraySync() as number[][];
+                    perStepCallback(i, x_t_array);
+                }
             }
             // Return all samples
             return tf.stack(all_step_data);
         });
     }    
     
-    /** 
+    /**
     * Sample from a uniform grid of initial points
     * @param gridResolution Number of points along each axis
     * @param domainRange The domain range for x and y coordinates
     * @param num_total_steps Number of flow steps
     * @param options Optional parameters for future extensibility
+    * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
     * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
     */
     sample_grid(
         gridResolution: number,
         domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
         num_total_steps: number = 100,
-        options: {} = {}
+        options: {} = {},
+        perStepCallback?: (step: number, x_t: number[][]) => void
     ): tf.Tensor3D {
         // Generate uniform grid
         const initialPoints = sampleUniformGrid(gridResolution, domainRange);
 
         // Sample from the initial points
-        return this.sample_from_initial_points(initialPoints, num_total_steps, options);
+        return this.sample_from_initial_points(initialPoints, num_total_steps, options, perStepCallback);
     }
 
     /**
