@@ -5,6 +5,7 @@ export interface TrajectoryStyleOptions {
   pointRadius: number;
   showPreview?: boolean;
   previewOpacity?: number;
+  showHeadMarker?: boolean; // Whether to show dot at trajectory head (default: true)
 }
 
 /**
@@ -68,13 +69,15 @@ export function drawTrajectoriesWithOpacityGradient(
       }
     }
 
-    // Draw marker at head position
-    const [mx, my] = points[headIdx];
-    ctx.beginPath();
-    ctx.arc(mx, my, style.pointRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = style.color;
-    ctx.globalAlpha = style.progressOpacity;
-    ctx.fill();
+    // Draw marker at head position (unless disabled)
+    if (style.showHeadMarker !== false) {
+      const [mx, my] = points[headIdx];
+      ctx.beginPath();
+      ctx.arc(mx, my, style.pointRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = style.color;
+      ctx.globalAlpha = style.progressOpacity;
+      ctx.fill();
+    }
   }
 
   // Reset alpha

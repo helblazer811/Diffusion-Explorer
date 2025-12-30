@@ -25,8 +25,14 @@
   // Labels
   export let leftLabel = "Flow Matching";
   export let rightLabel = "Rectified Flow";
-  export let labelFontSize = 26;
+  export let labelFontSize = 30;
   export let labelColor = settings.stylingSettings.label.color;
+
+  // Subtitles
+  export let leftSubtitle = "Curved Paths Flow Slow";
+  export let rightSubtitle = "Straight Paths Flow Fast";
+  export let subtitleFontSize = 26;
+  export let subtitleColor = settings.stylingSettings.label.color;
 
   // Target distribution styling
   export let targetColor = "#3b82f6";
@@ -43,7 +49,8 @@
   export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory visible with fade
 
   // Animation
-  export let animationDuration = 8000;
+  export let leftAnimationDuration = 12000;
+  export let rightAnimationDuration = 3000;
   export let pauseDuration = 2000;
   export let playingByDefault = true;
 
@@ -61,7 +68,8 @@
     targetDistribution?.length > 0;
   $: numTimeSteps = isDataValid ? leftTrajectories.length : 1;
   $: numSegments = numTimeSteps - 1;
-  $: msPerSegment = numSegments > 0 ? animationDuration / numSegments : animationDuration;
+  $: leftMsPerSegment = numSegments > 0 ? leftAnimationDuration / numSegments : leftAnimationDuration;
+  $: rightMsPerSegment = numSegments > 0 ? rightAnimationDuration / numSegments : rightAnimationDuration;
 
   // ===== STATE =====
 
@@ -76,15 +84,25 @@
   let xScale;
   let yScale;
 
-  // Animation
-  let time = 0;
-  let currentSegmentIndex = 0;
-  let segmentAccumulator = 0;
+  // Animation - Shared state
   let isPlaying = playingByDefault;
-  let animationFrameId = null;
-  let lastTimestamp = null;
-  let isPaused = false;
-  let pauseStartTime = null;
+  let leftFinished = false;
+  let rightFinished = false;
+  let restartPauseStartTime = null;
+
+  // Animation - Left
+  let leftTime = 0;
+  let leftCurrentSegmentIndex = 0;
+  let leftSegmentAccumulator = 0;
+  let leftAnimationFrameId = null;
+  let leftLastTimestamp = null;
+
+  // Animation - Right
+  let rightTime = 0;
+  let rightCurrentSegmentIndex = 0;
+  let rightSegmentAccumulator = 0;
+  let rightAnimationFrameId = null;
+  let rightLastTimestamp = null;
 
   // Initialization
   let isInitialized = false;
@@ -186,90 +204,147 @@
     initializeCanvas();
     precomputeCoordinates();
     pathsInitialized = true;
-    updateVisualization();
+    updateLeftVisualization();
+    updateRightVisualization();
     isInitialized = true;
     onInitialized?.();
   }
 
-  function updateVisualization() {
-    if (!isDataValid || !leftCtx || !rightCtx) return;
-
-    draw(leftCtx, scaledLeftTrajectories, currentSegmentIndex);
-    draw(rightCtx, scaledRightTrajectories, currentSegmentIndex);
+  function updateLeftVisualization() {
+    if (!isDataValid || !leftCtx) return;
+    draw(leftCtx, scaledLeftTrajectories, leftCurrentSegmentIndex);
   }
 
-  function animate(ts) {
-    if (!isPlaying) {
-      animationFrameId = null;
-      return;
-    }
-    if (lastTimestamp === null) lastTimestamp = ts;
-    const elapsed = ts - lastTimestamp;
-    lastTimestamp = ts;
+  function updateRightVisualization() {
+    if (!isDataValid || !rightCtx) return;
+    draw(rightCtx, scaledRightTrajectories, rightCurrentSegmentIndex);
+  }
 
-    if (isPaused && pauseStartTime !== null) {
-      if (ts - pauseStartTime >= pauseDuration) {
-        isPaused = false;
-        pauseStartTime = null;
-        currentSegmentIndex = 0;
-        segmentAccumulator = 0;
-        time = 0;
-        updateVisualization();
+  // Synchronized restart check (called from both animate functions)
+  function checkSynchronizedRestart(ts) {
+    if (leftFinished && rightFinished) {
+      if (restartPauseStartTime === null) {
+        restartPauseStartTime = ts;
+      } else if (ts - restartPauseStartTime >= pauseDuration) {
+        // Reset both animations
+        leftFinished = false;
+        rightFinished = false;
+        restartPauseStartTime = null;
+        leftCurrentSegmentIndex = 0;
+        leftSegmentAccumulator = 0;
+        leftTime = 0;
+        rightCurrentSegmentIndex = 0;
+        rightSegmentAccumulator = 0;
+        rightTime = 0;
+        updateLeftVisualization();
+        updateRightVisualization();
       }
-      animationFrameId = requestAnimationFrame(animate);
+    }
+  }
+
+  // Left animation
+  function animateLeft(ts) {
+    if (!isPlaying) {
+      leftAnimationFrameId = null;
+      return;
+    }
+    if (leftLastTimestamp === null) leftLastTimestamp = ts;
+    const elapsed = ts - leftLastTimestamp;
+    leftLastTimestamp = ts;
+
+    // Check for synchronized restart
+    checkSynchronizedRestart(ts);
+
+    // If already finished, just keep the animation frame going for restart check
+    if (leftFinished) {
+      leftAnimationFrameId = requestAnimationFrame(animateLeft);
       return;
     }
 
-    // Accumulate time and advance segments one at a time
-    segmentAccumulator += elapsed;
-    while (segmentAccumulator >= msPerSegment && currentSegmentIndex < numSegments) {
-      segmentAccumulator -= msPerSegment;
-      currentSegmentIndex += 1;
+    leftSegmentAccumulator += elapsed;
+    while (leftSegmentAccumulator >= leftMsPerSegment && leftCurrentSegmentIndex < numSegments) {
+      leftSegmentAccumulator -= leftMsPerSegment;
+      leftCurrentSegmentIndex += 1;
     }
 
-    // Keep time in sync for slider display
-    time = numSegments > 0 ? currentSegmentIndex / numSegments : 0;
+    leftTime = numSegments > 0 ? leftCurrentSegmentIndex / numSegments : 0;
+    updateLeftVisualization();
 
-    updateVisualization();
-
-    if (currentSegmentIndex >= numSegments) {
-      isPaused = true;
-      pauseStartTime = ts;
+    if (leftCurrentSegmentIndex >= numSegments) {
+      leftFinished = true;
     }
 
-    animationFrameId = requestAnimationFrame(animate);
+    leftAnimationFrameId = requestAnimationFrame(animateLeft);
   }
 
-  function startAnimation() {
-    if (animationFrameId !== null) return;
-    lastTimestamp = null;
-    animationFrameId = requestAnimationFrame(animate);
+  function startLeftAnimation() {
+    if (leftAnimationFrameId !== null) return;
+    leftLastTimestamp = null;
+    leftAnimationFrameId = requestAnimationFrame(animateLeft);
   }
 
-  function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
+  function stopLeftAnimation() {
+    if (leftAnimationFrameId !== null) {
+      cancelAnimationFrame(leftAnimationFrameId);
+      leftAnimationFrameId = null;
     }
   }
 
+  // Unified toggle for both animations
   function togglePlayPause() {
     isPlaying = !isPlaying;
     if (!isPlaying) {
-      stopAnimation();
+      stopLeftAnimation();
+      stopRightAnimation();
     }
   }
 
-  function handleSliderInput() {
-    // When user drags the slider, stop playback
-    if (isPlaying) {
-      isPlaying = false;
-      stopAnimation();
+  // Right animation
+  function animateRight(ts) {
+    if (!isPlaying) {
+      rightAnimationFrameId = null;
+      return;
     }
-    // Convert slider time value to segment index
-    currentSegmentIndex = Math.round(time * numSegments);
-    segmentAccumulator = 0;
-    updateVisualization();
+    if (rightLastTimestamp === null) rightLastTimestamp = ts;
+    const elapsed = ts - rightLastTimestamp;
+    rightLastTimestamp = ts;
+
+    // Check for synchronized restart
+    checkSynchronizedRestart(ts);
+
+    // If already finished, just keep the animation frame going for restart check
+    if (rightFinished) {
+      rightAnimationFrameId = requestAnimationFrame(animateRight);
+      return;
+    }
+
+    rightSegmentAccumulator += elapsed;
+    while (rightSegmentAccumulator >= rightMsPerSegment && rightCurrentSegmentIndex < numSegments) {
+      rightSegmentAccumulator -= rightMsPerSegment;
+      rightCurrentSegmentIndex += 1;
+    }
+
+    rightTime = numSegments > 0 ? rightCurrentSegmentIndex / numSegments : 0;
+    updateRightVisualization();
+
+    if (rightCurrentSegmentIndex >= numSegments) {
+      rightFinished = true;
+    }
+
+    rightAnimationFrameId = requestAnimationFrame(animateRight);
+  }
+
+  function startRightAnimation() {
+    if (rightAnimationFrameId !== null) return;
+    rightLastTimestamp = null;
+    rightAnimationFrameId = requestAnimationFrame(animateRight);
+  }
+
+  function stopRightAnimation() {
+    if (rightAnimationFrameId !== null) {
+      cancelAnimationFrame(rightAnimationFrameId);
+      rightAnimationFrameId = null;
+    }
   }
 
   function handleVisibilityChange(isActive) {
@@ -288,8 +363,11 @@
     initializeVisualization();
   }
 
-  $: if (isPlaying && pathsInitialized && !animationFrameId) startAnimation();
-  $: if (!isPlaying && animationFrameId) stopAnimation();
+  $: if (isPlaying && pathsInitialized && !leftAnimationFrameId) startLeftAnimation();
+  $: if (!isPlaying && leftAnimationFrameId) stopLeftAnimation();
+
+  $: if (isPlaying && pathsInitialized && !rightAnimationFrameId) startRightAnimation();
+  $: if (!isPlaying && rightAnimationFrameId) stopRightAnimation();
 
   // Handle visibility changes (pause when off-screen, resume when back)
   $: if (figureIsActive !== undefined && isInitialized) {
@@ -303,8 +381,11 @@
   });
 
   onDestroy(() => {
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
+    if (leftAnimationFrameId) {
+      cancelAnimationFrame(leftAnimationFrameId);
+    }
+    if (rightAnimationFrameId) {
+      cancelAnimationFrame(rightAnimationFrameId);
     }
   });
 </script>
@@ -316,10 +397,27 @@
         <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor};">
           {leftLabel}
         </div>
+        <div class="panel-subtitle" style="font-size: {subtitleFontSize}px; color: {subtitleColor};">
+          {leftSubtitle}
+        </div>
         <canvas
           bind:this={leftCanvas}
           class="panel-canvas"
         ></canvas>
+        <div style="padding-left: 30px;">
+          <TimeSlider
+            bind:value={leftTime}
+            isPlaying={isPlaying}
+            min={0}
+            max={1}
+            onTogglePlay={togglePlayPause}
+            color="#f17720"
+            showTicks={false}
+            showTimeLabel={true}
+            timeLabel="Sampling Duration"
+            dragEnabled={false}
+          />
+        </div>
       </div>
     {/snippet}
 
@@ -328,23 +426,28 @@
         <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor};">
           {rightLabel}
         </div>
+        <div class="panel-subtitle" style="font-size: {subtitleFontSize}px; color: {subtitleColor};">
+          {rightSubtitle}
+        </div>
         <canvas
           bind:this={rightCanvas}
           class="panel-canvas"
         ></canvas>
+        <div style="padding-left: 30px;">
+          <TimeSlider
+            bind:value={rightTime}
+            isPlaying={isPlaying}
+            min={0}
+            max={1}
+            onTogglePlay={togglePlayPause}
+            color="#f17720"
+            showTicks={false}
+            showTimeLabel={true}
+            timeLabel="Sampling Duration"
+            dragEnabled={false}
+          />
+        </div>
       </div>
-    {/snippet}
-
-    {#snippet footer()}
-      <TimeSlider
-        bind:value={time}
-        {isPlaying}
-        min={0}
-        max={1}
-        onTogglePlay={togglePlayPause}
-        onInput={handleSliderInput}
-        color="#f17720"
-      />
     {/snippet}
   </DoubleFigure>
 {:else}
@@ -363,7 +466,13 @@
 
   .panel-label {
     text-align: center;
-    padding-bottom: 8px;
+    padding-bottom: 4px;
+  }
+
+  .panel-subtitle {
+    text-align: center;
+    white-space: nowrap;
+    font-weight: 300;
   }
 
   .panel-canvas {
@@ -384,6 +493,18 @@
   @media (max-width: 600px) {
     .panel-label {
       font-size: 18px !important;
+    }
+    .panel-subtitle {
+      font-size: 13px !important;
+    }
+  }
+
+  @media (max-width: 400px) {
+    .panel-label {
+      font-size: 16px !important;
+    }
+    .panel-subtitle {
+      font-size: 11px !important;
     }
   }
 </style>

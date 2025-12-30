@@ -148,7 +148,7 @@ export const settings = {
     // Trajectory styling
     trajectory: {
       color: '#f17720',           // Orange
-      strokeWidth: 2.5,
+      strokeWidth: 3.5,
       pointRadius: 4,
       fullOpacity: 0.15,          // Background paths (preview)
       progressOpacity: 0.8        // Animated paths

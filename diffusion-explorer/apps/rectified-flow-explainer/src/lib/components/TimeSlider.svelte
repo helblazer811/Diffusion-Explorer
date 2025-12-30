@@ -8,6 +8,9 @@
   export let disabled = false;
   export let color = '#4594e3';
   export let showTicks = true;
+  export let showTimeLabel = true;
+  export let timeLabel = 'Time';
+  export let dragEnabled = true;
   export let onTogglePlay = () => {};
   export let onInput = () => {};  // Called when user drags slider
 
@@ -27,6 +30,7 @@
   <div class="time-slider-inner">
     <button
       class="play-button"
+      style={showTicks ? '' : 'margin-top: 12px; margin-bottom: 12px;'}
       onclick={handleTogglePlay}
       aria-label={isPlaying ? 'Pause' : 'Play'}
       {disabled}
@@ -50,7 +54,7 @@
         {max}
         {step}
         class="slider"
-        style="{sliderStyle}; --slider-color: {color};"
+        style="{sliderStyle}; --slider-color: {color};{dragEnabled ? '' : ' pointer-events: none;'}"
         bind:value
         {disabled}
         oninput={onInput}
@@ -60,10 +64,14 @@
         <div class="tick-container">
           <div class="tick" style="left: 1%;"></div>
           <div class="tick-label" style="left: 1%;">t=0</div>
-          <div class="time-label">Time</div>
+          {#if showTimeLabel}
+            <div class="time-label">{timeLabel}</div>
+          {/if}
           <div class="tick" style="left: 99%;"></div>
           <div class="tick-label" style="left: 99%;">t=1</div>
         </div>
+      {:else if showTimeLabel}
+        <div class="time-label-standalone">{timeLabel}</div>
       {/if}
     </div>
 
@@ -198,5 +206,13 @@
     font-size: 16px;
     font-family: Helvetica, sans-serif;
     color: #7b7b7b;
+  }
+
+  .time-label-standalone {
+    text-align: center;
+    font-size: 16px;
+    font-family: Helvetica, sans-serif;
+    color: #7b7b7b;
+    margin-top: 4px;
   }
 </style>

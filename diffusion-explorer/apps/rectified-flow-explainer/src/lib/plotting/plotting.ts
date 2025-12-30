@@ -161,6 +161,12 @@ export function drawVectorField(
   ctx.restore();
 }
 
+export interface ScatterPlotOutlineOptions {
+  color?: string;      // Outline color (default: same as fill)
+  width?: number;      // Outline width in pixels (default: 1)
+  opacity?: number;    // Outline opacity (default: same as fill opacity)
+}
+
 /**
  * Draws a scatter plot from pixel coordinates
  * @param ctx - Canvas 2D rendering context
@@ -168,21 +174,33 @@ export function drawVectorField(
  * @param radius - Point radius in pixels
  * @param fill - Fill color
  * @param opacity - Point opacity (0-1)
+ * @param outline - Optional outline/stroke options
  */
 export function drawScatterPlot(
   ctx: CanvasRenderingContext2D,
   pixelCoords: number[][],
   radius: number,
   fill: string,
-  opacity: number
+  opacity: number,
+  outline?: ScatterPlotOutlineOptions
 ): void {
   ctx.fillStyle = fill;
-  ctx.globalAlpha = opacity;
 
   for (const [x, y] of pixelCoords) {
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, 2 * Math.PI);
+
+    // Fill
+    ctx.globalAlpha = opacity;
     ctx.fill();
+
+    // Stroke outline if specified
+    if (outline) {
+      ctx.strokeStyle = outline.color ?? fill;
+      ctx.lineWidth = outline.width ?? 1;
+      ctx.globalAlpha = outline.opacity ?? opacity;
+      ctx.stroke();
+    }
   }
 
   // Reset alpha
