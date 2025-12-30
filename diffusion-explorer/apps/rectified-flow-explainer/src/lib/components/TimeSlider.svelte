@@ -74,8 +74,6 @@
         <div class="time-label-standalone">{timeLabel}</div>
       {/if}
     </div>
-
-    <div class="spacer"></div>
   </div>
 </div>
 
@@ -97,6 +95,7 @@
     align-items: center;
     width: 100%;
     max-width: 600px;
+    padding-right: 44px;
   }
 
   .play-button {
@@ -127,14 +126,6 @@
 
   .play-button svg {
     color: #333;
-  }
-
-  .spacer {
-    width: 32px;
-    margin-left: 12px;
-    flex-shrink: 0;
-    align-self: flex-start;
-    height: 32px;
   }
 
   .slider-wrapper {
@@ -213,6 +204,12 @@
     font-size: 16px;
     font-family: Helvetica, sans-serif;
     color: #7b7b7b;
-    margin-top: 4px;
+    opacity: 0.6;
+  }
+
+  @media (max-width: 600px) {
+    .time-slider-inner {
+      padding-right: 10px;
+    }
   }
 </style>
