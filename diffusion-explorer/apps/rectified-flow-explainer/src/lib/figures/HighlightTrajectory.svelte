@@ -5,7 +5,7 @@
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
   import { drawScatterPlot } from "$lib/plotting/plotting";
-  import { latexToSvgElement, placeMathjaxSVG } from "$lib/plotting/mathjax";
+  import { drawMathjaxOnCanvas } from "$lib/plotting/mathjax";
 
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
@@ -21,7 +21,7 @@
 
   // LaTeX label styling
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
-  export let latexSizeMultiplier = settings.stylingSettings.figureLatex.sizeMultiplier;
+  export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -49,11 +49,6 @@
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
   let combinedMeanX = 0;
-
-  // Pre-rendered MathJax SVG labels
-  let xLabelSvg = null;
-  let psiLabelSvg = null;
-  let svgOverlay = null;
 
   // Visibility tracking
   let figureIsActive;
@@ -224,60 +219,8 @@
     ctx.globalAlpha = 1;
   }
 
-  // Pre-render MathJax SVG labels
-  async function preRenderLabels() {
-    const latexColor = settings.stylingSettings.figureLatex.color;
-    try {
-      [xLabelSvg, psiLabelSvg] = await Promise.all([
-        latexToSvgElement("x", { color: latexColor }),
-        latexToSvgElement("\\psi_t(x)", { color: latexColor }),
-      ]);
-    } catch (e) {
-      console.warn("Failed to pre-render MathJax labels:", e);
-    }
-  }
-
-  // Update SVG overlay with label positions
-  function updateLabelPositions() {
-    if (!svgOverlay) return;
-
-    svgOverlay.innerHTML = "";
-
-    for (let idx = 0; idx < transformedTrajectories.length; idx++) {
-      const traj = transformedTrajectories[idx];
-      const startPoint = traj[0];
-      const currentPoint = getPointAtProgress(idx, time);
-
-      if (xLabelSvg) {
-        placeMathjaxSVG(
-          xLabelSvg.cloneNode(true),
-          svgOverlay,
-          startPoint[0],
-          startPoint[1],
-          0,
-          latexLabelOffsetY,
-          50,
-          latexSizeMultiplier
-        );
-      }
-
-      if (time >= 0.05 && psiLabelSvg) {
-        placeMathjaxSVG(
-          psiLabelSvg.cloneNode(true),
-          svgOverlay,
-          currentPoint[0],
-          currentPoint[1],
-          0,
-          latexLabelOffsetY,
-          50,
-          latexSizeMultiplier
-        );
-      }
-    }
-  }
-
   // Main draw function
-  function draw() {
+  async function draw() {
     if (!ctx || !initialized) return;
 
     // Clear canvas
@@ -323,8 +266,39 @@
       ctx.globalAlpha = 1;
     }
 
-    // Update SVG overlay labels
-    updateLabelPositions();
+    // Draw LaTeX labels directly on canvas
+    const latexColor = settings.stylingSettings.figureLatex.color;
+    for (let idx = 0; idx < transformedTrajectories.length; idx++) {
+      const traj = transformedTrajectories[idx];
+      const startPoint = traj[0];
+      const currentPoint = getPointAtProgress(idx, time);
+
+      // Draw "x" label at start
+      await drawMathjaxOnCanvas(
+        ctx,
+        "x",
+        startPoint[0],
+        startPoint[1],
+        latexFontSize,
+        0,
+        latexLabelOffsetY,
+        { color: latexColor }
+      );
+
+      // Draw "ψ_t(x)" label at current position (after initial movement)
+      if (time >= 0.05) {
+        await drawMathjaxOnCanvas(
+          ctx,
+          "\\psi_t(x)",
+          currentPoint[0],
+          currentPoint[1],
+          latexFontSize,
+          0,
+          latexLabelOffsetY,
+          { color: latexColor }
+        );
+      }
+    }
   }
 
   // Animation functions
@@ -393,11 +367,8 @@
     initializeCanvas();
     initializeData();
     initialized = true;
-    // Pre-render KaTeX labels, then draw and start animation
-    preRenderLabels().then(() => {
-      draw();
-      if (playingByDefault) startAnimation();
-    });
+    draw();
+    if (playingByDefault) startAnimation();
   }
 
   // Handle visibility changes (separate from initialization)
@@ -430,16 +401,11 @@
     <div
       style="display:flex;flex-direction:column;align-items:center;width:100%;"
     >
-      <div style="position:relative;width:100%;max-width:{width}px;">
+      <div style="width:100%;max-width:{width}px;">
         <canvas
           bind:this={canvas}
           style="width:100%;height:auto;aspect-ratio:{width}/{height};"
         ></canvas>
-        <svg
-          bind:this={svgOverlay}
-          style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"
-          viewBox="0 0 {width} {height}"
-        ></svg>
       </div>
       <TimeSlider
         bind:value={time}

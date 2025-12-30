@@ -145,7 +145,7 @@ export const settings = {
       outlineColor: '#fff',
       outlineWidth: 3,
       outlineOpacity: 0.5,
-      sizeMultiplier: 1.8,
+      fontSize: 28,
       latexLabelOffsetY: -20
     },
     // Trajectory styling
