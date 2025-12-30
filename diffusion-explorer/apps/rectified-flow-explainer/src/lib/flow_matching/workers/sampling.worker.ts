@@ -30,6 +30,14 @@ self.onmessage = async (e) => {
   const timeValue = data.timeValue;
   const domainRange = data.domainRange || null;
   const options = data.options || {}; // Optional parameters object
+  const streaming = data.streaming || false; // Enable per-step streaming
+
+  // Create perStepCallback if streaming is enabled
+  const perStepCallback = streaming
+    ? (step: number, x_t: number[][]) => {
+        self.postMessage({ type: 'step', step, x_t });
+      }
+    : undefined;
 
   // Set up the backend
   if (backend === "wasm") {
@@ -74,7 +82,8 @@ self.onmessage = async (e) => {
     const samplingResult = ourModel.sample(
       numSamples,
       numberOfSteps,
-      samplingOptions
+      samplingOptions,
+      perStepCallback
     );
 
     // Handle the result based on whether guidance is returned
@@ -122,7 +131,8 @@ self.onmessage = async (e) => {
     const samplingResult = ourModel.sample_from_initial_points(
       initialPointsTensor,
       numberOfSteps,
-      samplingOptions
+      samplingOptions,
+      perStepCallback
     );
 
     // Handle the result based on whether guidance is returned
@@ -171,7 +181,8 @@ self.onmessage = async (e) => {
       gridResolution,
       domainRange,
       numberOfSteps,
-      samplingOptions
+      samplingOptions,
+      perStepCallback
     );
 
     // Handle the result based on whether guidance is returned

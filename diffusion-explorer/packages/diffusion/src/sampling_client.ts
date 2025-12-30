@@ -18,20 +18,40 @@ interface SamplingMessageData {
     timeValue?: number;
     domainRange?: { xMin: number, xMax: number; yMin: number, yMax: number };
     options?: SamplingOptions;
+    streaming?: boolean;
 }
 
+/**
+ * Internal helper to create and communicate with a sampling worker.
+ *
+ * Creates a new Web Worker, sends a sampling request, and routes
+ * responses to the provided callback. Optionally supports streaming
+ * per-step updates via the onStep callback.
+ *
+ * @param samplingWorkerUrl - URL to the sampling worker script
+ * @param type - Type of sampling operation to perform
+ * @param data - Configuration data for the sampling operation
+ * @param callback - Callback receiving sampled results
+ * @param onStep - Optional callback invoked after each integration step
+ * @returns The created Worker instance
+ */
 function callSamplingWorker(
     samplingWorkerUrl: string,
     type: SamplingType,
     data: SamplingMessageData,
-    callback: (allSamples: any, guidance?: any) => void
+    callback: (allSamples: any, guidance?: any) => void,
+    onStep?: (step: number, x_t: number[][]) => void
 ) {
     const worker = new Worker(samplingWorkerUrl, { type: 'module' });
-    console.log(samplingWorkerUrl)
+
+    // Enable streaming if onStep callback is provided
+    const messageData = onStep ? { ...data, streaming: true } : data;
 
     worker.onmessage = (e) => {
         const { type: msgType } = e.data;
-        if (msgType === 'result') {
+        if (msgType === 'step' && onStep) {
+            onStep(e.data.step, e.data.x_t);
+        } else if (msgType === 'result') {
             callback(e.data.allSamples, e.data.guidance);
         } else if (msgType === 'status') {
             console.log('Worker status:', e.data.message);
@@ -39,12 +59,28 @@ function callSamplingWorker(
             console.error('Worker error:', e.data.error);
         }
     };
-    worker.postMessage({ type, data });
-    console.log(worker);
+    worker.postMessage({ type, data: messageData });
     return worker;
 }
 
-// Lightweight wrappers
+/**
+ * Sample trajectories from random Gaussian initial points.
+ *
+ * Generates `numSamples` random points from a standard Gaussian distribution
+ * and integrates them through the learned flow to produce trajectories.
+ *
+ * @param samplingWorkerUrl - URL to the sampling worker script
+ * @param modelJSONPath - Path to the saved model (file path or IndexedDB URL)
+ * @param trainingObjective - Training objective ('Flow Matching', 'Diffusion', etc.)
+ * @param modelConfig - Model configuration object with dim and hidden size
+ * @param numSamples - Number of random samples to generate
+ * @param numberOfSteps - Number of integration steps for the ODE solver
+ * @param callback - Callback receiving trajectories [timestep][sample][dim]
+ * @param domainRange - Optional domain bounds for clipping
+ * @param options - Optional sampling parameters (conditioning, guidance)
+ * @param onStep - Optional callback invoked after each integration step for streaming
+ * @returns The created Worker instance
+ */
 export function callSamplingWorkerThread(
     samplingWorkerUrl: string,
     modelJSONPath: string,
@@ -54,7 +90,8 @@ export function callSamplingWorkerThread(
     numberOfSteps: number,
     callback: (allSamples: any, guidance?: any) => void,
     domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
-    options: SamplingOptions = {}
+    options: SamplingOptions = {},
+    onStep?: (step: number, x_t: number[][]) => void
 ) {
     return callSamplingWorker(
         samplingWorkerUrl,
@@ -68,10 +105,30 @@ export function callSamplingWorkerThread(
             domainRange,
             options
         },
-        callback
+        callback,
+        onStep
     );
 }
 
+/**
+ * Sample trajectories from specified initial points.
+ *
+ * Takes an array of initial points and integrates each through the learned
+ * flow to produce trajectories. Useful for visualizing flow from specific
+ * locations or for interactive click-to-sample functionality.
+ *
+ * @param samplingWorkerUrl - URL to the sampling worker script
+ * @param modelJSONPath - Path to the saved model (file path or IndexedDB URL)
+ * @param trainingObjective - Training objective ('Flow Matching', 'Diffusion', etc.)
+ * @param modelConfig - Model configuration object with dim and hidden size
+ * @param initialPoints - Array of starting points [[x, y], ...] to integrate
+ * @param numberOfSteps - Number of integration steps for the ODE solver
+ * @param callback - Callback receiving trajectories [timestep][sample][dim]
+ * @param domainRange - Optional domain bounds for clipping
+ * @param options - Optional sampling parameters (conditioning, guidance)
+ * @param onStep - Optional callback invoked after each integration step for streaming
+ * @returns The created Worker instance
+ */
 export function callSamplingWorkerThreadFromInitialPoints(
     samplingWorkerUrl: string,
     modelJSONPath: string,
@@ -81,7 +138,8 @@ export function callSamplingWorkerThreadFromInitialPoints(
     numberOfSteps: number,
     callback: (allSamples: any, guidance?: any) => void,
     domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
-    options: SamplingOptions = {}
+    options: SamplingOptions = {},
+    onStep?: (step: number, x_t: number[][]) => void
 ) {
     return callSamplingWorker(
         samplingWorkerUrl,
@@ -95,10 +153,30 @@ export function callSamplingWorkerThreadFromInitialPoints(
             domainRange,
             options
         },
-        callback
+        callback,
+        onStep
     );
 }
 
+/**
+ * Sample trajectories from a uniform grid of initial points.
+ *
+ * Creates a uniform grid of points within the specified domain and integrates
+ * each through the learned flow. Useful for visualizing how the flow transforms
+ * space uniformly across the domain.
+ *
+ * @param samplingWorkerUrl - URL to the sampling worker script
+ * @param modelJSONPath - Path to the saved model (file path or IndexedDB URL)
+ * @param trainingObjective - Training objective ('Flow Matching', 'Diffusion', etc.)
+ * @param modelConfig - Model configuration object with dim and hidden size
+ * @param gridResolution - Number of points along each axis (total = gridResolution^2)
+ * @param numberOfSteps - Number of integration steps for the ODE solver
+ * @param domainRange - Domain bounds defining the grid extent
+ * @param callback - Callback receiving trajectories [timestep][sample][dim]
+ * @param options - Optional sampling parameters (conditioning, guidance)
+ * @param onStep - Optional callback invoked after each integration step for streaming
+ * @returns The created Worker instance
+ */
 export function callSamplingWorkerThreadGrid(
     samplingWorkerUrl: string,
     modelJSONPath: string,
@@ -108,7 +186,8 @@ export function callSamplingWorkerThreadGrid(
     numberOfSteps: number,
     domainRange: { xMin: number, xMax: number; yMin: number, yMax: number },
     callback: (allSamples: any, guidance?: any) => void,
-    options: SamplingOptions = {}
+    options: SamplingOptions = {},
+    onStep?: (step: number, x_t: number[][]) => void
 ) {
     return callSamplingWorker(
         samplingWorkerUrl,
@@ -122,7 +201,8 @@ export function callSamplingWorkerThreadGrid(
             domainRange,
             options
         },
-        callback
+        callback,
+        onStep
     );
 }
 
