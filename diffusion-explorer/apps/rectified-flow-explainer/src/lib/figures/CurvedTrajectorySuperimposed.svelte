@@ -5,7 +5,7 @@
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/plotting/plotting";
-  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
+  import { drawTrajectoriesWithOpacityGradient } from "$lib/plotting/trajectories";
 
   // ===== PROPS =====
 
@@ -35,6 +35,7 @@
   export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
   export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
   export let showTrajectoryPreview = false;
+  export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory visible with fade
 
   // Animation
   export let animationDuration = 5000;
@@ -137,15 +138,16 @@
     // Draw target distribution
     drawScatterPlot(ctx, scaledTargetDistribution, distributionPointRadius, targetColor, targetOpacity);
 
-    // Draw trajectories
-    drawTrajectoriesWithPreview(ctx, scaledTrajectories, currentSegmentIndex, {
+    // Draw trajectories with opacity gradient
+    drawTrajectoriesWithOpacityGradient(ctx, scaledTrajectories, currentSegmentIndex, {
       strokeWidth: trajectoryStrokeWidth,
       color: trajectoryColor,
       progressOpacity: trajectoryProgressOpacity,
       pointRadius: trajectoryPointRadius,
       showPreview: showTrajectoryPreview,
-      previewOpacity: trajectoryFullOpacity
-    });
+      previewOpacity: trajectoryFullOpacity,
+      showHeadMarker: false
+    }, alphaTimeWindow);
   }
 
   function initializeVisualization() {

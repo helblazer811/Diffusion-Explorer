@@ -27,6 +27,7 @@
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
   import EulerCircularDemo from "$lib/figures/EulerCircularDemo.svelte";
   import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
+  import CrownJewel from "$lib/figures/CrownJewel.svelte";
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
   import IntersectingPaths from "$lib/figures/IntersectingPaths.svelte";
   import InducedCouplingDouble from "$lib/figures/InducedCouplingDouble.svelte";
@@ -536,7 +537,7 @@
     </div>
   </div>
 
-  <RectifiedFlowSuperimposed
+  <CrownJewel
     width={figureWidth}
     leftTrajectories={$flowMatchingGridTrajectories ?? []}
     rightTrajectories={$rectifiedFlowGridTrajectories?.[
@@ -548,7 +549,7 @@
     onInitialized={() => {
       showOtherFigures = true;
       console.log(
-        "RectifiedFlowSuperimposed initialized, showing other figures."
+        "CrownJewel initialized, showing other figures."
       );
     }}
   >
@@ -557,7 +558,7 @@
       A rectified flow learns straighter paths. Left: Before rectification -
       curved trajectories. Right: After rectification - straighter trajectories.
     </div>
-  </RectifiedFlowSuperimposed>
+  </CrownJewel>
 
   <hr class="section-divider" />
 
@@ -709,6 +710,7 @@
         {isTraining}
         playingByDefault={true}
         backgroundVisible={false}
+        showContours={true}
       >
         <div class="caption">
           <span class="figure-number">Figure 3:</span>
