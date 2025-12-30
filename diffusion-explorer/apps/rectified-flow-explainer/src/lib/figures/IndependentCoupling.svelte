@@ -14,7 +14,7 @@
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
 
-  export const height = 300;
+  export const height = 450;
   export const width = 800;
   export const sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export const targetPointColor = settings.stylingSettings.scatterPlot.color;
@@ -30,7 +30,7 @@
   export const outlineOpacity = settings.stylingSettings.label.outlineOpacity;
   export const edgeColor = '#888';
   export const edgeOpacity = 0.3;
-  export const edgeWidth = 1.5;
+  export const edgeWidth = 2;
   export const pointRadius = settings.stylingSettings.scatterPlot.radius;
   export const pointOpacity = 0.4; // Custom: different from default
   export const yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;

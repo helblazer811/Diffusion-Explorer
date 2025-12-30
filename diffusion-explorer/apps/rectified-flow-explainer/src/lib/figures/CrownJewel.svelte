@@ -515,6 +515,10 @@
     .slider-wrapper {
       padding-left: 0;
     }
+    .duration-label {
+      font-size: 12px;
+      padding-left: 15px;
+    }
   }
 
   @media (max-width: 400px) {

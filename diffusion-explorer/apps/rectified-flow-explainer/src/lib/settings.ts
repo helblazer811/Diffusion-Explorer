@@ -117,12 +117,13 @@ export const settings = {
     },
     // Layout for source/target distribution positioning
     layout: {
-      sourceCenterX: 0.15,  // Source distribution centered at 20% of width
-      targetCenterX: 0.85   // Target distribution centered at 80% of width
+      sourceCenterX: 0.25,  // Source distribution centered at 25% of width
+      targetCenterX: 0.75   // Target distribution centered at 75% of width
     },
     // Label styling
     label: {
-      fontSize: 22,
+      fontSize: 28,
+      fontWeight: 400,
       yShiftFactor: 0.5,
       color: '#666',
       outlineColor: '#f9f9f9',
@@ -143,15 +144,25 @@ export const settings = {
       outline: true,
       outlineColor: '#fff',
       outlineWidth: 3,
-      outlineOpacity: 0.5
+      outlineOpacity: 0.5,
+      sizeMultiplier: 1.8,
+      latexLabelOffsetY: -20
     },
     // Trajectory styling
     trajectory: {
       color: '#f17720',           // Orange
-      strokeWidth: 3.5,
+      strokeWidth: 4.5,
       pointRadius: 4,
       fullOpacity: 0.15,          // Background paths (preview)
       progressOpacity: 0.8        // Animated paths
+    },
+    // Contour plot styling
+    contour: {
+      bandwidth: 15,
+      thresholds: 3,
+      opacity: 0.3,
+      fillColor: '#f17720',
+      blendMode: undefined as string | undefined
     }
   }
 };

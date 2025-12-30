@@ -6,32 +6,44 @@
   import PlayButton from '$lib/components/PlayButton.svelte';
   import { settings } from '$lib/settings';
 
-  // Props
+  // Layout props
   export let width = 400;
-  export let height = 450;
+  export let height = 550;
   export let gap = 20;
+  export let marginWidth = 80;
+  export let marginHeight = 60;
+  export let backgroundVisible = true;
+
+  // Styling props
   export let groundTruthColor = '#888888';
   export let eulerColor = '#f17720';
   export let lineWidth = 6;
   export let eulerLineWidth = 6;
-  export let backgroundVisible = true;
-  export let marginWidth = 80;
-  export let marginHeight = 80;
+
+  // Simulation props
+  export let numSteps = 5;
   export let deltaT = 2.5;
   export let groundTruthDeltaT = 0.05;
-  export let domain = [0, 4 * Math.PI];
-  export let children = undefined;
-  export let animationDuration = 2000;
-  export let animationDelay = 500;
-  export let pathPause = 0;
-  export let perEdgeAnimationDelay = 250;
+
+  // Animation timing props
+  export let perStepDuration = 400;
+  export let perStepDelay = 250;
+  export let fullAnimationDelay = 500;
   export let repeatAnimation = true;
-  export let repeatDelay = 1000;
-  export let labelFontSize = 44;
+  export let repeatDelay = 1500;
+
+  // Computed domain from numSteps and deltaT
+  $: domain = [0, numSteps * deltaT];
+
+  // Label props
+  export let labelFontSize = 52;
   export let labelColor = settings.stylingSettings.label.color;
   export let labelYShiftFactor = 0;
-  export let highCurvatureLabel = 'Highly Curved Function';
-  export let lowCurvatureLabel = 'Approximately Straight Function';
+  export let highCurvatureLabel = 'Curved Function';
+  export let lowCurvatureLabel = 'Almost Straight Function';
+
+  // Caption
+  export let children = undefined;
 
   $: caption = children;
 
@@ -49,9 +61,7 @@
   let timeTrackingFrameId = null;
 
   // Calculate total cycle duration
-  $: numSegments = Math.ceil((domain[1] - domain[0]) / deltaT);
-  $: segmentDuration = animationDuration / numSegments;
-  $: totalCycleDuration = animationDelay + numSegments * (segmentDuration + perEdgeAnimationDelay) - perEdgeAnimationDelay;
+  $: totalCycleDuration = fullAnimationDelay + numSteps * perStepDuration + (numSteps - 1) * perStepDelay;
 
   function startTimeTracking() {
     animationStartTime = performance.now();
@@ -70,7 +80,7 @@
 
     // During animation (not in repeat delay)
     if (timeInCycle < totalCycleDuration) {
-      normalizedTime = Math.min(1, (timeInCycle - animationDelay) / (totalCycleDuration - animationDelay));
+      normalizedTime = Math.min(1, (timeInCycle - fullAnimationDelay) / (totalCycleDuration - fullAnimationDelay));
       if (normalizedTime < 0) normalizedTime = 0;
     } else {
       // During repeat delay, show full circle
@@ -126,8 +136,8 @@
     // Stop any existing animations first
     stopAllAnimations();
     const { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler } = animationData;
-    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, 'left', highCurvatureYScaleFactor, highCurvatureLabel, 0);
-    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, 'right', lowCurvatureYScaleFactor, lowCurvatureLabel, 0);
+    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, highCurvatureYScaleFactor, highCurvatureLabel, 0);
+    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, lowCurvatureYScaleFactor, lowCurvatureLabel, 0);
     // Restart time tracking
     if (isPlaying) {
       startTimeTracking();
@@ -265,50 +275,8 @@
       .text(label);
   }
 
-  // Animate Euler Curve (single path)
-  function animateEulerCurve(path, delay = animationDelay) {
-    const totalLength = path.node()?.getTotalLength() || 0;
-
-    path
-      .attr('stroke-dasharray', `${totalLength} ${totalLength}`)
-      .attr('stroke-dashoffset', totalLength)
-      .transition()
-      .delay(delay)
-      .duration(animationDuration)
-      .ease(d3.easeLinear)
-      .attr('stroke-dashoffset', 0)
-      .on('end', function() {
-        if (repeatAnimation) {
-          // Reset and repeat
-          path
-            .attr('stroke-dashoffset', totalLength)
-            .transition()
-            .delay(repeatDelay)
-            .duration(animationDuration)
-            .ease(d3.easeLinear)
-            .attr('stroke-dashoffset', 0)
-            .on('end', function repeat() {
-              if (repeatAnimation) {
-                path
-                  .attr('stroke-dashoffset', totalLength)
-                  .transition()
-                  .delay(repeatDelay)
-                  .duration(animationDuration)
-                  .ease(d3.easeLinear)
-                  .attr('stroke-dashoffset', 0)
-                  .on('end', repeat);
-              }
-            });
-        }
-      });
-  }
-
   // Animate individual Euler line segments
-  function animateEulerSegments(svg, eulerPoints, xScale, yScale, delay = animationDelay) {
-    const segmentDuration = perEdgeAnimationDelay > 0
-      ? (animationDuration / eulerPoints.length)
-      : animationDuration / eulerPoints.length;
-
+  function animateEulerSegments(svg, eulerPoints, xScale, yScale, delay = fullAnimationDelay) {
     // Clear existing segments and arrows
     svg.selectAll('.euler-segment').remove();
     svg.selectAll('.euler-arrow').remove();
@@ -338,7 +306,7 @@
       const x2 = xScale(p2.t);
       const y2 = yScale(p2.y);
 
-      const segmentDelay = delay + i * (segmentDuration + perEdgeAnimationDelay);
+      const segmentDelay = delay + i * (perStepDuration + perStepDelay);
       const isLastSegment = i === eulerPoints.length - 2;
 
       const line = svg.append('line')
@@ -353,7 +321,7 @@
       const transition = line
         .transition()
         .delay(segmentDelay)
-        .duration(segmentDuration)
+        .duration(perStepDuration)
         .ease(d3.easeLinear)
         .attr('x2', x2)
         .attr('y2', y2)
@@ -375,7 +343,7 @@
           // Animate arrow along with the segment
           arrow
             .transition()
-            .duration(segmentDuration)
+            .duration(perStepDuration)
             .ease(d3.easeLinear)
             .attr('x2', x2)
             .attr('y2', y2);
@@ -386,6 +354,8 @@
         transition.on('end', function() {
           if (shouldAnimate) {
             scheduleTimeout(() => {
+              // Reset timer to sync with animation restart
+              animationStartTime = performance.now();
               animateEulerSegments(svg, eulerPoints, xScale, yScale, 0);
             }, repeatDelay);
           }
@@ -395,7 +365,7 @@
   }
 
   // Plot Curves
-  function plotCurves(svg, groundTruth, eulerData, groupId, yScaleFactor = 1, label = '', animDelay = animationDelay) {
+  function plotCurves(svg, groundTruth, eulerData, yScaleFactor = 1, label = '', animDelay = fullAnimationDelay) {
     if (!svg) return;
 
     const d3Svg = d3.select(svg);
@@ -420,21 +390,8 @@
       .attr('stroke-width', lineWidth)
       .attr('d', line);
 
-    // Plot and animate Euler approximation (orange)
-    if (perEdgeAnimationDelay > 0) {
-      // Animate individual segments with pauses between them
-      animateEulerSegments(d3Svg, eulerPoints, xScale, yScale, animDelay);
-    } else {
-      // Animate as a single path
-      const eulerPath = d3Svg.append('path')
-        .datum(eulerPoints)
-        .attr('fill', 'none')
-        .attr('stroke', eulerColor)
-        .attr('stroke-width', eulerLineWidth)
-        .attr('d', line);
-
-      animateEulerCurve(eulerPath, animDelay);
-    }
+    // Animate individual Euler segments
+    animateEulerSegments(d3Svg, eulerPoints, xScale, yScale, animDelay);
 
     // Add curve label at the top
     if (label) {
@@ -459,8 +416,8 @@
     animationData = { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler };
 
     // Plot both with same animation delay so they start in sync
-    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, 'left', highCurvatureYScaleFactor, highCurvatureLabel, animationDelay);
-    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, 'right', lowCurvatureYScaleFactor, lowCurvatureLabel, animationDelay);
+    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, highCurvatureYScaleFactor, highCurvatureLabel, fullAnimationDelay);
+    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, lowCurvatureYScaleFactor, lowCurvatureLabel, fullAnimationDelay);
 
     isInitialized = true;
 

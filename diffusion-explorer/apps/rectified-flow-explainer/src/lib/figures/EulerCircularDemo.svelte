@@ -318,7 +318,8 @@
         color={trajectoryColor}
       />
       <div class="step-slider-container">
-        <div class="step-slider-inner">
+        <div class="step-slider-spacer"></div>
+        <div class="slider-wrapper">
           <input
             type="range"
             class="step-slider"
@@ -329,12 +330,12 @@
             oninput={handleStepSizeInput}
             style="--slider-color: {trajectoryColor}; background: linear-gradient(to right, {trajectoryColor} {((stepSize - 0.01) / (0.15 - 0.01)) * 100}%, #d3d3d3 {((stepSize - 0.01) / (0.15 - 0.01)) * 100}%);"
           />
-          <div class="step-tick-container">
-            <div class="step-tick" style="left: 1%;"></div>
-            <div class="step-tick-label" style="left: 1%;">0.01</div>
-            <div class="step-slider-label">Step Size: {stepSize.toFixed(2)}</div>
-            <div class="step-tick" style="left: 99%;"></div>
-            <div class="step-tick-label" style="left: 99%;">0.15</div>
+          <div class="tick-container">
+            <div class="tick" style="left: 1%;"></div>
+            <div class="tick-label" style="left: 1%;">0.01</div>
+            <div class="step-label">Step Size: {stepSize.toFixed(2)}</div>
+            <div class="tick" style="left: 99%;"></div>
+            <div class="tick-label" style="left: 99%;">0.15</div>
           </div>
         </div>
       </div>
@@ -344,54 +345,24 @@
 
 <style>
   .step-slider-container {
+    display: flex;
+    align-items: flex-start;
     width: 100%;
     max-width: 600px;
-    padding: 10px 44px 5px 44px;
+    padding-right: 44px;
     margin-top: 20px;
-    margin-left: auto;
-    margin-right: auto;
-    box-sizing: border-box;
   }
 
-  .step-slider-inner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
+  .step-slider-spacer {
+    width: 32px;
+    margin-right: 12px;
+    flex-shrink: 0;
   }
 
-  .step-tick-container {
+  .slider-wrapper {
+    flex: 1;
     position: relative;
-    width: 100%;
-    height: 20px;
-    margin-top: 2px;
-  }
-
-  .step-tick {
-    position: absolute;
-    top: 0;
-    width: 2px;
-    height: 10px;
-    background-color: #7b7b7b;
-  }
-
-  .step-tick-label {
-    position: absolute;
-    top: 12px;
-    font-size: 16px;
-    transform: translateX(-50%);
-    font-family: Helvetica, sans-serif;
-    color: #7b7b7b;
-  }
-
-  .step-slider-label {
-    position: absolute;
-    left: 50%;
-    top: 0;
-    transform: translateX(-50%);
-    font-size: 16px;
-    font-family: Helvetica, sans-serif;
-    color: #7b7b7b;
+    padding-top: 4px;
   }
 
   .step-slider {
@@ -423,5 +394,45 @@
     border-radius: 50%;
     cursor: pointer;
     border: none;
+  }
+
+  .tick-container {
+    position: relative;
+    width: 100%;
+    height: 20px;
+    margin-top: 2px;
+  }
+
+  .tick {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 10px;
+    background-color: #7b7b7b;
+  }
+
+  .tick-label {
+    position: absolute;
+    top: 12px;
+    font-size: 16px;
+    transform: translateX(-50%);
+    font-family: Helvetica, sans-serif;
+    color: #7b7b7b;
+  }
+
+  .step-label {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: 16px;
+    font-family: Helvetica, sans-serif;
+    color: #7b7b7b;
+  }
+
+  @media (max-width: 600px) {
+    .step-slider-container {
+      padding-right: 10px;
+    }
   }
 </style>

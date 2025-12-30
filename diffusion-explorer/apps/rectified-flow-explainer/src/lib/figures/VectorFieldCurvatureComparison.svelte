@@ -15,11 +15,11 @@
   export let rectifiedFlowVectorField = null;
 
   // Layout
-  export let canvasWidth = 350;
-  export let canvasHeight = 350;
-  export let marginWidth = 40;
-  export let marginHeight = 40;
-  export let gap = 30;
+  export let canvasWidth = 400;
+  export let canvasHeight = 400;
+  export let marginWidth = 20;
+  export let marginHeight = 20;
+  export let gap = 20;
 
   // Labels
   export let leftLabel = 'Flow Matching';
@@ -351,5 +351,17 @@
     border: 1px solid #e0e0e0;
     border-radius: 4px;
     color: #666;
+  }
+
+  @media (max-width: 600px) {
+    .panel-label {
+      font-size: 18px !important;
+    }
+  }
+
+  @media (max-width: 400px) {
+    .panel-label {
+      font-size: 16px !important;
+    }
   }
 </style>

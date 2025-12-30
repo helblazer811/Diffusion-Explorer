@@ -16,11 +16,11 @@
 
   // ===== LAYOUT PROPS =====
   export let width = 800;
-  export let height = 300;
+  export let height = 450;
   export let marginWidth = 50;
   export let marginHeight = 20;
-  export let sourceCenterX = 0.15;
-  export let targetCenterX = 0.85;
+  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let yShiftFactor = -0.2;
 
   // ===== SCATTER PLOT STYLING =====
@@ -60,9 +60,13 @@
   // ===== BACKGROUND =====
   export let backgroundVisible = true;
 
+  // ===== LATEX LABEL STYLING =====
+  export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
+  export let latexSizeMultiplier = settings.stylingSettings.figureLatex.sizeMultiplier;
+
   // ===== FIXED POINT POSITIONS (pixel coords) =====
   export let x0Pixel = { x: 180, y: 170 };
-  export let x1Pixel = { x: 620, y: 90 };
+  export let x1Pixel = { x: 540, y: 130 };
 
   // ===== STATE =====
   let canvas;
@@ -161,8 +165,6 @@
     if (!svgOverlay || !scales) return;
     svgOverlay.innerHTML = "";
 
-    const labelOffsetY = -14;
-
     // x_0 label above source point
     if (x0LabelSvg) {
       placeMathjaxSVG(
@@ -171,9 +173,9 @@
         x0Pixel.x,
         x0Pixel.y,
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
 
@@ -185,9 +187,9 @@
         x1Pixel.x,
         x1Pixel.y,
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
 
@@ -203,9 +205,9 @@
         interpX,
         interpY,
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
 
@@ -227,10 +229,10 @@
           svgOverlay,
           vtCenterX,
           vtCenterY,
-          0,
-          35,
+          10,
+          45,
           50,
-          1.2
+          latexSizeMultiplier
         );
       }
 
@@ -250,7 +252,7 @@
           -10,
           -20,
           50,
-          1.2
+          latexSizeMultiplier
         );
       }
     }
@@ -269,7 +271,7 @@
         0,
         8,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
     if (p1LabelSvg) {
@@ -281,7 +283,7 @@
         0,
         8,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
   }

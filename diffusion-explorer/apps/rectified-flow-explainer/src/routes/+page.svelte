@@ -598,7 +598,7 @@
     flows by visualizing them in low-dimensions. In fact, we can use the exact
     same algorithms used to train large-scale models to train simple 2D flows on
     toy distributions and reproduce many phenomena of practical interest. In a related 
-    project we developed an interactive web app called Diffusion Explorer 
+    project we developed an <a href="https://github.com/helblazer811/Diffusion-Explorer">interactive web app</a> called Diffusion Explorer 
     <HoverableReference id="helbling2025diffusionexplorerinteractiveexploration" {bibEntries} {citations} />
     that allows users to experiment with training and sampling from flow and
     diffusion models in 2D. 

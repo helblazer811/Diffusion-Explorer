@@ -17,10 +17,10 @@
   export let targetDistribution = [];
 
   // Layout
-  export let marginWidth = 0;
-  export let marginHeight = 0;
-  export let canvasWidth = 370;
-  export let canvasHeight = 370;
+  export let marginWidth = 20;
+  export let marginHeight = 20;
+  export let canvasWidth = 400;
+  export let canvasHeight = 400;
   export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
 
   // Target distribution styling

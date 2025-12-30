@@ -14,7 +14,7 @@
   export let playingByDefault = true;
   export let pauseBeforeRestart = 1000;
   export let width = 750;
-  export let height = 275;
+  export let height = 375;
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let numTrajectoriesToShow = 10;
@@ -169,8 +169,11 @@
 
     // Draw distribution labels
     const labelColor = settings.stylingSettings.label.color;
-    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, { color: labelColor });
-    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor });
+    const labelFontSize = settings.stylingSettings.label.fontSize;
+    const labelFontWeight = settings.stylingSettings.label.fontWeight;
+    const labelFont = `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`;
+    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
+    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
 
     // Calculate current segment index from normalized time
     const segmentIndex = Math.floor(time * numSegments);
