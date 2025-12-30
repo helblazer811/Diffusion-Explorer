@@ -555,8 +555,12 @@
   >
     <div class="caption">
       <span class="figure-number">Figure 1:</span>
-      A rectified flow learns straighter paths. Left: Before rectification -
-      curved trajectories. Right: After rectification - straighter trajectories.
+      <strong>
+        A rectified flow model learns straighter <span style="color: #f17720;">sampling paths</span> than a standard
+        flow matching model, enabling faster sampling.
+      </strong> Both models are trained to generate samples from the same <span style="color: #3b82f6;">target distribution</span>. The
+      rectified flow's straighter paths allow for accurate numerical simulation with
+      fewer steps, reducing the computational cost of sampling and lowering latency.
     </div>
   </CrownJewel>
 
