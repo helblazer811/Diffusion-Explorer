@@ -17,7 +17,7 @@
   export const height = 450;
   export const width = 800;
   export const sourcePointColor = settings.stylingSettings.scatterPlot.color;
-  export const targetPointColor = settings.stylingSettings.scatterPlot.color;
+  export const targetPointColor = '#f17720';
   export const sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
   export const targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export const marginWidth = 50;

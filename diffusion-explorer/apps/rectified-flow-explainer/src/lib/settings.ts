@@ -46,12 +46,12 @@ export const settings = {
   cachedRectifiedFlowVectorFieldPath: "cached_samples/rectified_flow_vector_field.json" as string | null,
 
   // Worker URLs
-  trainWorkerUrl: 'src/lib/flow_matching/workers/train.worker.js',
-  samplingWorkerUrl: 'src/lib/flow_matching/workers/sampling.worker.js',
+  trainWorkerUrl: '/src/lib/flow_matching/workers/train.worker.ts',
+  samplingWorkerUrl: '/src/lib/flow_matching/workers/sampling.worker.ts',
 
   // Model paths (null means train from scratch, otherwise load from path)
-  flowMatchingModelPath: null as string | null,
-  rectifiedFlowModelPath: null as string | null,
+  flowMatchingModelPath: "models/flow_matching_model.json" as string | null,
+  rectifiedFlowModelPath: "models/rectified_flow_model.json" as string | null,
 
   // ========== SAMPLING SETTINGS ==========
   samplingSettings: {
@@ -96,15 +96,16 @@ export const settings = {
     modelConfig: { dim: 2, hidden: 64 },
     domainRange: null,
     flowMatchingTrainingConfig: {
-      epochs: 500,
+      // Important: use > 1000 epochs for good sampling quality
+      epochs: 2000,
       batchSize: 1024,
       verbose: true,
       displayInterval: 100
     },
     rectifiedFlowTrainingConfig: {
-      num_rectified_steps: 3,
-      epochs_per_rectified_step: 200,
-      batchSize: 64,
+      num_rectified_steps: 4,
+      epochs_per_rectified_step: 2000,
+      batchSize: 1024,
       num_simulation_steps: 200
     }
   } as TrainingSettings,
@@ -145,8 +146,8 @@ export const settings = {
       outlineColor: '#fff',
       outlineWidth: 3,
       outlineOpacity: 0.5,
-      fontSize: 28,
-      latexLabelOffsetY: -20
+      fontSize: 20,
+      latexLabelOffsetY: -10
     },
     // Trajectory styling
     trajectory: {

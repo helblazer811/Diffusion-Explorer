@@ -46,19 +46,29 @@ self.onmessage = async (e) => {
   const { type, data } = e.data;
 
   if (type === "train") {
-    // Destructure the data
-    const { trainingObjective, modelConfig, datasetPath, trainingConfig } =
-      data;
-    // Set up tf wasm backend
-    if (backend === "wasm") {
-      await tf.setBackend("wasm");
-      await tf.ready();
-    } else if (backend === "webgl") {
-      await tf.setBackend("webgl");
-      await tf.ready();
-    } else {
-      throw new Error("Invalid backend specified");
-    }
+    try {
+      self.postMessage({
+        type: "status",
+        message: "Worker received train message",
+      });
+      // Destructure the data
+      const { trainingObjective, modelConfig, datasetPath, trainingConfig } =
+        data;
+      // Set up tf wasm backend
+      if (backend === "wasm") {
+        await tf.setBackend("wasm");
+        await tf.ready();
+      } else if (backend === "webgl") {
+        await tf.setBackend("webgl");
+        await tf.ready();
+      } else {
+        throw new Error("Invalid backend specified");
+      }
+      // Send status message that training has started
+      self.postMessage({
+        type: "status",
+        message: "Training successfully started",
+      });
     // Initialize the empty model
     const ModelClass = trainingObjectiveToModelClass[trainingObjective];
     let ourModel;
@@ -132,6 +142,12 @@ self.onmessage = async (e) => {
       tfModelPath: modelSaveName,
       // allSamples: allSamplesArray,
     });
+    } catch (err) {
+      self.postMessage({
+        type: "error",
+        message: `Training error: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
   } else if (type === "stop_training") {
     // Figure out how to stop the training
     trainingStopped = true;

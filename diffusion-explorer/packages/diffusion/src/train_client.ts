@@ -20,7 +20,7 @@ export function callTrainingWorkerThread(
             finishCallback(e.data.tfModelPath);
         } else if (type === 'epoch_chunk') {
             // Recieved a chunk of data from the worker thread
-            epochCallback(e.data.epoch, e.data.intermediateSamples);
+            epochCallback(e.data.epoch, e.data.intermediateSamples, e.data.loss);
         } else if (type === 'status') {
             console.log('Worker status:', e.data.message);
         } else if (type === 'error') {
@@ -65,7 +65,7 @@ export function callRectifiedFlowTrainingWorker(
             finishCallback(e.data.tfModelPath, e.data.allRectifiedTrajectories);
         } else if (type === 'epoch_chunk') {
             // Received epoch update during a rectified step
-            epochCallback(e.data.epoch, e.data.rectifiedStep, e.data.intermediateSamples);
+            epochCallback(e.data.epoch, e.data.rectifiedStep, e.data.intermediateSamples, e.data.loss);
         } else if (type === 'rectified_step_complete') {
             // Received completion of a rectified step with trajectories
             rectifiedStepCallback(e.data.rectifiedStep, e.data.trajectories);

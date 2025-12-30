@@ -5,7 +5,6 @@
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/plotting/plotting";
-  import { drawTrajectoriesWithOpacityGradient } from "$lib/plotting/trajectories";
 
   // ===== PROPS =====
 
@@ -167,16 +166,26 @@
     // Draw target distribution scatter (behind trajectories)
     drawScatterPlot(ctx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
 
-    // Draw trajectories with opacity gradient
-    drawTrajectoriesWithOpacityGradient(ctx, scaledTrajectories, segmentIndex, {
-      strokeWidth: trajectoryStrokeWidth,
-      color: trajectoryColor,
-      progressOpacity: trajectoryProgressOpacity,
-      pointRadius: trajectoryPointRadius,
-      showPreview: showTrajectoryPreview,
-      previewOpacity: trajectoryFullOpacity,
-      showHeadMarker: false
-    }, alphaTimeWindow);
+    // Draw trajectories as simple lines up to segmentIndex
+    ctx.strokeStyle = trajectoryColor;
+    ctx.lineWidth = trajectoryStrokeWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.globalAlpha = trajectoryProgressOpacity;
+
+    for (const trajectory of scaledTrajectories) {
+      const endIdx = Math.min(segmentIndex + 1, trajectory.length);
+      if (endIdx < 2) continue;
+
+      ctx.beginPath();
+      ctx.moveTo(trajectory[0][0], trajectory[0][1]);
+      for (let i = 1; i < endIdx; i++) {
+        ctx.lineTo(trajectory[i][0], trajectory[i][1]);
+      }
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1.0;
   }
 
   function initializeVisualization() {

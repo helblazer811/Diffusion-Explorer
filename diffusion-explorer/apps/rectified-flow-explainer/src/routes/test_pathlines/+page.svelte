@@ -1,14 +1,15 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, afterUpdate } from "svelte";
   import * as d3 from "d3";
-  import { base } from "$app/paths";
   import DoubleFigure from "$lib/components/DoubleFigure.svelte";
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/plotting/plotting";
-  import { drawTrajectoriesWithOpacityGradient } from "$lib/plotting/trajectories";
   import * as sample from "$lib/flow_matching/sample";
-  import { generateTemporallySpacedPathlines } from "$lib/plotting/pathlines";
+  import * as train from "$lib/flow_matching/train";
+  import { downloadJSON } from "$lib/flow_matching/utils";
+  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
+  import { generateSpatiallySpacedPathlines } from "$lib/plotting/pathlines";
 
   // ===== DATA =====
   let leftTrajectories: number[][][] = []; // [timestep][sample][dim]
@@ -18,11 +19,11 @@
   let loadError: string | null = null;
 
   // ===== PATHLINE FILTERING =====
-  let leftDeactivationTimes: number[] = [];
-  let rightDeactivationTimes: number[] = [];
+  // Filtered pathlines in [sample][timestep][dim] format
+  let leftFilteredPathlines: number[][][] = [];
+  let rightFilteredPathlines: number[][][] = [];
   const pathlineSpacingOptions = {
-    dMin: 0.05, // Minimum spacing distance
-    windowDeltaT: 0.25, // Time window (25% of interval)
+    dMin: 0.12, // Minimum spacing distance
   };
 
   // ===== LAYOUT =====
@@ -31,7 +32,7 @@
   let marginWidth = 10;
   let marginHeight = 10;
   let gap = 20;
-  let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
+  let domainRange = { xMin: -2.0, xMax: 2.0, yMin: -2.0, yMax: 2.0 };
 
   // ===== LABELS =====
   let leftLabel = "Flow Matching";
@@ -47,12 +48,7 @@
   // ===== TRAJECTORY STYLING =====
   let trajectoryColor = settings.stylingSettings.trajectory.color;
   let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-  let trajectoryPointRadius = settings.stylingSettings.trajectory.pointRadius;
-  let trajectoryProgressOpacity =
-    settings.stylingSettings.trajectory.progressOpacity;
-  let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
-  let showTrajectoryPreview = false;
-  let alphaTimeWindow = 1.0;
+  let trajectoryOpacity = settings.stylingSettings.trajectory.progressOpacity;
 
   // ===== ANIMATION =====
   let animationDuration = 8000;
@@ -140,12 +136,10 @@
     }
   }
 
-  function transposeAndScale(trajectories) {
-    if (!xScale || !yScale || !trajectories || trajectories.length === 0)
-      return [];
-    const numSamples = trajectories[0]?.length || 0;
-    return Array.from({ length: numSamples }, (_, i) =>
-      trajectories.map((ts) => [xScale(ts[i][0]), yScale(ts[i][1])])
+  function scalePathlines(pathlines: number[][][]): number[][][] {
+    if (!xScale || !yScale || !pathlines || pathlines.length === 0) return [];
+    return pathlines.map((pathline) =>
+      pathline.map((point) => [xScale(point[0]), yScale(point[1])])
     );
   }
 
@@ -156,15 +150,15 @@
       xScale(p[0]),
       yScale(p[1]),
     ]);
-    scaledLeftTrajectories = transposeAndScale(leftTrajectories);
-    scaledRightTrajectories = transposeAndScale(rightTrajectories);
+    // Scale the filtered pathlines (already in [sample][timestep][dim] format)
+    scaledLeftTrajectories = scalePathlines(leftFilteredPathlines);
+    scaledRightTrajectories = scalePathlines(rightFilteredPathlines);
   }
 
   function draw(
     ctx: CanvasRenderingContext2D,
     scaledTrajectories: number[][][],
-    segmentIndex: number,
-    deactivationTimes: number[]
+    segmentIndex: number
   ) {
     if (!ctx) return;
 
@@ -178,59 +172,32 @@
       targetOpacity
     );
 
-    // Calculate window size in timesteps
-    const numTimesteps = scaledTrajectories[0]?.length || 1;
-    const windowSteps = Math.floor(alphaTimeWindow * numTimesteps);
+    // Draw trajectories as simple lines up to segmentIndex
+    ctx.strokeStyle = trajectoryColor;
+    ctx.lineWidth = trajectoryStrokeWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.globalAlpha = trajectoryOpacity;
 
-    // The visible window is [windowStart, segmentIndex]
-    const windowStart = Math.max(0, segmentIndex - windowSteps);
+    for (const trajectory of scaledTrajectories) {
+      const endIdx = Math.min(segmentIndex + 1, trajectory.length);
+      if (endIdx < 2) continue;
 
-    // Filter and trim trajectories
-    const filteredTrajectories: number[][][] = [];
-    for (let i = 0; i < scaledTrajectories.length; i++) {
-      const deactivateAt = deactivationTimes[i] ?? Infinity;
-      const trajectory = scaledTrajectories[i];
-
-      // Trajectory geometry ends at deactivation time (frozen, no new segments revealed)
-      const geometryEnd = Math.min(
-        deactivateAt === Infinity ? segmentIndex + 1 : deactivateAt + 1,
-        trajectory.length
-      );
-
-      // Visible portion is intersection of [windowStart, segmentIndex] and [0, geometryEnd]
-      const visibleStart = windowStart;
-      const visibleEnd = Math.min(segmentIndex + 1, geometryEnd);
-
-      // Skip if no visible portion (window has moved past the frozen geometry)
-      if (visibleStart >= visibleEnd) continue;
-
-      const trimmedTrajectory = trajectory.slice(visibleStart, visibleEnd);
-      filteredTrajectories.push(trimmedTrajectory);
+      ctx.beginPath();
+      ctx.moveTo(trajectory[0][0], trajectory[0][1]);
+      for (let i = 1; i < endIdx; i++) {
+        ctx.lineTo(trajectory[i][0], trajectory[i][1]);
+      }
+      ctx.stroke();
     }
 
-    // Draw all visible trajectories
-    // The segment index for drawing is relative to each trimmed trajectory
-    const trimmedSegmentIndex = Math.min(windowSteps, segmentIndex);
-
-    drawTrajectoriesWithOpacityGradient(
-      ctx,
-      filteredTrajectories,
-      trimmedSegmentIndex,
-      {
-        strokeWidth: trajectoryStrokeWidth,
-        color: trajectoryColor,
-        progressOpacity: trajectoryProgressOpacity,
-        pointRadius: trajectoryPointRadius,
-        showPreview: showTrajectoryPreview,
-        previewOpacity: trajectoryFullOpacity,
-        showHeadMarker: false,
-      },
-      alphaTimeWindow
-    );
+    ctx.globalAlpha = 1.0;
   }
 
   function initializeVisualization() {
-    if (!leftCanvas || !rightCanvas || !isDataValid) return;
+    if (!leftCanvas || !rightCanvas || !isDataValid) {
+      return;
+    }
 
     initializeScales();
     initializeCanvas();
@@ -243,18 +210,8 @@
   function updateVisualization() {
     if (!isDataValid || !leftCtx || !rightCtx) return;
 
-    draw(
-      leftCtx,
-      scaledLeftTrajectories,
-      currentSegmentIndex,
-      leftDeactivationTimes
-    );
-    draw(
-      rightCtx,
-      scaledRightTrajectories,
-      currentSegmentIndex,
-      rightDeactivationTimes
-    );
+    draw(leftCtx, scaledLeftTrajectories, currentSegmentIndex);
+    draw(rightCtx, scaledRightTrajectories, currentSegmentIndex);
   }
 
   function animate(ts) {
@@ -342,8 +299,17 @@
 
   // ===== REACTIVE EFFECTS =====
 
-  $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
-    initializeVisualization();
+  // Use afterUpdate to initialize visualization after DOM has updated
+  afterUpdate(() => {
+    if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
+      initializeVisualization();
+    }
+  });
+
+  // Re-precompute coordinates when filtered pathlines change
+  $: if (isInitialized && leftFilteredPathlines.length > 0 && rightFilteredPathlines.length > 0) {
+    precomputeCoordinates();
+    updateVisualization();
   }
 
   $: if (isPlaying && pathsInitialized && !animationFrameId) startAnimation();
@@ -353,15 +319,181 @@
     handleVisibilityChange($figureIsActive);
   }
 
-  // ===== DENSE GRID GENERATION =====
+  // ===== TRAJECTORY GENERATION =====
 
-  // Configuration for dense grid sampling
+  // Configuration for trajectory generation
+  const numRandomSamples = 2000;
+  const numSteps = 300;
+
+  // Training state
+  let isTraining = false;
+  let trainingWorker: Worker | null = null;
+  let rectifiedTrainingWorker: Worker | null = null;
+  let flowMatchingModelPath: string | null = null;
+  let rectifiedFlowModelPath: string | null = null;
+
+  // Configuration for uniform grid generation
+  const uniformGridResolution = 45; // 45x45 = 2025 samples
+  const uniformGridDomainRange = { xMin: -2.0, xMax: 2.0, yMin: -2.0, yMax: 2.0 };
+
+  // Toggle for initial point source: 'random' or 'grid'
+  type InitialPointSource = 'random' | 'grid';
+  let initialPointSource: InitialPointSource = 'random';
+
+  // Configuration for dense grid sampling (manual override button)
   const denseGridResolution = 50;
   const denseGridNumSteps = 100;
   const denseGridDomainRange = { xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 };
 
   let isGenerating = false;
   let generationStatus = "";
+
+  /**
+   * Clip samples to the display domain range so trajectories don't start off screen
+   */
+  function clipSamplesToDomain(samples: number[][]): number[][] {
+    const { xMin, xMax, yMin, yMax } = domainRange;
+    return samples.filter(point =>
+      point[0] >= xMin && point[0] <= xMax &&
+      point[1] >= yMin && point[1] <= yMax
+    );
+  }
+
+  /**
+   * Train a flow matching model
+   */
+  async function trainFlowMatchingModel(): Promise<string> {
+    generationStatus = "Training flow matching model...";
+    isTraining = true;
+
+    const result = await train.trainModel(
+      settings.trainingSettings,
+      settings.trainWorkerUrl,
+      () => { isTraining = true; },
+      () => { isTraining = false; }
+    );
+
+    trainingWorker = result.worker;
+    flowMatchingModelPath = result.modelPath;
+    return result.modelPath;
+  }
+
+  /**
+   * Train a rectified flow model
+   */
+  async function trainRectifiedFlowModel(): Promise<string> {
+    generationStatus = "Training rectified flow model...";
+    isTraining = true;
+
+    const result = await train.trainRectifiedFlow(
+      settings.trainingSettings,
+      settings.trainWorkerUrl
+    );
+
+    rectifiedTrainingWorker = result.worker;
+    rectifiedFlowModelPath = result.data.modelPath;
+    isTraining = false;
+    return result.data.modelPath;
+  }
+
+  /**
+   * Generate trajectories from specific initial points using the sampling worker
+   */
+  function generateFromInitialPoints(
+    modelPath: string,
+    initialPoints: number[][]
+  ): Promise<number[][][]> {
+    return new Promise((resolve) => {
+      callSamplingWorkerThreadFromInitialPoints(
+        settings.samplingWorkerUrl,
+        modelPath,
+        "Flow Matching",
+        settings.trainingSettings.modelConfig,
+        initialPoints,
+        numSteps,
+        (allSamples: number[][][]) => {
+          resolve(allSamples);
+        },
+        settings.trainingSettings.domainRange
+      );
+    });
+  }
+
+  /**
+   * Generate uniform grid samples
+   */
+  function generateUniformGridSamples(): number[][] {
+    const samples: number[][] = [];
+    const { xMin, xMax, yMin, yMax } = uniformGridDomainRange;
+
+    for (let i = 0; i < uniformGridResolution; i++) {
+      for (let j = 0; j < uniformGridResolution; j++) {
+        const x = xMin + (xMax - xMin) * (i / (uniformGridResolution - 1));
+        const y = yMin + (yMax - yMin) * (j / (uniformGridResolution - 1));
+        samples.push([x, y]);
+      }
+    }
+    return samples;
+  }
+
+  /**
+   * Generate trajectories for both panels on page load
+   * Uses either random Gaussian samples or uniform grid based on initialPointSource
+   * Trains models from scratch instead of loading from files
+   */
+  async function generateTrajectories() {
+    isGenerating = true;
+    generationStatus = "Starting...";
+
+    try {
+      // Train flow matching model if not already trained
+      if (!flowMatchingModelPath) {
+        flowMatchingModelPath = await trainFlowMatchingModel();
+      }
+
+      // Train rectified flow model if not already trained
+      if (!rectifiedFlowModelPath) {
+        rectifiedFlowModelPath = await trainRectifiedFlowModel();
+      }
+
+      // Generate shared initial points for both models
+      generationStatus = "Generating initial points...";
+      let initialPoints = initialPointSource === 'grid'
+        ? generateUniformGridSamples()
+        : sample.generateClippedGaussianSamples(numRandomSamples);
+
+      // Clip samples to domain so trajectories don't start off screen
+      initialPoints = clipSamplesToDomain(initialPoints);
+
+      // Generate Flow Matching trajectories (left panel)
+      generationStatus = "Generating Flow Matching trajectories...";
+      leftTrajectories = await generateFromInitialPoints(flowMatchingModelPath, initialPoints);
+
+      // Generate Rectified Flow trajectories (right panel)
+      generationStatus = "Generating Rectified Flow trajectories...";
+      rightTrajectories = await generateFromInitialPoints(rectifiedFlowModelPath, initialPoints);
+
+      // Use final timestep as target distribution
+      if (leftTrajectories.length > 0) {
+        targetDistribution = leftTrajectories[leftTrajectories.length - 1];
+      }
+
+      // Run spatial filtering
+      runPathlineFiltering();
+
+      generationStatus = "Done!";
+      isLoading = false;
+    } catch (error) {
+      loadError =
+        error instanceof Error
+          ? error.message
+          : "Failed to generate trajectories";
+      console.error("Error generating trajectories:", error);
+      isLoading = false;
+    } finally {
+      isGenerating = false;
+    }
+  }
 
   /**
    * Generate dense grid trajectories from a model
@@ -380,52 +512,6 @@
       settings.samplingWorkerUrl
     );
     return result.allTimeSamples;
-  }
-
-  /**
-   * Generate trajectories for both panels using flow matching and rectified flow models
-   */
-  async function generateBothTrajectories() {
-    isGenerating = true;
-    generationStatus = "Generating flow matching trajectories...";
-
-    try {
-      // Generate flow matching trajectories (left panel)
-      if (settings.flowMatchingModelPath) {
-        const fmModelPath = `${base}/${settings.flowMatchingModelPath}`;
-        leftTrajectories = await generateDenseGridTrajectories(fmModelPath);
-        console.log(
-          `Generated ${leftTrajectories[0]?.length || 0} flow matching trajectories`
-        );
-      }
-
-      generationStatus = "Generating rectified flow trajectories...";
-
-      // Generate rectified flow trajectories (right panel)
-      if (settings.rectifiedFlowModelPath) {
-        const rfModelPath = `${base}/${settings.rectifiedFlowModelPath}`;
-        rightTrajectories = await generateDenseGridTrajectories(rfModelPath);
-        console.log(
-          `Generated ${rightTrajectories[0]?.length || 0} rectified flow trajectories`
-        );
-      }
-
-      // Use final timestep as target distribution
-      if (leftTrajectories.length > 0) {
-        targetDistribution = leftTrajectories[leftTrajectories.length - 1];
-      }
-
-      generationStatus = "Done!";
-      isLoading = false;
-    } catch (error) {
-      loadError =
-        error instanceof Error
-          ? error.message
-          : "Failed to generate trajectories";
-      console.error("Error generating trajectories:", error);
-    } finally {
-      isGenerating = false;
-    }
   }
 
   // ===== PATHLINE FILTERING =====
@@ -447,119 +533,68 @@
   }
 
   /**
-   * Run pathline filtering on both trajectory sets
+   * Transpose pathlines from [sample][timestep][dim] back to [timestep][sample][dim]
+   */
+  function transposePathlinesToTimesteps(pathlines: number[][][]): number[][][] {
+    if (pathlines.length === 0) return [];
+    const numSamples = pathlines.length;
+    const numTimesteps = pathlines[0].length;
+
+    return Array.from({ length: numTimesteps }, (_, t) =>
+      Array.from({ length: numSamples }, (_, s) => pathlines[s][t])
+    );
+  }
+
+  /**
+   * Run independent spatial pathline filtering on each trajectory set
    */
   function runPathlineFiltering() {
-    if (leftTrajectories.length === 0 && rightTrajectories.length === 0) {
+    if (leftTrajectories.length === 0 || rightTrajectories.length === 0) {
       return;
     }
 
-    console.log("Running pathline filtering...");
-    console.log(
-      `Left trajectories: ${leftTrajectories.length} timesteps, ${leftTrajectories[0]?.length || 0} samples`
-    );
-    console.log(
-      `Right trajectories: ${rightTrajectories.length} timesteps, ${rightTrajectories[0]?.length || 0} samples`
-    );
-
     // Transpose from [timestep][sample][dim] to [sample][timestep][dim]
-    if (leftTrajectories.length > 0) {
-      const leftTransposed = transposeTrajectories(leftTrajectories);
-      leftDeactivationTimes = generateTemporallySpacedPathlines(
-        leftTransposed,
-        pathlineSpacingOptions
-      );
+    const leftTransposed = transposeTrajectories(leftTrajectories);
+    const rightTransposed = transposeTrajectories(rightTrajectories);
 
-      const leftActive = leftDeactivationTimes.filter(
-        (t) => t === Infinity
-      ).length;
-      const leftDeactivated = leftDeactivationTimes.filter(
-        (t) => t !== Infinity
-      ).length;
-      console.log(
-        `Left pathlines: ${leftActive} active, ${leftDeactivated} deactivated`
-      );
-      console.log("Left deactivation times:", leftDeactivationTimes);
-    }
+    // Run independent filtering on each set
+    leftFilteredPathlines = generateSpatiallySpacedPathlines(
+      leftTransposed,
+      pathlineSpacingOptions
+    );
+    rightFilteredPathlines = generateSpatiallySpacedPathlines(
+      rightTransposed,
+      pathlineSpacingOptions
+    );
 
-    if (rightTrajectories.length > 0) {
-      const rightTransposed = transposeTrajectories(rightTrajectories);
-      rightDeactivationTimes = generateTemporallySpacedPathlines(
-        rightTransposed,
-        pathlineSpacingOptions
-      );
-
-      const rightActive = rightDeactivationTimes.filter(
-        (t) => t === Infinity
-      ).length;
-      const rightDeactivated = rightDeactivationTimes.filter(
-        (t) => t !== Infinity
-      ).length;
-      console.log(
-        `Right pathlines: ${rightActive} active, ${rightDeactivated} deactivated`
-      );
-      console.log("Right deactivation times:", rightDeactivationTimes);
-    }
-  }
-
-  // ===== DATA LOADING =====
-
-  async function loadTrajectoryData() {
-    try {
-      // Load target distribution
-      const targetSamples = await sample.loadTargetDistribution(
-        `${base}/${settings.targetDistributionPointsPath}`,
-        settings.samplingSettings.flowMatching.numSamples
-      );
-      if (targetSamples) {
-        targetDistribution = targetSamples;
-      }
-
-      // Load flow matching grid trajectories
-      if (settings.cachedFlowMatchingGridTrajectoriesPath) {
-        const fmResult = await sample.loadCachedTrajectories(
-          `${base}/${settings.cachedFlowMatchingGridTrajectoriesPath}`
-        );
-        if (fmResult) {
-          leftTrajectories = fmResult.trajectories;
-        }
-      }
-
-      // Load rectified flow grid trajectories
-      if (settings.cachedRectifiedFlowGridTrajectoriesPath) {
-        const rfResult = await sample.loadCachedRectifiedFlowTrajectories(
-          `${base}/${settings.cachedRectifiedFlowGridTrajectoriesPath}`
-        );
-        if (rfResult && rfResult.allRectifiedTrajectories.length > 0) {
-          // Use the last rectified step (most straightened trajectories)
-          rightTrajectories =
-            rfResult.allRectifiedTrajectories[
-              rfResult.allRectifiedTrajectories.length - 1
-            ];
-        }
-      }
-
-      // Run pathline filtering on both trajectory sets
-      runPathlineFiltering();
-
-      isLoading = false;
-    } catch (error) {
-      loadError =
-        error instanceof Error ? error.message : "Failed to load data";
-      isLoading = false;
-      console.error("Error loading trajectory data:", error);
-    }
+    // Download filtered trajectory sets (transpose back to [timestep][sample][dim] format)
+    // Flow matching: raw array format
+    downloadJSON(transposePathlinesToTimesteps(leftFilteredPathlines), 'flow_matching_filtered_pathlines.json');
+    // Rectified flow: RectifiedFlowData format with allRectifiedTrajectories
+    downloadJSON(
+      {
+        allRectifiedTrajectories: [transposePathlinesToTimesteps(rightFilteredPathlines)],
+        modelPath: rectifiedFlowModelPath || 'trained'
+      },
+      'rectified_flow_filtered_pathlines.json'
+    );
   }
 
   // ===== LIFECYCLE =====
 
   onMount(() => {
-    loadTrajectoryData();
+    generateTrajectories();
   });
 
   onDestroy(() => {
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
+    }
+    if (trainingWorker) {
+      trainingWorker.terminate();
+    }
+    if (rectifiedTrainingWorker) {
+      rectifiedTrainingWorker.terminate();
     }
   });
 </script>
@@ -568,20 +603,33 @@
   <h1>Pathlines Test Page</h1>
 
   <div class="controls">
-    <button
-      onclick={generateBothTrajectories}
-      disabled={isGenerating}
-      class="generate-button"
-    >
-      {isGenerating ? "Generating..." : "Generate Dense Grid Trajectories"}
-    </button>
+    <div class="button-group">
+      <button
+        onclick={() => { initialPointSource = 'random'; generateTrajectories(); }}
+        disabled={isGenerating || isTraining}
+        class="generate-button"
+        class:active={initialPointSource === 'random'}
+      >
+        Random Points
+      </button>
+      <button
+        onclick={() => { initialPointSource = 'grid'; generateTrajectories(); }}
+        disabled={isGenerating || isTraining}
+        class="generate-button"
+        class:active={initialPointSource === 'grid'}
+      >
+        Uniform Grid
+      </button>
+    </div>
     {#if generationStatus}
       <span class="status">{generationStatus}</span>
     {/if}
   </div>
 
-  {#if isLoading}
-    <div class="loading">Loading trajectory data...</div>
+  {#if isLoading || isTraining}
+    <div class="loading">
+      {generationStatus || (isTraining ? "Training models..." : "Generating trajectories...")}
+    </div>
   {:else if loadError}
     <div class="error">Error: {loadError}</div>
   {:else if isDataValid}
@@ -644,29 +692,44 @@
 
   .controls {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-bottom: 1.5rem;
-    justify-content: center;
+  }
+
+  .button-group {
+    display: flex;
+    gap: 0.5rem;
   }
 
   .generate-button {
-    padding: 0.75rem 1.5rem;
-    font-size: 1rem;
-    background-color: #3b82f6;
-    color: white;
+    padding: 0.6rem 1.25rem;
+    font-size: 0.95rem;
+    background-color: #e5e7eb;
+    color: #374151;
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, color 0.2s;
   }
 
   .generate-button:hover:not(:disabled) {
+    background-color: #d1d5db;
+  }
+
+  .generate-button.active {
+    background-color: #3b82f6;
+    color: white;
+  }
+
+  .generate-button.active:hover:not(:disabled) {
     background-color: #2563eb;
   }
 
   .generate-button:disabled {
     background-color: #9ca3af;
+    color: white;
     cursor: not-allowed;
   }
 
