@@ -19,8 +19,8 @@
   export let height = 300;
   export let marginWidth = 50;
   export let marginHeight = 20;
-  export let sourceCenterX = 0.25;
-  export let targetCenterX = 0.75;
+  export let sourceCenterX = 0.15;
+  export let targetCenterX = 0.85;
   export let yShiftFactor = -0.2;
 
   // ===== SCATTER PLOT STYLING =====

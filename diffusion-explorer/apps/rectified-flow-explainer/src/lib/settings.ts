@@ -113,12 +113,12 @@ export const settings = {
   stylingSettings: {
     // Global styling
     global: {
-      figureWidth: 750
+      figureWidth: 800
     },
     // Layout for source/target distribution positioning
     layout: {
-      sourceCenterX: 0.2,  // Source distribution centered at 20% of width
-      targetCenterX: 0.8   // Target distribution centered at 80% of width
+      sourceCenterX: 0.15,  // Source distribution centered at 20% of width
+      targetCenterX: 0.85   // Target distribution centered at 80% of width
     },
     // Label styling
     label: {
