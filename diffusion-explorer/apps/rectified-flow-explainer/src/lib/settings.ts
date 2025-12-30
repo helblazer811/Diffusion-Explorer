@@ -50,8 +50,8 @@ export const settings = {
   samplingWorkerUrl: '/src/lib/flow_matching/workers/sampling.worker.ts',
 
   // Model paths (null means train from scratch, otherwise load from path)
-  flowMatchingModelPath: "models/flow_matching_model.json" as string | null,
-  rectifiedFlowModelPath: "models/rectified_flow_model.json" as string | null,
+  flowMatchingModelPath: "/models/flow_matching_model.json" as string | null,
+  rectifiedFlowModelPath: "/models/rectified_flow_model.json" as string | null,
 
   // ========== SAMPLING SETTINGS ==========
   samplingSettings: {

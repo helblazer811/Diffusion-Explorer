@@ -5,6 +5,7 @@
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/plotting/plotting";
+  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
 
@@ -52,6 +53,11 @@
   export let rightAnimationDuration = 5000;
   export let pauseDuration = 2000;
   export let playingByDefault = true;
+
+  // Interactive sampling
+  export let samplingSteps = 100;
+  export let highlightedTrajectoryOpacity = 1.0;
+  export let dimmedTrajectoryOpacity = 0.15;
 
   // Callbacks & misc
   export let onInitialized = undefined;
@@ -116,6 +122,13 @@
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
 
+  // User-clicked trajectory state
+  let leftClickedTrajectory = null;   // [timestep][x,y] in pixels
+  let rightClickedTrajectory = null;
+  let hasClickedTrajectory = false;
+  let leftClickedLoaded = false;
+  let rightClickedLoaded = false;
+
   // ===== FUNCTIONS =====
 
   function initializeScales() {
@@ -175,7 +188,7 @@
   }
 
   // Draw scatter plot + trajectories (using pre-scaled pixel coordinates)
-  function draw(ctx, scaledTrajectories, segmentIndex) {
+  function draw(ctx, scaledTrajectories, segmentIndex, clickedTrajectory, time) {
     if (!ctx) return;
 
     // Clear previous frame
@@ -184,12 +197,13 @@
     // Draw target distribution as scatter (behind trajectories)
     drawScatterPlot(ctx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
 
-    // Draw trajectories as simple lines up to segmentIndex
+    // Draw default trajectories (dimmed if user has clicked)
+    const defaultOpacity = hasClickedTrajectory ? dimmedTrajectoryOpacity : trajectoryProgressOpacity;
     ctx.strokeStyle = trajectoryColor;
     ctx.lineWidth = trajectoryStrokeWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.globalAlpha = trajectoryProgressOpacity;
+    ctx.globalAlpha = defaultOpacity;
 
     for (const trajectory of scaledTrajectories) {
       const endIdx = Math.min(segmentIndex + 1, trajectory.length);
@@ -201,6 +215,24 @@
         ctx.lineTo(trajectory[i][0], trajectory[i][1]);
       }
       ctx.stroke();
+    }
+
+    // Draw clicked trajectory (highlighted) - sync with time proportion
+    if (clickedTrajectory && clickedTrajectory.length > 0) {
+      ctx.globalAlpha = highlightedTrajectoryOpacity;
+      ctx.lineWidth = trajectoryStrokeWidth;
+      // Calculate segment index based on time (0-1) to sync with animation
+      const clickedNumSegments = clickedTrajectory.length - 1;
+      const clickedSegmentIndex = Math.floor(time * clickedNumSegments);
+      const endIdx = Math.min(clickedSegmentIndex + 1, clickedTrajectory.length);
+      if (endIdx >= 2) {
+        ctx.beginPath();
+        ctx.moveTo(clickedTrajectory[0][0], clickedTrajectory[0][1]);
+        for (let i = 1; i < endIdx; i++) {
+          ctx.lineTo(clickedTrajectory[i][0], clickedTrajectory[i][1]);
+        }
+        ctx.stroke();
+      }
     }
 
     ctx.globalAlpha = 1.0;
@@ -221,12 +253,12 @@
 
   function updateLeftVisualization() {
     if (!isDataValid || !leftCtx) return;
-    draw(leftCtx, scaledLeftTrajectories, leftCurrentSegmentIndex);
+    draw(leftCtx, scaledLeftTrajectories, leftCurrentSegmentIndex, leftClickedTrajectory, leftTime);
   }
 
   function updateRightVisualization() {
     if (!isDataValid || !rightCtx) return;
-    draw(rightCtx, scaledRightTrajectories, rightCurrentSegmentIndex);
+    draw(rightCtx, scaledRightTrajectories, rightCurrentSegmentIndex, rightClickedTrajectory, rightTime);
   }
 
   // Synchronized restart check (called from both animate functions)
@@ -366,6 +398,94 @@
     }
   }
 
+  // Handle canvas click - convert to domain coordinates and sample
+  function handleCanvasClick(event, side) {
+    if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath || !settings.rectifiedFlowModelPath) return;
+
+    const canvas = side === 'left' ? leftCanvas : rightCanvas;
+    const rect = canvas.getBoundingClientRect();
+
+    // Get click position in CSS pixels (account for canvas scaling)
+    const scaleX = canvasWidth / rect.width;
+    const scaleY = canvasHeight / rect.height;
+    const clickX = (event.clientX - rect.left) * scaleX;
+    const clickY = (event.clientY - rect.top) * scaleY;
+
+    // Convert to domain coordinates using scale.invert()
+    const domainX = xScale.invert(clickX);
+    const domainY = yScale.invert(clickY);
+
+    // Trigger sampling for both panels from the same point
+    sampleFromPoint([domainX, domainY]);
+  }
+
+  // Check if both trajectories are loaded and start animation
+  function checkAndStartAnimation() {
+    if (leftClickedLoaded && rightClickedLoaded) {
+      // Reset animation state
+      leftCurrentSegmentIndex = 0;
+      rightCurrentSegmentIndex = 0;
+      leftSegmentAccumulator = 0;
+      rightSegmentAccumulator = 0;
+      leftTime = 0;
+      rightTime = 0;
+      leftFinished = false;
+      rightFinished = false;
+      restartPauseStartTime = null;
+      leftLastTimestamp = null;
+      rightLastTimestamp = null;
+
+      // Start animation
+      isPlaying = true;
+      updateLeftVisualization();
+      updateRightVisualization();
+    }
+  }
+
+  // Sample trajectory from a specific point using both models
+  function sampleFromPoint(point) {
+    hasClickedTrajectory = true;
+    leftClickedLoaded = false;
+    rightClickedLoaded = false;
+
+    // Pause animation while loading
+    isPlaying = false;
+
+    // Sample from left model (Flow Matching)
+    callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      [point],
+      samplingSteps,
+      (allSamples) => {
+        // allSamples is [timestep][1][2], extract and scale to pixels
+        leftClickedTrajectory = allSamples.map(ts => [xScale(ts[0][0]), yScale(ts[0][1])]);
+        leftClickedLoaded = true;
+        checkAndStartAnimation();
+      },
+      settings.trainingSettings.domainRange
+    );
+
+    // Sample from right model (Rectified Flow)
+    callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.rectifiedFlowModelPath,
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      [point],
+      samplingSteps,
+      (allSamples) => {
+        // allSamples is [timestep][1][2], extract and scale to pixels
+        rightClickedTrajectory = allSamples.map(ts => [xScale(ts[0][0]), yScale(ts[0][1])]);
+        rightClickedLoaded = true;
+        checkAndStartAnimation();
+      },
+      settings.trainingSettings.domainRange
+    );
+  }
+
   // ===== REACTIVE EFFECTS =====
 
   $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
@@ -412,6 +532,8 @@
         <canvas
           bind:this={leftCanvas}
           class="panel-canvas"
+          onclick={(e) => handleCanvasClick(e, 'left')}
+          style="cursor: pointer;"
         ></canvas>
         <div class="slider-wrapper">
           <TimeSlider
@@ -441,6 +563,8 @@
         <canvas
           bind:this={rightCanvas}
           class="panel-canvas"
+          onclick={(e) => handleCanvasClick(e, 'right')}
+          style="cursor: pointer;"
         ></canvas>
         <div class="slider-wrapper">
           <TimeSlider
