@@ -37,6 +37,7 @@
 <style>
   .algorithm-box {
     width: 100%;
+    margin: 1rem;
   }
 
   .algorithm-title {

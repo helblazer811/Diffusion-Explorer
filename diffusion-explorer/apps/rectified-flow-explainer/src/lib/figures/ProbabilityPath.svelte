@@ -23,7 +23,7 @@
 
   // Props/Configuration
   export let width = 800;
-  export let height = 320;
+  export let height = 450;
 
   // Styling props for visualization
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
@@ -33,6 +33,7 @@
   export let sourceLabelText = "Source Distribution";
   export let targetLabelText = "Target Distribution";
   export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelFontWeight = settings.stylingSettings.label.fontWeight;
   export let labelColor = settings.stylingSettings.label.color;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
@@ -60,11 +61,15 @@
 
   // Contour plot options for P_t
   export let showContours = false;
-  export let contourBandwidth = 15;
-  export let contourThresholds = 3;
-  export let contourOpacity = 0.3;
-  export let contourFillColor = "#f17720"; // Single color for all contours (matches intermediate point color)
-  export let contourBlendMode = undefined; // No blend mode - denser regions drawn on top appear more saturated
+  export let contourBandwidth = settings.stylingSettings.contour.bandwidth;
+  export let contourThresholds = settings.stylingSettings.contour.thresholds;
+  export let contourOpacity = settings.stylingSettings.contour.opacity;
+  export let contourFillColor = settings.stylingSettings.contour.fillColor;
+  export let contourBlendMode = settings.stylingSettings.contour.blendMode;
+
+  // LaTeX label styling
+  export let latexLabelOffsetY = 20;
+  export let latexSizeMultiplier = settings.stylingSettings.figureLatex.sizeMultiplier;
 
   // Canvas state
   let canvas;
@@ -151,12 +156,14 @@
     if (!scales) return;
 
     sourcePixelCoords = sourceDistributionSamples.map((p) => [
-      scales.sourceCenterPixelX + (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
+      scales.sourceCenterPixelX +
+        (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
 
     targetPixelCoords = targetDistributionSamples.map((p) => [
-      scales.targetCenterPixelX + (p[0] - scales.targetMeanX) * scales.xScaleFactor,
+      scales.targetCenterPixelX +
+        (p[0] - scales.targetMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
   }
@@ -184,16 +191,44 @@
     const textLabelY = scales.yScale(yTop) + 0.5 * labelFontSize;
     const mathLabelY = textLabelY + labelFontSize;
 
-    const labelOffsetY = 8;
     if (p0LabelSvg) {
-      placeMathjaxSVG(p0LabelSvg.cloneNode(true), svgOverlay, scales.sourceCenterPixelX, mathLabelY, 0, labelOffsetY, 50, 1.4);
+      placeMathjaxSVG(
+        p0LabelSvg.cloneNode(true),
+        svgOverlay,
+        scales.sourceCenterPixelX,
+        mathLabelY,
+        0,
+        latexLabelOffsetY,
+        50,
+        latexSizeMultiplier
+      );
     }
     if (p1LabelSvg) {
-      placeMathjaxSVG(p1LabelSvg.cloneNode(true), svgOverlay, scales.targetCenterPixelX, mathLabelY, 0, labelOffsetY, 50, 1.4);
+      placeMathjaxSVG(
+        p1LabelSvg.cloneNode(true),
+        svgOverlay,
+        scales.targetCenterPixelX,
+        mathLabelY,
+        0,
+        latexLabelOffsetY,
+        50,
+        latexSizeMultiplier
+      );
     }
     if (time >= 0.1 && time <= 0.9 && ptLabelSvg) {
-      const centerX = scales.sourceCenterPixelX + time * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
-      placeMathjaxSVG(ptLabelSvg.cloneNode(true), svgOverlay, centerX, mathLabelY, 0, labelOffsetY, 50, 1.4);
+      const centerX =
+        scales.sourceCenterPixelX +
+        time * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+      placeMathjaxSVG(
+        ptLabelSvg.cloneNode(true),
+        svgOverlay,
+        centerX,
+        mathLabelY,
+        0,
+        latexLabelOffsetY,
+        50,
+        latexSizeMultiplier
+      );
     }
   }
 
@@ -204,26 +239,38 @@
     // Draw text labels
     const textY = marginHeight / 2;
     drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
-      font: `${labelFontSize}px Helvetica, Arial, sans-serif`,
+      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
       color: labelColor,
-      align: 'center',
-      baseline: 'top'
+      align: "center",
+      baseline: "top",
     });
     drawText(ctx, targetLabelText, scales.targetCenterPixelX, textY, {
-      font: `${labelFontSize}px Helvetica, Arial, sans-serif`,
+      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
       color: labelColor,
-      align: 'center',
-      baseline: 'top'
+      align: "center",
+      baseline: "top",
     });
 
     // Draw source scatter
     if (showSourceScatter) {
-      drawScatterPlot(ctx, sourcePixelCoords, pointRadius, sourcePointColor, pointOpacity);
+      drawScatterPlot(
+        ctx,
+        sourcePixelCoords,
+        pointRadius,
+        sourcePointColor,
+        pointOpacity
+      );
     }
 
     // Draw target scatter
     if (showTargetScatter) {
-      drawScatterPlot(ctx, targetPixelCoords, pointRadius, targetPointColor, pointOpacity);
+      drawScatterPlot(
+        ctx,
+        targetPixelCoords,
+        pointRadius,
+        targetPointColor,
+        pointOpacity
+      );
     }
 
     // Draw intermediate distribution (contours and/or scatter)
@@ -263,7 +310,13 @@
             getPixelX(p[0], meanX, time),
             scales.yScale(p[1]),
           ]);
-          drawScatterPlot(ctx, coords, pointRadius, intermediatePointColor, intermediatePointOpacity);
+          drawScatterPlot(
+            ctx,
+            coords,
+            pointRadius,
+            intermediatePointColor,
+            intermediatePointOpacity
+          );
         }
       }
     }
@@ -274,7 +327,11 @@
 
   function initializeVisualization() {
     if (!canvas) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
 
     // Create scales
     scales = createSourceTargetScales(
@@ -331,7 +388,10 @@
           draw();
         }
 
-        if (pauseStartTime && currentTime - pauseStartTime >= animationPauseTime) {
+        if (
+          pauseStartTime &&
+          currentTime - pauseStartTime >= animationPauseTime
+        ) {
           animationStartTime = currentTime;
           isPaused = false;
           pauseStartTime = null;
@@ -385,7 +445,9 @@
 
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
-    <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+    <div
+      style="display: flex; flex-direction: column; align-items: center; width: 100%;"
+    >
       <div class="canvas-container" style="max-width: {width}px;">
         <canvas
           bind:this={canvas}

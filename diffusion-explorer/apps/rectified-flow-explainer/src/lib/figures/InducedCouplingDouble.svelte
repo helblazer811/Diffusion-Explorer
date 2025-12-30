@@ -25,17 +25,17 @@
     targetDistribution.length > 0;
 
   // Layout props
-  export let svgWidth = 350;
+  export let svgWidth = 390;
   export let svgHeight = 250;
   export let sourceCenterX = 0.25;
-  export let targetCenterX = 0.75;
-  export let marginWidth = 50;
+  export let targetCenterX = 0.775;
+  export let marginWidth = 20;
   export let marginHeight = 20;
-  export let gap = 30;
+  export let gap = 10;
 
   // Styling props
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
-  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
+  export let targetPointColor = "#f17720";
   export let edgeColor = '#888';
   export let edgeOpacity = 0.3;
   export let edgeWidth = 1.5;
@@ -46,7 +46,7 @@
   export let hoverEdgeOpacity = 0.8;
   export let hoverPointOpacity = 0.9;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
-  export let distributionScaleFactor = 0.6;
+  export let distributionScaleFactor = 0.7;
 
   // Label props
   export let leftLabel = 'Independent Coupling';
@@ -61,7 +61,7 @@
   export let numSamplesToShow = 50;
 
   // Clipping radius - only show points within this radius from origin
-  export let clippingRadius = 1.8;
+  export let clippingRadius = 1.5;
 
   // SVG references
   let leftSvgElement;

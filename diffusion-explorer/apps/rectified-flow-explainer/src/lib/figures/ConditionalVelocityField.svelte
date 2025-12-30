@@ -16,11 +16,11 @@
 
   // ===== LAYOUT PROPS =====
   export let width = 800;
-  export let height = 300;
+  export let height = 450;
   export let marginWidth = 50;
   export let marginHeight = 20;
-  export let sourceCenterX = 0.15;
-  export let targetCenterX = 0.85;
+  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let yShiftFactor = -0.2;
 
   // ===== SCATTER PLOT STYLING =====
@@ -46,15 +46,19 @@
   // ===== CONDITIONAL VECTOR STYLING =====
   export let vectorColor = "#f17720";
   export let vectorOpacity = 1.0;
-  export let vectorWidth = 2.5;
-  export let vectorScale = 80;
+  export let vectorWidth = 4.5;
+  export let vectorScale = 180;
   export let t = 0.4;
 
   // ===== LABEL STYLING =====
-  export let labelYShiftFactor = -1.5;
+  export let labelYShiftFactor = 0.5;
 
   // ===== BACKGROUND =====
   export let backgroundVisible = true;
+
+  // ===== LATEX LABEL STYLING =====
+  export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
+  export let latexSizeMultiplier = settings.stylingSettings.figureLatex.sizeMultiplier;
 
   // ===== STATE =====
   let canvas;
@@ -80,9 +84,6 @@
   let selectedTargetIndex = 0;
   let selectedSourceIndices = [];
   let selectedPathIndex = 0;
-
-  // Vertical spacing between point and label
-  const labelAbovePointOffset = -10;
 
   // ===== CANVAS INITIALIZATION =====
   function initializeCanvas() {
@@ -225,8 +226,6 @@
     if (!svgOverlay || !scales) return;
     svgOverlay.innerHTML = "";
 
-    const sizeMultiplier = 1.4;
-
     // p_0 and p_1 above distributions
     const yDomain = scales.yScale.domain();
     const distributionLabelY =
@@ -241,7 +240,7 @@
         0,
         0,
         50,
-        sizeMultiplier
+        latexSizeMultiplier
       );
     }
 
@@ -254,7 +253,7 @@
         0,
         0,
         50,
-        sizeMultiplier
+        latexSizeMultiplier
       );
     }
 
@@ -266,9 +265,9 @@
         targetX,
         targetY,
         0,
-        labelAbovePointOffset,
+        latexLabelOffsetY,
         50,
-        sizeMultiplier
+        latexSizeMultiplier
       );
     }
 
@@ -280,9 +279,9 @@
         interpPixel.x,
         interpPixel.y,
         0,
-        labelAbovePointOffset,
+        latexLabelOffsetY,
         50,
-        sizeMultiplier
+        latexSizeMultiplier
       );
     }
 
@@ -296,9 +295,9 @@
         vectorCenterX,
         vectorCenterY,
         30,
-        -10,
+        -20,
         50,
-        sizeMultiplier
+        latexSizeMultiplier
       );
     }
   }
@@ -380,7 +379,7 @@
       ctx.fillStyle = vectorColor;
       ctx.lineWidth = vectorWidth;
       ctx.globalAlpha = vectorOpacity;
-      drawArrow(ctx, interpPixel.x, interpPixel.y, vectorEndX, vectorEndY, 5);
+      drawArrow(ctx, interpPixel.x, interpPixel.y, vectorEndX, vectorEndY, 8);
       ctx.restore();
     }
 

@@ -11,6 +11,7 @@
   let spanElement: HTMLSpanElement;
   let showTooltip = false;
   let positionAbove = true;
+  let horizontalAlign: 'left' | 'center' | 'right' = 'center';
   let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Derived values
@@ -25,7 +26,20 @@
     if (!entry) return;
     const rect = spanElement.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+
+    // Vertical positioning
     positionAbove = rect.bottom > viewportHeight * 0.7;
+
+    // Horizontal positioning
+    if (rect.left < 150) {
+      horizontalAlign = 'left';
+    } else if (rect.right > viewportWidth - 150) {
+      horizontalAlign = 'right';
+    } else {
+      horizontalAlign = 'center';
+    }
+
     showTooltip = true;
   }
 
@@ -51,6 +65,9 @@
       class="tooltip"
       class:above={positionAbove}
       class:below={!positionAbove}
+      class:align-left={horizontalAlign === 'left'}
+      class:align-center={horizontalAlign === 'center'}
+      class:align-right={horizontalAlign === 'right'}
       role="tooltip"
       on:mouseenter={handleMouseEnter}
       on:mouseleave={handleMouseLeave}
@@ -77,8 +94,6 @@
 
   .tooltip {
     position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
     width: max-content;
     max-width: 300px;
     padding: 0.75rem 1rem;
@@ -89,6 +104,22 @@
     z-index: 1000;
     text-align: left;
     line-height: 1.4;
+  }
+
+  .tooltip.align-center {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .tooltip.align-left {
+    left: 0;
+    transform: none;
+  }
+
+  .tooltip.align-right {
+    left: auto;
+    right: 0;
+    transform: none;
   }
 
   .tooltip.above {

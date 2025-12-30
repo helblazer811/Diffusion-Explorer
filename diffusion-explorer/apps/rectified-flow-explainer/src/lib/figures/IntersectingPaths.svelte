@@ -23,22 +23,23 @@
 
   // Layout/Styling
   export let width = 800;
-  export let height = 300;
+  export let height = 350;
   export let marginWidth = 50;
   export let marginHeight = 20;
-  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
-  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
+  export let sourceCenterX = 0.2;
+  export let targetCenterX = 0.8;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let lineColor = "#888";
   export let lineOpacity = 0.25;
-  export let lineWidth = 3;
+  export let lineWidth = 4;
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export let targetPointColor = settings.stylingSettings.scatterPlot.color;
-  export let arrowWidth = 2.5;
+  export let arrowWidth = 4;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
 
   export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelFontWeight = settings.stylingSettings.label.fontWeight;
   export let labelColor = settings.stylingSettings.label.color;
   export let sourceLabelText = "Source Distribution";
   export let targetLabelText = "Target Distribution";
@@ -49,13 +50,17 @@
   export let meanArrowLabelOffset = { x: 10, y: -18 };
 
   // Hardcoded line endpoint coordinates
-  export let sourcePointA = [0.6, -0.8];
-  export let sourcePointB = [0.6, 0.5];
+  export let sourcePointA = [-0.2, -0.8];
+  export let sourcePointB = [-0.2, 0.5];
   export let targetPointA = [0.2, 1.6];
   export let targetPointB = [-1.1, -1.0];
 
   // Background visibility
   export let backgroundVisible = true;
+
+  // LaTeX label styling
+  export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
+  export let latexSizeMultiplier = 1.4;
 
   // Canvas/SVG state
   let canvas;
@@ -206,8 +211,6 @@
     if (!svgOverlay || !scales || !intersection) return;
     svgOverlay.innerHTML = "";
 
-    const labelOffsetY = -14;
-
     // Intersection label 'x'
     if (xLabelSvg) {
       placeMathjaxSVG(
@@ -216,9 +219,9 @@
         intersection.x,
         intersection.y,
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
 
@@ -230,9 +233,9 @@
         line2Coords.x1,
         line2Coords.y1,
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
     if (x0bLabelSvg) {
@@ -242,9 +245,9 @@
         line1Coords.x1,
         line1Coords.y1,
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
     if (x1aLabelSvg) {
@@ -254,9 +257,9 @@
         line2Coords.x2,
         line2Coords.y2,
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
     if (x1bLabelSvg) {
@@ -266,9 +269,9 @@
         line1Coords.x2,
         line1Coords.y2,
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        1.4
+        latexSizeMultiplier
       );
     }
 
@@ -330,7 +333,7 @@
         60,
         100,
         50,
-        1.2
+        latexSizeMultiplier
       );
     }
     if (bottomArrowLabelSvg) {
@@ -342,7 +345,7 @@
         60,
         -35,
         50,
-        1.2
+        latexSizeMultiplier
       );
     }
     if (meanArrowLabelSvg) {
@@ -353,8 +356,8 @@
         meanEnd.y + meanArrowLabelOffset.y,
         150,
         30,
-        50,
-        1.2
+        55,
+        latexSizeMultiplier
       );
     }
   }
@@ -386,7 +389,7 @@
       scales.sourceCenterPixelX,
       marginHeight / 2,
       {
-        font: `${labelFontSize}px Helvetica, Arial, sans-serif`,
+        font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
         color: labelColor,
         align: "center",
         baseline: "top",
@@ -398,7 +401,7 @@
       scales.targetCenterPixelX,
       marginHeight / 2,
       {
-        font: `${labelFontSize}px Helvetica, Arial, sans-serif`,
+        font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
         color: labelColor,
         align: "center",
         baseline: "top",

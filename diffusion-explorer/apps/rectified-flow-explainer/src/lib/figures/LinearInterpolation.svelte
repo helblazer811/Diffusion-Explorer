@@ -34,7 +34,7 @@
 
   // Layout/Styling
   export let width = 800;
-  export let height = 275;
+  export let height = 450;
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
@@ -42,15 +42,20 @@
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
-  export let lineWidth = 3;
+  export let lineWidth = 5;
   export let animatedDotRadius = 6;
   export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let labelFontWeight = settings.stylingSettings.label.fontWeight;
   export let labelColor = settings.stylingSettings.label.color;
   export let sourceLabelText = "Source Distribution";
   export let targetLabelText = "Target Distribution";
 
   // Background visibility
   export let backgroundVisible = true;
+
+  // LaTeX label styling
+  export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
+  export let latexSizeMultiplier = settings.stylingSettings.figureLatex.sizeMultiplier;
 
   // Canvas state
   let canvas;
@@ -194,9 +199,6 @@
     if (!svgOverlay || !scales) return;
     svgOverlay.innerHTML = "";
 
-    const labelOffsetY = -10;
-    const sizeMultiplier = 1.4;
-
     // x_0 above source point
     if (x0LabelSvg) {
       placeMathjaxSVG(
@@ -205,9 +207,9 @@
         sourcePointPixel[0],
         sourcePointPixel[1],
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        sizeMultiplier
+        latexSizeMultiplier
       );
     }
 
@@ -219,9 +221,9 @@
         targetPointPixel[0],
         targetPointPixel[1],
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        sizeMultiplier
+        latexSizeMultiplier
       );
     }
 
@@ -234,9 +236,9 @@
         dotX,
         dotY,
         0,
-        labelOffsetY,
+        latexLabelOffsetY,
         50,
-        sizeMultiplier
+        latexSizeMultiplier
       );
     }
 
@@ -248,9 +250,9 @@
         width / 2,
         height - marginHeight,
         0,
-        12,
+        25,
         50,
-        sizeMultiplier
+        latexSizeMultiplier
       );
     }
   }
@@ -263,13 +265,13 @@
     // Draw text labels
     const textY = marginHeight / 2;
     drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
-      font: `${labelFontSize}px Helvetica, Arial, sans-serif`,
+      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
       color: labelColor,
       align: "center",
       baseline: "top",
     });
     drawText(ctx, targetLabelText, scales.targetCenterPixelX, textY, {
-      font: `${labelFontSize}px Helvetica, Arial, sans-serif`,
+      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
       color: labelColor,
       align: "center",
       baseline: "top",

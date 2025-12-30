@@ -14,10 +14,15 @@
   export let playingByDefault = true;
   export let pauseBeforeRestart = 1000;
   export let width = 750;
-  export let height = 275;
+  export let height = 350;
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let numTrajectoriesToShow = 1;
+
+  // LaTeX label styling
+  export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
+  export let latexSizeMultiplier = settings.stylingSettings.figureLatex.sizeMultiplier;
+
   // Caption slot (passed as default children)
   export let children = undefined;
   $: caption = children;
@@ -169,10 +174,7 @@
 
       if (accumulatedLength + segmentLength >= targetLength) {
         const t = (targetLength - accumulatedLength) / segmentLength;
-        return [
-          traj[i - 1][0] + t * dx,
-          traj[i - 1][1] + t * dy,
-        ];
+        return [traj[i - 1][0] + t * dx, traj[i - 1][1] + t * dy];
       }
       accumulatedLength += segmentLength;
     }
@@ -247,11 +249,29 @@
       const currentPoint = getPointAtProgress(idx, time);
 
       if (xLabelSvg) {
-        placeMathjaxSVG(xLabelSvg.cloneNode(true), svgOverlay, startPoint[0], startPoint[1], 0, -8, 50, 1.4);
+        placeMathjaxSVG(
+          xLabelSvg.cloneNode(true),
+          svgOverlay,
+          startPoint[0],
+          startPoint[1],
+          0,
+          latexLabelOffsetY,
+          50,
+          latexSizeMultiplier
+        );
       }
 
       if (time >= 0.05 && psiLabelSvg) {
-        placeMathjaxSVG(psiLabelSvg.cloneNode(true), svgOverlay, currentPoint[0], currentPoint[1], 0, -8, 50, 1.4);
+        placeMathjaxSVG(
+          psiLabelSvg.cloneNode(true),
+          svgOverlay,
+          currentPoint[0],
+          currentPoint[1],
+          0,
+          latexLabelOffsetY,
+          50,
+          latexSizeMultiplier
+        );
       }
     }
   }
