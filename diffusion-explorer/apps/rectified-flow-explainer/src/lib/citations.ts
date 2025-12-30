@@ -6,6 +6,7 @@ export interface BibEntry {
   year: string;
   journal?: string;
   booktitle?: string;
+  url?: string;
 }
 
 export interface CitationInfo {
@@ -46,7 +47,8 @@ export function parseBibTeX(content: string): Map<string, BibEntry> {
       author: fields.author || '',
       year: fields.year || '',
       journal: fields.journal,
-      booktitle: fields.booktitle
+      booktitle: fields.booktitle,
+      url: fields.url
     });
   }
 
@@ -65,11 +67,13 @@ export async function loadBibliography(bibPath: string): Promise<Map<string, Bib
 
 /**
  * Collect citations from the page after mount.
- * Finds all span.citation[data-cite] elements, assigns numbers in order of appearance,
- * updates their text content, and adds click handlers.
+ * Finds all span.citation[data-cite] and span.hoverable-reference[data-cite] elements,
+ * assigns numbers in order of appearance.
+ * For regular citations: updates text content and adds click handlers.
+ * For hoverable references: just collects IDs for numbering (component handles display).
  */
 export function collectCitations(): CitationInfo[] {
-  const spans = document.querySelectorAll('span.citation[data-cite]');
+  const spans = document.querySelectorAll('span.citation[data-cite], span.hoverable-reference[data-cite]');
   const seen = new Map<string, number>();
   const citations: CitationInfo[] = [];
   let counter = 1;
@@ -85,17 +89,54 @@ export function collectCitations(): CitationInfo[] {
       counter++;
     }
 
-    // Update span text to show citation number
     const num = seen.get(id)!;
-    span.textContent = `[${num}]`;
-    span.setAttribute('data-number', String(num));
+    const isHoverable = span.classList.contains('hoverable-reference');
 
-    // Add click handler to scroll to bibliography entry
-    span.addEventListener('click', () => {
-      const bibEntry = document.getElementById(`bib-${id}`);
-      bibEntry?.scrollIntoView({ behavior: 'smooth' });
-    });
+    // Only modify regular citations (hoverable references handle their own display)
+    if (!isHoverable) {
+      // Update span text to show citation number
+      span.textContent = `[${num}]`;
+      span.setAttribute('data-number', String(num));
+
+      // Add click handler to scroll to bibliography entry
+      span.addEventListener('click', () => {
+        const bibEntry = document.getElementById(`bib-${id}`);
+        bibEntry?.scrollIntoView({ behavior: 'smooth' });
+      });
+    }
   });
 
   return citations;
+}
+
+/**
+ * Format author string from BibTeX format (Last, First and Last, First)
+ * to a more readable format (F. Last, F. Last, ...)
+ */
+export function formatAuthors(authorStr: string): string {
+  if (!authorStr) return '';
+
+  // Split by " and " to get individual authors
+  const authors = authorStr.split(' and ').map(author => author.trim());
+
+  return authors.map(author => {
+    // Handle "Last, First" format
+    if (author.includes(',')) {
+      const [last, first] = author.split(',').map(s => s.trim());
+      // Get first initial(s)
+      const initials = first.split(' ')
+        .map(name => name.charAt(0) + '.')
+        .join(' ');
+      return `${initials} ${last}`;
+    }
+    // Handle "First Last" format
+    const parts = author.split(' ');
+    if (parts.length >= 2) {
+      const last = parts[parts.length - 1];
+      const firstNames = parts.slice(0, -1);
+      const initials = firstNames.map(name => name.charAt(0) + '.').join(' ');
+      return `${initials} ${last}`;
+    }
+    return author;
+  }).join(', ');
 }
