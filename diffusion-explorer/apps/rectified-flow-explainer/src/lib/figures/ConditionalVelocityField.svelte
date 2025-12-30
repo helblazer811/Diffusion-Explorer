@@ -4,7 +4,7 @@
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
   import { drawScatterPlot, drawArrow } from "$lib/plotting/plotting";
-  import { latexToSvgElement, placeMathjaxSVG } from "$lib/plotting/mathjax";
+  import { drawMathjaxOnCanvas } from "$lib/plotting/mathjax";
 
   // ===== CAPTION =====
   export let children = undefined;
@@ -58,13 +58,12 @@
 
   // ===== LATEX LABEL STYLING =====
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
-  export let latexSizeMultiplier = settings.stylingSettings.figureLatex.sizeMultiplier;
+  export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
   // ===== STATE =====
   let canvas;
   let ctx;
   let dpr = 1;
-  let svgOverlay = null;
   let scales = null;
   let isInitialized = false;
   let figureIsActive;
@@ -72,13 +71,6 @@
   // Pre-computed pixel coordinates
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
-
-  // Pre-rendered MathJax labels
-  let p0LabelSvg = null;
-  let p1LabelSvg = null;
-  let xLabelSvg = null;
-  let x1LabelSvg = null;
-  let vtLabelSvg = null;
 
   // Selected indices
   let selectedTargetIndex = 0;
@@ -110,23 +102,6 @@
         (p[0] - scales.targetMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
-  }
-
-  // ===== PRE-RENDER MATHJAX LABELS =====
-  async function preRenderLabels() {
-    const latexColor = settings.stylingSettings.figureLatex.color;
-    try {
-      [p0LabelSvg, p1LabelSvg, xLabelSvg, x1LabelSvg, vtLabelSvg] =
-        await Promise.all([
-          latexToSvgElement("p_0", { color: latexColor }),
-          latexToSvgElement("p_1", { color: latexColor }),
-          latexToSvgElement("x", { color: latexColor }),
-          latexToSvgElement("x_1", { color: latexColor }),
-          latexToSvgElement("v_t(x|x_1)", { color: vectorColor }),
-        ]);
-    } catch (e) {
-      console.warn("Failed to pre-render MathJax labels:", e);
-    }
   }
 
   // ===== CANVAS DRAWING HELPERS =====
@@ -215,95 +190,8 @@
     return { x: pixelX, y: pixelY };
   }
 
-  // ===== LABEL POSITIONING =====
-  function updateLabelPositions(
-    targetX,
-    targetY,
-    interpPixel,
-    vectorEndX,
-    vectorEndY
-  ) {
-    if (!svgOverlay || !scales) return;
-    svgOverlay.innerHTML = "";
-
-    // p_0 and p_1 above distributions
-    const yDomain = scales.yScale.domain();
-    const distributionLabelY =
-      scales.yScale(yDomain[0]) + labelYShiftFactor * 22;
-
-    if (p0LabelSvg) {
-      placeMathjaxSVG(
-        p0LabelSvg.cloneNode(true),
-        svgOverlay,
-        scales.sourceCenterPixelX,
-        distributionLabelY,
-        0,
-        0,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    if (p1LabelSvg) {
-      placeMathjaxSVG(
-        p1LabelSvg.cloneNode(true),
-        svgOverlay,
-        scales.targetCenterPixelX,
-        distributionLabelY,
-        0,
-        0,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // x_1 above selected target point
-    if (x1LabelSvg) {
-      placeMathjaxSVG(
-        x1LabelSvg.cloneNode(true),
-        svgOverlay,
-        targetX,
-        targetY,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // x above intermediate point
-    if (xLabelSvg) {
-      placeMathjaxSVG(
-        xLabelSvg.cloneNode(true),
-        svgOverlay,
-        interpPixel.x,
-        interpPixel.y,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // v_t(x|x_1) near vector
-    if (vtLabelSvg && vectorEndX !== undefined && vectorEndY !== undefined) {
-      const vectorCenterX = (interpPixel.x + vectorEndX) / 2;
-      const vectorCenterY = (interpPixel.y + vectorEndY) / 2;
-      placeMathjaxSVG(
-        vtLabelSvg.cloneNode(true),
-        svgOverlay,
-        vectorCenterX,
-        vectorCenterY,
-        30,
-        -20,
-        50,
-        latexSizeMultiplier
-      );
-    }
-  }
-
   // ===== MAIN DRAW FUNCTION =====
-  function draw() {
+  async function draw() {
     if (!ctx || !scales || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -383,8 +271,44 @@
       ctx.restore();
     }
 
-    // Update SVG overlay labels
-    updateLabelPositions(targetX, targetY, interpPixel, vectorEndX, vectorEndY);
+    // Draw LaTeX labels directly on canvas
+    const latexColor = settings.stylingSettings.figureLatex.color;
+
+    // p_0 and p_1 above distributions
+    const yDomain = scales.yScale.domain();
+    const distributionLabelY = scales.yScale(yDomain[0]) + labelYShiftFactor * 22;
+
+    await drawMathjaxOnCanvas(
+      ctx, "p_0", scales.sourceCenterPixelX, distributionLabelY,
+      latexFontSize, 0, 0, { color: latexColor }
+    );
+
+    await drawMathjaxOnCanvas(
+      ctx, "p_1", scales.targetCenterPixelX, distributionLabelY,
+      latexFontSize, 0, 0, { color: latexColor }
+    );
+
+    // x_1 above selected target point
+    await drawMathjaxOnCanvas(
+      ctx, "x_1", targetX, targetY,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    // x above intermediate point
+    await drawMathjaxOnCanvas(
+      ctx, "x", interpPixel.x, interpPixel.y,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    // v_t(x|x_1) near vector
+    if (vectorEndX !== undefined && vectorEndY !== undefined) {
+      const vectorCenterX = (interpPixel.x + vectorEndX) / 2;
+      const vectorCenterY = (interpPixel.y + vectorEndY) / 2;
+      await drawMathjaxOnCanvas(
+        ctx, "v_t(x|x_1)", vectorCenterX, vectorCenterY,
+        latexFontSize, 30, -20, { color: vectorColor }
+      );
+    }
   }
 
   // ===== INITIALIZATION =====
@@ -425,10 +349,8 @@
     canvas
   ) {
     initializeVisualization();
-    preRenderLabels().then(() => {
-      isInitialized = true;
-      draw();
-    });
+    isInitialized = true;
+    draw();
   }
 
   onMount(() => {
@@ -440,23 +362,11 @@
 
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
-    <div class="canvas-container" style="max-width: {width}px;">
+    <div style="width: 100%; max-width: {width}px;">
       <canvas
         bind:this={canvas}
         style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
       ></canvas>
-      <svg
-        bind:this={svgOverlay}
-        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"
-        viewBox="0 0 {width} {height}"
-      ></svg>
     </div>
   {/snippet}
 </Figure>
-
-<style>
-  .canvas-container {
-    position: relative;
-    width: 100%;
-  }
-</style>

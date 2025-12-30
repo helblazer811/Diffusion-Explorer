@@ -4,7 +4,7 @@
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
   import { drawScatterPlot, drawArrow } from "$lib/plotting/plotting";
-  import { latexToSvgElement, placeMathjaxSVG } from "$lib/plotting/mathjax";
+  import { drawMathjaxOnCanvas } from "$lib/plotting/mathjax";
 
   // ===== CAPTION =====
   export let children = undefined;
@@ -62,7 +62,7 @@
 
   // ===== LATEX LABEL STYLING =====
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
-  export let latexSizeMultiplier = settings.stylingSettings.figureLatex.sizeMultiplier;
+  export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
   // ===== FIXED POINT POSITIONS (pixel coords) =====
   export let x0Pixel = { x: 180, y: 170 };
@@ -72,7 +72,6 @@
   let canvas;
   let ctx;
   let dpr = 1;
-  let svgOverlay = null;
   let scales = null;
   let isInitialized = false;
   let figureIsActive;
@@ -80,15 +79,6 @@
   // Pre-computed pixel coordinates
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
-
-  // Pre-rendered MathJax labels
-  let x0LabelSvg = null;
-  let x1LabelSvg = null;
-  let xLabelSvg = null;
-  let vtLabelSvg = null;
-  let vtThetaLabelSvg = null;
-  let p0LabelSvg = null;
-  let p1LabelSvg = null;
 
   function initializeCanvas() {
     if (!canvas) return;
@@ -136,159 +126,7 @@
     precomputeScatterCoords();
   }
 
-  async function preRenderLabels() {
-    const latexColor = settings.stylingSettings.figureLatex.color;
-    try {
-      [
-        x0LabelSvg,
-        x1LabelSvg,
-        xLabelSvg,
-        vtLabelSvg,
-        vtThetaLabelSvg,
-        p0LabelSvg,
-        p1LabelSvg,
-      ] = await Promise.all([
-        latexToSvgElement("x_0", { color: latexColor }),
-        latexToSvgElement("x_1", { color: latexColor }),
-        latexToSvgElement("x", { color: latexColor }),
-        latexToSvgElement("v_t(x_t|x_1)", { color: vectorColor }),
-        latexToSvgElement("v_t^\\theta(x_t)", { color: noisyVectorColor }),
-        latexToSvgElement("p_0", { color: latexColor }),
-        latexToSvgElement("p_1", { color: latexColor }),
-      ]);
-    } catch (e) {
-      console.warn("Failed to pre-render MathJax labels:", e);
-    }
-  }
-
-  function updateLabelPositions() {
-    if (!svgOverlay || !scales) return;
-    svgOverlay.innerHTML = "";
-
-    // x_0 label above source point
-    if (x0LabelSvg) {
-      placeMathjaxSVG(
-        x0LabelSvg.cloneNode(true),
-        svgOverlay,
-        x0Pixel.x,
-        x0Pixel.y,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // x_1 label above target point
-    if (x1LabelSvg) {
-      placeMathjaxSVG(
-        x1LabelSvg.cloneNode(true),
-        svgOverlay,
-        x1Pixel.x,
-        x1Pixel.y,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // Intermediate point position
-    const interpX = (1 - t) * x0Pixel.x + t * x1Pixel.x;
-    const interpY = (1 - t) * x0Pixel.y + t * x1Pixel.y;
-
-    // x label above intermediate point
-    if (xLabelSvg) {
-      placeMathjaxSVG(
-        xLabelSvg.cloneNode(true),
-        svgOverlay,
-        interpX,
-        interpY,
-        0,
-        latexLabelOffsetY,
-        50,
-        latexSizeMultiplier
-      );
-    }
-
-    // Vector calculations for label positioning
-    const pixelDx = x1Pixel.x - interpX;
-    const pixelDy = x1Pixel.y - interpY;
-    const pixelMag = Math.sqrt(pixelDx * pixelDx + pixelDy * pixelDy);
-
-    if (pixelMag > 0.01) {
-      const vtEndX = interpX + (pixelDx / pixelMag) * vectorScale;
-      const vtEndY = interpY + (pixelDy / pixelMag) * vectorScale;
-
-      // v_t label near vector
-      if (vtLabelSvg) {
-        const vtCenterX = (interpX + vtEndX) / 2;
-        const vtCenterY = (interpY + vtEndY) / 2;
-        placeMathjaxSVG(
-          vtLabelSvg.cloneNode(true),
-          svgOverlay,
-          vtCenterX,
-          vtCenterY,
-          10,
-          45,
-          50,
-          latexSizeMultiplier
-        );
-      }
-
-      // v_t^theta endpoint
-      const vtThetaEndX = vtEndX + noiseVector[0];
-      const vtThetaEndY = vtEndY + noiseVector[1];
-
-      // v_t^theta label near noisy vector
-      if (vtThetaLabelSvg) {
-        const vtThetaCenterX = (interpX + vtThetaEndX) / 2;
-        const vtThetaCenterY = (interpY + vtThetaEndY) / 2;
-        placeMathjaxSVG(
-          vtThetaLabelSvg.cloneNode(true),
-          svgOverlay,
-          vtThetaCenterX,
-          vtThetaCenterY,
-          -10,
-          -20,
-          50,
-          latexSizeMultiplier
-        );
-      }
-    }
-
-    // Distribution labels at top
-    const yDomain = scales.yScale.domain();
-    const yTop = yDomain[0];
-    const distributionLabelY = scales.yScale(yTop) - 5;
-
-    if (p0LabelSvg) {
-      placeMathjaxSVG(
-        p0LabelSvg.cloneNode(true),
-        svgOverlay,
-        scales.sourceCenterPixelX,
-        distributionLabelY,
-        0,
-        8,
-        50,
-        latexSizeMultiplier
-      );
-    }
-    if (p1LabelSvg) {
-      placeMathjaxSVG(
-        p1LabelSvg.cloneNode(true),
-        svgOverlay,
-        scales.targetCenterPixelX,
-        distributionLabelY,
-        0,
-        8,
-        50,
-        latexSizeMultiplier
-      );
-    }
-  }
-
-  function draw() {
+  async function draw() {
     if (!ctx || !scales) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -383,10 +221,59 @@
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
+
+      // v_t label near vector
+      const vtCenterX = (interpX + vtEndX) / 2;
+      const vtCenterY = (interpY + vtEndY) / 2;
+      await drawMathjaxOnCanvas(
+        ctx, "v_t(x_t|x_1)", vtCenterX, vtCenterY,
+        latexFontSize, 10, 45, { color: vectorColor }
+      );
+
+      // v_t^theta label near noisy vector
+      const vtThetaCenterX = (interpX + vtThetaEndX) / 2;
+      const vtThetaCenterY = (interpY + vtThetaEndY) / 2;
+      await drawMathjaxOnCanvas(
+        ctx, "v_t^\\theta(x_t)", vtThetaCenterX, vtThetaCenterY,
+        latexFontSize, -10, -20, { color: noisyVectorColor }
+      );
     }
 
-    // Update SVG overlay labels
-    updateLabelPositions();
+    // Draw LaTeX labels directly on canvas
+    const latexColor = settings.stylingSettings.figureLatex.color;
+
+    // x_0 label above source point
+    await drawMathjaxOnCanvas(
+      ctx, "x_0", x0Pixel.x, x0Pixel.y,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    // x_1 label above target point
+    await drawMathjaxOnCanvas(
+      ctx, "x_1", x1Pixel.x, x1Pixel.y,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    // x label above intermediate point
+    await drawMathjaxOnCanvas(
+      ctx, "x", interpX, interpY,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
+    // Distribution labels at top
+    const yDomain = scales.yScale.domain();
+    const yTop = yDomain[0];
+    const distributionLabelY = scales.yScale(yTop) - 5;
+
+    await drawMathjaxOnCanvas(
+      ctx, "p_0", scales.sourceCenterPixelX, distributionLabelY,
+      latexFontSize, 0, 8, { color: latexColor }
+    );
+
+    await drawMathjaxOnCanvas(
+      ctx, "p_1", scales.targetCenterPixelX, distributionLabelY,
+      latexFontSize, 0, 8, { color: latexColor }
+    );
   }
 
   $: if (
@@ -398,7 +285,7 @@
     initializeCanvas();
     initializeData();
     isInitialized = true;
-    preRenderLabels().then(() => draw());
+    draw();
   }
 
   onMount(() => {
@@ -410,16 +297,11 @@
 
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
-    <div style="position:relative;width:100%;max-width:{width}px;">
+    <div style="width:100%;max-width:{width}px;">
       <canvas
         bind:this={canvas}
         style="width:100%;height:auto;aspect-ratio:{width}/{height};"
       ></canvas>
-      <svg
-        bind:this={svgOverlay}
-        style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"
-        viewBox="0 0 {width} {height}"
-      ></svg>
     </div>
   {/snippet}
 </Figure>
