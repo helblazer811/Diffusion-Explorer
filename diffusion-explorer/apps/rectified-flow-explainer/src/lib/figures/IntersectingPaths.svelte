@@ -1,12 +1,12 @@
 <!-- Visualizes intersecting linear paths between source and target distributions with velocity vectors at intersection. -->
 
 <script>
-  import { onMount } from 'svelte';
-  import * as d3 from 'd3';
-  import Figure from '$lib/components/Figure.svelte';
-  import { plotKatexInSVG } from '@diffusion-explorer/ui';
-  import { settings } from '$lib/settings';
-  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
+  import { onMount } from "svelte";
+  import Figure from "$lib/components/Figure.svelte";
+  import { settings } from "$lib/settings";
+  import { createSourceTargetScales, dataToPixelX } from "$lib/d3_helpers";
+  import { drawScatterPlot, drawArrow, drawText } from "$lib/plotting/plotting";
+  import { latexToSvgElement, placeMathjaxSVG } from "$lib/plotting/mathjax";
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -17,9 +17,9 @@
   export let targetDistributionSamples = [];
 
   // Arrow styling
-  export let arrowColor = '#f17720';
+  export let arrowColor = "#f17720";
   export let arrowLength = 0.4;
-  export let meanVectorColor = '#22c55e';
+  export let meanVectorColor = "#22c55e";
 
   // Layout/Styling
   export let width = 800;
@@ -30,7 +30,7 @@
   export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
-  export let lineColor = '#888';
+  export let lineColor = "#888";
   export let lineOpacity = 0.25;
   export let lineWidth = 3;
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
@@ -40,36 +40,8 @@
 
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelColor = settings.stylingSettings.label.color;
-  export let outlineColor = settings.stylingSettings.label.outlineColor;
-  export let outlineOpacity = settings.stylingSettings.label.outlineOpacity;
-  export let labelYShiftFactor = settings.stylingSettings.label.yShiftFactor;
-  export let sourceLabelText = 'Source Distribution';
-  export let targetLabelText = 'Target Distribution';
-
-  // LaTeX labels
-  export let labelVerticalOffset = -35;
-  export let latexFontSize = 16;
-  export let figureLatexColor = settings.stylingSettings.figureLatex.color;
-  export let intersectionLabel = 'x';
-  export let topArrowLabel = 'v_t(x|x_0^a, x_1^a)';
-  export let bottomArrowLabel = 'v_t(x|x_0^b, x_1^b)';
-  export let meanArrowLabel = 'v_t^\\theta(x) = \\mathbb{E}[X_1 - X_0 | x_t = x]';
-  export let sourcePointALabel = 'x_0^a';
-  export let sourcePointBLabel = 'x_0^b';
-  export let targetPointALabel = 'x_1^a';
-
-  // Background visibility
-  export let backgroundVisible = true;
-  export let targetPointBLabel = 'x_1^b';
-
-  // KaTeX outline styling
-  export let katexOutline = settings.stylingSettings.figureLatex.outline;
-  export let katexOutlineColor = settings.stylingSettings.figureLatex.outlineColor;
-  export let katexOutlineWidth = settings.stylingSettings.figureLatex.outlineWidth;
-  export let katexOutlineOpacity = settings.stylingSettings.figureLatex.outlineOpacity;
-
-  // Vertical spacing between point and label
-  const labelAbovePointOffset = -5;
+  export let sourceLabelText = "Source Distribution";
+  export let targetLabelText = "Target Distribution";
 
   // LaTeX label offsets
   export let topArrowLabelOffset = { x: -55, y: -45 };
@@ -82,10 +54,35 @@
   export let targetPointA = [0.2, 1.6];
   export let targetPointB = [-1.1, -1.0];
 
-  // SVG and scale state
-  let svgElement;
+  // Background visibility
+  export let backgroundVisible = true;
+
+  // Canvas/SVG state
+  let canvas;
+  let ctx;
+  let dpr = 1;
+  let svgOverlay = null;
   let scales = null;
   let isInitialized = false;
+
+  // Pre-computed coordinates
+  let sourcePixelCoords = [];
+  let targetPixelCoords = [];
+
+  // Line endpoint pixel coords (computed once)
+  let line1Coords = null; // sourcePointB -> targetPointB
+  let line2Coords = null; // sourcePointA -> targetPointA
+  let intersection = null;
+
+  // Pre-rendered MathJax labels
+  let xLabelSvg = null;
+  let topArrowLabelSvg = null;
+  let bottomArrowLabelSvg = null;
+  let meanArrowLabelSvg = null;
+  let x0aLabelSvg = null;
+  let x0bLabelSvg = null;
+  let x1aLabelSvg = null;
+  let x1bLabelSvg = null;
 
   function normalize(v) {
     const len = Math.hypot(v.x, v.y);
@@ -93,80 +90,9 @@
     return { x: v.x / len, y: v.y / len };
   }
 
-  function createArrowMarkers(svg) {
-    const defs = svg.append('defs');
-
-    defs.append('marker')
-      .attr('id', 'direction-arrow')
-      .attr('viewBox', '0 0 10 10')
-      .attr('refX', 8)
-      .attr('refY', 5)
-      .attr('markerWidth', 5)
-      .attr('markerHeight', 5)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M 0 0 L 10 5 L 0 10 z')
-      .attr('fill', arrowColor);
-
-    defs.append('marker')
-      .attr('id', 'mean-arrow')
-      .attr('viewBox', '0 0 10 10')
-      .attr('refX', 8)
-      .attr('refY', 5)
-      .attr('markerWidth', 5)
-      .attr('markerHeight', 5)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M 0 0 L 10 5 L 0 10 z')
-      .attr('fill', meanVectorColor);
-  }
-
-  function initializeLayers() {
-    const svg = d3.select(svgElement);
-    svg.selectAll('*').remove();
-
-    createArrowMarkers(svg);
-
-    svg.append('g').attr('id', 'sourceScatter');
-    svg.append('g').attr('id', 'targetScatter');
-    svg.append('g').attr('id', 'connectionLines');
-    svg.append('g').attr('id', 'arrows');
-    svg.append('g').attr('id', 'labels');
-  }
-
-  function plotConnectingLine(sourcePoint, targetPoint, lineGroup) {
-    const x1 = dataToPixelX(sourcePoint[0], true, scales);
-    const y1 = scales.yScale(sourcePoint[1]);
-    const x2 = dataToPixelX(targetPoint[0], false, scales);
-    const y2 = scales.yScale(targetPoint[1]);
-
-    lineGroup.append('line')
-      .attr('x1', x1)
-      .attr('y1', y1)
-      .attr('x2', x2)
-      .attr('y2', y2)
-      .attr('stroke', lineColor)
-      .attr('stroke-width', lineWidth)
-      .attr('stroke-opacity', lineOpacity);
-
-    lineGroup.append('circle')
-      .attr('cx', x1)
-      .attr('cy', y1)
-      .attr('r', pointRadius)
-      .attr('fill', lineColor);
-
-    lineGroup.append('circle')
-      .attr('cx', x2)
-      .attr('cy', y2)
-      .attr('r', pointRadius)
-      .attr('fill', lineColor);
-
-    return { x1, y1, x2, y2 };
-  }
-
-  function findIntersection(line1, line2) {
-    const { x1, y1, x2, y2 } = line1;
-    const { x1: x3, y1: y3, x2: x4, y2: y4 } = line2;
+  function findIntersection(l1, l2) {
+    const { x1, y1, x2, y2 } = l1;
+    const { x1: x3, y1: y3, x2: x4, y2: y4 } = l2;
 
     const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
     if (Math.abs(denom) < 1e-10) return null;
@@ -176,197 +102,435 @@
     return {
       x: x1 + t * (x2 - x1),
       y: y1 + t * (y2 - y1),
-      t: t
+      t: t,
     };
   }
 
-  function drawArrow(group, start, direction, length, color, markerId) {
-    const endX = start.x + direction.x * length;
-    const endY = start.y + direction.y * length;
-
-    group.append('line')
-      .attr('x1', start.x)
-      .attr('y1', start.y)
-      .attr('x2', endX)
-      .attr('y2', endY)
-      .attr('stroke', color)
-      .attr('stroke-width', arrowWidth)
-      .attr('marker-end', `url(#${markerId})`);
+  function initializeCanvas() {
+    if (!canvas) return;
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
   }
 
-  function plotVectors(intersection, line1, line2, arrowsGroup, labelsGroup) {
-    plotKatexInSVG(labelsGroup, intersectionLabel, intersection.x, intersection.y, {
-      bg: false,
-      fontSize: latexFontSize,
-      color: figureLatexColor,
-      anchor: 'bottom-center',
-      offsetY: labelAbovePointOffset,
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
+  function precomputeScatterCoords() {
+    if (!scales) return;
+
+    sourcePixelCoords = sourceDistributionSamples.map((point) => {
+      const pixelX =
+        scales.sourceCenterPixelX +
+        (point[0] - scales.sourceMeanX) * scales.xScaleFactor;
+      const pixelY = scales.yScale(point[1]);
+      return [pixelX, pixelY];
     });
 
-    const dir1 = normalize({ x: line1.x2 - line1.x1, y: line1.y2 - line1.y1 });
-    const dir2 = normalize({ x: line2.x2 - line2.x1, y: line2.y2 - line2.y1 });
-
-    const lineLength1 = Math.hypot(line1.x2 - line1.x1, line1.y2 - line1.y1);
-    const lineLength2 = Math.hypot(line2.x2 - line2.x1, line2.y2 - line2.y1);
-    const arrowScale = arrowLength * Math.min(lineLength1, lineLength2);
-
-    drawArrow(arrowsGroup, intersection, dir1, arrowScale, arrowColor, 'direction-arrow');
-    drawArrow(arrowsGroup, intersection, dir2, arrowScale, arrowColor, 'direction-arrow');
-
-    const meanDir = normalize({
-      x: (dir1.x + dir2.x) / 2,
-      y: (dir1.y + dir2.y) / 2
+    targetPixelCoords = targetDistributionSamples.map((point) => {
+      const pixelX =
+        scales.targetCenterPixelX +
+        (point[0] - scales.targetMeanX) * scales.xScaleFactor;
+      const pixelY = scales.yScale(point[1]);
+      return [pixelX, pixelY];
     });
-    drawArrow(arrowsGroup, intersection, meanDir, arrowScale, meanVectorColor, 'mean-arrow');
-
-    // Arrow endpoint positions for labels
-    const arrow1End = { x: intersection.x + dir1.x * arrowScale, y: intersection.y + dir1.y * arrowScale };
-    const arrow2End = { x: intersection.x + dir2.x * arrowScale, y: intersection.y + dir2.y * arrowScale };
-    const meanEnd = { x: intersection.x + meanDir.x * arrowScale, y: intersection.y + meanDir.y * arrowScale };
-
-    // Label above the arrow (midpoint between intersection and arrow end)
-    const arrow1Mid = { x: (intersection.x + arrow1End.x) / 2, y: (intersection.y + arrow1End.y) / 2 };
-    const arrow2Mid = { x: (intersection.x + arrow2End.x) / 2, y: (intersection.y + arrow2End.y) / 2 };
-    plotKatexInSVG(labelsGroup, topArrowLabel, arrow1Mid.x + topArrowLabelOffset.x, arrow1Mid.y + topArrowLabelOffset.y, {
-      bg: false,
-      fontSize: latexFontSize,
-      color: figureLatexColor,
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
-    });
-    // Label below the arrow
-    plotKatexInSVG(labelsGroup, bottomArrowLabel, arrow2Mid.x + bottomArrowLabelOffset.x, arrow2Mid.y + bottomArrowLabelOffset.y, {
-      bg: false,
-      fontSize: latexFontSize,
-      color: figureLatexColor,
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
-    });
-    // Label to the right of mean arrow
-    plotKatexInSVG(labelsGroup, meanArrowLabel, meanEnd.x + meanArrowLabelOffset.x, meanEnd.y + meanArrowLabelOffset.y, {
-      bg: false,
-      fontSize: latexFontSize,
-      color: figureLatexColor,
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
-    });
-
-    arrowsGroup.append('circle')
-      .attr('cx', intersection.x)
-      .attr('cy', intersection.y)
-      .attr('r', pointRadius)
-      .attr('fill', lineColor);
   }
 
-  function initializeVisualization() {
-    if (!svgElement) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+  function computeLineCoords() {
+    // Line 1: sourcePointB -> targetPointB
+    line1Coords = {
+      x1: dataToPixelX(sourcePointB[0], true, scales),
+      y1: scales.yScale(sourcePointB[1]),
+      x2: dataToPixelX(targetPointB[0], false, scales),
+      y2: scales.yScale(targetPointB[1]),
+    };
 
-    initializeLayers();
-    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
-    });
+    // Line 2: sourcePointA -> targetPointA
+    line2Coords = {
+      x1: dataToPixelX(sourcePointA[0], true, scales),
+      y1: scales.yScale(sourcePointA[1]),
+      x2: dataToPixelX(targetPointA[0], false, scales),
+      y2: scales.yScale(targetPointA[1]),
+    };
 
-    const svg = d3.select(svgElement);
-    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, scales, {
-      sourcePointColor,
-      targetPointColor,
-      pointRadius,
-      pointOpacity
-    });
+    intersection = findIntersection(line1Coords, line2Coords);
+  }
 
-    // Add distribution labels at top
-    svg.append('g').attr('id', 'distributionLabels');
-    plotSourceTargetLabels(svg, scales, {
-      sourceLabelText,
-      targetLabelText,
-      labelFontSize,
-      labelColor,
-      outlineColor,
-      outlineOpacity,
-      yShiftFactor: labelYShiftFactor,
-      groupId: 'distributionLabels'
-    });
+  function initializeData() {
+    scales = createSourceTargetScales(
+      sourceDistributionSamples,
+      targetDistributionSamples,
+      {
+        width,
+        height,
+        marginWidth,
+        marginHeight,
+        sourceCenterX,
+        targetCenterX,
+        yShiftFactor,
+      }
+    );
+    precomputeScatterCoords();
+    computeLineCoords();
+  }
 
-    const lineGroup = svg.select('#connectionLines');
-    const arrowsGroup = svg.select('#arrows');
-    const labelsGroup = svg.select('#labels');
+  async function preRenderLabels() {
+    const latexColor = settings.stylingSettings.figureLatex.color;
+    try {
+      [
+        xLabelSvg,
+        topArrowLabelSvg,
+        bottomArrowLabelSvg,
+        meanArrowLabelSvg,
+        x0aLabelSvg,
+        x0bLabelSvg,
+        x1aLabelSvg,
+        x1bLabelSvg,
+      ] = await Promise.all([
+        latexToSvgElement("x", { color: latexColor }),
+        latexToSvgElement("v_t(x|x_0^a, x_1^a)", { color: arrowColor }),
+        latexToSvgElement("v_t(x|x_0^b, x_1^b)", { color: arrowColor }),
+        latexToSvgElement("v_t^\\theta(x) = \\mathbb{E}[X_1 - X_0 | x_t = x]", {
+          color: meanVectorColor,
+        }),
+        latexToSvgElement("x_0^a", { color: latexColor }),
+        latexToSvgElement("x_0^b", { color: latexColor }),
+        latexToSvgElement("x_1^a", { color: latexColor }),
+        latexToSvgElement("x_1^b", { color: latexColor }),
+      ]);
+    } catch (e) {
+      console.warn("Failed to pre-render MathJax labels:", e);
+    }
+  }
 
-    const line1Coords = plotConnectingLine(sourcePointB, targetPointB, lineGroup);
-    const line2Coords = plotConnectingLine(sourcePointA, targetPointA, lineGroup);
+  function updateLabelPositions() {
+    if (!svgOverlay || !scales || !intersection) return;
+    svgOverlay.innerHTML = "";
 
-    const intersection = findIntersection(line1Coords, line2Coords);
-    if (intersection) {
-      plotVectors(intersection, line1Coords, line2Coords, arrowsGroup, labelsGroup);
+    const labelOffsetY = -14;
+
+    // Intersection label 'x'
+    if (xLabelSvg) {
+      placeMathjaxSVG(
+        xLabelSvg.cloneNode(true),
+        svgOverlay,
+        intersection.x,
+        intersection.y,
+        0,
+        labelOffsetY,
+        50,
+        1.4
+      );
     }
 
-    // Add endpoint labels (all above points)
-    // pair1: bottom-left source (x_0^b) -> top-right target (x_1^b)
-    // pair2: top-left source (x_0^a) -> bottom-right target (x_1^a)
-    plotKatexInSVG(labelsGroup, sourcePointALabel, line2Coords.x1, line2Coords.y1, {
-      bg: false,
-      fontSize: latexFontSize,
-      color: figureLatexColor,
-      anchor: 'bottom-center',
-      offsetY: labelAbovePointOffset,
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
+    // Endpoint labels
+    if (x0aLabelSvg) {
+      placeMathjaxSVG(
+        x0aLabelSvg.cloneNode(true),
+        svgOverlay,
+        line2Coords.x1,
+        line2Coords.y1,
+        0,
+        labelOffsetY,
+        50,
+        1.4
+      );
+    }
+    if (x0bLabelSvg) {
+      placeMathjaxSVG(
+        x0bLabelSvg.cloneNode(true),
+        svgOverlay,
+        line1Coords.x1,
+        line1Coords.y1,
+        0,
+        labelOffsetY,
+        50,
+        1.4
+      );
+    }
+    if (x1aLabelSvg) {
+      placeMathjaxSVG(
+        x1aLabelSvg.cloneNode(true),
+        svgOverlay,
+        line2Coords.x2,
+        line2Coords.y2,
+        0,
+        labelOffsetY,
+        50,
+        1.4
+      );
+    }
+    if (x1bLabelSvg) {
+      placeMathjaxSVG(
+        x1bLabelSvg.cloneNode(true),
+        svgOverlay,
+        line1Coords.x2,
+        line1Coords.y2,
+        0,
+        labelOffsetY,
+        50,
+        1.4
+      );
+    }
+
+    // Arrow direction calculations
+    const dir1 = normalize({
+      x: line1Coords.x2 - line1Coords.x1,
+      y: line1Coords.y2 - line1Coords.y1,
     });
-    plotKatexInSVG(labelsGroup, sourcePointBLabel, line1Coords.x1, line1Coords.y1, {
-      bg: false,
-      fontSize: latexFontSize,
-      color: figureLatexColor,
-      anchor: 'bottom-center',
-      offsetY: labelAbovePointOffset,
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
+    const dir2 = normalize({
+      x: line2Coords.x2 - line2Coords.x1,
+      y: line2Coords.y2 - line2Coords.y1,
     });
-    plotKatexInSVG(labelsGroup, targetPointBLabel, line1Coords.x2, line1Coords.y2, {
-      bg: false,
-      fontSize: latexFontSize,
-      color: figureLatexColor,
-      anchor: 'bottom-center',
-      offsetY: labelAbovePointOffset,
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
-    });
-    plotKatexInSVG(labelsGroup, targetPointALabel, line2Coords.x2, line2Coords.y2, {
-      bg: false,
-      fontSize: latexFontSize,
-      color: figureLatexColor,
-      anchor: 'bottom-center',
-      offsetY: labelAbovePointOffset,
-      outline: katexOutline,
-      outlineColor: katexOutlineColor,
-      outlineWidth: katexOutlineWidth,
-      outlineOpacity: katexOutlineOpacity,
+    const meanDir = normalize({
+      x: (dir1.x + dir2.x) / 2,
+      y: (dir1.y + dir2.y) / 2,
     });
 
-    isInitialized = true;
+    const lineLength1 = Math.hypot(
+      line1Coords.x2 - line1Coords.x1,
+      line1Coords.y2 - line1Coords.y1
+    );
+    const lineLength2 = Math.hypot(
+      line2Coords.x2 - line2Coords.x1,
+      line2Coords.y2 - line2Coords.y1
+    );
+    const arrowScale = arrowLength * Math.min(lineLength1, lineLength2);
+
+    // Arrow endpoint positions
+    const arrow1End = {
+      x: intersection.x + dir1.x * arrowScale,
+      y: intersection.y + dir1.y * arrowScale,
+    };
+    const arrow2End = {
+      x: intersection.x + dir2.x * arrowScale,
+      y: intersection.y + dir2.y * arrowScale,
+    };
+    const meanEnd = {
+      x: intersection.x + meanDir.x * arrowScale,
+      y: intersection.y + meanDir.y * arrowScale,
+    };
+
+    // Arrow midpoints for labels
+    const arrow1Mid = {
+      x: (intersection.x + arrow1End.x) / 2,
+      y: (intersection.y + arrow1End.y) / 2,
+    };
+    const arrow2Mid = {
+      x: (intersection.x + arrow2End.x) / 2,
+      y: (intersection.y + arrow2End.y) / 2,
+    };
+
+    // Arrow labels
+    if (topArrowLabelSvg) {
+      placeMathjaxSVG(
+        topArrowLabelSvg.cloneNode(true),
+        svgOverlay,
+        arrow2Mid.x + topArrowLabelOffset.x,
+        arrow2Mid.y + topArrowLabelOffset.y,
+        60,
+        100,
+        50,
+        1.2
+      );
+    }
+    if (bottomArrowLabelSvg) {
+      placeMathjaxSVG(
+        bottomArrowLabelSvg.cloneNode(true),
+        svgOverlay,
+        arrow1Mid.x + bottomArrowLabelOffset.x,
+        arrow1Mid.y + bottomArrowLabelOffset.y,
+        60,
+        -35,
+        50,
+        1.2
+      );
+    }
+    if (meanArrowLabelSvg) {
+      placeMathjaxSVG(
+        meanArrowLabelSvg.cloneNode(true),
+        svgOverlay,
+        meanEnd.x + meanArrowLabelOffset.x,
+        meanEnd.y + meanArrowLabelOffset.y,
+        150,
+        30,
+        50,
+        1.2
+      );
+    }
   }
 
-  // Reactive initialization
-  $: if (!isInitialized &&
-         sourceDistributionSamples.length > 0 &&
-         targetDistributionSamples.length > 0 &&
-         svgElement) {
-    initializeVisualization();
+  function draw() {
+    if (!ctx || !scales) return;
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw scatter plots
+    drawScatterPlot(
+      ctx,
+      sourcePixelCoords,
+      pointRadius,
+      sourcePointColor,
+      pointOpacity
+    );
+    drawScatterPlot(
+      ctx,
+      targetPixelCoords,
+      pointRadius,
+      targetPointColor,
+      pointOpacity
+    );
+
+    // Draw distribution labels
+    drawText(
+      ctx,
+      sourceLabelText,
+      scales.sourceCenterPixelX,
+      marginHeight / 2,
+      {
+        font: `${labelFontSize}px Helvetica, Arial, sans-serif`,
+        color: labelColor,
+        align: "center",
+        baseline: "top",
+      }
+    );
+    drawText(
+      ctx,
+      targetLabelText,
+      scales.targetCenterPixelX,
+      marginHeight / 2,
+      {
+        font: `${labelFontSize}px Helvetica, Arial, sans-serif`,
+        color: labelColor,
+        align: "center",
+        baseline: "top",
+      }
+    );
+
+    // Draw connecting lines
+    ctx.save();
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = lineWidth;
+    ctx.globalAlpha = lineOpacity;
+
+    // Line 1: sourcePointB -> targetPointB
+    ctx.beginPath();
+    ctx.moveTo(line1Coords.x1, line1Coords.y1);
+    ctx.lineTo(line1Coords.x2, line1Coords.y2);
+    ctx.stroke();
+
+    // Line 2: sourcePointA -> targetPointA
+    ctx.beginPath();
+    ctx.moveTo(line2Coords.x1, line2Coords.y1);
+    ctx.lineTo(line2Coords.x2, line2Coords.y2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // Draw endpoint circles
+    ctx.fillStyle = lineColor;
+    const endpoints = [
+      [line1Coords.x1, line1Coords.y1],
+      [line1Coords.x2, line1Coords.y2],
+      [line2Coords.x1, line2Coords.y1],
+      [line2Coords.x2, line2Coords.y2],
+    ];
+    for (const [x, y] of endpoints) {
+      ctx.beginPath();
+      ctx.arc(x, y, pointRadius, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    // Draw velocity arrows at intersection
+    if (intersection) {
+      const dir1 = normalize({
+        x: line1Coords.x2 - line1Coords.x1,
+        y: line1Coords.y2 - line1Coords.y1,
+      });
+      const dir2 = normalize({
+        x: line2Coords.x2 - line2Coords.x1,
+        y: line2Coords.y2 - line2Coords.y1,
+      });
+      const meanDir = normalize({
+        x: (dir1.x + dir2.x) / 2,
+        y: (dir1.y + dir2.y) / 2,
+      });
+
+      const lineLength1 = Math.hypot(
+        line1Coords.x2 - line1Coords.x1,
+        line1Coords.y2 - line1Coords.y1
+      );
+      const lineLength2 = Math.hypot(
+        line2Coords.x2 - line2Coords.x1,
+        line2Coords.y2 - line2Coords.y1
+      );
+      const arrowScale = arrowLength * Math.min(lineLength1, lineLength2);
+
+      // Arrow 1 (dir1 - orange)
+      ctx.save();
+      ctx.strokeStyle = arrowColor;
+      ctx.fillStyle = arrowColor;
+      ctx.lineWidth = arrowWidth;
+      drawArrow(
+        ctx,
+        intersection.x,
+        intersection.y,
+        intersection.x + dir1.x * arrowScale,
+        intersection.y + dir1.y * arrowScale,
+        6
+      );
+      ctx.restore();
+
+      // Arrow 2 (dir2 - orange)
+      ctx.save();
+      ctx.strokeStyle = arrowColor;
+      ctx.fillStyle = arrowColor;
+      ctx.lineWidth = arrowWidth;
+      drawArrow(
+        ctx,
+        intersection.x,
+        intersection.y,
+        intersection.x + dir2.x * arrowScale,
+        intersection.y + dir2.y * arrowScale,
+        6
+      );
+      ctx.restore();
+
+      // Mean arrow (green)
+      ctx.save();
+      ctx.strokeStyle = meanVectorColor;
+      ctx.fillStyle = meanVectorColor;
+      ctx.lineWidth = arrowWidth;
+      drawArrow(
+        ctx,
+        intersection.x,
+        intersection.y,
+        intersection.x + meanDir.x * arrowScale,
+        intersection.y + meanDir.y * arrowScale,
+        6
+      );
+      ctx.restore();
+
+      // Draw intersection point
+      ctx.beginPath();
+      ctx.arc(intersection.x, intersection.y, pointRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = lineColor;
+      ctx.fill();
+    }
+
+    // Update SVG overlay labels
+    updateLabelPositions();
+  }
+
+  $: if (
+    canvas &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples.length > 0 &&
+    !isInitialized
+  ) {
+    initializeCanvas();
+    initializeData();
+    isInitialized = true;
+    preRenderLabels().then(() => draw());
   }
 
   onMount(() => {
@@ -374,9 +538,18 @@
   });
 </script>
 
-<Figure caption={caption} {backgroundVisible}>
+<Figure {caption} {backgroundVisible}>
   {#snippet children()}
-    <svg bind:this={svgElement} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
-    </svg>
+    <div style="position:relative;width:100%;max-width:{width}px;">
+      <canvas
+        bind:this={canvas}
+        style="width:100%;height:auto;aspect-ratio:{width}/{height};"
+      ></canvas>
+      <svg
+        bind:this={svgOverlay}
+        style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"
+        viewBox="0 0 {width} {height}"
+      ></svg>
+    </div>
   {/snippet}
 </Figure>

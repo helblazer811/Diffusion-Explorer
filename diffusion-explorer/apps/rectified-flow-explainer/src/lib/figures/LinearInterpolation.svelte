@@ -248,7 +248,7 @@
         width / 2,
         height - marginHeight,
         0,
-        0,
+        12,
         50,
         sizeMultiplier
       );

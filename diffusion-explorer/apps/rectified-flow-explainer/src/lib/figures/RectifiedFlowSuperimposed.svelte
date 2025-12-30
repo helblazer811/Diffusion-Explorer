@@ -379,4 +379,10 @@
     border-radius: 4px;
     color: #666;
   }
+
+  @media (max-width: 600px) {
+    .panel-label {
+      font-size: 18px !important;
+    }
+  }
 </style>
