@@ -1,41 +1,10 @@
 <script lang="ts">
   import type { BibEntry, CitationInfo } from '$lib/citations';
+  import { formatAuthors } from '$lib/citations';
 
   // Props
   export let citations: CitationInfo[] = [];
   export let bibEntries: Map<string, BibEntry> | null = null;
-
-  /**
-   * Format author string from BibTeX format (Last, First and Last, First)
-   * to a more readable format (F. Last, F. Last, ...)
-   */
-  function formatAuthors(authorStr) {
-    if (!authorStr) return '';
-
-    // Split by " and " to get individual authors
-    const authors = authorStr.split(' and ').map(author => author.trim());
-
-    return authors.map(author => {
-      // Handle "Last, First" format
-      if (author.includes(',')) {
-        const [last, first] = author.split(',').map(s => s.trim());
-        // Get first initial(s)
-        const initials = first.split(' ')
-          .map(name => name.charAt(0) + '.')
-          .join(' ');
-        return `${initials} ${last}`;
-      }
-      // Handle "First Last" format
-      const parts = author.split(' ');
-      if (parts.length >= 2) {
-        const last = parts[parts.length - 1];
-        const firstNames = parts.slice(0, -1);
-        const initials = firstNames.map(name => name.charAt(0) + '.').join(' ');
-        return `${initials} ${last}`;
-      }
-      return author;
-    }).join(', ');
-  }
 </script>
 
 {#if citations.length > 0 && bibEntries}
@@ -50,6 +19,9 @@
             {entry.journal}.
           {:else if entry.booktitle}
             {entry.booktitle}.
+          {/if}
+          {#if entry.url}
+            <a href={entry.url} target="_blank" rel="noopener noreferrer" class="bib-link">[Link]</a>
           {/if}
         </li>
       {/if}
@@ -74,5 +46,15 @@
     margin-left: -0.5rem;
     border-radius: 4px;
     transition: background-color 0.3s ease;
+  }
+
+  .bib-link {
+    color: rgb(0, 100, 200);
+    text-decoration: none;
+    margin-left: 0.25rem;
+  }
+
+  .bib-link:hover {
+    text-decoration: underline;
   }
 </style>
