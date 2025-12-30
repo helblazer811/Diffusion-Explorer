@@ -19,19 +19,26 @@ export function callTrainingWorkerThread(
         trainWorkerUrl,
         { type: 'module' }
     );
-    // Add listeners that recieve messages from the worker thread on the main thread (client)
+    // Add listeners that receive messages from the worker thread on the main thread (client)
     trainingWorker.onmessage = (e) => {
-        const { type, result: res } = e.data;
+        const { type } = e.data;
         if (type === 'result') {
             finishCallback(e.data.tfModelPath);
         } else if (type === 'epoch_chunk') {
-            // Recieved a chunk of data from the worker thread
+            // Received a chunk of data from the worker thread
             epochCallback(e.data.epoch, e.data.intermediateSamples);
         } else if (type === 'status') {
             console.log('Worker status:', e.data.message);
         } else if (type === 'error') {
             console.error('Worker error:', e.data.message);
+        } else {
+            console.log('Unknown worker message type:', type, e.data);
         }
+    };
+
+    // Catch worker-level errors (syntax errors, import failures, etc.)
+    trainingWorker.onerror = (e) => {
+        console.error('Worker error event:', e.message, 'at', e.filename, ':', e.lineno);
     };
     // Call the dummy worker thread 
     // Send a message

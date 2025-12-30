@@ -36,7 +36,7 @@ function callSamplingWorker(
         } else if (msgType === 'status') {
             console.log('Worker status:', e.data.message);
         } else if (msgType === 'error') {
-            console.error('Worker error:', e.data.message);
+            console.error('Worker error:', e.data.error);
         }
     };
     worker.postMessage({ type, data });
