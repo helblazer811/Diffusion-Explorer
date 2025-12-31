@@ -36,6 +36,7 @@
   import ConditionalFlowMatching from "$lib/figures/ConditionalFlowMatching.svelte";
   import CurvedTrajectorySuperimposed from "$lib/figures/CurvedTrajectorySuperimposed.svelte";
   import ReflowAlgorithm from "$lib/figures/ReflowAlgorithm.svelte";
+  import EulerStepComparison from "$lib/figures/EulerStepComparison.svelte";
   import { Figure, Bibliography, HoverableReference, Katex } from "@diffusion-explorer/ui";
   import { base } from "$app/paths";
 
@@ -1373,14 +1374,44 @@
     </div>
   {/if}
   <p>
+    This difference in curvature has a direct impact on how many steps are
+    needed during sampling. We can observe this effect by comparing how well
+    Euler's method approximates the "ground truth" trajectory (using many steps)
+    with varying numbers of integration steps (see
+    <a href="#figure-15" class="internal-link">Figure 15</a>
+    ). Notice how the rectified flow model produces accurate approximations even
+    with very few steps, while the flow matching model's curved trajectories
+    lead to significant deviation from the true path.
+  </p>
+  {#if showOtherFigures}
+    <div id="figure-15">
+      <EulerStepComparison
+        targetDistribution={$targetDistributionSamples}
+        backgroundVisible={false}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 15:</span>
+          <strong>
+            Rectified flow enables accurate sampling with fewer Euler steps.
+          </strong>
+          The <span style="color: #888888;">gray trajectory</span> shows the ground
+          truth (512 steps), while the <span style="color: #f17720;">orange trajectory</span>
+          shows the approximation using the selected number of steps. With curved
+          paths, few-step approximations deviate significantly from the true path.
+          With straight paths, even a single step can produce accurate results.
+        </div>
+      </EulerStepComparison>
+    </div>
+  {/if}
+  <p>
     Finally, we can compare the vector fields learned by a standard flow
     matching model versus a rectified flow model (see
-    <a href="#figure-15" class="internal-link">Figure 15</a>
+    <a href="#figure-16" class="internal-link">Figure 16</a>
     ). The rectified flow model learns vector field that is more consistent over
     time, meaning the model has lower curvature in its trajectories.
   </p>
   {#if showOtherFigures}
-    <div id="figure-15">
+    <div id="figure-16">
       <VectorFieldCurvatureComparison
         flowMatchingVectorField={$vectorFieldData}
         rectifiedFlowVectorField={$rectifiedFlowVectorFieldData}
@@ -1388,7 +1419,7 @@
         backgroundVisible={false}
       >
         <div class="caption">
-          <span class="figure-number">Figure 15:</span>
+          <span class="figure-number">Figure 16:</span>
           The curvature of a flow matching model can be seen through its rapidly
           changing vector field. In contrast, a rectified flow model learns a more
           consistent vector field over time, indicating straighter trajectories.

@@ -1,26 +1,26 @@
 // Existing components
-export { default as Katex } from './Katex.svelte';
-export { default as Minimizable } from './Minimizable.svelte';
-export { default as Quote } from './Quote.svelte';
+export { default as Katex } from './components/Katex.svelte';
+export { default as Minimizable } from './components/Minimizable.svelte';
+export { default as Quote } from './components/Quote.svelte';
 export { plotKatexInSVG, type PlotKatexOptions, type Anchor } from './d3_utils';
 
 // Layout components
-export { default as TableOfContents } from './TableOfContents.svelte';
-export { default as Figure } from './Figure.svelte';
-export { default as DoubleFigure } from './DoubleFigure.svelte';
+export { default as TableOfContents } from './components/TableOfContents.svelte';
+export { default as Figure } from './components/Figure.svelte';
+export { default as DoubleFigure } from './components/DoubleFigure.svelte';
 
 // UI Controls
-export { default as PlayButton } from './PlayButton.svelte';
-export { default as TimeSlider } from './TimeSlider.svelte';
-export { default as TextToggleButton } from './TextToggleButton.svelte';
+export { default as PlayButton } from './components/PlayButton.svelte';
+export { default as TimeSlider } from './components/TimeSlider.svelte';
+export { default as TextToggleButton } from './components/TextToggleButton.svelte';
 
 // Algorithm components
-export { default as Algorithm } from './Algorithm.svelte';
-export { default as AlgorithmLine } from './AlgorithmLine.svelte';
+export { default as Algorithm } from './components/Algorithm.svelte';
+export { default as AlgorithmLine } from './components/AlgorithmLine.svelte';
 
 // Bibliography components
-export { default as Bibliography } from './Bibliography.svelte';
-export { default as HoverableReference } from './HoverableReference.svelte';
+export { default as Bibliography } from './components/Bibliography.svelte';
+export { default as HoverableReference } from './components/HoverableReference.svelte';
 
 // Citations utilities
 export {
