@@ -12,5 +12,8 @@ export default defineConfig({
         path.resolve('../packages/diffusion/dist')
       ]
     }
+  },
+  worker: {
+    format: 'es'
   }
 });

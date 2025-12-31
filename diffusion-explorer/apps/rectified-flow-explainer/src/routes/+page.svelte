@@ -385,6 +385,17 @@
   // ========== LIFECYCLE ==========
 
   onMount(async () => {
+    // Prefix paths with base for production deployment
+    if (settings.flowMatchingModelPath) {
+      settings.flowMatchingModelPath = `${base}${settings.flowMatchingModelPath}`;
+    }
+    if (settings.rectifiedFlowModelPath) {
+      settings.rectifiedFlowModelPath = `${base}${settings.rectifiedFlowModelPath}`;
+    }
+    if (settings.samplingWorkerUrl) {
+      settings.samplingWorkerUrl = `${base}${settings.samplingWorkerUrl}`;
+    }
+
     // Load target distribution first
     await loadTargetDistribution();
 
@@ -563,7 +574,7 @@
       fewer steps, reducing the computational cost of simulation and lowering
       latency. Tap
       <img
-        src="/icons/tap.svg"
+        src="{base}/icons/tap.svg"
         alt="tap"
         style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
       /> to generate a sample.
@@ -639,7 +650,7 @@
           This figure visualizes the transformation of a random noise source distribution
           to a simple smiley face target distribution over time. Tap
           <img
-            src="/icons/tap.svg"
+            src="{base}/icons/tap.svg"
             alt="tap"
             style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
           /> to generate a sample.
@@ -793,7 +804,7 @@
         <Katex math={"x"} color="#f17720" />
         moves from the source distribution to the target distribution. Tap
         <img
-          src="/icons/tap.svg"
+          src="{base}/icons/tap.svg"
           alt="tap"
           style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
         /> to generate a sample.
@@ -1093,7 +1104,7 @@
         This curvature is even more apparent when we superimpose the trajectories
         and the <span style="color: #3b82f6;">target distribution</span>. Tap
         <img
-          src="/icons/tap.svg"
+          src="{base}/icons/tap.svg"
           alt="tap"
           style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
         /> to generate a sample.
@@ -1383,7 +1394,7 @@
           integration with fewer steps, reducing the computational cost of
           simulation and lowering latency. Tap
           <img
-            src="/icons/tap.svg"
+            src="{base}/icons/tap.svg"
             alt="tap"
             style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
           /> to generate a sample.
