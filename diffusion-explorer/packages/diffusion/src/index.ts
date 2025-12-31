@@ -1,5 +1,6 @@
 // export * from './diffusion';
 export * from './flow_matching';
+export * from './schedulers';
 // export * from './conditional_diffusion';
 export * from './interfaces';
 export * from './sampling_client';

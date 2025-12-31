@@ -1,6 +1,7 @@
 import * as tf from '@tensorflow/tfjs'
 import { Model } from './interfaces';
 import { sampleUniformGrid } from './utils';
+import { SchedulerType, SamplingOptions, getScheduler } from './schedulers';
 
 export class FlowModel extends Model {
   
@@ -263,23 +264,20 @@ export class FlowModel extends Model {
     }
   
     /**
-     * Integrate one step from t_start to t_end using midpoint method
+     * Integrate one step from t_start to t_end using the specified scheduler
      * @param x_t tf.Tensor2D of shape [batch, dim]
      * @param t_start tf.Tensor1D or tf.Tensor2D of shape [batch] or [batch, 1]
      * @param t_end tf.Tensor1D or tf.Tensor2D of shape [batch] or [batch, 1]
+     * @param scheduler The integration method to use (default: 'euler_midpoint')
      */
-    step(x_t: tf.Tensor2D, t_start: tf.Tensor1D | tf.Tensor2D, t_end: tf.Tensor1D | tf.Tensor2D): tf.Tensor2D {
-      return tf.tidy(() => {
-        const t0 = t_start.reshape([x_t.shape[0], 1]);
-        const t1 = t_end.reshape([x_t.shape[0], 1]);
-        const dt = t1.sub(t0); // shape [batch, 1]
-  
-        const half_step = this.forward(x_t, t0).mul(dt).div(2);
-        const mid_point = x_t.add(half_step);
-        const t_mid = t0.add(dt.div(2));
-        const update = this.forward(mid_point, t_mid).mul(dt);
-        return x_t.add(update);
-      });
+    step(
+      x_t: tf.Tensor2D,
+      t_start: tf.Tensor1D | tf.Tensor2D,
+      t_end: tf.Tensor1D | tf.Tensor2D,
+      scheduler: SchedulerType = 'euler_midpoint'
+    ): tf.Tensor2D {
+      const stepFn = getScheduler(scheduler);
+      return stepFn(x_t, t_start, t_end, (x, t) => this.forward(x, t));
     }
 
     /**
@@ -287,14 +285,14 @@ export class FlowModel extends Model {
      * @param num_samples number of samples to draw
      * @param t timestep to draw samples at in [0, num_total_steps]
      * @param num_total_steps number of total steps to simulate the ODE
-     * @param options Optional parameters for future extensibility
+     * @param options Sampling options (scheduler, etc.)
      * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
      * @returns tf.Tensor2D of shape [num_total_steps, num_samples, dim]
      */
     sample(
         num_samples: number,
         num_total_steps: number = 100,
-        options: {} = {},
+        options: SamplingOptions = {},
         perStepCallback?: (step: number, x_t: number[][]) => void
     ): tf.Tensor3D {
         // Draw initial samples from a Gaussian distribution
@@ -308,15 +306,17 @@ export class FlowModel extends Model {
     * Draw samples from the model using the given initial points
     * @param initial_points tf.Tensor2D of shape [num_samples, dim]
     * @param num_total_steps Number of integration steps
-    * @param options Optional parameters for future extensibility
+    * @param options Sampling options (scheduler, etc.)
     * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
     */
     sample_from_initial_points(
         initial_points: tf.Tensor2D,
         num_total_steps: number = 100,
-        options: {} = {},
+        options: SamplingOptions = {},
         perStepCallback?: (step: number, x_t: number[][]) => void
     ): tf.Tensor3D {
+        const scheduler = options.scheduler ?? 'euler_midpoint';
+
         return tf.tidy(() => {
             // Draw some initial samples from the source distribution
             const num_samples = initial_points.shape[0];
@@ -332,8 +332,8 @@ export class FlowModel extends Model {
                 const t_i_repeated = tf.tile(t_i, [num_samples]);
                 const t_next = t_steps.slice([i + 1], [1]); // next time
                 const t_next_repeated = tf.tile(t_next, [num_samples]);
-                // Do the step using the midpoint method
-                x_t = this.step(x_t, t_i_repeated, t_next_repeated);
+                // Do the step using the selected scheduler
+                x_t = this.step(x_t, t_i_repeated, t_next_repeated, scheduler);
                 // Store the result in the all_step_data tensor
                 all_step_data.push(x_t);
 
@@ -353,7 +353,7 @@ export class FlowModel extends Model {
     * @param gridResolution Number of points along each axis
     * @param domainRange The domain range for x and y coordinates
     * @param num_total_steps Number of flow steps
-    * @param options Optional parameters for future extensibility
+    * @param options Sampling options (scheduler, etc.)
     * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
     * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
     */
@@ -361,7 +361,7 @@ export class FlowModel extends Model {
         gridResolution: number,
         domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
         num_total_steps: number = 100,
-        options: {} = {},
+        options: SamplingOptions = {},
         perStepCallback?: (step: number, x_t: number[][]) => void
     ): tf.Tensor3D {
         // Generate uniform grid
