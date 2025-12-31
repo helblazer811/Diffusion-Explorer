@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { BibEntry, CitationInfo } from './citations';
-  import { formatAuthors } from './citations';
+  import type { BibEntry, CitationInfo } from '../citations';
+  import { formatAuthors } from '../citations';
 
   // Props
   export let citations: CitationInfo[] = [];

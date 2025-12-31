@@ -47,7 +47,7 @@
   export let trajectoryStrokeWidth =
     settings.stylingSettings.trajectory.strokeWidth;
   export let trajectoryPointRadius =
-    settings.stylingSettings.trajectory.pointRadius;
+    settings.stylingSettings.trajectory.endpointRadius;
   export let trajectoryProgressOpacity =
     settings.stylingSettings.trajectory.progressOpacity;
   export let trajectoryPreviewOpacity =

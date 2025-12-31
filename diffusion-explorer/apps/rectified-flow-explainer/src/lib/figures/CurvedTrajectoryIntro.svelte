@@ -285,7 +285,7 @@
         strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
         color: settings.stylingSettings.trajectory.color,
         progressOpacity: highlightedOpacity,
-        pointRadius: settings.stylingSettings.trajectory.pointRadius,
+        pointRadius: settings.stylingSettings.trajectory.endpointRadius,
         showPreview: false,
         previewOpacity: 0,
       });
@@ -297,7 +297,7 @@
           strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
           color: settings.stylingSettings.trajectory.color,
           progressOpacity: dimmedOpacity,
-          pointRadius: settings.stylingSettings.trajectory.pointRadius,
+          pointRadius: settings.stylingSettings.trajectory.endpointRadius,
           showPreview: false,
           previewOpacity: 0,
         });
@@ -310,7 +310,7 @@
           strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
           color: settings.stylingSettings.trajectory.color,
           progressOpacity: highlightedOpacity,
-          pointRadius: settings.stylingSettings.trajectory.pointRadius,
+          pointRadius: settings.stylingSettings.trajectory.endpointRadius,
           showPreview: false,
           previewOpacity: 0,
         });
@@ -342,7 +342,7 @@
         const lastPoint = clickedTrajectory[endIdx - 1];
         ctx.fillStyle = settings.stylingSettings.trajectory.color;
         ctx.beginPath();
-        ctx.arc(lastPoint[0], lastPoint[1], settings.stylingSettings.trajectory.pointRadius, 0, Math.PI * 2);
+        ctx.arc(lastPoint[0], lastPoint[1], settings.stylingSettings.trajectory.endpointRadius, 0, Math.PI * 2);
         ctx.fill();
       }
 

@@ -36,6 +36,7 @@
   export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
   export let showTrajectoryPreview = false;
   export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory visible with fade
+  export let endpointRadius = settings.stylingSettings.trajectory.endpointRadius;
 
   // Animation
   export let animationDuration = 5000;
@@ -214,6 +215,18 @@
         ctx.lineTo(trajectory[i][0], trajectory[i][1]);
       }
       ctx.stroke();
+    }
+
+    // Draw endpoint circles at the current position of each trajectory
+    ctx.fillStyle = trajectoryColor;
+    for (const trajectory of scaledTrajectories) {
+      const endIdx = Math.min(currentSegmentIndex + 1, trajectory.length) - 1;
+      if (endIdx < 0) continue;
+
+      const [ex, ey] = trajectory[endIdx];
+      ctx.beginPath();
+      ctx.arc(ex, ey, endpointRadius, 0, 2 * Math.PI);
+      ctx.fill();
     }
 
     ctx.globalAlpha = 1.0;

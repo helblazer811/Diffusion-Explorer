@@ -152,10 +152,17 @@ export const settings = {
     // Trajectory styling
     trajectory: {
       color: '#f17720',           // Orange
-      strokeWidth: 4.5,
-      pointRadius: 4,
-      fullOpacity: 0.15,          // Background paths (preview)
-      progressOpacity: 0.8        // Animated paths
+      strokeWidth: 3,
+      pointRadius: 3,
+      endpointRadius: 6,          // Endpoint circle radius
+      progressOpacity: 0.8,       // Animated paths
+      previewOpacity: 0.0,        // Preview path opacity (0 = hidden)
+      outline: {
+        enabled: true,
+        color: '#ffffff',         // Black outline
+        width: 0,                 // Outline width (should be > strokeWidth)
+        opacity: 1.0              // Outline opacity
+      }
     },
     // Contour plot styling
     contour: {
