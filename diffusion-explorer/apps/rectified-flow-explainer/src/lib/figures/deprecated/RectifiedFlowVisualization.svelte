@@ -46,7 +46,7 @@
 
   // Styling props (dimensions)
   export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-  export let trajectoryPointRadius = settings.stylingSettings.trajectory.pointRadius;
+  export let trajectoryPointRadius = settings.stylingSettings.trajectory.endpointRadius;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
 
   // Layout

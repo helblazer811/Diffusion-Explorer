@@ -1,10 +1,8 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { drawScatterPlot } from "$lib/plotting/plotting";
-  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
   import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
@@ -36,7 +34,7 @@
   // Trajectory styling
   export let trajectoryColor = settings.stylingSettings.trajectory.color;
   export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-  export let trajectoryPointRadius = settings.stylingSettings.trajectory.pointRadius;
+  export let trajectoryPointRadius = settings.stylingSettings.trajectory.endpointRadius;
   export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
   export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
   export let showTrajectoryPreview = false;

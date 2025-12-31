@@ -1,10 +1,8 @@
 <script>
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
-  import { drawScatterPlot, drawText } from "$lib/plotting/plotting";
-  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
   import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   export let sourceDistributionSamples = [];
