@@ -1,9 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import Figure from "$lib/components/Figure.svelte";
-  import PlayButton from "$lib/components/PlayButton.svelte";
-  import TextToggleButton from "$lib/components/TextToggleButton.svelte";
+  import { Figure, PlayButton, TextToggleButton } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales } from "$lib/d3_helpers";
 

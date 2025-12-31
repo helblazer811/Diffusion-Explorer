@@ -2,7 +2,7 @@
 
 <script>
   import * as d3 from 'd3';
-  import Figure from '$lib/components/Figure.svelte';
+  import { Figure } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
   import { plotSourceTargetLabels, plotSourceTargetScatter, createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
 

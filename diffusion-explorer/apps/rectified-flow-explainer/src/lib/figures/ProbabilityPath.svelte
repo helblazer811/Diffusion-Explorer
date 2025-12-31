@@ -3,8 +3,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import Figure from "$lib/components/Figure.svelte";
-  import TimeSlider from "$lib/components/TimeSlider.svelte";
+  import { Figure, TimeSlider } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
   import { drawScatterPlot, drawText } from "$lib/plotting/plotting";
