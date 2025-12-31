@@ -3,7 +3,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, drawScatterPlot } from "@diffusion-explorer/ui";
+  import { DoubleFigure, drawScatterPlot, Slider } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
@@ -345,6 +345,12 @@
 
   $: currentSteps = stepValues[currentStepIndex];
 
+  // Generate ticks for slider (log scale positions)
+  $: sliderTicks = stepValues.map((step, i) => ({
+    position: i / (stepValues.length - 1),
+    label: String(step)
+  }));
+
   // ===== LIFECYCLE =====
 
   onMount(() => {
@@ -393,44 +399,35 @@
     {/snippet}
 
     {#snippet footer()}
-      <div class="slider-container">
-        <div class="slider-header">
-          <span class="slider-label">Euler Steps:</span>
-          <span class="slider-value">{currentSteps}</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max={stepValues.length - 1}
-          step="1"
+      <div class="footer-container">
+        <Slider
           bind:value={currentStepIndex}
-          oninput={handleSliderChange}
-          class="steps-slider"
+          min={0}
+          max={stepValues.length - 1}
+          step={1}
           disabled={isLoading}
+          color={approximationColor}
+          ticks={sliderTicks}
+          activeTickIndex={currentStepIndex}
+          showTickMarks={true}
+          showLabel={false}
+          onInput={handleSliderChange}
         />
-        <div class="slider-ticks">
-          {#each stepValues as step, i}
-            <span
-              class="tick"
-              class:active={i === currentStepIndex}
-              style="left: {(i / (stepValues.length - 1)) * 100}%"
-            >{step}</span>
-          {/each}
-        </div>
+        <div class="slider-label-below">Number of Euler Steps</div>
         {#if isLoading}
           <div class="loading-indicator">
             <div class="loading-bar" style="width: {loadingProgress * 100}%"></div>
           </div>
         {/if}
-      </div>
-      <div class="legend">
-        <div class="legend-item">
-          <span class="legend-color" style="background-color: {groundTruthColor};"></span>
-          <span class="legend-text">Ground Truth ({groundTruthSteps} steps)</span>
-        </div>
-        <div class="legend-item">
-          <span class="legend-color" style="background-color: {approximationColor};"></span>
-          <span class="legend-text">Approximation ({currentSteps} {currentSteps === 1 ? 'step' : 'steps'})</span>
+        <div class="legend">
+          <div class="legend-item">
+            <span class="legend-color" style="background-color: {groundTruthColor};"></span>
+            <span class="legend-text">Ground Truth ({groundTruthSteps} steps)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color" style="background-color: {approximationColor};"></span>
+            <span class="legend-text">Approximation ({currentSteps} {currentSteps === 1 ? 'step' : 'steps'})</span>
+          </div>
         </div>
       </div>
     {/snippet}
@@ -458,97 +455,26 @@
     display: block;
   }
 
-  .slider-container {
+  .footer-container {
     width: 100%;
-    max-width: 500px;
-    margin: 0 auto;
-    padding: 16px 20px 8px;
+    padding: 16px 0 8px;
   }
 
-  .slider-header {
-    display: flex;
-    justify-content: center;
-    align-items: baseline;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-
-  .slider-label {
+  .slider-label-below {
+    text-align: center;
     font-size: 16px;
-    color: #555;
     font-family: Helvetica, Arial, sans-serif;
-  }
-
-  .slider-value {
-    font-size: 20px;
-    font-weight: 600;
-    color: #f17720;
-    min-width: 40px;
-  }
-
-  .steps-slider {
-    width: 100%;
-    height: 8px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: #e0e0e0;
-    border-radius: 4px;
-    outline: none;
-    cursor: pointer;
-  }
-
-  .steps-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    background: #f17720;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  }
-
-  .steps-slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    background: #f17720;
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  }
-
-  .steps-slider:disabled {
-    opacity: 0.5;
-    cursor: wait;
-  }
-
-  .slider-ticks {
-    position: relative;
-    width: 100%;
-    height: 24px;
-    margin-top: 4px;
-  }
-
-  .tick {
-    position: absolute;
-    transform: translateX(-50%);
-    font-size: 11px;
-    color: #888;
-    font-family: monospace;
-  }
-
-  .tick.active {
-    color: #f17720;
-    font-weight: 600;
+    color: #7b7b7b;
+    margin-top: 8px;
   }
 
   .loading-indicator {
     width: 100%;
+    max-width: 600px;
+    margin: 8px auto 0;
     height: 4px;
     background: #e0e0e0;
     border-radius: 2px;
-    margin-top: 8px;
     overflow: hidden;
   }
 
@@ -563,7 +489,7 @@
     display: flex;
     justify-content: center;
     gap: 24px;
-    margin-top: 8px;
+    margin-top: 16px;
     flex-wrap: wrap;
   }
 
@@ -605,10 +531,6 @@
 
     .legend-text {
       font-size: 11px;
-    }
-
-    .tick {
-      font-size: 9px;
     }
 
     .slider-container {
