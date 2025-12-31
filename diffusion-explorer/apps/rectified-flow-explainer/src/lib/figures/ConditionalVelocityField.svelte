@@ -3,7 +3,8 @@
   import { Figure } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
-  import { drawScatterPlot, drawArrow } from "$lib/plotting/plotting";
+  import { drawScatterPlot } from "$lib/plotting/plotting";
+  import { drawArrow } from "$lib/plotting/VectorField";
   import { drawMathjaxOnCanvas } from "$lib/plotting/mathjax";
 
   // ===== CAPTION =====
