@@ -347,3 +347,214 @@ export function drawTrajectoriesWithSpatialHash(
     ctx.globalAlpha = 1;
   }
 }
+
+// ========== PROGRESSIVE ANIMATION ==========
+
+export interface ProgressiveAnimationOptions {
+  // Timing
+  segmentDuration: number;      // ms per segment animation
+  segmentPauseDuration: number; // ms pause between segments
+  endPauseDuration: number;     // ms pause at end before restart
+  loop?: boolean;               // Whether to loop (default: true)
+
+  // Styling
+  strokeWidth: number;
+  pointRadius: number;
+  color: string;
+  opacity: number;
+
+  // Callbacks
+  onEndPause?: () => void;      // Called each frame during end pause (for drawing overlays like error lines)
+}
+
+export interface AnimationController {
+  start: () => void;
+  stop: () => void;
+  reset: () => void;
+  isRunning: () => boolean;
+}
+
+/**
+ * Draws trajectories with smooth interpolation within the current segment.
+ * @param ctx - Canvas 2D rendering context
+ * @param trajectories - Array of trajectories in pixel coords: [trajectory][timestep][x,y]
+ * @param segmentIndex - Current segment index (0-based)
+ * @param segmentProgress - Progress within current segment (0-1)
+ * @param options - Styling options
+ */
+function drawPartialTrajectories(
+  ctx: CanvasRenderingContext2D,
+  trajectories: number[][][],
+  segmentIndex: number,
+  segmentProgress: number,
+  options: ProgressiveAnimationOptions
+): void {
+  const { strokeWidth, pointRadius, color, opacity } = options;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = strokeWidth;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalAlpha = opacity;
+
+  for (const points of trajectories) {
+    if (points.length < 2) continue;
+
+    // Draw completed segments (points 0 through segmentIndex)
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i <= segmentIndex && i < points.length; i++) {
+      ctx.lineTo(points[i][0], points[i][1]);
+    }
+
+    // Interpolate current segment if not yet at final point
+    let endX: number, endY: number;
+    if (segmentIndex < points.length - 1) {
+      const [x1, y1] = points[segmentIndex];
+      const [x2, y2] = points[segmentIndex + 1];
+      endX = x1 + (x2 - x1) * segmentProgress;
+      endY = y1 + (y2 - y1) * segmentProgress;
+      ctx.lineTo(endX, endY);
+    } else {
+      // At or past final point
+      [endX, endY] = points[points.length - 1];
+    }
+    ctx.stroke();
+
+    // Draw endpoint marker at interpolated position
+    ctx.beginPath();
+    ctx.arc(endX, endY, pointRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * Creates a self-contained progressive animation for trajectories.
+ * Encapsulates all animation state internally and returns a controller.
+ * @param ctx - Canvas 2D rendering context
+ * @param trajectories - Array of trajectories in pixel coords: [trajectory][timestep][x,y]
+ * @param options - Animation timing and styling options
+ * @param drawBackground - Optional function called before each frame to clear/redraw background layers
+ * @returns AnimationController with start(), stop(), reset(), isRunning()
+ */
+export function progressivelyAnimateTrajectories(
+  ctx: CanvasRenderingContext2D,
+  trajectories: number[][][],
+  options: ProgressiveAnimationOptions,
+  drawBackground?: () => void
+): AnimationController {
+  // Internal state (encapsulated in closure)
+  let segmentIndex = 0;
+  let animationFrameId: number | null = null;
+  let lastAnimationTime: number | null = null;
+  let isPaused = false;
+  let pauseStartTime: number | null = null;
+
+  // Calculate max segments across all trajectories
+  const maxSegments = trajectories.length > 0
+    ? Math.max(...trajectories.map(t => t.length - 1))
+    : 0;
+
+  const {
+    segmentDuration,
+    segmentPauseDuration,
+    endPauseDuration,
+    loop = true,
+    onEndPause
+  } = options;
+
+  function drawFrame(progress: number) {
+    // Clear and redraw background if provided
+    if (drawBackground) {
+      drawBackground();
+    }
+
+    // Draw partial trajectories with interpolation
+    drawPartialTrajectories(ctx, trajectories, segmentIndex, progress, options);
+  }
+
+  function animate(timestamp: number) {
+    if (lastAnimationTime === null) {
+      lastAnimationTime = timestamp;
+    }
+
+    // Handle pause state
+    if (isPaused) {
+      const pauseElapsed = timestamp - (pauseStartTime ?? timestamp);
+      // We're at the end if current segment is the last one (index maxSegments - 1)
+      const isEndPause = segmentIndex >= maxSegments - 1;
+      const pauseDuration = isEndPause ? endPauseDuration : segmentPauseDuration;
+
+      if (pauseElapsed >= pauseDuration) {
+        // Pause is ending - advance segment and continue to normal animation
+        isPaused = false;
+        pauseStartTime = null;
+        lastAnimationTime = timestamp;
+
+        if (isEndPause) {
+          // Finished the last segment
+          if (loop) {
+            segmentIndex = 0;
+          } else {
+            animationFrameId = null;
+            return;
+          }
+        } else {
+          // Advance to next segment
+          segmentIndex++;
+        }
+        // Fall through to normal animation below (don't draw at progress 1 with new segment)
+      } else {
+        // Still in pause - draw at full progress for current segment
+        if (isEndPause && onEndPause) {
+          drawFrame(1);
+          onEndPause();
+        } else {
+          drawFrame(1);
+        }
+        animationFrameId = requestAnimationFrame(animate);
+        return;
+      }
+    }
+
+    const elapsed = timestamp - lastAnimationTime;
+
+    // Calculate progress within current segment (0 to 1)
+    const segmentProgress = Math.min(elapsed / segmentDuration, 1);
+
+    // Draw current frame
+    drawFrame(segmentProgress);
+
+    // When segment completes, enter pause (don't advance segment yet)
+    if (segmentProgress >= 1) {
+      isPaused = true;
+      pauseStartTime = timestamp;
+    }
+
+    animationFrameId = requestAnimationFrame(animate);
+  }
+
+  return {
+    start: () => {
+      if (animationFrameId === null) {
+        animationFrameId = requestAnimationFrame(animate);
+      }
+    },
+    stop: () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+    },
+    reset: () => {
+      segmentIndex = 0;
+      lastAnimationTime = null;
+      isPaused = false;
+      pauseStartTime = null;
+    },
+    isRunning: () => animationFrameId !== null
+  };
+}
