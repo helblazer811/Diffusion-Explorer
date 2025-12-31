@@ -3,10 +3,8 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { base } from "$app/paths";
-  import { DoubleFigure } from "@diffusion-explorer/ui";
+  import { DoubleFigure, drawScatterPlot } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { drawScatterPlot } from "$lib/plotting/plotting";
   import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
@@ -435,9 +433,6 @@
           <span class="legend-text">Approximation ({currentSteps} {currentSteps === 1 ? 'step' : 'steps'})</span>
         </div>
       </div>
-      <p class="tap-instruction">
-        Tap <img src="{base}/icons/tap.svg" alt="tap" class="tap-icon" /> to select a new starting point.
-      </p>
     {/snippet}
   </DoubleFigure>
 {:else}
@@ -588,22 +583,6 @@
     font-size: 13px;
     color: #666;
     font-family: Helvetica, Arial, sans-serif;
-  }
-
-  .tap-instruction {
-    text-align: center;
-    font-size: 14px;
-    color: #666;
-    margin-top: 12px;
-    font-family: Helvetica, Arial, sans-serif;
-  }
-
-  .tap-icon {
-    width: 24px;
-    height: 24px;
-    vertical-align: middle;
-    margin: 0 2px;
-    filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);
   }
 
   .placeholder {

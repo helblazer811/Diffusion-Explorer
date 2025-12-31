@@ -3,10 +3,8 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import * as d3 from 'd3';
-  import { Figure, TimeSlider } from '@diffusion-explorer/ui';
+  import { Figure, TimeSlider, drawVectorField, drawTrajectoriesWithPreview } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
-  import { drawVectorField } from '$lib/plotting/VectorField';
-  import { drawTrajectoriesWithPreview } from '$lib/plotting/trajectories';
 
   // ===== PROPS =====
 
@@ -31,7 +29,7 @@
   export let numSteps = 63;
   export let trajectoryColor = settings.stylingSettings.trajectory.color;
   export let trajectoryWidth = settings.stylingSettings.trajectory.strokeWidth;
-  export let pointRadius = settings.stylingSettings.trajectory.pointRadius;
+  export let pointRadius = settings.stylingSettings.trajectory.endpointRadius;
 
   // Animation
   export let animationDuration = 6000;

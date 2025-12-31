@@ -153,8 +153,7 @@ export const settings = {
     trajectory: {
       color: '#f17720',           // Orange
       strokeWidth: 3,
-      pointRadius: 3,
-      endpointRadius: 6,          // Endpoint circle radius
+      endpointRadius: 3,          // Endpoint circle radius
       progressOpacity: 0.8,       // Animated paths
       previewOpacity: 0.0,        // Preview path opacity (0 = hidden)
       outline: {

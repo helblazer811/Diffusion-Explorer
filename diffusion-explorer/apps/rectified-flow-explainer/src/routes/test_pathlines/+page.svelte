@@ -1,14 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy, afterUpdate } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, generateSpatiallySpacedPathlines } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { drawScatterPlot } from "$lib/plotting/plotting";
   import * as sample from "$lib/flow_matching/sample";
   import * as train from "$lib/flow_matching/train";
   import { downloadJSON } from "$lib/flow_matching/utils";
   import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
-  import { generateSpatiallySpacedPathlines } from "$lib/plotting/pathlines";
 
   // ===== DATA =====
   let leftTrajectories: number[][][] = []; // [timestep][sample][dim]

@@ -1,11 +1,8 @@
 <script>
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawMathjaxOnCanvas, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
-  import { drawScatterPlot } from "$lib/plotting/plotting";
-  import { drawMathjaxOnCanvas } from "$lib/plotting/mathjax";
-  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
   import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   export let sourceDistributionSamples = [];
@@ -287,7 +284,7 @@
         strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
         color: settings.stylingSettings.trajectory.color,
         progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
-        pointRadius: settings.stylingSettings.trajectory.pointRadius,
+        pointRadius: settings.stylingSettings.trajectory.endpointRadius,
         showPreview: false,
         previewOpacity: 0,
       });
@@ -316,7 +313,7 @@
         const lastPoint = clickedTrajectory[endIdx - 1];
         ctx.fillStyle = settings.stylingSettings.trajectory.color;
         ctx.beginPath();
-        ctx.arc(lastPoint[0], lastPoint[1], settings.stylingSettings.trajectory.pointRadius, 0, Math.PI * 2);
+        ctx.arc(lastPoint[0], lastPoint[1], settings.stylingSettings.trajectory.endpointRadius, 0, Math.PI * 2);
         ctx.fill();
       }
 

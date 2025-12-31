@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { latexToSvg } from '$lib/plotting/mathjax';
+  import { latexToSvg } from '@diffusion-explorer/ui';
 
   let svgHtml = '';
 

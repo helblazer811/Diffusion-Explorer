@@ -11,6 +11,7 @@ export { default as DoubleFigure } from './components/DoubleFigure.svelte';
 
 // UI Controls
 export { default as PlayButton } from './components/PlayButton.svelte';
+export { default as Slider } from './components/Slider.svelte';
 export { default as TimeSlider } from './components/TimeSlider.svelte';
 export { default as TextToggleButton } from './components/TextToggleButton.svelte';
 
@@ -31,3 +32,12 @@ export {
   collectCitations,
   formatAuthors
 } from './citations';
+
+// Plotting utilities
+export * from './plotting/plotting';
+export * from './plotting/trajectories';
+export * from './plotting/contours';
+export * from './plotting/VectorField';
+export * from './plotting/mathjax';
+export * from './plotting/katex';
+export * from './plotting/pathlines';

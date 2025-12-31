@@ -1,11 +1,8 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { drawScatterPlot } from "$lib/plotting/plotting";
-  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
-  import { computeContours, plotContours } from "$lib/plotting/contours";
   import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
