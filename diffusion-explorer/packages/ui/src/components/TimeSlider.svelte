@@ -1,4 +1,6 @@
 <script>
+  import Slider from './Slider.svelte';
+
   // Props
   export let value = 0;
   export let isPlaying = false;
@@ -13,13 +15,7 @@
   export let dragEnabled = true;
   export let onTogglePlay = () => {};
   export let onInput = () => {};  // Called when user drags slider
-
-  // Dynamic background gradient based on current value
-  let sliderStyle;
-  $: {
-    const fillPercent = ((value - min) / (max - min)) * 100;
-    sliderStyle = `background: linear-gradient(to right, ${color} ${fillPercent}%, #d3d3d3 ${fillPercent}%)`;
-  }
+  export let hideSpacerOnMobile = false;
 
   function handleTogglePlay() {
     onTogglePlay();
@@ -30,7 +26,6 @@
   <div class="time-slider-inner">
     <button
       class="play-button"
-      style={showTicks ? '' : 'margin-top: 12px; margin-bottom: 12px;'}
       onclick={handleTogglePlay}
       aria-label={isPlaying ? 'Pause' : 'Play'}
       {disabled}
@@ -48,39 +43,28 @@
     </button>
 
     <div class="slider-wrapper">
-      <input
-        type="range"
+      <Slider
+        bind:value
         {min}
         {max}
         {step}
-        class="slider"
-        style="{sliderStyle}; --slider-color: {color};{dragEnabled ? '' : ' pointer-events: none;'}"
-        bind:value
         {disabled}
-        oninput={onInput}
+        {color}
+        {showTicks}
+        showLabel={showTimeLabel}
+        label={timeLabel}
+        {dragEnabled}
+        {onInput}
       />
-
-      {#if showTicks}
-        <div class="tick-container">
-          <div class="tick" style="left: 1%;"></div>
-          <div class="tick-label" style="left: 1%;">t=0</div>
-          {#if showTimeLabel}
-            <div class="time-label">{timeLabel}</div>
-          {/if}
-          <div class="tick" style="left: 99%;"></div>
-          <div class="tick-label" style="left: 99%;">t=1</div>
-        </div>
-      {:else if showTimeLabel}
-        <div class="time-label-standalone">{timeLabel}</div>
-      {/if}
     </div>
+
+    <div class="spacer" class:desktop-only={hideSpacerOnMobile}></div>
   </div>
 </div>
 
 <style>
   .time-slider-container {
     width: 100%;
-    padding: 5px 0;
     display: flex;
     justify-content: center;
   }
@@ -92,10 +76,9 @@
 
   .time-slider-inner {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     width: 100%;
-    max-width: 600px;
-    padding-right: 44px;
+    max-width: 644px;
   }
 
   .play-button {
@@ -103,6 +86,7 @@
     height: 32px;
     padding: 0;
     margin-right: 12px;
+    margin-top: 5px;
     background: none;
     border: none;
     cursor: pointer;
@@ -112,7 +96,6 @@
     opacity: 0.7;
     transition: opacity 0.2s;
     flex-shrink: 0;
-    align-self: flex-start;
   }
 
   .play-button:hover {
@@ -130,86 +113,21 @@
 
   .slider-wrapper {
     flex: 1;
-    position: relative;
-    padding-top: 4px;
   }
 
-  .slider {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 5px;
-    border-radius: 3px;
-    outline: none;
-    cursor: pointer;
-    line-height: 0;
-    padding: 0;
+  .spacer {
+    width: 32px;
+    margin-left: 12px;
+    flex-shrink: 0;
   }
 
-  .slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 10px;
-    height: 10px;
-    background: var(--slider-color, #4594e3);
-    border-radius: 50%;
-    cursor: pointer;
-  }
-
-  .slider::-moz-range-thumb {
-    width: 10px;
-    height: 10px;
-    background: var(--slider-color, #4594e3);
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-  }
-
-  .tick-container {
-    position: relative;
-    width: 100%;
-    height: 20px;
-    margin-top: 2px;
-  }
-
-  .tick {
-    position: absolute;
-    top: 0;
-    width: 2px;
-    height: 10px;
-    background-color: #7b7b7b;
-  }
-
-  .tick-label {
-    position: absolute;
-    top: 12px;
-    font-size: 16px;
-    transform: translateX(-50%);
-    font-family: Helvetica, sans-serif;
-    color: #7b7b7b;
-  }
-
-  .time-label {
-    position: absolute;
-    left: 50%;
-    top: 0;
-    transform: translateX(-50%);
-    font-size: 16px;
-    font-family: Helvetica, sans-serif;
-    color: #7b7b7b;
-  }
-
-  .time-label-standalone {
-    text-align: center;
-    font-size: 16px;
-    font-family: Helvetica, sans-serif;
-    color: #7b7b7b;
-    opacity: 0.6;
+  .desktop-only {
+    display: block;
   }
 
   @media (max-width: 600px) {
-    .time-slider-inner {
-      padding-right: 10px;
+    .desktop-only {
+      display: none;
     }
   }
 </style>

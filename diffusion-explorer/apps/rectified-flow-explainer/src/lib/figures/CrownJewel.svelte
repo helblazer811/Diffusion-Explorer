@@ -650,6 +650,7 @@
             showTicks={false}
             showTimeLabel={false}
             dragEnabled={false}
+            hideSpacerOnMobile={true}
           />
         </div>
         <div class="duration-label">Sampling Duration</div>
@@ -687,6 +688,7 @@
             showTicks={false}
             showTimeLabel={false}
             dragEnabled={false}
+            hideSpacerOnMobile={true}
           />
         </div>
         <div class="duration-label">Sampling Duration</div>

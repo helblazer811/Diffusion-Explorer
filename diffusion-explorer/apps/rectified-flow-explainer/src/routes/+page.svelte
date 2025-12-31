@@ -1399,6 +1399,11 @@
           shows the approximation using the selected number of steps. With curved
           paths, few-step approximations deviate significantly from the true path.
           With straight paths, even a single step can produce accurate results.
+          Tap <img
+            src="{base}/icons/tap.svg"
+            alt="tap"
+            style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+          /> to select a new starting point.
         </div>
       </EulerStepComparison>
     </div>
