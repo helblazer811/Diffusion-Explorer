@@ -5,7 +5,8 @@
   import { Figure } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales, dataToPixelX } from "$lib/d3_helpers";
-  import { drawScatterPlot, drawArrow, drawText } from "$lib/plotting/plotting";
+  import { drawScatterPlot, drawText } from "$lib/plotting/plotting";
+  import { drawArrow } from "$lib/plotting/VectorField";
   import { drawMathjaxOnCanvas } from "$lib/plotting/mathjax";
 
   // Caption slot (passed as default children)
