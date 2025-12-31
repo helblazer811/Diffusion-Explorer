@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy, afterUpdate } from "svelte";
   import * as d3 from "d3";
-  import DoubleFigure from "$lib/components/DoubleFigure.svelte";
-  import TimeSlider from "$lib/components/TimeSlider.svelte";
+  import { DoubleFigure, TimeSlider } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/plotting/plotting";
   import * as sample from "$lib/flow_matching/sample";

@@ -2,8 +2,7 @@
   import * as tf from '@tensorflow/tfjs';
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import DoubleFigure from '$lib/components/DoubleFigure.svelte';
-  import PlayButton from '$lib/components/PlayButton.svelte';
+  import { DoubleFigure, PlayButton } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
 
   // Layout props

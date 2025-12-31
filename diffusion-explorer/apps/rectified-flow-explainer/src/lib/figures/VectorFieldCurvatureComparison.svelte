@@ -3,8 +3,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import * as d3 from 'd3';
-  import DoubleFigure from '$lib/components/DoubleFigure.svelte';
-  import TimeSlider from '$lib/components/TimeSlider.svelte';
+  import { DoubleFigure, TimeSlider } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
   import { drawVectorField } from '$lib/plotting/plotting';
 

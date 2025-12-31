@@ -3,7 +3,7 @@
 <script>
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import DoubleFigure from '$lib/components/DoubleFigure.svelte';
+  import { DoubleFigure } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
   import { createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
 

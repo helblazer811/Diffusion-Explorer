@@ -1,16 +1,17 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import DoubleFigure from "$lib/components/DoubleFigure.svelte";
-  import TimeSlider from "$lib/components/TimeSlider.svelte";
+  import { DoubleFigure, TimeSlider } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/plotting/plotting";
+  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
+  import { computeContours, plotContours } from "$lib/plotting/contours";
   import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
 
   // Data
-  export let leftTrajectories = [];  // [timestep][sample][dim]
+  export let leftTrajectories = []; // [timestep][sample][dim]
   export let rightTrajectories = []; // [timestep][sample][dim]
   export let targetDistribution = [];
 
@@ -20,7 +21,7 @@
   export let marginWidth = 10;
   export let marginHeight = 10;
   export let gap = 20;
-  export let domainRange = { xMin: -1.9, xMax: 1.9, yMin: -1.9, yMax: 1.9 };
+  export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
 
   // Labels
   export let leftLabel = "Flow Matching";
@@ -38,15 +39,29 @@
   export let targetColor = "#3b82f6";
   export let targetOpacity = 0.35;
   export let targetPointRadius = 5;
+  export let showTargetScatter = true;   // On by default
+  export let showTargetContour = false;  // Off by default
 
   // Trajectory styling
   export let trajectoryColor = settings.stylingSettings.trajectory.color;
-  export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-  export let trajectoryPointRadius = settings.stylingSettings.trajectory.pointRadius;
-  export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
-  export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
-  export let showTrajectoryPreview = false;
-  export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory visible with fade
+  export let trajectoryStrokeWidth =
+    settings.stylingSettings.trajectory.strokeWidth;
+  export let trajectoryPointRadius =
+    settings.stylingSettings.trajectory.pointRadius;
+  export let trajectoryProgressOpacity =
+    settings.stylingSettings.trajectory.progressOpacity;
+  export let trajectoryPreviewOpacity =
+    settings.stylingSettings.trajectory.previewOpacity;
+
+  // Trajectory outline styling
+  export let trajectoryOutlineColor =
+    settings.stylingSettings.trajectory.outline.color;
+  export let trajectoryOutlineWidth =
+    settings.stylingSettings.trajectory.outline.width;
+  export let trajectoryOutlineOpacity =
+    settings.stylingSettings.trajectory.outline.opacity;
+  export let showTrajectoryOutline =
+    settings.stylingSettings.trajectory.outline.enabled;
 
   // Animation
   export let leftAnimationDuration = 10000;
@@ -72,8 +87,14 @@
     targetDistribution?.length > 0;
   $: numTimeSteps = isDataValid ? leftTrajectories.length : 1;
   $: numSegments = numTimeSteps - 1;
-  $: leftMsPerSegment = numSegments > 0 ? leftAnimationDuration / numSegments : leftAnimationDuration;
-  $: rightMsPerSegment = numSegments > 0 ? rightAnimationDuration / numSegments : rightAnimationDuration;
+  $: leftMsPerSegment =
+    numSegments > 0
+      ? leftAnimationDuration / numSegments
+      : leftAnimationDuration;
+  $: rightMsPerSegment =
+    numSegments > 0
+      ? rightAnimationDuration / numSegments
+      : rightAnimationDuration;
 
   // ===== STATE =====
 
@@ -113,16 +134,17 @@
   let pathsInitialized = false;
 
   // Pre-computed pixel coordinates (scaled once upfront)
-  let scaledTargetDistribution = [];  // [point][x,y] in pixels - target distribution
-  let scaledLeftTrajectories = [];    // [trajectory][timestep][x,y] in pixels
-  let scaledRightTrajectories = [];   // [trajectory][timestep][x,y] in pixels
+  let scaledTargetDistribution = []; // [point][x,y] in pixels - target distribution
+  let scaledLeftTrajectories = []; // [trajectory][timestep][x,y] in pixels
+  let scaledRightTrajectories = []; // [trajectory][timestep][x,y] in pixels
+  let computedTargetContours = null; // Pre-computed contour data
 
   // Visibility
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
 
   // User-clicked trajectory state
-  let leftClickedTrajectory = null;   // [timestep][x,y] in pixels
+  let leftClickedTrajectory = null; // [timestep][x,y] in pixels
   let rightClickedTrajectory = null;
   let hasClickedTrajectory = false;
   let isStreamingTrajectory = false;
@@ -167,10 +189,11 @@
 
   // Transpose trajectories from [timestep][sample][dim] to [sample][timestep][x,y] and scale to pixels
   function transposeAndScale(trajectories) {
-    if (!xScale || !yScale || !trajectories || trajectories.length === 0) return [];
+    if (!xScale || !yScale || !trajectories || trajectories.length === 0)
+      return [];
     const numSamples = trajectories[0]?.length || 0;
     return Array.from({ length: numSamples }, (_, i) =>
-      trajectories.map(ts => [xScale(ts[i][0]), yScale(ts[i][1])])
+      trajectories.map((ts) => [xScale(ts[i][0]), yScale(ts[i][1])])
     );
   }
 
@@ -183,69 +206,99 @@
     scaledRightTrajectories = transposeAndScale(rightTrajectories);
 
     // Scale target distribution
-    scaledTargetDistribution = targetDistribution.map(p => [xScale(p[0]), yScale(p[1])]);
+    scaledTargetDistribution = targetDistribution.map((p) => [
+      xScale(p[0]),
+      yScale(p[1]),
+    ]);
+
+    // Pre-compute contours if needed
+    if (showTargetContour && targetDistribution.length > 0) {
+      computedTargetContours = computeContours(targetDistribution, {
+        bandwidth: settings.stylingSettings.contour.bandwidth,
+        thresholds: 8,  // More contour lines for CrownJewel
+        domain: [domainRange.xMin, domainRange.xMax, domainRange.yMin, domainRange.yMax]
+      });
+    } else {
+      computedTargetContours = null;
+    }
   }
 
-  // Draw scatter plot + trajectories (using pre-scaled pixel coordinates)
-  function draw(ctx, scaledTrajectories, segmentIndex, clickedTrajectory, time) {
+  // Build style object for trajectory drawing
+  function getTrajectoryStyle(opacity) {
+    return {
+      strokeWidth: trajectoryStrokeWidth,
+      color: trajectoryColor,
+      progressOpacity: opacity,
+      previewOpacity: trajectoryPreviewOpacity,
+      pointRadius: trajectoryPointRadius,
+      outline: showTrajectoryOutline
+        ? {
+            color: trajectoryOutlineColor,
+            width: trajectoryOutlineWidth,
+            opacity: trajectoryOutlineOpacity,
+          }
+        : undefined,
+    };
+  }
+
+  // Draw trajectories (clears and redraws each frame)
+  function draw(
+    ctx,
+    scaledTrajectories,
+    segmentIndex,
+    clickedTrajectory,
+    time
+  ) {
     if (!ctx) return;
 
-    // Clear previous frame
+    // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw target distribution as scatter (behind trajectories)
-    drawScatterPlot(ctx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
-
-    // Draw default trajectories (dimmed if user has clicked)
-    const defaultOpacity = hasClickedTrajectory ? dimmedTrajectoryOpacity : trajectoryProgressOpacity;
-    ctx.strokeStyle = trajectoryColor;
-    ctx.lineWidth = trajectoryStrokeWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.globalAlpha = defaultOpacity;
-
-    for (const trajectory of scaledTrajectories) {
-      const endIdx = Math.min(segmentIndex + 1, trajectory.length);
-      if (endIdx < 2) continue;
-
-      ctx.beginPath();
-      ctx.moveTo(trajectory[0][0], trajectory[0][1]);
-      for (let i = 1; i < endIdx; i++) {
-        ctx.lineTo(trajectory[i][0], trajectory[i][1]);
-      }
-      ctx.stroke();
-
-      // Draw endpoint
-      const lastPoint = trajectory[endIdx - 1];
-      ctx.fillStyle = trajectoryColor;
-      ctx.beginPath();
-      ctx.arc(lastPoint[0], lastPoint[1], trajectoryPointRadius, 0, Math.PI * 2);
-      ctx.fill();
+    // Draw target distribution (behind trajectories)
+    // Draw contour plot if enabled
+    if (showTargetContour && computedTargetContours) {
+      plotContours(ctx, computedTargetContours, {
+        fillColor: targetColor,
+        fill: true,
+        stroke: false,
+        opacity: 0.15,  // Lower opacity for CrownJewel contours
+        xScale,
+        yScale
+      });
     }
 
-    // Draw clicked trajectory (highlighted) - sync with time proportion
-    if (clickedTrajectory && clickedTrajectory.length > 0) {
-      ctx.globalAlpha = highlightedTrajectoryOpacity;
-      ctx.lineWidth = trajectoryStrokeWidth;
-      // Calculate segment index based on time (0-1) to sync with animation
+    // Draw scatter plot if enabled
+    if (showTargetScatter) {
+      drawScatterPlot(
+        ctx,
+        scaledTargetDistribution,
+        targetPointRadius,
+        targetColor,
+        targetOpacity
+      );
+    }
+
+    // Draw default trajectories
+    const defaultOpacity = hasClickedTrajectory
+      ? dimmedTrajectoryOpacity
+      : trajectoryProgressOpacity;
+    drawTrajectoriesWithPreview(
+      ctx,
+      scaledTrajectories,
+      segmentIndex,
+      getTrajectoryStyle(defaultOpacity)
+    );
+
+    // Draw clicked trajectory (highlighted) on top
+    if (clickedTrajectory && clickedTrajectory.length > 1) {
       const clickedNumSegments = clickedTrajectory.length - 1;
       const clickedSegmentIndex = Math.floor(time * clickedNumSegments);
-      const endIdx = Math.min(clickedSegmentIndex + 1, clickedTrajectory.length);
-      if (endIdx >= 2) {
-        ctx.beginPath();
-        ctx.moveTo(clickedTrajectory[0][0], clickedTrajectory[0][1]);
-        for (let i = 1; i < endIdx; i++) {
-          ctx.lineTo(clickedTrajectory[i][0], clickedTrajectory[i][1]);
-        }
-        ctx.stroke();
-
-        // Draw endpoint
-        const lastPoint = clickedTrajectory[endIdx - 1];
-        ctx.fillStyle = trajectoryColor;
-        ctx.beginPath();
-        ctx.arc(lastPoint[0], lastPoint[1], trajectoryPointRadius, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      drawTrajectoriesWithPreview(
+        ctx,
+        [clickedTrajectory],
+        clickedSegmentIndex,
+        getTrajectoryStyle(highlightedTrajectoryOpacity)
+      );
     }
 
     ctx.globalAlpha = 1.0;
@@ -266,12 +319,24 @@
 
   function updateLeftVisualization() {
     if (!isDataValid || !leftCtx) return;
-    draw(leftCtx, scaledLeftTrajectories, leftCurrentSegmentIndex, leftClickedTrajectory, leftTime);
+    draw(
+      leftCtx,
+      scaledLeftTrajectories,
+      leftCurrentSegmentIndex,
+      leftClickedTrajectory,
+      leftTime
+    );
   }
 
   function updateRightVisualization() {
     if (!isDataValid || !rightCtx) return;
-    draw(rightCtx, scaledRightTrajectories, rightCurrentSegmentIndex, rightClickedTrajectory, rightTime);
+    draw(
+      rightCtx,
+      scaledRightTrajectories,
+      rightCurrentSegmentIndex,
+      rightClickedTrajectory,
+      rightTime
+    );
   }
 
   // Synchronized restart check (called from both animate functions)
@@ -316,7 +381,10 @@
     }
 
     leftSegmentAccumulator += elapsed;
-    while (leftSegmentAccumulator >= leftMsPerSegment && leftCurrentSegmentIndex < numSegments) {
+    while (
+      leftSegmentAccumulator >= leftMsPerSegment &&
+      leftCurrentSegmentIndex < numSegments
+    ) {
       leftSegmentAccumulator -= leftMsPerSegment;
       leftCurrentSegmentIndex += 1;
     }
@@ -373,7 +441,10 @@
     }
 
     rightSegmentAccumulator += elapsed;
-    while (rightSegmentAccumulator >= rightMsPerSegment && rightCurrentSegmentIndex < numSegments) {
+    while (
+      rightSegmentAccumulator >= rightMsPerSegment &&
+      rightCurrentSegmentIndex < numSegments
+    ) {
       rightSegmentAccumulator -= rightMsPerSegment;
       rightCurrentSegmentIndex += 1;
     }
@@ -415,9 +486,14 @@
   function handleCanvasClick(event, side) {
     // Ignore clicks while sampling is in progress
     if (isStreamingTrajectory) return;
-    if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath || !settings.rectifiedFlowModelPath) return;
+    if (
+      !settings.samplingWorkerUrl ||
+      !settings.flowMatchingModelPath ||
+      !settings.rectifiedFlowModelPath
+    )
+      return;
 
-    const canvas = side === 'left' ? leftCanvas : rightCanvas;
+    const canvas = side === "left" ? leftCanvas : rightCanvas;
     const rect = canvas.getBoundingClientRect();
 
     // Get click position in CSS pixels (account for canvas scaling)
@@ -471,7 +547,7 @@
     callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.flowMatchingModelPath,
-      'Flow Matching',
+      "Flow Matching",
       settings.trainingSettings.modelConfig,
       [point],
       numTimeSteps,
@@ -489,7 +565,7 @@
     callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.rectifiedFlowModelPath,
-      'Flow Matching',
+      "Flow Matching",
       settings.trainingSettings.modelConfig,
       [point],
       numTimeSteps,
@@ -510,10 +586,12 @@
     initializeVisualization();
   }
 
-  $: if (isPlaying && pathsInitialized && !leftAnimationFrameId) startLeftAnimation();
+  $: if (isPlaying && pathsInitialized && !leftAnimationFrameId)
+    startLeftAnimation();
   $: if (!isPlaying && leftAnimationFrameId) stopLeftAnimation();
 
-  $: if (isPlaying && pathsInitialized && !rightAnimationFrameId) startRightAnimation();
+  $: if (isPlaying && pathsInitialized && !rightAnimationFrameId)
+    startRightAnimation();
   $: if (!isPlaying && rightAnimationFrameId) stopRightAnimation();
 
   // Handle visibility changes (pause when off-screen, resume when back)
@@ -538,25 +616,36 @@
 </script>
 
 {#if isDataValid}
-  <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+  <DoubleFigure
+    {gap}
+    {caption}
+    {backgroundVisible}
+    bind:isActive={figureIsActive}
+  >
     {#snippet left()}
       <div class="panel-container" style="max-width: {canvasWidth}px;">
-        <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor};">
+        <div
+          class="panel-label"
+          style="font-size: {labelFontSize}px; color: {labelColor};"
+        >
           {leftLabel}
         </div>
-        <div class="panel-subtitle" style="font-size: {subtitleFontSize}px; color: {subtitleColor};">
+        <div
+          class="panel-subtitle"
+          style="font-size: {subtitleFontSize}px; color: {subtitleColor};"
+        >
           {leftSubtitle}
         </div>
         <canvas
           bind:this={leftCanvas}
           class="panel-canvas"
-          onclick={(e) => handleCanvasClick(e, 'left')}
+          onclick={(e) => handleCanvasClick(e, "left")}
           style="cursor: pointer;"
         ></canvas>
         <div class="slider-wrapper">
           <TimeSlider
             bind:value={leftTime}
-            isPlaying={isPlaying}
+            {isPlaying}
             min={0}
             max={1}
             onTogglePlay={togglePlayPause}
@@ -572,22 +661,28 @@
 
     {#snippet right()}
       <div class="panel-container" style="max-width: {canvasWidth}px;">
-        <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor};">
+        <div
+          class="panel-label"
+          style="font-size: {labelFontSize}px; color: {labelColor};"
+        >
           {rightLabel}
         </div>
-        <div class="panel-subtitle" style="font-size: {subtitleFontSize}px; color: {subtitleColor};">
+        <div
+          class="panel-subtitle"
+          style="font-size: {subtitleFontSize}px; color: {subtitleColor};"
+        >
           {rightSubtitle}
         </div>
         <canvas
           bind:this={rightCanvas}
           class="panel-canvas"
-          onclick={(e) => handleCanvasClick(e, 'right')}
+          onclick={(e) => handleCanvasClick(e, "right")}
           style="cursor: pointer;"
         ></canvas>
         <div class="slider-wrapper">
           <TimeSlider
             bind:value={rightTime}
-            isPlaying={isPlaying}
+            {isPlaying}
             min={0}
             max={1}
             onTogglePlay={togglePlayPause}

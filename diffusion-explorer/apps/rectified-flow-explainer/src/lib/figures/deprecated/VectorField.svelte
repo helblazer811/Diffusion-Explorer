@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import * as d3 from 'd3';
-  import Figure from '$lib/components/Figure.svelte';
-  import PlayButton from '$lib/components/PlayButton.svelte';
+  import { Figure, PlayButton } from '@diffusion-explorer/ui';
 
   // Data props
   export let vectorFieldData: {

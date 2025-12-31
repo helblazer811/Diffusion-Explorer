@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import Figure from "$lib/components/Figure.svelte";
+  import { Figure } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
   import { drawScatterPlot, drawArrow } from "$lib/plotting/plotting";

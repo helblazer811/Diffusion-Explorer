@@ -1,9 +1,7 @@
 <!-- Displays the Reflow algorithm pseudocode -->
 
 <script>
-  import Algorithm from '$lib/components/Algorithm.svelte';
-  import Line from '$lib/components/AlgorithmLine.svelte';
-  import { Katex } from '@diffusion-explorer/ui';
+  import { Algorithm, AlgorithmLine as Line, Katex } from '@diffusion-explorer/ui';
 
   // Caption slot (passed as default children)
   export let children = undefined;
