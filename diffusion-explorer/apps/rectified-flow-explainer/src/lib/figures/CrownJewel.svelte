@@ -214,6 +214,13 @@
         ctx.lineTo(trajectory[i][0], trajectory[i][1]);
       }
       ctx.stroke();
+
+      // Draw endpoint
+      const lastPoint = trajectory[endIdx - 1];
+      ctx.fillStyle = trajectoryColor;
+      ctx.beginPath();
+      ctx.arc(lastPoint[0], lastPoint[1], trajectoryPointRadius, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // Draw clicked trajectory (highlighted) - sync with time proportion
@@ -231,6 +238,13 @@
           ctx.lineTo(clickedTrajectory[i][0], clickedTrajectory[i][1]);
         }
         ctx.stroke();
+
+        // Draw endpoint
+        const lastPoint = clickedTrajectory[endIdx - 1];
+        ctx.fillStyle = trajectoryColor;
+        ctx.beginPath();
+        ctx.arc(lastPoint[0], lastPoint[1], trajectoryPointRadius, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
 
