@@ -5,6 +5,8 @@
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/plotting/plotting";
+  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
+  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
 
@@ -86,6 +88,11 @@
   let scaledTargetDistribution = [];
   let scaledTrajectories = [];
 
+  // Clicked trajectory state
+  let clickedTrajectory = [];           // [[x,y], ...] in pixel coords
+  let hasClickedTrajectory = false;
+  let isStreamingTrajectory = false;
+
   // ===== FUNCTIONS =====
 
   function initializeScales() {
@@ -129,6 +136,59 @@
     scaledTrajectories = transposeAndScale(trajectories);
   }
 
+  // Handle canvas click - convert to domain coordinates and sample
+  function handleCanvasClick(event) {
+    // Ignore clicks while sampling is in progress
+    if (isStreamingTrajectory) return;
+    if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvasWidth / rect.width;
+    const scaleY = canvasHeight / rect.height;
+    const clickX = (event.clientX - rect.left) * scaleX;
+    const clickY = (event.clientY - rect.top) * scaleY;
+
+    // Convert to domain coordinates using scale.invert()
+    const domainX = xScale.invert(clickX);
+    const domainY = yScale.invert(clickY);
+
+    sampleFromPoint([domainX, domainY]);
+  }
+
+  // Sample trajectory from a specific point using streaming
+  function sampleFromPoint(point) {
+    hasClickedTrajectory = true;
+    isStreamingTrajectory = true;
+
+    // Initialize trajectory with the initial click point (scaled to pixels)
+    const initialPixelPoint = [xScale(point[0]), yScale(point[1])];
+    clickedTrajectory = [initialPixelPoint];
+
+    // Reset and start animation
+    currentSegmentIndex = 0;
+    segmentAccumulator = 0;
+    time = 0;
+    isPlaying = true;
+
+    // Sample using streaming - use same number of steps as passed-in trajectories
+    callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      [point],
+      numTimeSteps, // match passed-in trajectory steps
+      () => { isStreamingTrajectory = false; }, // onComplete
+      settings.trainingSettings.domainRange,
+      {},
+      // onStep callback - append each new point as it arrives
+      (_step, x_t) => {
+        const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
+        clickedTrajectory = [...clickedTrajectory, newPoint];
+      }
+    );
+  }
+
   function draw() {
     if (!ctx) return;
 
@@ -137,12 +197,13 @@
     // Draw target distribution
     drawScatterPlot(ctx, scaledTargetDistribution, distributionPointRadius, targetColor, targetOpacity);
 
-    // Draw trajectories as simple lines up to currentSegmentIndex
+    // Draw default trajectories (dimmed if user has clicked)
+    const defaultOpacity = hasClickedTrajectory ? 0.15 : trajectoryProgressOpacity;
     ctx.strokeStyle = trajectoryColor;
     ctx.lineWidth = trajectoryStrokeWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.globalAlpha = trajectoryProgressOpacity;
+    ctx.globalAlpha = defaultOpacity;
 
     for (const trajectory of scaledTrajectories) {
       const endIdx = Math.min(currentSegmentIndex + 1, trajectory.length);
@@ -157,6 +218,20 @@
     }
 
     ctx.globalAlpha = 1.0;
+
+    // Draw clicked trajectory (highlighted) - no preview, no point at end
+    if (hasClickedTrajectory && clickedTrajectory.length > 1) {
+      const clickedNumPoints = clickedTrajectory.length;
+      const clickedSegmentIndex = Math.min(currentSegmentIndex, clickedNumPoints - 2);
+
+      drawTrajectoriesWithPreview(ctx, [clickedTrajectory], clickedSegmentIndex, {
+        strokeWidth: trajectoryStrokeWidth,
+        color: trajectoryColor,
+        progressOpacity: 1.0,
+        pointRadius: 0, // no point at end
+        showPreview: false
+      });
+    }
   }
 
   function initializeVisualization() {
@@ -282,7 +357,8 @@
       <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
         <canvas
           bind:this={canvas}
-          style="width: 100%; height: auto; max-width: {canvasWidth}px; aspect-ratio: {canvasWidth}/{canvasHeight};"
+          onclick={handleCanvasClick}
+          style="cursor: pointer; width: 100%; height: auto; max-width: {canvasWidth}px; aspect-ratio: {canvasWidth}/{canvasHeight};"
         ></canvas>
         <TimeSlider
           bind:value={time}

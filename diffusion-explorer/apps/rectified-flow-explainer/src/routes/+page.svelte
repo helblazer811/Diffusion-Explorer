@@ -118,8 +118,7 @@
   }
 
   async function loadCachedRectifiedFlowTrajectories(path: string) {
-    const result =
-      await sample.loadCachedRectifiedFlowTrajectories(path);
+    const result = await sample.loadCachedRectifiedFlowTrajectories(path);
     if (result) {
       rectifiedFlowData.set(result);
       return true;
@@ -133,8 +132,7 @@
   ) {
     if (isRectifiedFlow) {
       // Rectified flow grid is stored in RectifiedFlowData format: { allRectifiedTrajectories, modelPath }
-      const rfResult =
-        await sample.loadCachedRectifiedFlowTrajectories(path);
+      const rfResult = await sample.loadCachedRectifiedFlowTrajectories(path);
       if (rfResult) {
         rectifiedFlowGridTrajectories.set(rfResult.allRectifiedTrajectories);
         return true;
@@ -549,20 +547,26 @@
     backgroundVisible={false}
     onInitialized={() => {
       showOtherFigures = true;
-      console.log(
-        "CrownJewel initialized, showing other figures."
-      );
+      console.log("CrownJewel initialized, showing other figures.");
     }}
   >
     <div class="caption">
       <span class="figure-number">Figure 1:</span>
       <strong>
-        A rectified flow model learns straighter <span style="color: #f17720;">sampling paths</span> than a standard
-        flow matching model, enabling faster simulation.
-      </strong> Both models are trained to generate samples from the same <span style="color: #3b82f6;">target distribution</span>. The
-      rectified flow's straighter paths allow for accurate numerical integration with
-      fewer steps, reducing the computational cost of simulation and lowering latency.
-Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);" /> to generate a sample.
+        A rectified flow model learns straighter <span style="color: #f17720;"
+          >sampling paths</span
+        > than a standard flow matching model, enabling faster simulation.
+      </strong>
+      Both models are trained to generate samples from the same
+      <span style="color: #3b82f6;">target distribution</span>. The rectified
+      flow's straighter paths allow for accurate numerical integration with
+      fewer steps, reducing the computational cost of simulation and lowering
+      latency. Tap
+      <img
+        src="/icons/tap.svg"
+        alt="tap"
+        style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+      /> to generate a sample.
     </div>
   </CrownJewel>
 
@@ -570,7 +574,11 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
 
   <h1 id="introduction" class="section-heading">Introduction</h1>
   <p>
-    Flow-based generative models <HoverableReference id="rezende2016variationalinferencenormalizingflows" {bibEntries} {citations} />
+    Flow-based generative models <HoverableReference
+      id="rezende2016variationalinferencenormalizingflows"
+      {bibEntries}
+      {citations}
+    />
     have emerged as a powerful class of models for generating high-quality samples
     of complex data such as images and videos. These models leverage neural networks
     to transform random noise into complex data by applying a sequence of invertible
@@ -581,15 +589,15 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     iteratively refining it into a realistic sample, guided by patterns learned
     from training data.  -->
     The success of flow models is in part due to the introduction of flow matching
-    <HoverableReference id="lipman2022" {bibEntries} {citations} />, which enables the
-    training of flow models without computationally expensive simulation.
-    However, a practical barrier to deploying flow models at scale is the need
-    to run large neural networks—often with billions of parameters—many times to
-    generate high-quality samples. This incurs not just high computational cost
-    but also high latency; in some cases it can take minutes to generate a
-    single sample. Thus, there is a pressing need to develop methods for
-    accelerating flow-based models that minimize the number of necessary neural
-    network passes.
+    <HoverableReference id="lipman2022" {bibEntries} {citations} />, which
+    enables the training of flow models without computationally expensive
+    simulation. However, a practical barrier to deploying flow models at scale
+    is the need to run large neural networks—often with billions of
+    parameters—many times to generate high-quality samples. This incurs not just
+    high computational cost but also high latency; in some cases it can take
+    minutes to generate a single sample. Thus, there is a pressing need to
+    develop methods for accelerating flow-based models that minimize the number
+    of necessary neural network passes.
   </p>
   <p>
     A major culprit behind the high cost incurred when sampling from flow models
@@ -598,11 +606,19 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     we can gain an intuition about many of the important geometric properties of
     flows by visualizing them in low-dimensions. In fact, we can use the exact
     same algorithms used to train large-scale models to train simple 2D flows on
-    toy distributions and reproduce many phenomena of practical interest. In a related 
-    project we developed an <a href="https://github.com/helblazer811/Diffusion-Explorer">interactive web app</a> called Diffusion Explorer 
-    <HoverableReference id="helbling2025diffusionexplorerinteractiveexploration" {bibEntries} {citations} />
-    that allows users to experiment with training and sampling from flow and
-    diffusion models in 2D. 
+    toy distributions and reproduce many phenomena of practical interest. In a
+    related project we developed an <a
+      href="https://github.com/helblazer811/Diffusion-Explorer"
+      >interactive web app</a
+    >
+    called Diffusion Explorer
+    <HoverableReference
+      id="helbling2025diffusionexplorerinteractiveexploration"
+      {bibEntries}
+      {citations}
+    />
+    that allows users to experiment with training and sampling from flow and diffusion
+    models in 2D.
   </p>
   {#if showOtherFigures}
     <div id="figure-2">
@@ -615,8 +631,18 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
       >
         <div class="caption">
           <span class="figure-number">Figure 2:</span>
-          The <span style="color: #f17720;">curved trajectories</span> produced by
-          a model trained with flow matching.
+          <strong
+            >A flow matching model produces curved <span style="color: #f17720;"
+              >sampling trajectories.</span
+            ></strong
+          >
+          This figure visualizes the transformation of a random noise source distribution
+          to a simple smiley face target distribution over time. Tap
+          <img
+            src="/icons/tap.svg"
+            alt="tap"
+            style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+          /> to generate a sample.
         </div>
       </CurvedTrajectoryIntro>
     </div>
@@ -639,8 +665,8 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     We will discuss why trajectories generated by flow models have this geometry,
     why they are challenging to efficiently simulate, and how a simple approach called
     rectified flows
-    <HoverableReference id="liu2022" {bibEntries} {citations} /> can straighten out the trajectories
-    of flow models to enable faster sampling.
+    <HoverableReference id="liu2022" {bibEntries} {citations} /> can straighten out
+    the trajectories of flow models to enable faster sampling.
   </p>
 
   <!-- To sample from a flow model we model the
@@ -663,8 +689,12 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     produce curved trajectories and how rectified flows can help, we will first
     cover some necessary background on flow-based generative models and flow
     matching. Separately, a great introduction to this topic by some of the
-    original authors of flow matching can be found here <HoverableReference id="lipman2024flowmatchingguidecode" {bibEntries} {citations} />. If you already have some familiarity with flow-based generative
-    models and flow matching feel free to skip ahead to
+    original authors of flow matching can be found here <HoverableReference
+      id="lipman2024flowmatchingguidecode"
+      {bibEntries}
+      {citations}
+    />. If you already have some familiarity with flow-based generative models
+    and flow matching feel free to skip ahead to
     <a href="#the-problem" class="internal-link">The Problem</a>.
   </p>
 
@@ -760,7 +790,13 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
         <span class="figure-number">Figure 4:</span>
         A single <span style="color: #f17720;">sample trajectory</span>
         <Katex math={"\\psi_t(x)"} color="#f17720" /> showing how an individual point
-        moves from the source distribution to the target distribution.
+        <Katex math={"x"} color="#f17720" />
+        moves from the source distribution to the target distribution. Tap
+        <img
+          src="/icons/tap.svg"
+          alt="tap"
+          style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+        /> to generate a sample.
       </div>
     </HighlightTrajectory>
   {/if}
@@ -811,10 +847,10 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     <EulerCircularDemo backgroundVisible={false}>
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
-        Euler's method applied to a circular vector field. The
-        <span style="color: #3b82f6;">arrows</span> show the velocity field, and
-        the orange path shows the trajectory computed by taking discrete steps in
-        the direction of the velocity.
+        <strong> Euler's method applied to a circular vector field. </strong>
+        A <span style="color: #f17720;">trajectory</span> is shown for a single
+        sample that is integrated according to the
+        <span style="color: #3b82f6;">velocity field</span>.
       </div>
     </EulerCircularDemo>
   {/if}
@@ -825,7 +861,11 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     generative models, we can discuss flow matching. I will only give a high
     level overview of some of the concepts relevant to rectifed flows. Please
     check out
-    <HoverableReference id="lipman2024flowmatchingguidecode" {bibEntries} {citations} />
+    <HoverableReference
+      id="lipman2024flowmatchingguidecode"
+      {bibEntries}
+      {citations}
+    />
     for a more thorough introduction.
   </p>
   <p>
@@ -934,13 +974,9 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     >
       <div class="caption">
         <span class="figure-number">Figure 7:</span>
-        The <span style="color: #f17720;">conditional velocity field</span>
-        <Katex
-          math={"v_t(x_t|x_1) = \\frac{x_1 - x_t}{1 - t}"}
-          color="#f17720"
-        />
-        points from an intermediate sample <Katex math={"x_t"} /> toward the target
-        <Katex math={"x_1"} />.
+        The conditional velocity field <Katex math={"v_t(x|x_1)"} /> for a specific
+        target point <Katex math={"x_1"} /> is a bunch of straight arrows pointing
+        from the source distribution to the target point.
       </div>
     </ConditionalVelocityField>
   {/if}
@@ -987,13 +1023,20 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     >
       <div class="caption">
         <span class="figure-number">Figure 8:</span>
-        The <span style="color: #22c55e;">learned velocity field</span>
-        <Katex math={"v_t^\\theta(x_t)"} color="#22c55e" /> approximates the
-        <span style="color: #f17720;">conditional velocity</span>
-        <Katex math={"v_t(x_t|x_1)"} color="#f17720" />. The dashed line shows
-        the
-        <span style="color: #ef4444;">error</span> between the true and predicted
-        velocities.
+        <strong>
+          Conditional flow matching trains a <span style="color: #22c55e;"
+            >learned velocity field</span
+          >
+          to match the
+          <span style="color: #f17720;">conditional velocity</span>
+          <Katex math={"v_t(x_t|x_1)"} color="#f17720" />.
+        </strong>
+        Because the learned velocity field is not conditioned on the target point
+        it must infer the likely destination using only the current location <Katex
+          math={"x_t"}
+        />. This leads to a certain amount of
+        <span style="color: #ef4444;">error</span>
+        between the true and predicted velocities, which flow matching minimizes.
       </div>
     </ConditionalFlowMatching>
   {/if}
@@ -1042,8 +1085,18 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     >
       <div class="caption">
         <span class="figure-number">Figure 9:</span>
-        <span style="color: #f17720;">Curved trajectories</span> with source and
-        target distributions superimposed.
+        <strong
+          >A flow matching model produces curved sampling <span
+            style="color: #f17720;">trajectories</span
+          >.</strong
+        >
+        This curvature is even more apparent when we superimpose the trajectories
+        and the <span style="color: #3b82f6;">target distribution</span>. Tap
+        <img
+          src="/icons/tap.svg"
+          alt="tap"
+          style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+        /> to generate a sample.
       </div>
     </CurvedTrajectorySuperimposed>
   </div>
@@ -1091,8 +1144,9 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     <strong
       >But why does our model learn these curved trajectories in the first
       place?</strong
-    > The answer has to do with how our source and target random variables are 
-    jointly distributed, a concept called a <em>coupling</em>.
+    >
+    The answer has to do with how our source and target random variables are jointly
+    distributed, a concept called a <em>coupling</em>.
   </p>
 
   <h2 id="problem-coupling">What is a Coupling?</h2>
@@ -1130,10 +1184,12 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
   <p>
     As mentioned above, our choice of independent coupling is the key culprit
     behind our curved trajectories. You can see in
-    <a href="#figure-11" class="internal-link">Figure 11</a> that the lines connecting
-    independently drawn source and target points cross each other a lot. These intersections 
-    lead to curved trajectories because they introduce branches in our paths that our 
-    learned velocity field <Katex math={"v_t^\\theta(x)"} /> can not resolve. 
+    <a href="#figure-11" class="internal-link">Figure 11</a> that the lines
+    connecting independently drawn source and target points cross each other a
+    lot. These intersections lead to curved trajectories because they introduce
+    branches in our paths that our learned velocity field <Katex
+      math={"v_t^\\theta(x)"}
+    /> can not resolve.
   </p>
 
   {#if showOtherFigures}
@@ -1242,8 +1298,8 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
     <ReflowAlgorithm backgroundVisible={true}>
       <div class="caption">
         <span class="figure-number">Algorithm 1:</span>
-        The Reflow procedure iteratively straightens trajectories by retraining
-        on the coupling induced by the previous model.
+        The Reflow procedure iteratively straightens trajectories by retraining on
+        the coupling induced by the previous model.
       </div>
     </ReflowAlgorithm>
   </div>
@@ -1280,7 +1336,8 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
   {#if showOtherFigures}
     <div id="figure-13">
       <InducedCouplingDouble
-        allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ?? []}
+        allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ??
+          []}
         targetDistribution={$targetDistributionSamples}
         backgroundVisible={false}
       >
@@ -1315,8 +1372,21 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
       >
         <div class="caption">
           <span class="figure-number">Figure 14:</span>
-          A rectified flow learns straighter paths. Left: Before rectification -
-          curved trajectories. Right: After rectification - straighter trajectories.
+          <strong>
+            A rectified flow model learns straighter <span
+              style="color: #f17720;">sampling paths</span
+            > than a standard flow matching model, enabling faster simulation.
+          </strong>
+          Both models are trained to generate samples from the same
+          <span style="color: #3b82f6;">target distribution</span>. The
+          rectified flow's straighter paths allow for accurate numerical
+          integration with fewer steps, reducing the computational cost of
+          simulation and lowering latency. Tap
+          <img
+            src="/icons/tap.svg"
+            alt="tap"
+            style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+          /> to generate a sample.
         </div>
       </RectifiedFlowSuperimposed>
     </div>
@@ -1338,9 +1408,9 @@ Tap <img src="/icons/tap.svg" alt="tap" style="width: 28px; height: 28px; vertic
       >
         <div class="caption">
           <span class="figure-number">Figure 15:</span>
-          Comparison of vector fields. Left: Flow matching produces velocity vectors
-          that vary significantly across time. Right: Rectified flow produces more
-          consistent velocity vectors throughout the trajectory.
+          The curvature of a flow matching model can be seen through its rapidly
+          changing vector field. In contrast, a rectified flow model learns a more
+          consistent vector field over time, indicating straighter trajectories.
         </div>
       </VectorFieldCurvatureComparison>
     </div>
