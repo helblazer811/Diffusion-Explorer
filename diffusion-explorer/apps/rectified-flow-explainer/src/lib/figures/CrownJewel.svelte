@@ -55,7 +55,6 @@
   export let playingByDefault = true;
 
   // Interactive sampling
-  export let samplingSteps = 200;
   export let highlightedTrajectoryOpacity = 1.0;
   export let dimmedTrajectoryOpacity = 0.15;
 
@@ -126,6 +125,8 @@
   let leftClickedTrajectory = null;   // [timestep][x,y] in pixels
   let rightClickedTrajectory = null;
   let hasClickedTrajectory = false;
+  let isStreamingTrajectory = false;
+  let streamingCompleteCount = 0;
 
   // ===== FUNCTIONS =====
 
@@ -398,6 +399,8 @@
 
   // Handle canvas click - convert to domain coordinates and sample
   function handleCanvasClick(event, side) {
+    // Ignore clicks while sampling is in progress
+    if (isStreamingTrajectory) return;
     if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath || !settings.rectifiedFlowModelPath) return;
 
     const canvas = side === 'left' ? leftCanvas : rightCanvas;
@@ -420,6 +423,8 @@
   // Sample trajectory from a specific point using both models (streaming)
   function sampleFromPoint(point) {
     hasClickedTrajectory = true;
+    isStreamingTrajectory = true;
+    streamingCompleteCount = 0;
 
     // Initialize trajectories with the initial click point (scaled to pixels)
     const initialPixelPoint = [xScale(point[0]), yScale(point[1])];
@@ -440,6 +445,14 @@
     rightLastTimestamp = null;
     isPlaying = true;
 
+    // Helper to check if both samples are complete
+    function checkComplete() {
+      streamingCompleteCount++;
+      if (streamingCompleteCount >= 2) {
+        isStreamingTrajectory = false;
+      }
+    }
+
     // Sample from left model (Flow Matching) with streaming
     callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
@@ -447,8 +460,8 @@
       'Flow Matching',
       settings.trainingSettings.modelConfig,
       [point],
-      samplingSteps,
-      () => {}, // onComplete - not used since we build trajectory via onStep
+      numTimeSteps,
+      checkComplete, // onComplete
       settings.trainingSettings.domainRange,
       {},
       // onStep callback - append each new point as it arrives
@@ -465,8 +478,8 @@
       'Flow Matching',
       settings.trainingSettings.modelConfig,
       [point],
-      samplingSteps,
-      () => {}, // onComplete - not used since we build trajectory via onStep
+      numTimeSteps,
+      checkComplete, // onComplete
       settings.trainingSettings.domainRange,
       {},
       // onStep callback - append each new point as it arrives

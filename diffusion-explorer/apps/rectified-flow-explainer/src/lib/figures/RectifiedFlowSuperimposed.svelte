@@ -5,6 +5,8 @@
   import TimeSlider from "$lib/components/TimeSlider.svelte";
   import { settings } from "$lib/settings";
   import { drawScatterPlot } from "$lib/plotting/plotting";
+  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
+  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
 
@@ -94,6 +96,13 @@
   let scaledLeftTrajectories = [];    // [trajectory][timestep][x,y] in pixels
   let scaledRightTrajectories = [];   // [trajectory][timestep][x,y] in pixels
 
+  // Clicked trajectory state (one per panel)
+  let leftClickedTrajectory = [];
+  let rightClickedTrajectory = [];
+  let hasClickedTrajectory = false;
+  let isStreamingTrajectory = false;
+  let streamingCompleteCount = 0;
+
   // Visibility
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
@@ -156,8 +165,91 @@
     scaledRightTrajectories = transposeAndScale(rightTrajectories);
   }
 
+  // Handle canvas click - convert to domain coordinates and sample
+  function handleCanvasClick(event, side) {
+    // Ignore clicks while sampling is in progress
+    if (isStreamingTrajectory) return;
+    if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath || !settings.rectifiedFlowModelPath) return;
+
+    const canvas = side === 'left' ? leftCanvas : rightCanvas;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvasWidth / rect.width;
+    const scaleY = canvasHeight / rect.height;
+    const clickX = (event.clientX - rect.left) * scaleX;
+    const clickY = (event.clientY - rect.top) * scaleY;
+
+    // Convert to domain coordinates using scale.invert()
+    const domainX = xScale.invert(clickX);
+    const domainY = yScale.invert(clickY);
+
+    // Trigger sampling for both panels from the same point
+    sampleFromPoint([domainX, domainY]);
+  }
+
+  // Sample trajectory from a specific point using both models (streaming)
+  function sampleFromPoint(point) {
+    hasClickedTrajectory = true;
+    isStreamingTrajectory = true;
+    streamingCompleteCount = 0;
+
+    // Initialize trajectories with the initial click point (scaled to pixels)
+    const initialPixelPoint = [xScale(point[0]), yScale(point[1])];
+    leftClickedTrajectory = [initialPixelPoint];
+    rightClickedTrajectory = [initialPixelPoint];
+
+    // Reset and start animation
+    currentSegmentIndex = 0;
+    segmentAccumulator = 0;
+    time = 0;
+    isPlaying = true;
+
+    // Helper to check if both samples are complete
+    function checkComplete() {
+      streamingCompleteCount++;
+      if (streamingCompleteCount >= 2) {
+        isStreamingTrajectory = false;
+      }
+    }
+
+    // Sample from left model (Flow Matching) with streaming
+    callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      [point],
+      numTimeSteps, // match passed-in trajectory steps
+      checkComplete, // onComplete
+      settings.trainingSettings.domainRange,
+      {},
+      // onStep callback - append each new point as it arrives
+      (_step, x_t) => {
+        const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
+        leftClickedTrajectory = [...leftClickedTrajectory, newPoint];
+      }
+    );
+
+    // Sample from right model (Rectified Flow) with streaming
+    callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.rectifiedFlowModelPath,
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      [point],
+      numTimeSteps, // match passed-in trajectory steps
+      checkComplete, // onComplete
+      settings.trainingSettings.domainRange,
+      {},
+      // onStep callback - append each new point as it arrives
+      (_step, x_t) => {
+        const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
+        rightClickedTrajectory = [...rightClickedTrajectory, newPoint];
+      }
+    );
+  }
+
   // Draw scatter plot + trajectories (using pre-scaled pixel coordinates)
-  function draw(ctx, scaledTrajectories, segmentIndex) {
+  function draw(ctx, scaledTrajectories, segmentIndex, clickedTrajectory) {
     if (!ctx) return;
 
     // Clear previous frame
@@ -166,12 +258,13 @@
     // Draw target distribution scatter (behind trajectories)
     drawScatterPlot(ctx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
 
-    // Draw trajectories as simple lines up to segmentIndex
+    // Draw default trajectories (dimmed if user has clicked)
+    const defaultOpacity = hasClickedTrajectory ? 0.15 : trajectoryProgressOpacity;
     ctx.strokeStyle = trajectoryColor;
     ctx.lineWidth = trajectoryStrokeWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.globalAlpha = trajectoryProgressOpacity;
+    ctx.globalAlpha = defaultOpacity;
 
     for (const trajectory of scaledTrajectories) {
       const endIdx = Math.min(segmentIndex + 1, trajectory.length);
@@ -186,6 +279,20 @@
     }
 
     ctx.globalAlpha = 1.0;
+
+    // Draw clicked trajectory (highlighted) - no preview, no dot at end
+    if (hasClickedTrajectory && clickedTrajectory && clickedTrajectory.length > 1) {
+      const clickedNumPoints = clickedTrajectory.length;
+      const clickedSegmentIndex = Math.min(segmentIndex, clickedNumPoints - 2);
+
+      drawTrajectoriesWithPreview(ctx, [clickedTrajectory], clickedSegmentIndex, {
+        strokeWidth: trajectoryStrokeWidth,
+        color: trajectoryColor,
+        progressOpacity: 1.0,
+        pointRadius: 0,
+        showPreview: false
+      });
+    }
   }
 
   function initializeVisualization() {
@@ -203,8 +310,8 @@
   function updateVisualization() {
     if (!isDataValid || !leftCtx || !rightCtx) return;
 
-    draw(leftCtx, scaledLeftTrajectories, currentSegmentIndex);
-    draw(rightCtx, scaledRightTrajectories, currentSegmentIndex);
+    draw(leftCtx, scaledLeftTrajectories, currentSegmentIndex, leftClickedTrajectory);
+    draw(rightCtx, scaledRightTrajectories, currentSegmentIndex, rightClickedTrajectory);
   }
 
   function animate(ts) {
@@ -327,7 +434,9 @@
         </div>
         <canvas
           bind:this={leftCanvas}
+          onclick={(e) => handleCanvasClick(e, 'left')}
           class="panel-canvas"
+          style="cursor: pointer;"
         ></canvas>
       </div>
     {/snippet}
@@ -339,7 +448,9 @@
         </div>
         <canvas
           bind:this={rightCanvas}
+          onclick={(e) => handleCanvasClick(e, 'right')}
           class="panel-canvas"
+          style="cursor: pointer;"
         ></canvas>
       </div>
     {/snippet}

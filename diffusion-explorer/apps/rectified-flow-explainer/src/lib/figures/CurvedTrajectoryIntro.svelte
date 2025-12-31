@@ -6,6 +6,7 @@
   import { createSourceTargetScales } from "$lib/d3_helpers";
   import { drawScatterPlot, drawText } from "$lib/plotting/plotting";
   import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
+  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
@@ -18,6 +19,13 @@
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let numTrajectoriesToShow = 10;
+  export let maxTrajectories = 30;
+
+  // In-progress clicked trajectory state
+  let clickedTrajectory = null; // [[x,y], ...] in pixel coordinates being built
+  let isStreamingTrajectory = false;
+  let mostRecentTrajectoryIndex = -1; // Index of the most recently added trajectory
+  let hasUserTapped = false; // Track if user has tapped at all
 
   // Caption slot (passed as default children)
   export let children = undefined;
@@ -50,7 +58,8 @@
   let combinedMeanX = 0;
 
   // Derived values
-  $: numSegments = allTimeSamples?.length - 1 || 0;
+  $: numTimeSteps = allTimeSamples?.length || 1;
+  $: numSegments = numTimeSteps - 1;
 
   // Pick trajectories (first N samples)
   function selectTrajectoryIndices() {
@@ -121,6 +130,93 @@
     ctx.scale(dpr, dpr);
   }
 
+  // Handle canvas click - restricted to source distribution region
+  function handleCanvasClick(event) {
+    // Ignore clicks while sampling is in progress
+    if (isStreamingTrajectory) return;
+    if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath) return;
+    if (!scales) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const clickX = (event.clientX - rect.left) * scaleX;
+    const clickY = (event.clientY - rect.top) * scaleY;
+
+    // Restrict to source distribution region (left half of canvas)
+    const sourceRegionMaxX = width * 0.5;
+    if (clickX > sourceRegionMaxX) return;
+
+    // Convert pixel to domain coordinates
+    // Inverse of: pixelX = sourceCenterPixelX + (dataX - sourceMeanX) * xScaleFactor
+    const domainX = scales.sourceMeanX + (clickX - scales.sourceCenterPixelX) / scales.xScaleFactor;
+    const domainY = scales.yScale.invert(clickY);
+
+    sampleFromPoint([domainX, domainY]);
+  }
+
+  // Sample from a clicked point using streaming
+  function sampleFromPoint(point) {
+    hasUserTapped = true;
+    isStreamingTrajectory = true;
+
+    // Initialize with click point scaled to t=0 position
+    const initialPixelX = getPixelX(point[0], combinedMeanX, 0);
+    const initialPixelY = scales.yScale(point[1]);
+    clickedTrajectory = [[initialPixelX, initialPixelY]];
+
+    // Reset and start animation
+    time = 0;
+    isPaused = false;
+    pauseStartTime = null;
+    lastTimestamp = null;
+    isPlaying = true;
+
+    // Sample with streaming
+    callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      [point],
+      numTimeSteps,
+      // onComplete - add trajectory to the pool
+      () => {
+        if (clickedTrajectory && clickedTrajectory.length > 1) {
+          // Add to transformed trajectories
+          transformedTrajectories = [...transformedTrajectories, clickedTrajectory];
+          mostRecentTrajectoryIndex = transformedTrajectories.length - 1;
+
+          // Remove random trajectory if over cap (but not the most recent one)
+          while (transformedTrajectories.length > maxTrajectories) {
+            // Pick random index excluding the most recent trajectory
+            let randomIdx;
+            do {
+              randomIdx = Math.floor(Math.random() * transformedTrajectories.length);
+            } while (randomIdx === mostRecentTrajectoryIndex);
+
+            transformedTrajectories = transformedTrajectories.filter((_, i) => i !== randomIdx);
+            // Adjust mostRecentTrajectoryIndex if needed
+            if (randomIdx < mostRecentTrajectoryIndex) {
+              mostRecentTrajectoryIndex--;
+            }
+          }
+        }
+        clickedTrajectory = null;
+        isStreamingTrajectory = false;
+      },
+      null,     // domainRange
+      {},       // options
+      // onStep - append each new point, transformed to pixel space
+      (step, x_t) => {
+        const t = (step + 1) / numTimeSteps;
+        const pixelX = getPixelX(x_t[0][0], combinedMeanX, t);
+        const pixelY = scales.yScale(x_t[0][1]);
+        clickedTrajectory = [...clickedTrajectory, [pixelX, pixelY]];
+      }
+    );
+  }
+
   // Initialize scales and pre-compute all data
   function initializeData() {
     scales = createSourceTargetScales(
@@ -178,15 +274,81 @@
     // Calculate current segment index from normalized time
     const segmentIndex = Math.floor(time * numSegments);
 
-    // Draw trajectories with preview
-    drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
-      strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
-      color: settings.stylingSettings.trajectory.color,
-      progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
-      pointRadius: settings.stylingSettings.trajectory.pointRadius,
-      showPreview: true,
-      previewOpacity: settings.stylingSettings.trajectory.fullOpacity,
-    });
+    // Opacity settings
+    const dimmedOpacity = settings.stylingSettings.trajectory.fullOpacity; // Lower opacity for older trajectories
+    const highlightedOpacity = settings.stylingSettings.trajectory.progressOpacity; // Higher opacity for most recent
+
+    // Before user taps: draw all trajectories with normal opacity
+    // After user taps: dim older trajectories, highlight most recent
+    if (!hasUserTapped) {
+      // No tap yet - draw all trajectories with normal opacity
+      drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
+        strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+        color: settings.stylingSettings.trajectory.color,
+        progressOpacity: highlightedOpacity,
+        pointRadius: settings.stylingSettings.trajectory.pointRadius,
+        showPreview: false,
+        previewOpacity: 0,
+      });
+    } else {
+      // User has tapped - draw older trajectories dimmed, most recent highlighted
+      const olderTrajectories = transformedTrajectories.filter((_, i) => i !== mostRecentTrajectoryIndex);
+      if (olderTrajectories.length > 0) {
+        drawTrajectoriesWithPreview(ctx, olderTrajectories, segmentIndex, {
+          strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+          color: settings.stylingSettings.trajectory.color,
+          progressOpacity: dimmedOpacity,
+          pointRadius: settings.stylingSettings.trajectory.pointRadius,
+          showPreview: false,
+          previewOpacity: 0,
+        });
+      }
+
+      // Draw most recent trajectory (highlighted, no preview)
+      if (mostRecentTrajectoryIndex >= 0 && mostRecentTrajectoryIndex < transformedTrajectories.length) {
+        const recentTrajectory = [transformedTrajectories[mostRecentTrajectoryIndex]];
+        drawTrajectoriesWithPreview(ctx, recentTrajectory, segmentIndex, {
+          strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+          color: settings.stylingSettings.trajectory.color,
+          progressOpacity: highlightedOpacity,
+          pointRadius: settings.stylingSettings.trajectory.pointRadius,
+          showPreview: false,
+          previewOpacity: 0,
+        });
+      }
+    }
+
+    // Draw in-progress clicked trajectory (highlighted, synced with animation time)
+    if (clickedTrajectory && clickedTrajectory.length > 1) {
+      ctx.strokeStyle = settings.stylingSettings.trajectory.color;
+      ctx.lineWidth = settings.stylingSettings.trajectory.strokeWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.globalAlpha = highlightedOpacity;
+
+      // Calculate how much of clicked trajectory to draw based on time
+      // Use numSegments for timing to sync with pre-computed trajectories
+      const targetSegmentIndex = Math.floor(time * numSegments);
+      const endIdx = Math.min(targetSegmentIndex + 1, clickedTrajectory.length);
+
+      if (endIdx >= 2) {
+        ctx.beginPath();
+        ctx.moveTo(clickedTrajectory[0][0], clickedTrajectory[0][1]);
+        for (let i = 1; i < endIdx; i++) {
+          ctx.lineTo(clickedTrajectory[i][0], clickedTrajectory[i][1]);
+        }
+        ctx.stroke();
+
+        // Draw point at current position
+        const lastPoint = clickedTrajectory[endIdx - 1];
+        ctx.fillStyle = settings.stylingSettings.trajectory.color;
+        ctx.beginPath();
+        ctx.arc(lastPoint[0], lastPoint[1], settings.stylingSettings.trajectory.pointRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1.0;
+    }
   }
 
   // Animation functions
@@ -291,7 +453,8 @@
     >
       <canvas
         bind:this={canvas}
-        style="width:100%;height:auto;max-width:{width}px;aspect-ratio:{width}/{height};"
+        onclick={handleCanvasClick}
+        style="cursor:pointer;width:100%;height:auto;max-width:{width}px;aspect-ratio:{width}/{height};"
       ></canvas>
       <TimeSlider
         bind:value={time}

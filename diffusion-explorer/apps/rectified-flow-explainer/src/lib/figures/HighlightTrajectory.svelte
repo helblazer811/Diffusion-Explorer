@@ -6,6 +6,8 @@
   import { createSourceTargetScales } from "$lib/d3_helpers";
   import { drawScatterPlot } from "$lib/plotting/plotting";
   import { drawMathjaxOnCanvas } from "$lib/plotting/mathjax";
+  import { drawTrajectoriesWithPreview } from "$lib/plotting/trajectories";
+  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
 
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
@@ -18,6 +20,11 @@
   export let marginWidth = 50;
   export let marginHeight = 20;
   export let numTrajectoriesToShow = 1;
+  export let samplingSteps = 200;
+
+  // In-progress clicked trajectory state
+  let clickedTrajectory = null; // [[x,y], ...] in pixel coordinates being built
+  let isStreamingTrajectory = false;
 
   // LaTeX label styling
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
@@ -134,6 +141,78 @@
     ctx.scale(dpr, dpr);
   }
 
+  // Handle canvas click - restricted to source distribution region
+  function handleCanvasClick(event) {
+    // Ignore clicks while sampling is in progress
+    if (isStreamingTrajectory) return;
+    if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath) return;
+    if (!scales) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const clickX = (event.clientX - rect.left) * scaleX;
+    const clickY = (event.clientY - rect.top) * scaleY;
+
+    // Restrict to source distribution region (left half of canvas)
+    const sourceRegionMaxX = width * 0.5;
+    if (clickX > sourceRegionMaxX) return;
+
+    // Convert pixel to domain coordinates
+    const domainX = scales.sourceMeanX + (clickX - scales.sourceCenterPixelX) / scales.xScaleFactor;
+    const domainY = scales.yScale.invert(clickY);
+
+    sampleFromPoint([domainX, domainY]);
+  }
+
+  // Sample from a clicked point using streaming
+  function sampleFromPoint(point) {
+    isStreamingTrajectory = true;
+
+    // Initialize with click point scaled to t=0 position
+    const initialPixelX = getPixelX(point[0], combinedMeanX, 0);
+    const initialPixelY = scales.yScale(point[1]);
+    clickedTrajectory = [[initialPixelX, initialPixelY]];
+
+    // Clear existing trajectories - will be replaced by user's trajectory
+    transformedTrajectories = [];
+
+    // Reset and start animation
+    time = 0;
+    isPaused = false;
+    pauseStartTime = null;
+    lastTimestamp = null;
+    isPlaying = true;
+
+    // Sample with streaming
+    callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      [point],
+      samplingSteps,
+      // onComplete - replace trajectory
+      () => {
+        if (clickedTrajectory && clickedTrajectory.length > 1) {
+          // Replace with user's trajectory
+          transformedTrajectories = [clickedTrajectory];
+        }
+        clickedTrajectory = null;
+        isStreamingTrajectory = false;
+      },
+      null,     // domainRange
+      {},       // options
+      // onStep - append each new point, transformed to pixel space
+      (step, x_t) => {
+        const t = (step + 1) / samplingSteps;
+        const pixelX = getPixelX(x_t[0][0], combinedMeanX, t);
+        const pixelY = scales.yScale(x_t[0][1]);
+        clickedTrajectory = [...clickedTrajectory, [pixelX, pixelY]];
+      }
+    );
+  }
+
   // Initialize scales and pre-compute data
   function initializeData() {
     scales = createSourceTargetScales(
@@ -176,49 +255,6 @@
     return traj[traj.length - 1];
   }
 
-  // Draw a trajectory with partial progress
-  function drawTrajectory(trajectoryIndex, progress) {
-    const traj = transformedTrajectories[trajectoryIndex];
-    const totalLength = trajectoryLengths[trajectoryIndex];
-    const targetLength = progress * totalLength;
-
-    // Draw full trajectory (faded)
-    ctx.beginPath();
-    ctx.moveTo(traj[0][0], traj[0][1]);
-    for (let i = 1; i < traj.length; i++) {
-      ctx.lineTo(traj[i][0], traj[i][1]);
-    }
-    ctx.strokeStyle = settings.stylingSettings.trajectory.color;
-    ctx.lineWidth = settings.stylingSettings.trajectory.strokeWidth;
-    ctx.globalAlpha = settings.stylingSettings.trajectory.fullOpacity;
-    ctx.stroke();
-
-    // Draw progress portion (solid)
-    ctx.beginPath();
-    ctx.moveTo(traj[0][0], traj[0][1]);
-    let accumulatedLength = 0;
-    for (let i = 1; i < traj.length; i++) {
-      const dx = traj[i][0] - traj[i - 1][0];
-      const dy = traj[i][1] - traj[i - 1][1];
-      const segmentLength = Math.sqrt(dx * dx + dy * dy);
-
-      if (accumulatedLength + segmentLength >= targetLength) {
-        const t = (targetLength - accumulatedLength) / segmentLength;
-        const endX = traj[i - 1][0] + t * dx;
-        const endY = traj[i - 1][1] + t * dy;
-        ctx.lineTo(endX, endY);
-        break;
-      }
-      ctx.lineTo(traj[i][0], traj[i][1]);
-      accumulatedLength += segmentLength;
-    }
-    ctx.globalAlpha = settings.stylingSettings.trajectory.progressOpacity;
-    ctx.stroke();
-
-    // Reset alpha
-    ctx.globalAlpha = 1;
-  }
-
   // Main draw function
   async function draw() {
     if (!ctx || !initialized) return;
@@ -243,27 +279,49 @@
       settings.stylingSettings.scatterPlot.opacity
     );
 
-    // Draw trajectories and markers
-    for (let idx = 0; idx < transformedTrajectories.length; idx++) {
-      // Draw trajectory path
-      drawTrajectory(idx, time);
+    // Draw the single trajectory (if exists)
+    if (transformedTrajectories.length > 0) {
+      const numTimesteps = transformedTrajectories[0].length;
+      const segmentIndex = Math.floor(time * (numTimesteps - 1));
 
-      // Get current marker position
-      const currentPoint = getPointAtProgress(idx, time);
+      drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
+        strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+        color: settings.stylingSettings.trajectory.color,
+        progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+        pointRadius: settings.stylingSettings.trajectory.pointRadius,
+        showPreview: false,
+        previewOpacity: 0,
+      });
+    }
 
-      // Draw marker
-      ctx.beginPath();
-      ctx.arc(
-        currentPoint[0],
-        currentPoint[1],
-        settings.stylingSettings.trajectory.pointRadius,
-        0,
-        2 * Math.PI
-      );
-      ctx.fillStyle = settings.stylingSettings.trajectory.color;
+    // Draw in-progress clicked trajectory
+    if (clickedTrajectory && clickedTrajectory.length > 1) {
+      ctx.strokeStyle = settings.stylingSettings.trajectory.color;
+      ctx.lineWidth = settings.stylingSettings.trajectory.strokeWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
       ctx.globalAlpha = settings.stylingSettings.trajectory.progressOpacity;
-      ctx.fill();
-      ctx.globalAlpha = 1;
+
+      const targetSegmentIndex = Math.floor(time * (samplingSteps - 1));
+      const endIdx = Math.min(targetSegmentIndex + 1, clickedTrajectory.length);
+
+      if (endIdx >= 2) {
+        ctx.beginPath();
+        ctx.moveTo(clickedTrajectory[0][0], clickedTrajectory[0][1]);
+        for (let i = 1; i < endIdx; i++) {
+          ctx.lineTo(clickedTrajectory[i][0], clickedTrajectory[i][1]);
+        }
+        ctx.stroke();
+
+        // Draw point at current position
+        const lastPoint = clickedTrajectory[endIdx - 1];
+        ctx.fillStyle = settings.stylingSettings.trajectory.color;
+        ctx.beginPath();
+        ctx.arc(lastPoint[0], lastPoint[1], settings.stylingSettings.trajectory.pointRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1.0;
     }
 
     // Draw LaTeX labels directly on canvas
@@ -404,7 +462,8 @@
       <div style="width:100%;max-width:{width}px;">
         <canvas
           bind:this={canvas}
-          style="width:100%;height:auto;aspect-ratio:{width}/{height};"
+          onclick={handleCanvasClick}
+          style="cursor:pointer;width:100%;height:auto;aspect-ratio:{width}/{height};"
         ></canvas>
       </div>
       <TimeSlider
