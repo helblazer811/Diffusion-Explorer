@@ -14,7 +14,7 @@
 
   // Create sampling clients
   const flowMatchingClient = new FlowModelClient(
-    settings.samplingWorkerUrl,
+    settings.flowModelWorkerUrl,
     settings.flowMatchingModelPath,
     "Flow Matching",
     settings.trainingSettings.modelConfig,
@@ -22,7 +22,7 @@
   );
 
   const rectifiedFlowClient = new FlowModelClient(
-    settings.samplingWorkerUrl,
+    settings.flowModelWorkerUrl,
     settings.rectifiedFlowModelPath,
     "Flow Matching",
     settings.trainingSettings.modelConfig,
@@ -72,8 +72,6 @@
   // Starting points (supports multiple)
   export let defaultStartPoints = [
     [-1.5, -0.2],
-    [1.2, 0.0],
-    [0.3, -0.7],
   ];
   export let startPointRadius = endpointRadius;
   export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
@@ -310,8 +308,9 @@
         flowMatchingTrajectories[currentSteps] = flowMatchingTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
-        // Recreate controllers to pick up new data
+        // Recreate controllers to pick up new data and start them
         createAnimationControllers();
+        startApproxAnimation();
       }
     );
     fmApproxRequestId = fmApproxResult.requestId;
@@ -329,7 +328,9 @@
         rectifiedFlowTrajectories[currentSteps] = rectifiedFlowTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
+        // Recreate controllers to pick up new data and start them
         createAnimationControllers();
+        startApproxAnimation();
       }
     );
     rfApproxRequestId = rfApproxResult.requestId;

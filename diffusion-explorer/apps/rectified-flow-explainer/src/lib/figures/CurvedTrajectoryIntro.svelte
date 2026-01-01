@@ -6,7 +6,7 @@
 
   // Create sampling client
   const flowMatchingClient = new FlowModelClient(
-    settings.samplingWorkerUrl,
+    settings.flowModelWorkerUrl,
     settings.flowMatchingModelPath,
     "Flow Matching",
     settings.trainingSettings.modelConfig
@@ -139,7 +139,7 @@
 
   // Handle canvas click - restricted to source distribution region
   function handleCanvasClick(event) {
-    if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath) return;
+    if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
     if (!scales) return;
 
     const rect = canvas.getBoundingClientRect();

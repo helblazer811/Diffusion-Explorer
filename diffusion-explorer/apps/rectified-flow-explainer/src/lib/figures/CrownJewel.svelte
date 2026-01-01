@@ -7,7 +7,7 @@
 
   // Create sampling clients
   const flowMatchingClient = new FlowModelClient(
-    settings.samplingWorkerUrl,
+    settings.flowModelWorkerUrl,
     settings.flowMatchingModelPath,
     "Flow Matching",
     settings.trainingSettings.modelConfig,
@@ -15,7 +15,7 @@
   );
 
   const rectifiedFlowClient = new FlowModelClient(
-    settings.samplingWorkerUrl,
+    settings.flowModelWorkerUrl,
     settings.rectifiedFlowModelPath,
     "Flow Matching",
     settings.trainingSettings.modelConfig,
@@ -513,7 +513,7 @@
   // Handle canvas click - convert to domain coordinates and sample
   function handleCanvasClick(event, side) {
     if (
-      !settings.samplingWorkerUrl ||
+      !settings.flowModelWorkerUrl ||
       !settings.flowMatchingModelPath ||
       !settings.rectifiedFlowModelPath
     )

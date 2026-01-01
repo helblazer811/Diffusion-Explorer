@@ -25210,6 +25210,70 @@ Functional.className = "Functional";
 serialization_exports.registerClass(Functional);
 
 // ../../node_modules/@tensorflow/tfjs-layers/dist/models.js
+async function loadLayersModel(pathOrIOHandler, options) {
+  if (options == null) {
+    options = {};
+  }
+  if (typeof pathOrIOHandler === "string") {
+    const handlers = io_exports.getLoadHandlers(pathOrIOHandler, options);
+    if (handlers.length === 0) {
+      handlers.push(io_exports.browserHTTPRequest(pathOrIOHandler, options));
+    } else if (handlers.length > 1) {
+      throw new ValueError(`Found more than one (${handlers.length}) load handlers for URL '${pathOrIOHandler}'`);
+    }
+    pathOrIOHandler = handlers[0];
+  }
+  return loadLayersModelFromIOHandler(pathOrIOHandler, void 0, options);
+}
+async function loadLayersModelFromIOHandler(handler, customObjects, options) {
+  if (options == null) {
+    options = {};
+  }
+  if (handler.load == null) {
+    throw new ValueError("Cannot proceed with model loading because the IOHandler provided does not have the `load` method implemented.");
+  }
+  const artifacts = await handler.load();
+  let modelTopology = artifacts.modelTopology;
+  if (modelTopology["model_config"] != null) {
+    modelTopology = modelTopology["model_config"];
+  }
+  const strict = options.strict == null ? true : options.strict;
+  const fastWeightInit = artifacts.weightData != null && artifacts.weightSpecs != null && strict;
+  const model2 = deserialize(convertPythonicToTs(modelTopology), customObjects, fastWeightInit);
+  const trainingConfig = artifacts.trainingConfig;
+  if (trainingConfig != null) {
+    model2.loadTrainingConfig(trainingConfig);
+  }
+  if (artifacts.userDefinedMetadata != null) {
+    model2.setUserDefinedMetadata(artifacts.userDefinedMetadata);
+  }
+  if (artifacts.weightData != null) {
+    if (artifacts.weightSpecs == null) {
+      throw new ValueError("LayersModel artifacts contains weight data, but not weight specs. Therefore loading of weights cannot proceed.");
+    }
+    const { modelWeights, optimizerWeights } = decodeModelAndOptimizerWeights(artifacts.weightData, artifacts.weightSpecs);
+    model2.loadWeights(modelWeights, strict);
+    if (model2.optimizer != null && optimizerWeights.length > 0) {
+      await model2.optimizer.setWeights(optimizerWeights);
+    }
+    dispose(modelWeights);
+    dispose(optimizerWeights.map((w) => w.tensor));
+  }
+  return model2;
+}
+function decodeModelAndOptimizerWeights(weightData, specs) {
+  const name2Tensor = io_exports.decodeWeights(weightData, specs);
+  const modelWeights = {};
+  const optimizerWeights = [];
+  specs.forEach((spec) => {
+    if (spec.group === "optimizer") {
+      optimizerWeights.push({ name: spec.name, tensor: name2Tensor[spec.name] });
+    } else {
+      modelWeights[spec.name] = name2Tensor[spec.name];
+    }
+  });
+  return { modelWeights, optimizerWeights };
+}
 var Sequential = class _Sequential extends LayersModel {
   constructor(args) {
     super({ inputs: [], outputs: [] });
@@ -61227,18 +61291,24 @@ var Model = class _Model {
 };
 
 // ../../packages/diffusion/src/utils.ts
-function sampleUniformGrid(gridResolution, domainRange) {
-  const width = domainRange.xMax - domainRange.xMin;
-  const height = domainRange.yMax - domainRange.yMin;
-  const xMin = domainRange.xMin + 0 * width;
-  const xMax = domainRange.xMax - 0 * width;
-  const yMin = domainRange.yMin + 0 * height;
-  const yMax = domainRange.yMax - 0 * height;
-  const x = linspace(xMin, xMax, gridResolution);
-  const y = linspace(yMin, yMax, gridResolution);
-  let initialPoints = stack(meshgrid(x, y), 2);
-  initialPoints = initialPoints.reshape([gridResolution * gridResolution, 2]);
-  return initialPoints;
+function generateUniformGridSamples(gridResolution, domainRange, asTensor = false) {
+  const { xMin, xMax, yMin, yMax } = domainRange;
+  if (asTensor) {
+    const x = linspace(xMin, xMax, gridResolution);
+    const y = linspace(yMin, yMax, gridResolution);
+    const points = stack(meshgrid(x, y), 2);
+    return points.reshape([gridResolution * gridResolution, 2]);
+  } else {
+    const samples = [];
+    for (let i = 0; i < gridResolution; i++) {
+      for (let j = 0; j < gridResolution; j++) {
+        const x = xMin + (xMax - xMin) * (i / (gridResolution - 1));
+        const y = yMin + (yMax - yMin) * (j / (gridResolution - 1));
+        samples.push([x, y]);
+      }
+    }
+    return samples;
+  }
 }
 
 // ../../packages/diffusion/src/schedulers.ts
@@ -61538,7 +61608,7 @@ var FlowModel = class extends Model {
   * @returns Promise<tf.Tensor3D | null> - null if cancelled
   */
   async sample_grid(gridResolution, domainRange, num_total_steps = 100, options = {}, perStepCallback, shouldStop = () => false) {
-    const initialPoints = sampleUniformGrid(gridResolution, domainRange);
+    const initialPoints = generateUniformGridSamples(gridResolution, domainRange, true);
     return this.sample_from_initial_points(initialPoints, num_total_steps, options, perStepCallback, shouldStop);
   }
   /**
@@ -61573,39 +61643,22 @@ var FlowModel = class extends Model {
   }
 };
 
-// ../../packages/diffusion/src/index.ts
-var samplingWorkerUrl = new URL("./workers/sampling.worker.ts", import.meta.url).href;
-var trainWorkerUrl = new URL("./workers/train.worker.ts", import.meta.url).href;
-
-// src/lib/flow_matching/workers/train.worker.ts
+// src/lib/flow_matching/workers/flow_model.worker.ts
 setWasmPaths("/tfjs-backend-wasm/");
 var backend2 = "webgl";
 var trainingObjectiveToModelClass = {
   "Flow Matching": FlowModel
-  // "Conditional Diffusion": ConditionalDiffusionModel,
 };
-async function loadDataset(path) {
-  return fetch(path).then((response) => response.json()).then((data) => {
-    const pointsTensor = tensor(data.points);
-    const classesTensor = data.classes ? tensor(data.classes) : null;
-    return { pointsTensor, classesTensor };
-  });
-}
-async function saveModel(model2, path) {
-  const modelSaveName = "indexeddb://" + path.replace(/\s+/g, "_") + "_" + Date.now();
-  await model2.save(modelSaveName);
-  return modelSaveName;
-}
-var trainingStopped = false;
+var activeRequests = /* @__PURE__ */ new Map();
 self.addEventListener("unhandledrejection", (event) => {
-  console.error("[Training Worker] Unhandled promise rejection:", event.reason);
+  console.error("[FlowModel Worker] Unhandled promise rejection:", event.reason);
   self.postMessage({
     type: "error",
-    message: `Unhandled rejection: ${event.reason?.message || String(event.reason)}`
+    error: `Unhandled rejection: ${event.reason?.message || String(event.reason)}`
   });
 });
 self.addEventListener("error", (event) => {
-  console.error("[Training Worker] Uncaught error:", {
+  console.error("[FlowModel Worker] Uncaught error:", {
     message: event.message,
     filename: event.filename,
     lineno: event.lineno,
@@ -61613,157 +61666,273 @@ self.addEventListener("error", (event) => {
   });
   self.postMessage({
     type: "error",
-    message: `Uncaught error: ${event.message} at ${event.filename}:${event.lineno}`
+    error: `Uncaught error: ${event.message} at ${event.filename}:${event.lineno}`
   });
 });
+async function loadDataset(path) {
+  const response = await fetch(path);
+  const data = await response.json();
+  const pointsTensor = tensor(data.points);
+  const classesTensor = data.classes ? tensor(data.classes) : null;
+  return { pointsTensor, classesTensor };
+}
+async function saveModel(model2, path) {
+  const modelSaveName = "indexeddb://" + path.replace(/\s+/g, "_") + "_" + Date.now();
+  await model2.save(modelSaveName);
+  return modelSaveName;
+}
+async function initializeBackend() {
+  if (backend2 === "webgl") {
+    await setBackend("webgl");
+    await ready();
+  } else if (backend2 === "wasm") {
+    await setBackend("wasm");
+    await ready();
+  } else {
+    throw new Error("Invalid backend specified");
+  }
+}
+async function handleSamplingRequest(requestId, type, data) {
+  const shouldStop = () => activeRequests.get(requestId)?.cancelled ?? false;
+  const modelJSONPath = data.modelJSONPath;
+  const trainingObjective = data.trainingObjective;
+  const modelConfig = data.modelConfig;
+  const numberOfSteps = data.numberOfSteps;
+  const timeValue = data.timeValue;
+  const options = data.options || {};
+  const streaming = data.streaming || false;
+  const perStepCallback = streaming ? (step5, x_t) => {
+    if (!shouldStop()) {
+      self.postMessage({ requestId, type: "step", step: step5, x_t });
+    }
+  } : void 0;
+  await initializeBackend();
+  const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+  const ourModel = ModelClass.fromConfig(modelConfig);
+  const tfModel = await loadLayersModel(modelJSONPath);
+  ourModel.setModel(tfModel);
+  let allSamples = null;
+  let guidanceData = null;
+  const samplingOptions = { ...options };
+  if (Array.isArray(samplingOptions.cond)) {
+    samplingOptions.cond = tensor(samplingOptions.cond, void 0, "int32");
+  }
+  if (type === "sample") {
+    const numSamples = data.numSamples;
+    allSamples = await ourModel.sample(
+      numSamples,
+      numberOfSteps,
+      samplingOptions,
+      perStepCallback,
+      shouldStop
+    );
+  } else if (type === "sample_from_initial_points") {
+    const initialPoints = data.initialPoints;
+    const initialPointsTensor = tensor(initialPoints);
+    allSamples = await ourModel.sample_from_initial_points(
+      initialPointsTensor,
+      numberOfSteps,
+      samplingOptions,
+      perStepCallback,
+      shouldStop
+    );
+  } else if (type === "sample_grid") {
+    const gridResolution = data.gridResolution;
+    const gridDomainRange = data.domainRange;
+    allSamples = await ourModel.sample_grid(
+      gridResolution,
+      gridDomainRange,
+      numberOfSteps,
+      samplingOptions,
+      perStepCallback,
+      shouldStop
+    );
+  } else if (type === "vector_field_grid") {
+    const gridResolution = data.gridResolution;
+    const gridDomainRange = data.domainRange;
+    const gridPoints = generateUniformGridSamples(gridResolution, gridDomainRange, true);
+    const numPoints = gridPoints.shape[0];
+    const t = fill([numPoints, 1], timeValue || 0.5);
+    const velocities = ourModel.forward(gridPoints, t);
+    const gridPointsArray = gridPoints.arraySync();
+    const velocitiesArray = velocities.arraySync();
+    gridPoints.dispose();
+    t.dispose();
+    velocities.dispose();
+    self.postMessage({
+      requestId,
+      type: "result",
+      velocities: velocitiesArray,
+      gridPoints: gridPointsArray
+    });
+    return;
+  }
+  if (shouldStop() || allSamples === null) {
+    console.log("[FlowModel Worker] Request cancelled:", requestId);
+    self.postMessage({ requestId, type: "cancelled" });
+    return;
+  }
+  const allSamplesArray = allSamples.arraySync();
+  allSamples.dispose();
+  const resultMessage = {
+    requestId,
+    type: "result",
+    allSamples: allSamplesArray
+  };
+  if (guidanceData) {
+    resultMessage.guidance = guidanceData;
+  }
+  console.log("[FlowModel Worker] Sending result:", { requestId, type: "result", timestamp: Date.now() });
+  self.postMessage(resultMessage);
+}
+async function handleTrainRequest(requestId, data) {
+  const shouldStop = () => activeRequests.get(requestId)?.cancelled ?? false;
+  const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
+  await initializeBackend();
+  const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+  const ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
+  const { pointsTensor, classesTensor } = await loadDataset(datasetPath);
+  if (trainingObjective === "Conditional Diffusion") {
+    if (classesTensor === null) {
+      throw new Error("Classes tensor is null for conditional diffusion model");
+    }
+    await ourModel.train(
+      pointsTensor,
+      classesTensor,
+      trainingConfig.epochs,
+      trainingConfig.batchSize,
+      trainingConfig.updateInterval,
+      shouldStop,
+      (epoch, intermediateSamples, loss) => {
+        self.postMessage({
+          requestId,
+          type: "epoch_chunk",
+          epoch,
+          intermediateSamples,
+          loss
+        });
+      }
+    );
+  } else {
+    await ourModel.train(
+      pointsTensor,
+      trainingConfig.epochs,
+      trainingConfig.batchSize,
+      trainingConfig.updateInterval,
+      shouldStop,
+      (epoch, intermediateSamples, loss) => {
+        self.postMessage({
+          requestId,
+          type: "epoch_chunk",
+          epoch,
+          intermediateSamples,
+          loss
+        });
+      }
+    );
+  }
+  const modelSaveName = await saveModel(ourModel.model, trainingObjective);
+  console.log("[FlowModel Worker] Training complete:", { requestId, timestamp: Date.now() });
+  self.postMessage({
+    requestId,
+    type: "result",
+    tfModelPath: modelSaveName
+  });
+}
+async function handleRectifiedTrainRequest(requestId, data) {
+  const shouldStop = () => activeRequests.get(requestId)?.cancelled ?? false;
+  const { trainingObjective, modelConfig, datasetPath, rectifiedConfig } = data;
+  await initializeBackend();
+  const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+  const ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
+  const { pointsTensor } = await loadDataset(datasetPath);
+  let sourceDistribution = null;
+  if (rectifiedConfig.sourceDistributionPath) {
+    const { pointsTensor: sourceTensor } = await loadDataset(rectifiedConfig.sourceDistributionPath);
+    sourceDistribution = sourceTensor;
+  }
+  const allRectifiedTrajectories = [];
+  await ourModel.train_rectified(
+    pointsTensor,
+    sourceDistribution,
+    rectifiedConfig.num_rectified_steps,
+    rectifiedConfig.epochs_per_rectified_step,
+    rectifiedConfig.batchSize,
+    rectifiedConfig.num_simulation_steps,
+    shouldStop,
+    (epoch, rectifiedStep, intermediateSamples, loss) => {
+      self.postMessage({
+        requestId,
+        type: "epoch_chunk",
+        epoch,
+        rectifiedStep,
+        intermediateSamples,
+        loss
+      });
+    },
+    (rectifiedStep, trajectories) => {
+      if (trajectories) {
+        allRectifiedTrajectories.push(trajectories);
+      }
+      self.postMessage({
+        requestId,
+        type: "rectified_step_complete",
+        rectifiedStep,
+        trajectories
+      });
+    }
+  );
+  const modelSaveName = await saveModel(ourModel.model, trainingObjective);
+  console.log("[FlowModel Worker] Rectified training complete:", { requestId, timestamp: Date.now() });
+  self.postMessage({
+    requestId,
+    type: "result",
+    tfModelPath: modelSaveName,
+    allRectifiedTrajectories
+  });
+}
 self.onmessage = async (e) => {
+  const { requestId, type, data } = e.data;
+  if (type === "stop" || type === "stop_training") {
+    const req = activeRequests.get(requestId);
+    if (req) {
+      req.cancelled = true;
+    }
+    console.log("[FlowModel Worker] Cancel requested:", requestId || "all");
+    self.postMessage({ requestId, type: "cancelled" });
+    return;
+  }
+  activeRequests.set(requestId, { cancelled: false });
   try {
-    const { type, data } = e.data;
-    console.log("[Training Worker] Received message:", { type, timestamp: Date.now() });
-    if (type === "train") {
-      const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
-      if (backend2 === "wasm") {
-        await setBackend("wasm");
-        await ready();
-      } else if (backend2 === "webgl") {
-        await setBackend("webgl");
-        await ready();
-      } else {
-        throw new Error("Invalid backend specified");
-      }
-      const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-      let ourModel;
-      const { pointsTensor, classesTensor } = await loadDataset(datasetPath);
-      if (trainingObjective === "Conditional Diffusion") {
-        if (classesTensor === null) {
-          throw new Error(
-            "Classes tensor is null for conditional diffusion model"
-          );
-        }
-        console.log("Training conditional diffusion model...");
-        ourModel = new ModelClass(
-          modelConfig.dim,
-          modelConfig.condDim,
-          modelConfig.hidden
-        );
-        await ourModel.train(
-          pointsTensor,
-          classesTensor,
-          trainingConfig["epochs"],
-          trainingConfig["batchSize"],
-          trainingConfig["updateInterval"],
-          // Stop training function that handles halting the training
-          () => {
-            return trainingStopped;
-          },
-          (epoch, intermediateSamples, loss) => {
-            self.postMessage({
-              type: "epoch_chunk",
-              epoch,
-              intermediateSamples,
-              loss
-            });
-          }
-        );
-      } else if (trainingObjective === "Flow Matching" || trainingObjective === "Diffusion") {
-        ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
-        await ourModel.train(
-          pointsTensor,
-          trainingConfig["epochs"],
-          trainingConfig["batchSize"],
-          trainingConfig["updateInterval"],
-          // Stop training function that handles halting the training
-          () => {
-            return trainingStopped;
-          },
-          (epoch, intermediateSamples, loss) => {
-            self.postMessage({
-              type: "epoch_chunk",
-              epoch,
-              intermediateSamples,
-              loss
-            });
-          }
-        );
-      } else {
-        throw new Error("Invalid training objective" + trainingObjective);
-      }
-      const modelSaveName = await saveModel(ourModel.model, trainingObjective);
-      console.log("[Training Worker] Sending result:", { type: "result", timestamp: Date.now() });
-      self.postMessage({
-        type: "result",
-        tfModelPath: modelSaveName
-      });
-    } else if (type === "train_rectified") {
-      const { trainingObjective, modelConfig, datasetPath, rectifiedConfig } = data;
-      if (backend2 === "wasm") {
-        await setBackend("wasm");
-        await ready();
-      } else if (backend2 === "webgl") {
-        await setBackend("webgl");
-        await ready();
-      } else {
-        throw new Error("Invalid backend specified");
-      }
-      const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-      const ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
-      const { pointsTensor } = await loadDataset(datasetPath);
-      let sourceDistribution = null;
-      if (rectifiedConfig.sourceDistributionPath) {
-        const { pointsTensor: sourceTensor } = await loadDataset(rectifiedConfig.sourceDistributionPath);
-        sourceDistribution = sourceTensor;
-      }
-      const allRectifiedTrajectories = [];
-      await ourModel.train_rectified(
-        pointsTensor,
-        sourceDistribution,
-        rectifiedConfig.num_rectified_steps,
-        rectifiedConfig.epochs_per_rectified_step,
-        rectifiedConfig.batchSize,
-        rectifiedConfig.num_simulation_steps,
-        // Stop training function
-        () => trainingStopped,
-        // End epoch callback
-        (epoch, rectifiedStep, intermediateSamples, loss) => {
-          self.postMessage({
-            type: "epoch_chunk",
-            epoch,
-            rectifiedStep,
-            intermediateSamples,
-            loss
-          });
-        },
-        // End rectified step callback
-        (rectifiedStep, trajectories) => {
-          if (trajectories) {
-            allRectifiedTrajectories.push(trajectories);
-          }
-          self.postMessage({
-            type: "rectified_step_complete",
-            rectifiedStep,
-            trajectories
-          });
-        }
-      );
-      const modelSaveName = await saveModel(ourModel.model, trainingObjective);
-      console.log("[Training Worker] Sending result:", { type: "result", timestamp: Date.now() });
-      self.postMessage({
-        type: "result",
-        tfModelPath: modelSaveName,
-        allRectifiedTrajectories
-      });
-    } else if (type === "stop_training") {
-      console.log("[Training Worker] Received stop_training signal");
-      trainingStopped = true;
-    } else {
-      console.error("[Training Worker] Unknown message type:", type);
+    console.log("[FlowModel Worker] Received message:", { requestId, type, timestamp: Date.now() });
+    switch (type) {
+      case "sample":
+      case "sample_from_initial_points":
+      case "sample_grid":
+      case "vector_field_grid":
+        await handleSamplingRequest(requestId, type, data);
+        break;
+      case "train":
+        await handleTrainRequest(requestId, data);
+        break;
+      case "train_rectified":
+        await handleRectifiedTrainRequest(requestId, data);
+        break;
+      default:
+        throw new Error(`Unknown message type: ${type}`);
     }
   } catch (error) {
-    console.error("[Training Worker] Error in message handler:", error);
-    self.postMessage({
-      type: "error",
-      message: error instanceof Error ? error.message : String(error)
-    });
+    const shouldStop = () => activeRequests.get(requestId)?.cancelled ?? false;
+    if (!shouldStop()) {
+      console.error("[FlowModel Worker] Error in message handler:", error);
+      self.postMessage({
+        requestId,
+        type: "error",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  } finally {
+    activeRequests.delete(requestId);
   }
 };
 /*! Bundled license information:

@@ -6,7 +6,7 @@
 
   // Create sampling client
   const flowMatchingClient = new FlowModelClient(
-    settings.samplingWorkerUrl,
+    settings.flowModelWorkerUrl,
     settings.flowMatchingModelPath,
     "Flow Matching",
     settings.trainingSettings.modelConfig
@@ -148,7 +148,7 @@
   function handleCanvasClick(event) {
     // Ignore clicks while sampling is in progress
     if (isStreamingTrajectory) return;
-    if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath) return;
+    if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
     if (!scales) return;
 
     const rect = canvas.getBoundingClientRect();

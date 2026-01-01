@@ -45,9 +45,8 @@ export const settings = {
   cachedRectifiedFlowGridTrajectoriesPath: "cached_samples/rectified_flow_grid_trajectories.json" as string | null,
   cachedRectifiedFlowVectorFieldPath: "cached_samples/rectified_flow_vector_field.json" as string | null,
 
-  // Worker URLs (bundled to static/workers/ for production)
-  trainWorkerUrl: '/workers/train.worker.js',
-  samplingWorkerUrl: '/workers/sampling.worker.js',
+  // Worker URL (bundled to static/workers/ for production)
+  flowModelWorkerUrl: '/workers/flow_model.worker.js',
 
   // Model paths (null means train from scratch, otherwise load from path)
   flowMatchingModelPath: "/models/flow_matching_model.json" as string | null,

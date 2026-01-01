@@ -5,6 +5,7 @@
   import * as d3 from "d3";
   import {
     Figure,
+    TimeSlider,
     drawScatterPlot,
     drawVectorField,
   } from "@diffusion-explorer/ui";
@@ -13,7 +14,7 @@
 
   // Create sampling client
   const flowMatchingClient = new FlowModelClient(
-    settings.samplingWorkerUrl,
+    settings.flowModelWorkerUrl,
     settings.flowMatchingModelPath,
     "Flow Matching",
     settings.trainingSettings.modelConfig,
@@ -34,7 +35,7 @@
   export let domainRange = { xMin: -1.9, xMax: 1.9, yMin: -1.9, yMax: 1.9 };
 
   // Labels
-  export let label = "Velocity Field";
+  export let label = "";
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelColor = settings.stylingSettings.label.color;
 
@@ -65,8 +66,6 @@
   // Starting points
   export let defaultStartPoints = [
     [-1.5, -0.2],
-    [1.2, 0.0],
-    [0.3, -0.7],
   ];
   export let startPointRadius = endpointRadius;
   export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
@@ -81,9 +80,8 @@
   const GROUND_TRUTH_STEPS = 64;
 
   // Animation timing
-  const SEGMENT_DURATION = 600;
-  const SEGMENT_PAUSE_DURATION = 400;
-  const END_PAUSE_DURATION = 2500;
+  const STEP_DURATION = 400; // Duration per Euler step in ms
+  const PAUSE_BEFORE_RESTART = 1500;
 
   // ===== DERIVED FROM PROPS =====
 
@@ -126,12 +124,18 @@
 
   // Animation state
   let animationFrameId = null;
-  let segmentIndex = 0;
-  let segmentProgress = 0;
+  let time = 0; // 0 to 1
+  let isPlaying = true;
   let lastAnimationTime = null;
-  let isPaused = false;
+  let isPausedAtEnd = false;
   let pauseStartTime = null;
-  let showErrorLines = false;
+
+  // Derived animation values (computed from time)
+  // Time is discretized to step values: 0/NUM_STEPS, 1/NUM_STEPS, ..., NUM_STEPS/NUM_STEPS
+  $: currentStep = Math.round(time * NUM_STEPS);
+  $: segmentIndex = currentStep;
+  $: segmentProgress = 1; // Always show full segments (discrete stepping)
+  $: showErrorLines = currentStep >= NUM_STEPS;
 
   // ===== FUNCTIONS =====
 
@@ -205,9 +209,11 @@
 
     // Show initial state immediately and start animation
     isLoading = false;
-    segmentIndex = 0;
-    segmentProgress = 0;
-    showErrorLines = false;
+    time = 0;
+    isPlaying = true;
+    isPausedAtEnd = false;
+    pauseStartTime = null;
+    lastAnimationTime = null;
     draw();
     startAnimation();
 
@@ -436,67 +442,47 @@
     draw();
   }
 
-  // Animation loop
+  // Animation loop - advances in discrete steps
   function animate(timestamp) {
-    if (!isInitialized || isLoading) {
-      animationFrameId = requestAnimationFrame(animate);
+    if (!isInitialized || isLoading || !isPlaying) {
+      animationFrameId = null;
       return;
     }
-
-    const maxSegments = NUM_STEPS;
 
     if (lastAnimationTime === null) {
       lastAnimationTime = timestamp;
     }
 
-    // Handle pause state
-    if (isPaused) {
+    // Handle pause at end state
+    if (isPausedAtEnd) {
       const pauseElapsed = timestamp - (pauseStartTime ?? timestamp);
-      const isEndPause = segmentIndex >= maxSegments;
-      const pauseDuration = isEndPause ? END_PAUSE_DURATION : SEGMENT_PAUSE_DURATION;
-
-      if (pauseElapsed >= pauseDuration) {
-        // Pause ending
-        isPaused = false;
+      if (pauseElapsed >= PAUSE_BEFORE_RESTART) {
+        // Restart animation
+        isPausedAtEnd = false;
         pauseStartTime = null;
+        time = 0;
         lastAnimationTime = timestamp;
-
-        if (isEndPause) {
-          // Loop back to start
-          segmentIndex = 0;
-          segmentProgress = 0;
-          showErrorLines = false;
-        } else {
-          segmentIndex++;
-          segmentProgress = 0;
-        }
-      } else {
-        // Still in pause
-        drawAnimationFrame();
-        animationFrameId = requestAnimationFrame(animate);
-        return;
       }
+      drawAnimationFrame();
+      animationFrameId = requestAnimationFrame(animate);
+      return;
     }
 
-    // Normal animation
+    // Discrete stepping - advance one step when STEP_DURATION elapses
     const elapsed = timestamp - lastAnimationTime;
-    segmentProgress = Math.min(elapsed / SEGMENT_DURATION, 1);
+    if (elapsed >= STEP_DURATION) {
+      lastAnimationTime = timestamp;
+      const nextStep = currentStep + 1;
+      time = Math.min(nextStep / NUM_STEPS, 1);
+
+      // Check if animation complete
+      if (time >= 1) {
+        isPausedAtEnd = true;
+        pauseStartTime = timestamp;
+      }
+    }
 
     drawAnimationFrame();
-
-    // Check if segment complete
-    if (segmentProgress >= 1) {
-      isPaused = true;
-      pauseStartTime = timestamp;
-      segmentProgress = 1;
-
-      // Show error lines at end
-      if (segmentIndex >= maxSegments - 1) {
-        segmentIndex = maxSegments;
-        showErrorLines = true;
-      }
-    }
-
     animationFrameId = requestAnimationFrame(animate);
   }
 
@@ -513,16 +499,27 @@
     }
   }
 
+  function toggleAnimation() {
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      isPausedAtEnd = false;
+      pauseStartTime = null;
+      lastAnimationTime = null;
+      startAnimation();
+    } else {
+      stopAnimation();
+    }
+  }
+
   // Handle canvas click
   function handleCanvasClick(event) {
     if (isLoading) return;
 
     // Stop animation and reset state
     stopAnimation();
-    segmentIndex = 0;
-    segmentProgress = 0;
-    showErrorLines = false;
-    isPaused = false;
+    time = 0;
+    isPlaying = true;
+    isPausedAtEnd = false;
     pauseStartTime = null;
     lastAnimationTime = null;
 
@@ -562,6 +559,16 @@
     initializeVisualization();
   }
 
+  // Redraw when time changes (e.g., from slider)
+  $: if (isInitialized && time !== undefined) {
+    draw();
+  }
+
+  // Start/stop animation when isPlaying changes
+  $: if (isInitialized && isPlaying && !animationFrameId) {
+    startAnimation();
+  }
+
   // ===== LIFECYCLE =====
 
   onMount(() => {
@@ -587,6 +594,15 @@
         onclick={handleCanvasClick}
         style="cursor: {isLoading ? 'wait' : 'pointer'};"
       ></canvas>
+      <TimeSlider
+        bind:value={time}
+        bind:isPlaying
+        min={0}
+        max={1}
+        step={1 / NUM_STEPS}
+        onTogglePlay={toggleAnimation}
+        color={approximationColor}
+      />
     </div>
 
     {#snippet footer()}

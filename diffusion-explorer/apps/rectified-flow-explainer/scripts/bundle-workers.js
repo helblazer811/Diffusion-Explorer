@@ -13,12 +13,8 @@ const rootDir = path.resolve(__dirname, '..');
 async function bundleWorkers() {
   const workers = [
     {
-      entry: 'src/lib/flow_matching/workers/sampling.worker.ts',
-      output: 'static/workers/sampling.worker.js'
-    },
-    {
-      entry: 'src/lib/flow_matching/workers/train.worker.ts',
-      output: 'static/workers/train.worker.js'
+      entry: 'src/lib/flow_matching/workers/flow_model.worker.ts',
+      output: 'static/workers/flow_model.worker.js'
     }
   ];
 
