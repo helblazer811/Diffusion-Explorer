@@ -64,9 +64,9 @@
   const rectifiedFlowGridTrajectories: Writable<number[][][][] | null> =
     writable(null);
 
-  // Worker references
-  let trainingWorker: Worker | null = null;
-  let rectifiedTrainingWorker: Worker | null = null;
+  // Training request IDs (for potential cancellation)
+  let trainingRequestId: string | null = null;
+  let rectifiedTrainingRequestId: string | null = null;
 
   // Defer other figures until first frame renders
   let showOtherFigures = false;
@@ -160,17 +160,17 @@
   async function trainModel() {
     const result = await train.trainModel(
       settings.trainingSettings,
-      settings.trainWorkerUrl,
+      settings.flowModelWorkerUrl,
       () => isTraining.set(true),
       () => isTraining.set(false)
     );
-    trainingWorker = result.worker;
+    trainingRequestId = result.requestId;
     return result.modelPath;
   }
 
   async function generateSamples(modelPath: string) {
     const client = await FlowModelClient.create(
-      settings.samplingWorkerUrl,
+      settings.flowModelWorkerUrl,
       modelPath,
       'Flow Matching',
       settings.trainingSettings.modelConfig,
@@ -199,7 +199,7 @@
       settings.samplingSettings.flowMatchingVectorField.numTimeSteps,
       settings.samplingSettings.flowMatchingVectorField.domainRange,
       settings.trainingSettings,
-      settings.samplingWorkerUrl
+      settings.flowModelWorkerUrl
     );
     vectorFieldData.set(result);
     downloadVectorField();
@@ -208,9 +208,9 @@
   async function trainRectifiedFlow() {
     const result = await train.trainRectifiedFlow(
       settings.trainingSettings,
-      settings.trainWorkerUrl
+      settings.flowModelWorkerUrl
     );
-    rectifiedTrainingWorker = result.worker;
+    rectifiedTrainingRequestId = result.requestId;
     rectifiedFlowData.set(result.data);
     downloadRectifiedFlowData();
     return result.data.modelPath;
@@ -219,7 +219,7 @@
   async function generateFlowMatchingGridSamples(modelPath: string) {
     const gridSettings = settings.samplingSettings.flowMatchingGrid;
     const client = await FlowModelClient.create(
-      settings.samplingWorkerUrl,
+      settings.flowModelWorkerUrl,
       modelPath,
       'Flow Matching',
       settings.trainingSettings.modelConfig,
@@ -241,7 +241,7 @@
 
     // For the "before" visualization, use the flow matching model (step 0)
     const client = await FlowModelClient.create(
-      settings.samplingWorkerUrl,
+      settings.flowModelWorkerUrl,
       modelPath, // This should be the final rectified model
       'Flow Matching',
       settings.trainingSettings.modelConfig,
@@ -268,7 +268,7 @@
       settings.samplingSettings.rectifiedFlowVectorField.numTimeSteps,
       settings.samplingSettings.rectifiedFlowVectorField.domainRange,
       settings.trainingSettings,
-      settings.samplingWorkerUrl
+      settings.flowModelWorkerUrl
     );
     rectifiedFlowVectorFieldData.set(result);
     downloadRectifiedFlowVectorField();
@@ -313,8 +313,8 @@
     if (settings.rectifiedFlowModelPath) {
       settings.rectifiedFlowModelPath = `${base}${settings.rectifiedFlowModelPath}`;
     }
-    if (settings.samplingWorkerUrl) {
-      settings.samplingWorkerUrl = `${base}${settings.samplingWorkerUrl}`;
+    if (settings.flowModelWorkerUrl) {
+      settings.flowModelWorkerUrl = `${base}${settings.flowModelWorkerUrl}`;
     }
 
     // Load target distribution first
@@ -426,10 +426,8 @@
     await tick(); // Ensure DOM is ready
     citations = collectCitations();
 
-    return () => {
-      if (trainingWorker) trainingWorker.terminate();
-      if (rectifiedTrainingWorker) rectifiedTrainingWorker.terminate();
-    };
+    // Note: Workers are now pooled and managed by FlowModelClient,
+    // so no cleanup is needed here
   });
 </script>
 
@@ -756,13 +754,14 @@
       targetDistribution={$targetDistributionSamples}
       flowMatchingVectorField={$vectorFieldData}
       backgroundVisible={false}
+      maxUserTrajectories={1}
     >
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
         <strong> Euler integration through a time-dependent <span style="color: #3b82f6;">velocity field</span> <Katex math={"v_t(x)"} />. </strong>
         The <span style="color: #22c55e;">ground truth</span> trajectory
         is compared against the <span style="color: #f17720;">Euler approximation</span>, which takes
-        8 discrete steps along the direction of the <span style="color: #3b82f6;">velocity field</span>. Tap
+        16 discrete steps along the direction of the <span style="color: #3b82f6;">velocity field</span>. Tap
         <img
           src="{base}/icons/tap.svg"
           alt="tap"
@@ -1259,10 +1258,9 @@
         backgroundVisible={false}
       >
         <div class="caption">
-          <span class="figure-number">Figure 13:</span>
-          Comparison of independent coupling (left) vs induced coupling from the
-          flow model (right). The induced coupling connects each source point to
-          where it actually flows, resulting in less tangled paths.
+          <span class="figure-number">Figure 13:</span> 
+          <strong>The coupling induced by the flow model (right) produces less tangled paths than an independent coupling (left).</strong>
+          We connect each source point to its corresponding target point generated by the flow model with a line.
         </div>
       </InducedCouplingDouble>
     </div>
@@ -1323,6 +1321,7 @@
       <EulerStepComparison
         targetDistribution={$targetDistributionSamples}
         backgroundVisible={false}
+        maxUserTrajectories={1}
       >
         <div class="caption">
           <span class="figure-number">Figure 15:</span>

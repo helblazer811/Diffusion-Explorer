@@ -165,8 +165,30 @@ function createMessageHandler(workerIndex: number) {
                 break;
 
             case 'result':
-                // Final result - resolve promise
-                handlers.resolve(e.data);
+                // Final result - resolve promise with extracted payload
+                // Extract the actual result based on what's in the message
+                if (e.data.allSamples !== undefined) {
+                    // Sampling result
+                    handlers.resolve(e.data.allSamples);
+                } else if (e.data.allRectifiedTrajectories !== undefined) {
+                    // Rectified training result
+                    handlers.resolve({
+                        tfModelPath: e.data.tfModelPath,
+                        allRectifiedTrajectories: e.data.allRectifiedTrajectories
+                    });
+                } else if (e.data.tfModelPath !== undefined) {
+                    // Standard training result
+                    handlers.resolve({ tfModelPath: e.data.tfModelPath });
+                } else if (e.data.velocities !== undefined) {
+                    // Vector field result
+                    handlers.resolve({
+                        velocities: e.data.velocities,
+                        gridPoints: e.data.gridPoints
+                    });
+                } else {
+                    // Unknown result type - pass through as-is
+                    handlers.resolve(e.data);
+                }
                 cleanup(requestId);
                 break;
 

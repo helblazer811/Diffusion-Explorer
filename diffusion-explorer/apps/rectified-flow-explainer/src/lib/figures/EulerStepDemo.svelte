@@ -432,9 +432,6 @@
       }
       ctx.globalAlpha = 1.0;
     }
-
-    // Draw start point markers
-    drawStartPointsOnCtx(ctx);
   }
 
   // Draw during animation (just calls draw)
