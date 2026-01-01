@@ -7,7 +7,7 @@
 
   // Create sampling client
   const flowMatchingClient = new FlowModelClient(
-    settings.samplingWorkerUrl,
+    settings.flowModelWorkerUrl,
     settings.flowMatchingModelPath,
     "Flow Matching",
     settings.trainingSettings.modelConfig,
@@ -26,8 +26,8 @@
   // Layout
   export let marginWidth = 20;
   export let marginHeight = 20;
-  export let canvasWidth = 400;
-  export let canvasHeight = 400;
+  export let canvasWidth = 450;
+  export let canvasHeight = 450;
   export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
 
   // Target distribution styling
@@ -150,7 +150,7 @@
 
   // Handle canvas click - convert to domain coordinates and sample
   function handleCanvasClick(event) {
-    if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath) return;
+    if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvasWidth / rect.width;
@@ -401,20 +401,23 @@
   <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     {#snippet children()}
       <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
-        <canvas
-          bind:this={canvas}
-          onclick={handleCanvasClick}
-          style="cursor: pointer; width: 100%; height: auto; max-width: {canvasWidth}px; aspect-ratio: {canvasWidth}/{canvasHeight};"
-        ></canvas>
-        <TimeSlider
-          bind:value={time}
-          {isPlaying}
-          min={0}
-          max={1}
-          onTogglePlay={togglePlayPause}
-          onInput={handleSliderInput}
-          color={trajectoryColor}
-        />
+        <div style="width: 100%; max-width: {canvasWidth}px;">
+          <canvas
+            bind:this={canvas}
+            onclick={handleCanvasClick}
+            style="cursor: pointer; width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
+          ></canvas>
+          <TimeSlider
+            bind:value={time}
+            {isPlaying}
+            min={0}
+            max={1}
+            step={numSegments > 0 ? 1 / numSegments : 0.01}
+            onTogglePlay={togglePlayPause}
+            onInput={handleSliderInput}
+            color={trajectoryColor}
+          />
+        </div>
       </div>
     {/snippet}
   </Figure>

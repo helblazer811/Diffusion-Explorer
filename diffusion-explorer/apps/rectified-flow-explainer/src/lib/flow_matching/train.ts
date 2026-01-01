@@ -1,6 +1,5 @@
 import {
-  callTrainingWorkerThread,
-  callRectifiedFlowTrainingWorker,
+  FlowModelClient,
   downloadModelFromIndexedDB
 } from '@diffusion-explorer/diffusion';
 import {
@@ -16,88 +15,99 @@ export type { RectifiedFlowData, TrainingSettings };
 
 export async function trainModel(
   settings: TrainingSettings,
-  trainWorkerUrl: string,
+  workerUrl: string,
   onTrainingStart?: () => void,
   onTrainingEnd?: () => void
-): Promise<{ modelPath: string; worker: Worker }> {
+): Promise<{ modelPath: string; requestId: string }> {
   console.log('Starting model training...');
   const modelConfig = settings.modelConfig;
-  const trainingConfig = settings.flowMatchingTrainingConfig;
+  const trainingConfig = {
+    epochs: settings.flowMatchingTrainingConfig.epochs,
+    batchSize: settings.flowMatchingTrainingConfig.batchSize,
+    updateInterval: settings.flowMatchingTrainingConfig.displayInterval
+  };
   // Build absolute URL for worker to fetch (workers don't have same base URL context)
   const datasetPath = new URL('/' + globalSettings.targetDistributionPointsPath, window.location.origin).href;
 
   onTrainingStart?.();
 
-  return new Promise((resolve) => {
-    console.log("Starting training worker thread...");
-    const worker = callTrainingWorkerThread(
-      trainWorkerUrl,
-      'Flow Matching',
-      modelConfig,
-      datasetPath,
-      trainingConfig,
-      async (tfModelPath: string) => {
-        console.log('Training finished!', tfModelPath);
-        onTrainingEnd?.();
-        // Auto-download the trained model
-        await downloadModelFromIndexedDB(tfModelPath, 'flow_matching_model');
-        resolve({ modelPath: tfModelPath, worker });
-      },
-      (epoch: number, _samples: unknown, loss: number) => {
-        console.log(`Epoch ${epoch}: loss = ${loss?.toFixed(6) ?? 'N/A'}`);
-      }
-    );
-  });
+  // Create client for training (no model path needed)
+  const client = new FlowModelClient(
+    workerUrl,
+    '',  // No model path for training
+    'Flow Matching',
+    modelConfig
+  );
+
+  console.log("Starting training with unified FlowModelClient...");
+  const { requestId, promise } = client.train(
+    datasetPath,
+    trainingConfig,
+    (epoch: number, _samples: number[][] | null, loss: number) => {
+      console.log(`Epoch ${epoch}: loss = ${loss?.toFixed(6) ?? 'N/A'}`);
+    }
+  );
+
+  const result = await promise;
+  console.log('Training finished!', result.tfModelPath);
+  onTrainingEnd?.();
+
+  // Auto-download the trained model
+  await downloadModelFromIndexedDB(result.tfModelPath, 'flow_matching_model');
+
+  return { modelPath: result.tfModelPath, requestId };
 }
 
 export async function trainRectifiedFlow(
   settings: TrainingSettings,
-  trainWorkerUrl: string,
+  workerUrl: string,
   onEpochCallback?: (epoch: number, rectifiedStep: number) => void,
-  onRectifiedStepCallback?: (rectifiedStep: number, trajectories: number[][] | null) => void
-): Promise<{ data: RectifiedFlowData; worker: Worker }> {
+  onRectifiedStepCallback?: (rectifiedStep: number, trajectories: number[][][] | null) => void
+): Promise<{ data: RectifiedFlowData; requestId: string }> {
   console.log('Starting rectified flow training...');
   const modelConfig = settings.modelConfig;
   const rectifiedFlowConfig = settings.rectifiedFlowTrainingConfig;
   // Build absolute URL for worker to fetch (workers don't have same base URL context)
   const datasetPath = new URL('/' + globalSettings.targetDistributionPointsPath, window.location.origin).href;
 
-  return new Promise((resolve) => {
-    console.log("Starting rectified flow training worker thread...");
-    const worker = callRectifiedFlowTrainingWorker(
-      trainWorkerUrl,
-      'Flow Matching', // trainingObjective is constant
-      modelConfig,
-      datasetPath,
-      rectifiedFlowConfig,
-      // Finish callback
-      async (tfModelPath: string, allRectifiedTrajectories: number[][][][]) => {
-        console.log('Rectified flow training finished!', tfModelPath);
-        console.log('Collected', allRectifiedTrajectories.length, 'rectified steps');
+  // Create client for training (no model path needed)
+  const client = new FlowModelClient(
+    workerUrl,
+    '',  // No model path for training
+    'Flow Matching',
+    modelConfig
+  );
 
-        // Auto-download the trained rectified flow model
-        await downloadModelFromIndexedDB(tfModelPath, 'rectified_flow_model');
-
-        const data: RectifiedFlowData = {
-          allRectifiedTrajectories,
-          modelPath: tfModelPath
-        };
-
-        resolve({ data, worker });
-      },
-      // Epoch callback
-      (epoch: number, rectifiedStep: number, _intermediateSamples: number[][] | null, loss?: number) => {
-        console.log(`Rectified step ${rectifiedStep}, epoch ${epoch}: loss = ${loss?.toFixed(6) ?? 'N/A'}`);
-        onEpochCallback?.(epoch, rectifiedStep);
-      },
-      // Rectified step callback
-      (rectifiedStep: number, trajectories: number[][] | null) => {
-        console.log(`Completed rectified step ${rectifiedStep}`);
-        if (trajectories) {
-          console.log('  Trajectories shape:', trajectories.length, 'samples');
-        }
-        onRectifiedStepCallback?.(rectifiedStep, trajectories);
+  console.log("Starting rectified flow training with unified FlowModelClient...");
+  const { requestId, promise } = client.trainRectified(
+    datasetPath,
+    rectifiedFlowConfig,
+    // Epoch callback
+    (epoch: number, rectifiedStep: number, _intermediateSamples: number[][] | null, loss?: number) => {
+      console.log(`Rectified step ${rectifiedStep}, epoch ${epoch}: loss = ${loss?.toFixed(6) ?? 'N/A'}`);
+      onEpochCallback?.(epoch, rectifiedStep);
+    },
+    // Rectified step callback
+    (rectifiedStep: number, trajectories: number[][][] | null) => {
+      console.log(`Completed rectified step ${rectifiedStep}`);
+      if (trajectories) {
+        console.log('  Trajectories shape:', trajectories.length, 'samples');
       }
-    );
-  });
+      onRectifiedStepCallback?.(rectifiedStep, trajectories);
+    }
+  );
+
+  const result = await promise;
+  console.log('Rectified flow training finished!', result.tfModelPath);
+  console.log('Collected', result.allRectifiedTrajectories.length, 'rectified steps');
+
+  // Auto-download the trained rectified flow model
+  await downloadModelFromIndexedDB(result.tfModelPath, 'rectified_flow_model');
+
+  const data: RectifiedFlowData = {
+    allRectifiedTrajectories: result.allRectifiedTrajectories,
+    modelPath: result.tfModelPath
+  };
+
+  return { data, requestId };
 }

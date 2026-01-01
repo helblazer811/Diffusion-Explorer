@@ -29,12 +29,12 @@ export async function generateVectorField(
   numTimeSteps: number,
   domainRange: { xMin: number; xMax: number; yMin: number; yMax: number },
   settings: TrainingSettings,
-  samplingWorkerUrl: string
+  workerUrl: string
 ): Promise<VectorFieldData> {
   console.log('Generating vector field...');
 
   const client = await FlowModelClient.create(
-    samplingWorkerUrl,
+    workerUrl,
     modelPath,
     'Flow Matching',
     settings.modelConfig,
