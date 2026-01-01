@@ -1,9 +1,8 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { Figure, PlayButton, TextToggleButton } from "@diffusion-explorer/ui";
+  import { Figure, PlayButton, TextToggleButton, plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { plotSourceTargetScatter, plotSourceTargetLabels, createSourceTargetScales } from "$lib/d3_helpers";
 
   // Data props
   export let allRectifiedTrajectories = []; // [step][timestep][sample][dim]

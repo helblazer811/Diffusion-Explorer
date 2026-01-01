@@ -1,8 +1,7 @@
 <script>
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { createSourceTargetScales } from "$lib/d3_helpers";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
 
   // Create sampling client
@@ -310,21 +309,61 @@
     const trajectoryEndpointRadius = settings.stylingSettings.trajectory.endpointRadius;
     const normalOpacity = settings.stylingSettings.trajectory.progressOpacity;
     const dimmedOpacity = 0.15; // Dimmed opacity when user has clicked (matches CurvedTrajectorySuperimposed)
+    const highlightOpacity = 1.0; // Full opacity for user-defined trajectories
 
     // Before user clicks: draw all trajectories with normal opacity
-    // After user clicks: dim all existing trajectories
-    const existingOpacity = hasUserTrajectory ? dimmedOpacity : normalOpacity;
+    // After user clicks (or during streaming): dim non-highlighted trajectories, highlight user-defined ones
+    // Dim immediately when streaming starts (userTrajectories.length > 0)
+    const shouldDimExisting = hasUserTrajectory || userTrajectories.length > 0;
 
-    // Draw existing trajectories (dimmed if user has clicked)
     if (transformedTrajectories.length > 0) {
-      drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
-        strokeWidth: trajectoryStrokeWidth,
-        color: trajectoryColor,
-        progressOpacity: existingOpacity,
-        pointRadius: trajectoryEndpointRadius,
-        showPreview: false,
-        previewOpacity: 0,
-      });
+      if (shouldDimExisting) {
+        // Separate trajectories into highlighted and non-highlighted
+        const nonHighlightedTrajectories = [];
+        const highlightedTrajectories = [];
+
+        transformedTrajectories.forEach((traj, idx) => {
+          if (mostRecentTrajectoryIndices.includes(idx)) {
+            highlightedTrajectories.push(traj);
+          } else {
+            nonHighlightedTrajectories.push(traj);
+          }
+        });
+
+        // Draw non-highlighted trajectories with dimmed opacity
+        if (nonHighlightedTrajectories.length > 0) {
+          drawTrajectoriesWithPreview(ctx, nonHighlightedTrajectories, segmentIndex, {
+            strokeWidth: trajectoryStrokeWidth,
+            color: trajectoryColor,
+            progressOpacity: dimmedOpacity,
+            pointRadius: trajectoryEndpointRadius,
+            showPreview: false,
+            previewOpacity: 0,
+          });
+        }
+
+        // Draw highlighted (user-defined) trajectories with full opacity
+        if (highlightedTrajectories.length > 0) {
+          drawTrajectoriesWithPreview(ctx, highlightedTrajectories, segmentIndex, {
+            strokeWidth: trajectoryStrokeWidth,
+            color: trajectoryColor,
+            progressOpacity: highlightOpacity,
+            pointRadius: trajectoryEndpointRadius,
+            showPreview: false,
+            previewOpacity: 0,
+          });
+        }
+      } else {
+        // No user trajectories yet, draw all with normal opacity
+        drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
+          strokeWidth: trajectoryStrokeWidth,
+          color: trajectoryColor,
+          progressOpacity: normalOpacity,
+          pointRadius: trajectoryEndpointRadius,
+          showPreview: false,
+          previewOpacity: 0,
+        });
+      }
     }
 
     // Draw in-progress user trajectories (full opacity, synced with animation time)

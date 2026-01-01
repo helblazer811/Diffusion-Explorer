@@ -2,9 +2,8 @@
 
 <script>
   import { onMount } from "svelte";
-  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjaxOnCanvas } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjaxOnCanvas, createSourceTargetScales, dataToPixelX } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { createSourceTargetScales, dataToPixelX } from "$lib/d3_helpers";
 
   // Caption slot (passed as default children)
   export let children = undefined;
