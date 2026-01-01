@@ -4,6 +4,7 @@
 
   export let children = undefined;
   export let caption = undefined;
+  export let footer = undefined;
   export let backgroundVisible = true;
 
   // Visibility state - exported so parent can bind to it
@@ -70,6 +71,11 @@
   >
     {@render children?.()}
   </div>
+  {#if footer}
+    <div class="figure-footer">
+      {@render footer?.()}
+    </div>
+  {/if}
   <figcaption class="figure-caption">
     {@render caption?.()}
   </figcaption>
@@ -105,6 +111,11 @@
 
   .figure.no-background-figure {
     margin-top: 0.5rem;
+  }
+
+  .figure-footer {
+    width: 100%;
+    padding: 0.5rem 0;
   }
 
   .figure-caption {

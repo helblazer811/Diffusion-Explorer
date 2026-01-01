@@ -5,8 +5,7 @@
   import { settings } from "$lib/settings";
   import * as sample from "$lib/flow_matching/sample";
   import * as train from "$lib/flow_matching/train";
-  import { downloadJSON } from "$lib/flow_matching/utils";
-  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
+  import { callSamplingWorkerThreadFromInitialPoints, downloadJSON } from "@diffusion-explorer/diffusion";
 
   // ===== DATA =====
   let leftTrajectories: number[][][] = []; // [timestep][sample][dim]

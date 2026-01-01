@@ -13,22 +13,38 @@ export function callTrainingWorkerThread(
         trainWorkerUrl,
         { type: 'module' }
     );
-    // Add listeners that recieve messages from the worker thread on the main thread (client)
+
+    // Error handler for worker-level errors (script load failures, uncaught exceptions)
+    trainingWorker.onerror = (e) => {
+        console.error('[Training Worker Error]', {
+            message: e.message,
+            filename: e.filename,
+            lineno: e.lineno,
+            colno: e.colno
+        });
+    };
+
+    // Handler for message deserialization errors
+    trainingWorker.onmessageerror = (e) => {
+        console.error('[Training Worker Message Error] Failed to deserialize message:', e);
+    };
+
+    // Add listeners that receive messages from the worker thread on the main thread (client)
     trainingWorker.onmessage = (e) => {
         const { type, result: res } = e.data;
         if (type === 'result') {
             finishCallback(e.data.tfModelPath);
         } else if (type === 'epoch_chunk') {
-            // Recieved a chunk of data from the worker thread
+            // Received a chunk of data from the worker thread
             epochCallback(e.data.epoch, e.data.intermediateSamples, e.data.loss);
         } else if (type === 'status') {
-            console.log('Worker status:', e.data.message);
+            console.log('[Training Worker] status:', e.data.message);
         } else if (type === 'error') {
-            console.error('Worker error:', e.data.message);
+            console.error('[Training Worker] error:', e.data.message);
         }
     };
-    // Call the dummy worker thread
-    // Send a message
+    // Send a message to start training
+    console.log('[Training Worker] Sending message:', { type: 'train', timestamp: Date.now() });
     trainingWorker.postMessage({
         type: 'train',
         data: {
@@ -58,6 +74,21 @@ export function callRectifiedFlowTrainingWorker(
         { type: 'module' }
     );
 
+    // Error handler for worker-level errors (script load failures, uncaught exceptions)
+    trainingWorker.onerror = (e) => {
+        console.error('[Rectified Training Worker Error]', {
+            message: e.message,
+            filename: e.filename,
+            lineno: e.lineno,
+            colno: e.colno
+        });
+    };
+
+    // Handler for message deserialization errors
+    trainingWorker.onmessageerror = (e) => {
+        console.error('[Rectified Training Worker Message Error] Failed to deserialize message:', e);
+    };
+
     // Add listeners that receive messages from the worker thread
     trainingWorker.onmessage = (e) => {
         const { type } = e.data;
@@ -70,13 +101,14 @@ export function callRectifiedFlowTrainingWorker(
             // Received completion of a rectified step with trajectories
             rectifiedStepCallback(e.data.rectifiedStep, e.data.trajectories);
         } else if (type === 'status') {
-            console.log('Worker status:', e.data.message);
+            console.log('[Rectified Training Worker] status:', e.data.message);
         } else if (type === 'error') {
-            console.error('Worker error:', e.data.message);
+            console.error('[Rectified Training Worker] error:', e.data.message);
         }
     };
 
     // Send message to start rectified flow training
+    console.log('[Rectified Training Worker] Sending message:', { type: 'train_rectified', timestamp: Date.now() });
     trainingWorker.postMessage({
         type: 'train_rectified',
         data: {

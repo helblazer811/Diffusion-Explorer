@@ -1,4 +1,9 @@
-<!-- Visualizes Euler's method on a circular vector field -->
+<!--
+  @deprecated Use EulerStepDemo.svelte instead for a simpler Euler step demonstration
+  with ground truth, approximation, and error visualization.
+
+  This component visualizes Euler's method on a circular vector field.
+-->
 
 <script>
   import { onMount, onDestroy } from 'svelte';

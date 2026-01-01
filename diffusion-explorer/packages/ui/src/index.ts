@@ -37,7 +37,7 @@ export {
 export * from './plotting/plotting';
 export * from './plotting/trajectories';
 export * from './plotting/contours';
-export * from './plotting/VectorField';
+export * from './plotting/vector_field';
 export * from './plotting/mathjax';
 export * from './plotting/katex';
 export * from './plotting/pathlines';

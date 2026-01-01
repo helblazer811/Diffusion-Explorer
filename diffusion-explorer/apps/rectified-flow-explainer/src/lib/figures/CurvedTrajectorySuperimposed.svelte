@@ -41,6 +41,9 @@
   export let pauseDuration = 1000;
   export let playingByDefault = true;
 
+  // Interactive sampling
+  export let maxUserTrajectories = 5;
+
   // Background
   export let backgroundVisible = true;
 
@@ -86,9 +89,10 @@
   let scaledTargetDistribution = [];
   let scaledTrajectories = [];
 
-  // Clicked trajectory state
-  let clickedTrajectory = [];           // [[x,y], ...] in pixel coords
-  let hasClickedTrajectory = false;
+  // User-defined trajectory state (supports multiple trajectories)
+  let userStartPoints = []; // Array of [x, y] domain coordinates
+  let userTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
+  let hasUserTrajectory = false;
   let isStreamingTrajectory = false;
 
   // ===== FUNCTIONS =====
@@ -136,8 +140,6 @@
 
   // Handle canvas click - convert to domain coordinates and sample
   function handleCanvasClick(event) {
-    // Ignore clicks while sampling is in progress
-    if (isStreamingTrajectory) return;
     if (!settings.samplingWorkerUrl || !settings.flowMatchingModelPath) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -153,14 +155,21 @@
     sampleFromPoint([domainX, domainY]);
   }
 
-  // Sample trajectory from a specific point using streaming
+  // Sample trajectories from all user start points using streaming
   function sampleFromPoint(point) {
-    hasClickedTrajectory = true;
+    // Add new point to the list of user start points
+    userStartPoints = [...userStartPoints, point];
+
+    // If we exceed the max, remove the oldest point
+    if (userStartPoints.length > maxUserTrajectories) {
+      userStartPoints = userStartPoints.slice(-maxUserTrajectories);
+    }
+
+    hasUserTrajectory = true;
     isStreamingTrajectory = true;
 
-    // Initialize trajectory with the initial click point (scaled to pixels)
-    const initialPixelPoint = [xScale(point[0]), yScale(point[1])];
-    clickedTrajectory = [initialPixelPoint];
+    // Initialize trajectory arrays with initial pixel points for all start points
+    userTrajectories = userStartPoints.map(p => [[xScale(p[0]), yScale(p[1])]]);
 
     // Reset and start animation
     currentSegmentIndex = 0;
@@ -174,15 +183,19 @@
       settings.flowMatchingModelPath,
       'Flow Matching',
       settings.trainingSettings.modelConfig,
-      [point],
+      userStartPoints,
       numTimeSteps, // match passed-in trajectory steps
-      () => { isStreamingTrajectory = false; }, // onComplete
+      () => {
+        isStreamingTrajectory = false;
+      }, // onComplete
       settings.trainingSettings.domainRange,
       {},
-      // onStep callback - append each new point as it arrives
+      // onStep callback - append new points for all trajectories
       (_step, x_t) => {
-        const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
-        clickedTrajectory = [...clickedTrajectory, newPoint];
+        userTrajectories = userTrajectories.map((traj, i) => [
+          ...traj,
+          [xScale(x_t[i][0]), yScale(x_t[i][1])]
+        ]);
       }
     );
   }
@@ -196,7 +209,7 @@
     drawScatterPlot(ctx, scaledTargetDistribution, distributionPointRadius, targetColor, targetOpacity);
 
     // Draw default trajectories (dimmed if user has clicked)
-    const defaultOpacity = hasClickedTrajectory ? 0.15 : trajectoryProgressOpacity;
+    const defaultOpacity = hasUserTrajectory ? 0.15 : trajectoryProgressOpacity;
     ctx.strokeStyle = trajectoryColor;
     ctx.lineWidth = trajectoryStrokeWidth;
     ctx.lineCap = "round";
@@ -229,18 +242,28 @@
 
     ctx.globalAlpha = 1.0;
 
-    // Draw clicked trajectory (highlighted) - no preview, no point at end
-    if (hasClickedTrajectory && clickedTrajectory.length > 1) {
-      const clickedNumPoints = clickedTrajectory.length;
-      const clickedSegmentIndex = Math.min(currentSegmentIndex, clickedNumPoints - 2);
+    // Draw all user-defined trajectories (highlighted) on top
+    for (const userTrajectory of userTrajectories) {
+      if (userTrajectory && userTrajectory.length > 1) {
+        const userNumSegments = userTrajectory.length - 1;
+        const userSegmentIndex = Math.min(currentSegmentIndex, userNumSegments - 1);
 
-      drawTrajectoriesWithPreview(ctx, [clickedTrajectory], clickedSegmentIndex, {
-        strokeWidth: trajectoryStrokeWidth,
-        color: trajectoryColor,
-        progressOpacity: 1.0,
-        pointRadius: 0, // no point at end
-        showPreview: false
-      });
+        drawTrajectoriesWithPreview(ctx, [userTrajectory], userSegmentIndex, {
+          strokeWidth: trajectoryStrokeWidth,
+          color: trajectoryColor,
+          progressOpacity: 1.0,
+          pointRadius: endpointRadius,
+          showPreview: false
+        });
+      } else if (userTrajectory && userTrajectory.length === 1) {
+        // Draw just the starting point for immediate feedback
+        const [x, y] = userTrajectory[0];
+        ctx.globalAlpha = 1.0;
+        ctx.beginPath();
+        ctx.arc(x, y, endpointRadius, 0, Math.PI * 2);
+        ctx.fillStyle = trajectoryColor;
+        ctx.fill();
+      }
     }
   }
 

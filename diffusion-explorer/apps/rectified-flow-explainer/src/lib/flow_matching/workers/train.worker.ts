@@ -42,9 +42,33 @@ async function saveModel(model: tf.LayersModel, path: string) {
 // It is important to be out of the on message function so the value persists across message receives
 let trainingStopped = false;
 
+// Global unhandled rejection handler for async errors
+self.addEventListener('unhandledrejection', (event) => {
+  console.error('[Training Worker] Unhandled promise rejection:', event.reason);
+  self.postMessage({
+    type: 'error',
+    message: `Unhandled rejection: ${event.reason?.message || String(event.reason)}`
+  });
+});
+
+// Global error handler
+self.addEventListener('error', (event) => {
+  console.error('[Training Worker] Uncaught error:', {
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno
+  });
+  self.postMessage({
+    type: 'error',
+    message: `Uncaught error: ${event.message} at ${event.filename}:${event.lineno}`
+  });
+});
+
 self.onmessage = async (e) => {
+  try {
   const { type, data } = e.data;
-  console.log("Training worker received message of type:", type);
+  console.log("[Training Worker] Received message:", { type, timestamp: Date.now() });
 
   if (type === "train") {
     // Destructure the data
@@ -127,12 +151,10 @@ self.onmessage = async (e) => {
     }
 
     const modelSaveName = await saveModel(ourModel.model, trainingObjective);
-    // ourModel.download();
-    console.log("Training worker thread posting result...");
+    console.log("[Training Worker] Sending result:", { type: 'result', timestamp: Date.now() });
     self.postMessage({
       type: "result",
       tfModelPath: modelSaveName,
-      // allSamples: allSamplesArray,
     });
   } else if (type === "train_rectified") {
     // Destructure the data for rectified flow training
@@ -206,6 +228,7 @@ self.onmessage = async (e) => {
     const modelSaveName = await saveModel(ourModel.model, trainingObjective);
 
     // Send final result with all trajectories
+    console.log("[Training Worker] Sending result:", { type: 'result', timestamp: Date.now() });
     self.postMessage({
       type: "result",
       tfModelPath: modelSaveName,
@@ -213,8 +236,16 @@ self.onmessage = async (e) => {
     });
   } else if (type === "stop_training") {
     // Figure out how to stop the training
+    console.log("[Training Worker] Received stop_training signal");
     trainingStopped = true;
   } else {
-    console.error("Unknown message type:", type);
+    console.error("[Training Worker] Unknown message type:", type);
+  }
+  } catch (error) {
+    console.error('[Training Worker] Error in message handler:', error);
+    self.postMessage({
+      type: 'error',
+      message: error instanceof Error ? error.message : String(error)
+    });
   }
 };

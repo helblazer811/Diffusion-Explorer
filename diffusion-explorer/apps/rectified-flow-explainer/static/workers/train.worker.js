@@ -61241,6 +61241,42 @@ function sampleUniformGrid(gridResolution, domainRange) {
   return initialPoints;
 }
 
+// ../../packages/diffusion/src/schedulers.ts
+function eulerStep(x_t, t_start, t_end, vectorField) {
+  return tidy(() => {
+    const t0 = t_start.reshape([x_t.shape[0], 1]);
+    const t1 = t_end.reshape([x_t.shape[0], 1]);
+    const dt = t1.sub(t0);
+    const velocity = vectorField(x_t, t0);
+    const update = velocity.mul(dt);
+    return x_t.add(update);
+  });
+}
+function eulerMidpointStep(x_t, t_start, t_end, vectorField) {
+  return tidy(() => {
+    const t0 = t_start.reshape([x_t.shape[0], 1]);
+    const t1 = t_end.reshape([x_t.shape[0], 1]);
+    const dt = t1.sub(t0);
+    const half_step = vectorField(x_t, t0).mul(dt).div(2);
+    const mid_point = x_t.add(half_step);
+    const t_mid = t0.add(dt.div(2));
+    const update = vectorField(mid_point, t_mid).mul(dt);
+    return x_t.add(update);
+  });
+}
+var SCHEDULERS = {
+  "euler": eulerStep,
+  "euler_midpoint": eulerMidpointStep
+};
+function getScheduler(scheduler) {
+  const stepFn = SCHEDULERS[scheduler];
+  if (!stepFn) {
+    const validSchedulers = Object.keys(SCHEDULERS).join(", ");
+    throw new Error(`Unknown scheduler: '${scheduler}'. Valid options are: ${validSchedulers}`);
+  }
+  return stepFn;
+}
+
 // ../../packages/diffusion/src/flow_matching.ts
 var FlowModel = class extends Model {
   constructor(dim = 2, hidden = 64) {
@@ -61306,14 +61342,16 @@ var FlowModel = class extends Model {
       const avgEpochLoss = epochLoss / batchCount;
       let intermediateSamples = null;
       if (epoch % updateInterval === 0) {
-        const allTimeSamples = this.sample(
+        const allTimeSamples = await this.sample(
           500,
           // number of samples
           30
           // number of steps
         );
-        const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0);
-        intermediateSamples = lastTimeStep.arraySync();
+        if (allTimeSamples) {
+          const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0);
+          intermediateSamples = lastTimeStep.arraySync();
+        }
       }
       endEpochCallback(epoch, intermediateSamples, avgEpochLoss);
       await nextFrame();
@@ -61373,10 +61411,14 @@ var FlowModel = class extends Model {
         // source distribution
       );
       if (rectifiedStep < num_rectified_steps - 1) {
-        const trajectories = this.sample_from_initial_points(
+        const trajectories = await this.sample_from_initial_points(
           x0_coupling,
           num_simulation_steps
         );
+        if (!trajectories) {
+          console.log(`Sampling cancelled at rectified step ${rectifiedStep}`);
+          break;
+        }
         const finalStep = trajectories.shape[0] - 1;
         const newX1 = trajectories.slice([finalStep, 0, 0], [1, numSamples, dim]).squeeze([0]);
         if (rectifiedStep > 0) {
@@ -61425,77 +61467,79 @@ var FlowModel = class extends Model {
     });
   }
   /**
-   * Integrate one step from t_start to t_end using midpoint method
+   * Integrate one step from t_start to t_end using the specified scheduler
    * @param x_t tf.Tensor2D of shape [batch, dim]
    * @param t_start tf.Tensor1D or tf.Tensor2D of shape [batch] or [batch, 1]
    * @param t_end tf.Tensor1D or tf.Tensor2D of shape [batch] or [batch, 1]
+   * @param scheduler The integration method to use (default: 'euler_midpoint')
    */
-  step(x_t, t_start, t_end) {
-    return tidy(() => {
-      const t0 = t_start.reshape([x_t.shape[0], 1]);
-      const t1 = t_end.reshape([x_t.shape[0], 1]);
-      const dt = t1.sub(t0);
-      const half_step = this.forward(x_t, t0).mul(dt).div(2);
-      const mid_point = x_t.add(half_step);
-      const t_mid = t0.add(dt.div(2));
-      const update = this.forward(mid_point, t_mid).mul(dt);
-      return x_t.add(update);
-    });
+  step(x_t, t_start, t_end, scheduler = "euler_midpoint") {
+    const stepFn = getScheduler(scheduler);
+    return stepFn(x_t, t_start, t_end, (x, t) => this.forward(x, t));
   }
   /**
    * Draw `num_samples` samples from the model at time step `t`
    * @param num_samples number of samples to draw
    * @param t timestep to draw samples at in [0, num_total_steps]
    * @param num_total_steps number of total steps to simulate the ODE
-   * @param options Optional parameters for future extensibility
+   * @param options Sampling options (scheduler, etc.)
    * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
-   * @returns tf.Tensor2D of shape [num_total_steps, num_samples, dim]
+   * @param shouldStop Optional callback to check if sampling should be cancelled
+   * @returns Promise<tf.Tensor3D | null> - null if cancelled
    */
-  sample(num_samples, num_total_steps = 100, options = {}, perStepCallback) {
+  async sample(num_samples, num_total_steps = 100, options = {}, perStepCallback, shouldStop = () => false) {
     const initial_points = randomNormal([num_samples, this.dim]);
-    return this.sample_from_initial_points(initial_points, num_total_steps, options, perStepCallback);
+    return this.sample_from_initial_points(initial_points, num_total_steps, options, perStepCallback, shouldStop);
   }
   /**
   * Draw samples from the model using the given initial points
   * @param initial_points tf.Tensor2D of shape [num_samples, dim]
   * @param num_total_steps Number of integration steps
-  * @param options Optional parameters for future extensibility
+  * @param options Sampling options (scheduler, etc.)
   * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
+  * @param shouldStop Optional callback to check if sampling should be cancelled
+  * @returns Promise<tf.Tensor3D | null> - null if cancelled
   */
-  sample_from_initial_points(initial_points, num_total_steps = 100, options = {}, perStepCallback) {
-    return tidy(() => {
-      const num_samples = initial_points.shape[0];
-      const x_0 = initial_points;
-      const t_steps = linspace(0, 1, num_total_steps + 1);
-      let all_step_data = [];
-      let x_t = x_0;
-      for (let i = 0; i < num_total_steps; i++) {
-        const t_i = t_steps.slice([i], [1]);
-        const t_i_repeated = tile(t_i, [num_samples]);
-        const t_next = t_steps.slice([i + 1], [1]);
-        const t_next_repeated = tile(t_next, [num_samples]);
-        x_t = this.step(x_t, t_i_repeated, t_next_repeated);
-        all_step_data.push(x_t);
-        if (perStepCallback) {
-          const x_t_array = x_t.arraySync();
-          perStepCallback(i, x_t_array);
-        }
+  async sample_from_initial_points(initial_points, num_total_steps = 100, options = {}, perStepCallback, shouldStop = () => false) {
+    const scheduler = options.scheduler ?? "euler_midpoint";
+    const num_samples = initial_points.shape[0];
+    const t_steps = linspace(0, 1, num_total_steps + 1);
+    let x_t = initial_points;
+    const all_step_data = [];
+    for (let i = 0; i < num_total_steps; i++) {
+      if (shouldStop()) {
+        t_steps.dispose();
+        all_step_data.forEach((t) => t.dispose());
+        return null;
       }
-      return stack(all_step_data);
-    });
+      const x_next = tidy(() => {
+        const t_i = tile(t_steps.slice([i], [1]), [num_samples]);
+        const t_next = tile(t_steps.slice([i + 1], [1]), [num_samples]);
+        return this.step(x_t, t_i, t_next, scheduler);
+      });
+      x_t = x_next;
+      all_step_data.push(x_t);
+      if (perStepCallback) {
+        perStepCallback(i, x_t.arraySync());
+      }
+      await nextFrame();
+    }
+    t_steps.dispose();
+    return stack(all_step_data);
   }
   /**
   * Sample from a uniform grid of initial points
   * @param gridResolution Number of points along each axis
   * @param domainRange The domain range for x and y coordinates
   * @param num_total_steps Number of flow steps
-  * @param options Optional parameters for future extensibility
+  * @param options Sampling options (scheduler, etc.)
   * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
-  * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
+  * @param shouldStop Optional callback to check if sampling should be cancelled
+  * @returns Promise<tf.Tensor3D | null> - null if cancelled
   */
-  sample_grid(gridResolution, domainRange, num_total_steps = 100, options = {}, perStepCallback) {
+  async sample_grid(gridResolution, domainRange, num_total_steps = 100, options = {}, perStepCallback, shouldStop = () => false) {
     const initialPoints = sampleUniformGrid(gridResolution, domainRange);
-    return this.sample_from_initial_points(initialPoints, num_total_steps, options, perStepCallback);
+    return this.sample_from_initial_points(initialPoints, num_total_steps, options, perStepCallback, shouldStop);
   }
   /**
    * Private helper: Sample trajectories for visualization
@@ -61503,22 +61547,29 @@ var FlowModel = class extends Model {
    * @param numSteps Number of ODE integration steps
    * @param numVisualizationSamples Maximum number of samples to visualize
    * @param returnFullTrajectories If true, returns full trajectories; if false, returns only final timestep
-   * @returns Full trajectories as 3D array or final timestep samples as 2D array
+   * @returns Full trajectories as 3D array or final timestep samples as 2D array, or null if cancelled
    */
   async sampleForVisualization(initialPoints, numSteps, numVisualizationSamples = 100, returnFullTrajectories = false) {
-    return tidy(() => {
-      const numSamples = initialPoints.shape[0];
-      const sampleCount = Math.min(numVisualizationSamples, numSamples);
-      const subset = initialPoints.slice([0, 0], [sampleCount, -1]);
-      const trajectories = this.sample_from_initial_points(subset, numSteps);
-      if (returnFullTrajectories) {
-        return trajectories.arraySync();
-      } else {
-        const finalStep = trajectories.shape[0] - 1;
-        const finalSamples = trajectories.slice([finalStep, 0, 0], [1, -1, -1]).squeeze([0]);
-        return finalSamples.arraySync();
-      }
-    });
+    const numSamples = initialPoints.shape[0];
+    const sampleCount = Math.min(numVisualizationSamples, numSamples);
+    const subset = initialPoints.slice([0, 0], [sampleCount, -1]);
+    const trajectories = await this.sample_from_initial_points(subset, numSteps);
+    if (!trajectories) {
+      subset.dispose();
+      return null;
+    }
+    let result;
+    if (returnFullTrajectories) {
+      result = trajectories.arraySync();
+    } else {
+      const finalStep = trajectories.shape[0] - 1;
+      const finalSamples = trajectories.slice([finalStep, 0, 0], [1, -1, -1]).squeeze([0]);
+      result = finalSamples.arraySync();
+      finalSamples.dispose();
+    }
+    subset.dispose();
+    trajectories.dispose();
+    return result;
   }
 };
 
@@ -61546,145 +61597,173 @@ async function saveModel(model2, path) {
   return modelSaveName;
 }
 var trainingStopped = false;
+self.addEventListener("unhandledrejection", (event) => {
+  console.error("[Training Worker] Unhandled promise rejection:", event.reason);
+  self.postMessage({
+    type: "error",
+    message: `Unhandled rejection: ${event.reason?.message || String(event.reason)}`
+  });
+});
+self.addEventListener("error", (event) => {
+  console.error("[Training Worker] Uncaught error:", {
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno
+  });
+  self.postMessage({
+    type: "error",
+    message: `Uncaught error: ${event.message} at ${event.filename}:${event.lineno}`
+  });
+});
 self.onmessage = async (e) => {
-  const { type, data } = e.data;
-  console.log("Training worker received message of type:", type);
-  if (type === "train") {
-    const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
-    if (backend2 === "wasm") {
-      await setBackend("wasm");
-      await ready();
-    } else if (backend2 === "webgl") {
-      await setBackend("webgl");
-      await ready();
-    } else {
-      throw new Error("Invalid backend specified");
-    }
-    const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-    let ourModel;
-    const { pointsTensor, classesTensor } = await loadDataset(datasetPath);
-    if (trainingObjective === "Conditional Diffusion") {
-      if (classesTensor === null) {
-        throw new Error(
-          "Classes tensor is null for conditional diffusion model"
+  try {
+    const { type, data } = e.data;
+    console.log("[Training Worker] Received message:", { type, timestamp: Date.now() });
+    if (type === "train") {
+      const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
+      if (backend2 === "wasm") {
+        await setBackend("wasm");
+        await ready();
+      } else if (backend2 === "webgl") {
+        await setBackend("webgl");
+        await ready();
+      } else {
+        throw new Error("Invalid backend specified");
+      }
+      const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+      let ourModel;
+      const { pointsTensor, classesTensor } = await loadDataset(datasetPath);
+      if (trainingObjective === "Conditional Diffusion") {
+        if (classesTensor === null) {
+          throw new Error(
+            "Classes tensor is null for conditional diffusion model"
+          );
+        }
+        console.log("Training conditional diffusion model...");
+        ourModel = new ModelClass(
+          modelConfig.dim,
+          modelConfig.condDim,
+          modelConfig.hidden
         );
+        await ourModel.train(
+          pointsTensor,
+          classesTensor,
+          trainingConfig["epochs"],
+          trainingConfig["batchSize"],
+          trainingConfig["updateInterval"],
+          // Stop training function that handles halting the training
+          () => {
+            return trainingStopped;
+          },
+          (epoch, intermediateSamples, loss) => {
+            self.postMessage({
+              type: "epoch_chunk",
+              epoch,
+              intermediateSamples,
+              loss
+            });
+          }
+        );
+      } else if (trainingObjective === "Flow Matching" || trainingObjective === "Diffusion") {
+        ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
+        await ourModel.train(
+          pointsTensor,
+          trainingConfig["epochs"],
+          trainingConfig["batchSize"],
+          trainingConfig["updateInterval"],
+          // Stop training function that handles halting the training
+          () => {
+            return trainingStopped;
+          },
+          (epoch, intermediateSamples, loss) => {
+            self.postMessage({
+              type: "epoch_chunk",
+              epoch,
+              intermediateSamples,
+              loss
+            });
+          }
+        );
+      } else {
+        throw new Error("Invalid training objective" + trainingObjective);
       }
-      console.log("Training conditional diffusion model...");
-      ourModel = new ModelClass(
-        modelConfig.dim,
-        modelConfig.condDim,
-        modelConfig.hidden
-      );
-      await ourModel.train(
+      const modelSaveName = await saveModel(ourModel.model, trainingObjective);
+      console.log("[Training Worker] Sending result:", { type: "result", timestamp: Date.now() });
+      self.postMessage({
+        type: "result",
+        tfModelPath: modelSaveName
+      });
+    } else if (type === "train_rectified") {
+      const { trainingObjective, modelConfig, datasetPath, rectifiedConfig } = data;
+      if (backend2 === "wasm") {
+        await setBackend("wasm");
+        await ready();
+      } else if (backend2 === "webgl") {
+        await setBackend("webgl");
+        await ready();
+      } else {
+        throw new Error("Invalid backend specified");
+      }
+      const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+      const ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
+      const { pointsTensor } = await loadDataset(datasetPath);
+      let sourceDistribution = null;
+      if (rectifiedConfig.sourceDistributionPath) {
+        const { pointsTensor: sourceTensor } = await loadDataset(rectifiedConfig.sourceDistributionPath);
+        sourceDistribution = sourceTensor;
+      }
+      const allRectifiedTrajectories = [];
+      await ourModel.train_rectified(
         pointsTensor,
-        classesTensor,
-        trainingConfig["epochs"],
-        trainingConfig["batchSize"],
-        trainingConfig["updateInterval"],
-        // Stop training function that handles halting the training
-        () => {
-          return trainingStopped;
-        },
-        (epoch, intermediateSamples, loss) => {
+        sourceDistribution,
+        rectifiedConfig.num_rectified_steps,
+        rectifiedConfig.epochs_per_rectified_step,
+        rectifiedConfig.batchSize,
+        rectifiedConfig.num_simulation_steps,
+        // Stop training function
+        () => trainingStopped,
+        // End epoch callback
+        (epoch, rectifiedStep, intermediateSamples, loss) => {
           self.postMessage({
             type: "epoch_chunk",
             epoch,
+            rectifiedStep,
             intermediateSamples,
             loss
           });
-        }
-      );
-    } else if (trainingObjective === "Flow Matching" || trainingObjective === "Diffusion") {
-      ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
-      await ourModel.train(
-        pointsTensor,
-        trainingConfig["epochs"],
-        trainingConfig["batchSize"],
-        trainingConfig["updateInterval"],
-        // Stop training function that handles halting the training
-        () => {
-          return trainingStopped;
         },
-        (epoch, intermediateSamples, loss) => {
+        // End rectified step callback
+        (rectifiedStep, trajectories) => {
+          if (trajectories) {
+            allRectifiedTrajectories.push(trajectories);
+          }
           self.postMessage({
-            type: "epoch_chunk",
-            epoch,
-            intermediateSamples,
-            loss
+            type: "rectified_step_complete",
+            rectifiedStep,
+            trajectories
           });
         }
       );
+      const modelSaveName = await saveModel(ourModel.model, trainingObjective);
+      console.log("[Training Worker] Sending result:", { type: "result", timestamp: Date.now() });
+      self.postMessage({
+        type: "result",
+        tfModelPath: modelSaveName,
+        allRectifiedTrajectories
+      });
+    } else if (type === "stop_training") {
+      console.log("[Training Worker] Received stop_training signal");
+      trainingStopped = true;
     } else {
-      throw new Error("Invalid training objective" + trainingObjective);
+      console.error("[Training Worker] Unknown message type:", type);
     }
-    const modelSaveName = await saveModel(ourModel.model, trainingObjective);
-    console.log("Training worker thread posting result...");
+  } catch (error) {
+    console.error("[Training Worker] Error in message handler:", error);
     self.postMessage({
-      type: "result",
-      tfModelPath: modelSaveName
-      // allSamples: allSamplesArray,
+      type: "error",
+      message: error instanceof Error ? error.message : String(error)
     });
-  } else if (type === "train_rectified") {
-    const { trainingObjective, modelConfig, datasetPath, rectifiedConfig } = data;
-    if (backend2 === "wasm") {
-      await setBackend("wasm");
-      await ready();
-    } else if (backend2 === "webgl") {
-      await setBackend("webgl");
-      await ready();
-    } else {
-      throw new Error("Invalid backend specified");
-    }
-    const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-    const ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
-    const { pointsTensor } = await loadDataset(datasetPath);
-    let sourceDistribution = null;
-    if (rectifiedConfig.sourceDistributionPath) {
-      const { pointsTensor: sourceTensor } = await loadDataset(rectifiedConfig.sourceDistributionPath);
-      sourceDistribution = sourceTensor;
-    }
-    const allRectifiedTrajectories = [];
-    await ourModel.train_rectified(
-      pointsTensor,
-      sourceDistribution,
-      rectifiedConfig.num_rectified_steps,
-      rectifiedConfig.epochs_per_rectified_step,
-      rectifiedConfig.batchSize,
-      rectifiedConfig.num_simulation_steps,
-      // Stop training function
-      () => trainingStopped,
-      // End epoch callback
-      (epoch, rectifiedStep, intermediateSamples, loss) => {
-        self.postMessage({
-          type: "epoch_chunk",
-          epoch,
-          rectifiedStep,
-          intermediateSamples,
-          loss
-        });
-      },
-      // End rectified step callback
-      (rectifiedStep, trajectories) => {
-        if (trajectories) {
-          allRectifiedTrajectories.push(trajectories);
-        }
-        self.postMessage({
-          type: "rectified_step_complete",
-          rectifiedStep,
-          trajectories
-        });
-      }
-    );
-    const modelSaveName = await saveModel(ourModel.model, trainingObjective);
-    self.postMessage({
-      type: "result",
-      tfModelPath: modelSaveName,
-      allRectifiedTrajectories
-    });
-  } else if (type === "stop_training") {
-    trainingStopped = true;
-  } else {
-    console.error("Unknown message type:", type);
   }
 };
 /*! Bundled license information:

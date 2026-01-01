@@ -15,8 +15,8 @@
   // Layout
   export let canvasWidth = 400;
   export let canvasHeight = 400;
-  export let marginWidth = 20;
-  export let marginHeight = 20;
+  export let marginWidth = 50;
+  export let marginHeight = 50;
   export let gap = 20;
 
   // Labels
@@ -27,10 +27,12 @@
 
   // Arrow styling
   export let arrowColor = '#f17720';
-  export let arrowScale = 45;
+  export let arrowScale = 30;
   export let arrowWidth = 2.5;
   export let arrowOpacity = 1.0;
-  export let normalizeVectors = false;
+  export let normalizeVectors = true;
+  export let centerQuiver = true;
+  export let showArrowHeads = false;
 
   // Animation
   export let animationDuration = 8000;
@@ -143,7 +145,9 @@
       strokeWidth: arrowWidth,
       color: arrowColor,
       opacity: arrowOpacity,
-      normalizeVectors
+      normalizeVectors,
+      centerQuiver,
+      showArrowHeads
     };
 
     // Draw left panel (flow matching)

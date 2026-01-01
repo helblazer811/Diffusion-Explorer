@@ -3,7 +3,7 @@
   import * as d3 from "d3";
   import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
+  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
 
@@ -69,6 +69,7 @@
   // Interactive sampling
   export let highlightedTrajectoryOpacity = 1.0;
   export let dimmedTrajectoryOpacity = 0.15;
+  export let maxUserTrajectories = 5;
 
   // Callbacks & misc
   export let onInitialized = undefined;
@@ -140,11 +141,14 @@
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
 
-  // User-clicked trajectory state
-  let leftClickedTrajectory = null; // [timestep][x,y] in pixels
-  let rightClickedTrajectory = null;
-  let hasClickedTrajectory = false;
+  // User-defined trajectory state (supports multiple trajectories)
+  let userStartPoints = []; // Array of [x, y] domain coordinates
+  let userFlowMatchingTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
+  let userRectifiedFlowTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
+  let hasUserTrajectory = false;
   let isStreamingTrajectory = false;
+  let activeFlowMatchingRequestId = null; // Track active request for cancellation
+  let activeRectifiedFlowRequestId = null; // Track active request for cancellation
   let streamingCompleteCount = 0;
 
   // ===== FUNCTIONS =====
@@ -243,7 +247,7 @@
     ctx,
     scaledTrajectories,
     segmentIndex,
-    clickedTrajectory,
+    userTrajectories,
     time
   ) {
     if (!ctx) return;
@@ -276,7 +280,7 @@
     }
 
     // Draw default trajectories
-    const defaultOpacity = hasClickedTrajectory
+    const defaultOpacity = hasUserTrajectory
       ? dimmedTrajectoryOpacity
       : trajectoryProgressOpacity;
     drawTrajectoriesWithPreview(
@@ -286,16 +290,26 @@
       getTrajectoryStyle(defaultOpacity)
     );
 
-    // Draw clicked trajectory (highlighted) on top
-    if (clickedTrajectory && clickedTrajectory.length > 1) {
-      const clickedNumSegments = clickedTrajectory.length - 1;
-      const clickedSegmentIndex = Math.floor(time * clickedNumSegments);
-      drawTrajectoriesWithPreview(
-        ctx,
-        [clickedTrajectory],
-        clickedSegmentIndex,
-        getTrajectoryStyle(highlightedTrajectoryOpacity)
-      );
+    // Draw all user-defined trajectories (highlighted) on top
+    for (const userTrajectory of userTrajectories) {
+      if (userTrajectory && userTrajectory.length > 1) {
+        const userNumSegments = userTrajectory.length - 1;
+        const userSegmentIndex = Math.floor(time * userNumSegments);
+        drawTrajectoriesWithPreview(
+          ctx,
+          [userTrajectory],
+          userSegmentIndex,
+          getTrajectoryStyle(highlightedTrajectoryOpacity)
+        );
+      } else if (userTrajectory && userTrajectory.length === 1) {
+        // Draw just the starting point for immediate feedback
+        const [x, y] = userTrajectory[0];
+        ctx.globalAlpha = highlightedTrajectoryOpacity;
+        ctx.beginPath();
+        ctx.arc(x, y, trajectoryPointRadius, 0, Math.PI * 2);
+        ctx.fillStyle = trajectoryColor;
+        ctx.fill();
+      }
     }
 
     ctx.globalAlpha = 1.0;
@@ -320,7 +334,7 @@
       leftCtx,
       scaledLeftTrajectories,
       leftCurrentSegmentIndex,
-      leftClickedTrajectory,
+      userFlowMatchingTrajectories,
       leftTime
     );
   }
@@ -331,7 +345,7 @@
       rightCtx,
       scaledRightTrajectories,
       rightCurrentSegmentIndex,
-      rightClickedTrajectory,
+      userRectifiedFlowTrajectories,
       rightTime
     );
   }
@@ -481,8 +495,6 @@
 
   // Handle canvas click - convert to domain coordinates and sample
   function handleCanvasClick(event, side) {
-    // Ignore clicks while sampling is in progress
-    if (isStreamingTrajectory) return;
     if (
       !settings.samplingWorkerUrl ||
       !settings.flowMatchingModelPath ||
@@ -507,16 +519,33 @@
     sampleFromPoint([domainX, domainY]);
   }
 
-  // Sample trajectory from a specific point using both models (streaming)
+  // Sample trajectories from all user start points using both models (streaming)
   function sampleFromPoint(point) {
-    hasClickedTrajectory = true;
+    // Cancel any in-flight requests from previous clicks
+    if (activeFlowMatchingRequestId) {
+      stopSamplingRequest(activeFlowMatchingRequestId);
+      activeFlowMatchingRequestId = null;
+    }
+    if (activeRectifiedFlowRequestId) {
+      stopSamplingRequest(activeRectifiedFlowRequestId);
+      activeRectifiedFlowRequestId = null;
+    }
+
+    // Add new point to the list of user start points
+    userStartPoints = [...userStartPoints, point];
+
+    // If we exceed the max, remove the oldest point
+    if (userStartPoints.length > maxUserTrajectories) {
+      userStartPoints = userStartPoints.slice(-maxUserTrajectories);
+    }
+
+    hasUserTrajectory = true;
     isStreamingTrajectory = true;
     streamingCompleteCount = 0;
 
-    // Initialize trajectories with the initial click point (scaled to pixels)
-    const initialPixelPoint = [xScale(point[0]), yScale(point[1])];
-    leftClickedTrajectory = [initialPixelPoint];
-    rightClickedTrajectory = [initialPixelPoint];
+    // Initialize trajectory arrays with initial pixel points for all start points
+    userFlowMatchingTrajectories = userStartPoints.map(p => [[xScale(p[0]), yScale(p[1])]]);
+    userRectifiedFlowTrajectories = userStartPoints.map(p => [[xScale(p[0]), yScale(p[1])]]);
 
     // Reset and start animation immediately
     leftCurrentSegmentIndex = 0;
@@ -541,38 +570,42 @@
     }
 
     // Sample from left model (Flow Matching) with streaming
-    callSamplingWorkerThreadFromInitialPoints(
+    activeFlowMatchingRequestId = callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.flowMatchingModelPath,
       "Flow Matching",
       settings.trainingSettings.modelConfig,
-      [point],
+      userStartPoints,
       numTimeSteps,
       checkComplete, // onComplete
       settings.trainingSettings.domainRange,
       {},
-      // onStep callback - append each new point as it arrives
+      // onStep callback - append new points for all trajectories
       (_step, x_t) => {
-        const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
-        leftClickedTrajectory = [...leftClickedTrajectory, newPoint];
+        userFlowMatchingTrajectories = userFlowMatchingTrajectories.map((traj, i) => [
+          ...traj,
+          [xScale(x_t[i][0]), yScale(x_t[i][1])]
+        ]);
       }
     );
 
     // Sample from right model (Rectified Flow) with streaming
-    callSamplingWorkerThreadFromInitialPoints(
+    activeRectifiedFlowRequestId = callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.rectifiedFlowModelPath,
       "Flow Matching",
       settings.trainingSettings.modelConfig,
-      [point],
+      userStartPoints,
       numTimeSteps,
       checkComplete, // onComplete
       settings.trainingSettings.domainRange,
       {},
-      // onStep callback - append each new point as it arrives
+      // onStep callback - append new points for all trajectories
       (_step, x_t) => {
-        const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
-        rightClickedTrajectory = [...rightClickedTrajectory, newPoint];
+        userRectifiedFlowTrajectories = userRectifiedFlowTrajectories.map((traj, i) => [
+          ...traj,
+          [xScale(x_t[i][0]), yScale(x_t[i][1])]
+        ]);
       }
     );
   }

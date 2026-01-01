@@ -1,203 +1,30 @@
-import * as tf from '@tensorflow/tfjs';
 import {
   callSamplingWorkerThreadFromInitialPoints,
   callSamplingWorkerThreadVectorFieldGrid,
-  sampleMultivariateNormal
-} from '@diffusion-explorer/diffusion';
-import {
+  loadTargetDistribution,
+  loadCachedTrajectories,
+  loadCachedVectorField,
+  loadCachedRectifiedFlowTrajectories,
+  validateModelPath,
   type VectorFieldData,
-  type RectifiedFlowData,
-  type TrainingSettings
-} from '../settings';
-import { clipSamplesToRadius } from './utils';
+  type RectifiedFlowData
+} from '@diffusion-explorer/diffusion';
+import { type TrainingSettings } from '../settings';
+import {
+  generateUniformGridSamples,
+  generateClippedGaussianSamples
+} from './utils';
 
 // Re-export types for convenience
 export type { VectorFieldData, RectifiedFlowData, TrainingSettings };
 
-// ========== HELPER FUNCTIONS ==========
+// Re-export utility functions for convenience
+export { generateUniformGridSamples, generateClippedGaussianSamples, validateModelPath };
 
-export function generateUniformGridSamples(
-  gridResolution: number,
-  domainRange: { xMin: number; xMax: number; yMin: number; yMax: number }
-): number[][] {
-  const samples: number[][] = [];
-  const { xMin, xMax, yMin, yMax } = domainRange;
-
-  for (let i = 0; i < gridResolution; i++) {
-    for (let j = 0; j < gridResolution; j++) {
-      const x = xMin + (xMax - xMin) * (i / (gridResolution - 1));
-      const y = yMin + (yMax - yMin) * (j / (gridResolution - 1));
-      samples.push([x, y]);
-    }
-  }
-  return samples;
-}
-
-export function generateClippedGaussianSamples(numSamples: number): number[][] {
-  return tf.tidy(() => {
-    const mean = [0, 0];
-    const cov = [[1, 0], [0, 1]];
-    const maxStdDev = 2.0;
-    const threshold = maxStdDev * Math.sqrt(2);
-
-    let allClippedSamples: number[][] = [];
-    let attempts = 0;
-    const maxAttempts = 10;
-    const batchSize = Math.ceil(numSamples * 1.5);
-
-    while (allClippedSamples.length < numSamples && attempts < maxAttempts) {
-      attempts++;
-      const rawSamplesTensor = sampleMultivariateNormal(mean, cov, batchSize) as tf.Tensor2D;
-      const rawSamplesArray = rawSamplesTensor.arraySync() as number[][];
-
-      const clippedBatch = clipSamplesToRadius(rawSamplesArray, threshold);
-      allClippedSamples = allClippedSamples.concat(clippedBatch);
-    }
-    return allClippedSamples.slice(0, numSamples);
-  });
-}
-
-// ========== DATA LOADING FUNCTIONS ==========
-
-export async function loadTargetDistribution(
-  dataPath: string,
-  numSamples: number
-): Promise<number[][] | null> {
-  try {
-    const response = await fetch(dataPath);
-    const data = await response.json();
-    const allPoints = data.points as number[][];
-    // Fisher-Yates shuffle for unbiased random sampling
-    const shuffled = [...allPoints];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled.slice(0, numSamples);
-  } catch (error) {
-    console.error('Failed to load target distribution:', error);
-    return null;
-  }
-}
-
-export async function loadCachedTrajectories(
-  path: string
-): Promise<{ trajectories: number[][][]; sourceDistribution: number[][] } | null> {
-  try {
-    const response = await fetch(path);
-    if (!response.ok) {
-      console.log('Cached trajectories file not found:', path);
-      return null;
-    }
-
-    const cachedData = await response.json();
-    if (!cachedData || !Array.isArray(cachedData)) {
-      console.error('Invalid cached trajectories format from file: ', path);
-      return null;
-    }
-
-    if (cachedData.length > 0 && cachedData[0]) {
-      return {
-        trajectories: cachedData,
-        sourceDistribution: cachedData[0]
-      };
-    }
-
-    console.error('Cached trajectories array is empty');
-    return null;
-  } catch (error) {
-    console.log('Could not load cached trajectories:', error);
-    return null;
-  }
-}
-
-export async function loadCachedVectorField(
-  path: string
-): Promise<VectorFieldData | null> {
-  try {
-    const response = await fetch(path);
-    if (!response.ok) {
-      console.log('Cached vector field file not found:', path);
-      return null;
-    }
-
-    const cachedData = await response.json();
-
-    // Validate format
-    if (!cachedData ||
-        typeof cachedData.gridResolution !== 'number' ||
-        !Array.isArray(cachedData.timeSteps) ||
-        !Array.isArray(cachedData.velocities)) {
-      console.error('Invalid cached vector field format');
-      return null;
-    }
-
-    return cachedData;
-  } catch (error) {
-    console.log('Could not load cached vector field:', error);
-    return null;
-  }
-}
-
-export async function loadCachedRectifiedFlowTrajectories(
-  path: string
-): Promise<RectifiedFlowData | null> {
-  try {
-    const response = await fetch(path);
-    if (!response.ok) {
-      console.log('Cached rectified flow file not found:', path);
-      return null;
-    }
-
-    const cachedData = await response.json();
-
-    // Validate format
-    if (!cachedData ||
-        !Array.isArray(cachedData.allRectifiedTrajectories) ||
-        typeof cachedData.modelPath !== 'string') {
-      console.error('Invalid cached rectified flow format');
-      return null;
-    }
-
-    return cachedData;
-  } catch (error) {
-    console.log('Could not load cached rectified flow:', error);
-    return null;
-  }
-}
+// Re-export caching functions for convenience
+export { loadTargetDistribution, loadCachedTrajectories, loadCachedVectorField, loadCachedRectifiedFlowTrajectories };
 
 // ========== SAMPLING FUNCTIONS ==========
-
-/**
- * Validates that a model path exists by checking for model.json
- * @throws Error if the model path does not exist
- */
-async function validateModelPath(modelPath: string): Promise<void> {
-  // Determine the model.json URL - if path already ends with .json, use it directly
-  // Otherwise append /model.json
-  const modelJsonPath = modelPath.endsWith('.json')
-    ? modelPath
-    : modelPath.endsWith('/')
-      ? `${modelPath}model.json`
-      : `${modelPath}/model.json`;
-
-  try {
-    const response = await fetch(modelJsonPath);
-    if (!response.ok) {
-      throw new Error(`Model not found at path: ${modelPath} (HTTP ${response.status} for ${modelJsonPath})`);
-    }
-    // Verify it's valid JSON
-    const data = await response.json();
-    if (!data.modelTopology && !data.weightsManifest) {
-      throw new Error(`Invalid model.json format at: ${modelJsonPath}`);
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Model not found')) {
-      throw error;
-    }
-    throw new Error(`Failed to validate model at path: ${modelPath} - ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
 
 export async function generateSamples(
   modelPath: string,
@@ -213,7 +40,7 @@ export async function generateSamples(
   const initialPoints = generateClippedGaussianSamples(numSamples);
 
   return new Promise((resolve) => {
-    callSamplingWorkerThreadFromInitialPoints(
+    const worker = callSamplingWorkerThreadFromInitialPoints(
       samplingWorkerUrl,
       modelPath,
       'Flow Matching',
@@ -247,7 +74,7 @@ export async function generateSamplesUniformGrid(
   const initialPoints = generateUniformGridSamples(gridResolution, gridDomainRange);
 
   return new Promise((resolve) => {
-    callSamplingWorkerThreadFromInitialPoints(
+    const worker = callSamplingWorkerThreadFromInitialPoints(
       samplingWorkerUrl,
       modelPath,
       'Flow Matching',
@@ -295,7 +122,7 @@ export async function generateVectorField(
     console.log(`Sampling vector field at t=${t.toFixed(2)}...`);
 
     // Use promise to wait for worker callback
-    const result = await new Promise<{ velocities: number[][]; gridPoints?: number[][] }>((resolve) => {
+    const result = await new Promise<{ velocities: number[][]; gridPoints?: number[][] }>((resolve, reject) => {
       const worker = callSamplingWorkerThreadVectorFieldGrid(
         samplingWorkerUrl,
         modelPath,
@@ -317,7 +144,15 @@ export async function generateVectorField(
             velocities: e.data.velocities,
             gridPoints: e.data.gridPoints
           });
+        } else if (e.data.type === 'error') {
+          reject(new Error(e.data.error));
         }
+      };
+
+      // Add error handler
+      worker.onerror = (e) => {
+        console.error('[VectorField Worker Error]', e.message);
+        reject(new Error(e.message));
       };
     });
 

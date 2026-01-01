@@ -104,13 +104,15 @@ export class FlowModel extends Model {
             if (epoch % updateInterval === 0) {
                 // Sample from the model
                 // TODO put these in the settings
-                const allTimeSamples = this.sample(
+                const allTimeSamples = await this.sample(
                     500, // number of samples
                     30 // number of steps
                 ); // shape [num_total_steps, num_samples, dim]
-                // Pull out the last time step
-                const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0); // shape [num_samples, dim]
-                intermediateSamples = lastTimeStep.arraySync();
+                // Pull out the last time step (if not cancelled)
+                if (allTimeSamples) {
+                    const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0); // shape [num_samples, dim]
+                    intermediateSamples = lastTimeStep.arraySync();
+                }
             }
             // Run the end epoch callback with loss
             endEpochCallback(epoch, intermediateSamples, avgEpochLoss);
@@ -198,10 +200,16 @@ export class FlowModel extends Model {
             // Sample to get new coupling (except on last step)
             if (rectifiedStep < num_rectified_steps - 1) {
                 // Generate trajectories from x0_coupling
-                const trajectories = this.sample_from_initial_points(
+                const trajectories = await this.sample_from_initial_points(
                     x0_coupling,
                     num_simulation_steps
                 );
+
+                // Handle cancellation
+                if (!trajectories) {
+                    console.log(`Sampling cancelled at rectified step ${rectifiedStep}`);
+                    break;
+                }
 
                 // Extract final timestep (t=1) as new x1
                 const finalStep = trajectories.shape[0] - 1;
@@ -287,19 +295,21 @@ export class FlowModel extends Model {
      * @param num_total_steps number of total steps to simulate the ODE
      * @param options Sampling options (scheduler, etc.)
      * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
-     * @returns tf.Tensor2D of shape [num_total_steps, num_samples, dim]
+     * @param shouldStop Optional callback to check if sampling should be cancelled
+     * @returns Promise<tf.Tensor3D | null> - null if cancelled
      */
-    sample(
+    async sample(
         num_samples: number,
         num_total_steps: number = 100,
         options: SamplingOptions = {},
-        perStepCallback?: (step: number, x_t: number[][]) => void
-    ): tf.Tensor3D {
+        perStepCallback?: (step: number, x_t: number[][]) => void,
+        shouldStop: () => boolean = () => false
+    ): Promise<tf.Tensor3D | null> {
         // Draw initial samples from a Gaussian distribution
         const initial_points = tf.randomNormal([num_samples, this.dim]);
 
         // Delegate to sample_from_initial_points
-        return this.sample_from_initial_points(initial_points, num_total_steps, options, perStepCallback);
+        return this.sample_from_initial_points(initial_points, num_total_steps, options, perStepCallback, shouldStop);
     }
 
     /**
@@ -308,44 +318,52 @@ export class FlowModel extends Model {
     * @param num_total_steps Number of integration steps
     * @param options Sampling options (scheduler, etc.)
     * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
+    * @param shouldStop Optional callback to check if sampling should be cancelled
+    * @returns Promise<tf.Tensor3D | null> - null if cancelled
     */
-    sample_from_initial_points(
+    async sample_from_initial_points(
         initial_points: tf.Tensor2D,
         num_total_steps: number = 100,
         options: SamplingOptions = {},
-        perStepCallback?: (step: number, x_t: number[][]) => void
-    ): tf.Tensor3D {
+        perStepCallback?: (step: number, x_t: number[][]) => void,
+        shouldStop: () => boolean = () => false
+    ): Promise<tf.Tensor3D | null> {
         const scheduler = options.scheduler ?? 'euler_midpoint';
+        const num_samples = initial_points.shape[0];
+        const t_steps = tf.linspace(0, 1, num_total_steps + 1);
 
-        return tf.tidy(() => {
-            // Draw some initial samples from the source distribution
-            const num_samples = initial_points.shape[0];
-            const x_0 = initial_points;
-            // Draw some linear spaced timesteps in [0, 1]
-            const t_steps = tf.linspace(0, 1, num_total_steps + 1);
-            // Simulate the ODE until timestep t for all samples
-            let all_step_data: tf.Tensor2D[] = [];
-            // Store the initial sample
-            let x_t: tf.Tensor2D = x_0;
-            for (let i = 0; i < num_total_steps; i++) {
-                const t_i = t_steps.slice([i], [1]); // current time
-                const t_i_repeated = tf.tile(t_i, [num_samples]);
-                const t_next = t_steps.slice([i + 1], [1]); // next time
-                const t_next_repeated = tf.tile(t_next, [num_samples]);
-                // Do the step using the selected scheduler
-                x_t = this.step(x_t, t_i_repeated, t_next_repeated, scheduler);
-                // Store the result in the all_step_data tensor
-                all_step_data.push(x_t);
+        let x_t: tf.Tensor2D = initial_points;
+        const all_step_data: tf.Tensor2D[] = [];
 
-                // Call per-step callback if provided
-                if (perStepCallback) {
-                    const x_t_array = x_t.arraySync() as number[][];
-                    perStepCallback(i, x_t_array);
-                }
+        for (let i = 0; i < num_total_steps; i++) {
+            // Check for cancellation
+            if (shouldStop()) {
+                t_steps.dispose();
+                all_step_data.forEach(t => t.dispose());
+                return null;
             }
-            // Return all samples
-            return tf.stack(all_step_data);
-        });
+
+            // Perform ODE step
+            const x_next = tf.tidy(() => {
+                const t_i = tf.tile(t_steps.slice([i], [1]), [num_samples]);
+                const t_next = tf.tile(t_steps.slice([i + 1], [1]), [num_samples]);
+                return this.step(x_t, t_i, t_next, scheduler);
+            });
+
+            x_t = x_next;
+            all_step_data.push(x_t);
+
+            // Call per-step callback if provided
+            if (perStepCallback) {
+                perStepCallback(i, x_t.arraySync() as number[][]);
+            }
+
+            // Yield to event loop - allows cancel messages to be processed
+            await tf.nextFrame();
+        }
+
+        t_steps.dispose();
+        return tf.stack(all_step_data);
     }    
     
     /**
@@ -355,20 +373,22 @@ export class FlowModel extends Model {
     * @param num_total_steps Number of flow steps
     * @param options Sampling options (scheduler, etc.)
     * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
-    * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
+    * @param shouldStop Optional callback to check if sampling should be cancelled
+    * @returns Promise<tf.Tensor3D | null> - null if cancelled
     */
-    sample_grid(
+    async sample_grid(
         gridResolution: number,
         domainRange: { xMin: number, xMax: number, yMin: number, yMax: number },
         num_total_steps: number = 100,
         options: SamplingOptions = {},
-        perStepCallback?: (step: number, x_t: number[][]) => void
-    ): tf.Tensor3D {
+        perStepCallback?: (step: number, x_t: number[][]) => void,
+        shouldStop: () => boolean = () => false
+    ): Promise<tf.Tensor3D | null> {
         // Generate uniform grid
         const initialPoints = sampleUniformGrid(gridResolution, domainRange);
 
         // Sample from the initial points
-        return this.sample_from_initial_points(initialPoints, num_total_steps, options, perStepCallback);
+        return this.sample_from_initial_points(initialPoints, num_total_steps, options, perStepCallback, shouldStop);
     }
 
     /**
@@ -377,7 +397,7 @@ export class FlowModel extends Model {
      * @param numSteps Number of ODE integration steps
      * @param numVisualizationSamples Maximum number of samples to visualize
      * @param returnFullTrajectories If true, returns full trajectories; if false, returns only final timestep
-     * @returns Full trajectories as 3D array or final timestep samples as 2D array
+     * @returns Full trajectories as 3D array or final timestep samples as 2D array, or null if cancelled
      */
     private async sampleForVisualization(
         initialPoints: tf.Tensor2D,
@@ -385,27 +405,35 @@ export class FlowModel extends Model {
         numVisualizationSamples: number = 100,
         returnFullTrajectories: boolean = false
     ): Promise<number[][] | number[][][] | null> {
-        return tf.tidy(() => {
-            const numSamples = initialPoints.shape[0];
-            const sampleCount = Math.min(numVisualizationSamples, numSamples);
+        const numSamples = initialPoints.shape[0];
+        const sampleCount = Math.min(numVisualizationSamples, numSamples);
 
-            // Take subset of samples for visualization
-            const subset = initialPoints.slice([0, 0], [sampleCount, -1]);
+        // Take subset of samples for visualization
+        const subset = initialPoints.slice([0, 0], [sampleCount, -1]);
 
-            // Generate trajectories
-            const trajectories = this.sample_from_initial_points(subset, numSteps);
+        // Generate trajectories
+        const trajectories = await this.sample_from_initial_points(subset, numSteps);
 
-            if (returnFullTrajectories) {
-                // Return full trajectories: [num_timesteps, num_samples, dim]
-                return trajectories.arraySync() as number[][][];
-            } else {
-                // Return only final timestep (backward compatible)
-                const finalStep = trajectories.shape[0] - 1;
-                const finalSamples = trajectories.slice([finalStep, 0, 0], [1, -1, -1])
-                                                .squeeze([0]);
+        if (!trajectories) {
+            subset.dispose();
+            return null;
+        }
 
-                return finalSamples.arraySync() as number[][];
-            }
-        });
+        let result: number[][] | number[][][];
+        if (returnFullTrajectories) {
+            // Return full trajectories: [num_timesteps, num_samples, dim]
+            result = trajectories.arraySync() as number[][][];
+        } else {
+            // Return only final timestep (backward compatible)
+            const finalStep = trajectories.shape[0] - 1;
+            const finalSamples = trajectories.slice([finalStep, 0, 0], [1, -1, -1])
+                                            .squeeze([0]);
+            result = finalSamples.arraySync() as number[][];
+            finalSamples.dispose();
+        }
+
+        subset.dispose();
+        trajectories.dispose();
+        return result;
     }
 }
