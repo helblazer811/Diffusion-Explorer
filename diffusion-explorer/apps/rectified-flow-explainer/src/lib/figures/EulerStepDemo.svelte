@@ -9,7 +9,16 @@
     drawVectorField,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
+  import { FlowModelClient } from "@diffusion-explorer/diffusion";
+
+  // Create sampling client
+  const flowMatchingClient = new FlowModelClient(
+    settings.samplingWorkerUrl,
+    settings.flowMatchingModelPath,
+    "Flow Matching",
+    settings.trainingSettings.modelConfig,
+    settings.trainingSettings.domainRange
+  );
 
   // ===== PROPS =====
 
@@ -172,11 +181,11 @@
   // Cancel all in-flight requests
   function cancelAllRequests() {
     if (groundTruthRequestId) {
-      stopSamplingRequest(groundTruthRequestId);
+      flowMatchingClient.stopRequest(groundTruthRequestId);
       groundTruthRequestId = null;
     }
     if (activeRequestId) {
-      stopSamplingRequest(activeRequestId);
+      flowMatchingClient.stopRequest(activeRequestId);
       activeRequestId = null;
     }
   }
@@ -211,18 +220,9 @@
     };
 
     // Ground truth: streaming with many steps
-    groundTruthRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.flowMatchingModelPath,
-      "Flow Matching",
-      settings.trainingSettings.modelConfig,
+    const gtResult = flowMatchingClient.sampleFromInitialPoints(
       userStartPoints,
       GROUND_TRUTH_STEPS,
-      () => {
-        groundTruthRequestId = null;
-        checkComplete();
-      },
-      settings.trainingSettings.domainRange,
       { scheduler: "euler" },
       // onStep - append new points to each ground truth trajectory
       (_step, x_t) => {
@@ -232,20 +232,16 @@
         ]);
       }
     );
+    groundTruthRequestId = gtResult.requestId;
+    gtResult.promise.then(() => {
+      groundTruthRequestId = null;
+      checkComplete();
+    });
 
     // Approximation: streaming with fewer steps
-    activeRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.flowMatchingModelPath,
-      "Flow Matching",
-      settings.trainingSettings.modelConfig,
+    const approxResult = flowMatchingClient.sampleFromInitialPoints(
       userStartPoints,
       NUM_STEPS,
-      () => {
-        activeRequestId = null;
-        checkComplete();
-      },
-      settings.trainingSettings.domainRange,
       { scheduler: "euler" },
       // onStep - append new points to each approximation trajectory
       (_step, x_t) => {
@@ -255,6 +251,11 @@
         ]);
       }
     );
+    activeRequestId = approxResult.requestId;
+    approxResult.promise.then(() => {
+      activeRequestId = null;
+      checkComplete();
+    });
   }
 
   // Draw a full trajectory path on a given context

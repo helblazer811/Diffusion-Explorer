@@ -3,7 +3,15 @@
   import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
-  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
+  import { FlowModelClient } from "@diffusion-explorer/diffusion";
+
+  // Create sampling client
+  const flowMatchingClient = new FlowModelClient(
+    settings.samplingWorkerUrl,
+    settings.flowMatchingModelPath,
+    "Flow Matching",
+    settings.trainingSettings.modelConfig
+  );
 
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
@@ -152,7 +160,7 @@
 
     // Cancel any in-progress request before adding new point
     if (activeRequestId) {
-      stopSamplingRequest(activeRequestId);
+      flowMatchingClient.stopRequest(activeRequestId);
       activeRequestId = null;
     }
 
@@ -190,45 +198,10 @@
     isPlaying = true;
 
     // Sample all user points with streaming
-    activeRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.flowMatchingModelPath,
-      'Flow Matching',
-      settings.trainingSettings.modelConfig,
+    const result = flowMatchingClient.sampleFromInitialPoints(
       userStartPoints,
       numTimeSteps,
-      // onComplete - add trajectories to the pool
-      () => {
-        // Add all completed trajectories that have enough points
-        const validTrajectories = userTrajectories.filter(t => t && t.length > 1);
-        if (validTrajectories.length > 0) {
-          // Track where the new trajectories will be added
-          const startIdx = transformedTrajectories.length;
-          transformedTrajectories = [...transformedTrajectories, ...validTrajectories];
-          mostRecentTrajectoryIndices = validTrajectories.map((_, i) => startIdx + i);
-
-          // Remove random trajectories if over cap (but not the most recent ones)
-          while (transformedTrajectories.length > maxTrajectories) {
-            // Pick random index excluding the most recent trajectories
-            let randomIdx;
-            do {
-              randomIdx = Math.floor(Math.random() * transformedTrajectories.length);
-            } while (mostRecentTrajectoryIndices.includes(randomIdx));
-
-            transformedTrajectories = transformedTrajectories.filter((_, i) => i !== randomIdx);
-            // Adjust mostRecentTrajectoryIndices
-            mostRecentTrajectoryIndices = mostRecentTrajectoryIndices.map(idx =>
-              randomIdx < idx ? idx - 1 : idx
-            );
-          }
-        }
-        userTrajectories = [];
-        userStartPoints = [];
-        isStreamingTrajectory = false;
-        activeRequestId = null;
-      },
-      null,     // domainRange
-      {},       // options
+      {},
       // onStep - append each new point for all trajectories, transformed to pixel space
       (step, x_t) => {
         const t = (step + 1) / numTimeSteps;
@@ -242,6 +215,36 @@
         });
       }
     );
+    activeRequestId = result.requestId;
+    result.promise.then(() => {
+      // Add all completed trajectories that have enough points
+      const validTrajectories = userTrajectories.filter(t => t && t.length > 1);
+      if (validTrajectories.length > 0) {
+        // Track where the new trajectories will be added
+        const startIdx = transformedTrajectories.length;
+        transformedTrajectories = [...transformedTrajectories, ...validTrajectories];
+        mostRecentTrajectoryIndices = validTrajectories.map((_, i) => startIdx + i);
+
+        // Remove random trajectories if over cap (but not the most recent ones)
+        while (transformedTrajectories.length > maxTrajectories) {
+          // Pick random index excluding the most recent trajectories
+          let randomIdx;
+          do {
+            randomIdx = Math.floor(Math.random() * transformedTrajectories.length);
+          } while (mostRecentTrajectoryIndices.includes(randomIdx));
+
+          transformedTrajectories = transformedTrajectories.filter((_, i) => i !== randomIdx);
+          // Adjust mostRecentTrajectoryIndices
+          mostRecentTrajectoryIndices = mostRecentTrajectoryIndices.map(idx =>
+            randomIdx < idx ? idx - 1 : idx
+          );
+        }
+      }
+      userTrajectories = [];
+      userStartPoints = [];
+      isStreamingTrajectory = false;
+      activeRequestId = null;
+    });
   }
 
   // Initialize scales and pre-compute all data

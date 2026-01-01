@@ -3,7 +3,15 @@
   import { Figure, TimeSlider, drawScatterPlot, drawMathjaxOnCanvas, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import { createSourceTargetScales } from "$lib/d3_helpers";
-  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
+  import { FlowModelClient } from "@diffusion-explorer/diffusion";
+
+  // Create sampling client
+  const flowMatchingClient = new FlowModelClient(
+    settings.samplingWorkerUrl,
+    settings.flowMatchingModelPath,
+    "Flow Matching",
+    settings.trainingSettings.modelConfig
+  );
 
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
@@ -181,24 +189,10 @@
     isPlaying = true;
 
     // Sample with streaming
-    callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.flowMatchingModelPath,
-      'Flow Matching',
-      settings.trainingSettings.modelConfig,
+    const result = flowMatchingClient.sampleFromInitialPoints(
       [point],
       samplingSteps,
-      // onComplete - replace trajectory
-      () => {
-        if (clickedTrajectory && clickedTrajectory.length > 1) {
-          // Replace with user's trajectory
-          transformedTrajectories = [clickedTrajectory];
-        }
-        clickedTrajectory = null;
-        isStreamingTrajectory = false;
-      },
-      null,     // domainRange
-      {},       // options
+      {},
       // onStep - append each new point, transformed to pixel space
       (step, x_t) => {
         const t = (step + 1) / samplingSteps;
@@ -207,6 +201,14 @@
         clickedTrajectory = [...clickedTrajectory, [pixelX, pixelY]];
       }
     );
+    result.promise.then(() => {
+      if (clickedTrajectory && clickedTrajectory.length > 1) {
+        // Replace with user's trajectory
+        transformedTrajectories = [clickedTrajectory];
+      }
+      clickedTrajectory = null;
+      isStreamingTrajectory = false;
+    });
   }
 
   // Initialize scales and pre-compute data

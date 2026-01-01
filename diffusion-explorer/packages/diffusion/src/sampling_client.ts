@@ -1,24 +1,45 @@
 import { SchedulerType } from './schedulers';
 
+// ===== Types =====
+
 type SamplingType = 'sample' | 'sample_from_initial_points' | 'sample_grid' | 'vector_field_grid';
 
-interface SamplingOptions {
+export interface SamplingOptions {
     cond?: number[] | any;
     guidanceScale?: number;
     return_guidance?: boolean;
     scheduler?: SchedulerType;
 }
 
+export interface DomainRange {
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+}
+
+export interface ModelConfig {
+    dim: number;
+    hidden: number;
+}
+
+type PerStepCallback = (step: number, x_t: number[][]) => void;
+
+export interface SamplingResult<T> {
+    requestId: string;
+    promise: Promise<T>;
+}
+
 interface SamplingMessageData {
     modelJSONPath: string;
     trainingObjective: string;
-    modelConfig: object;
+    modelConfig: ModelConfig;
     numSamples?: number;
     initialPoints?: number[][];
     gridResolution?: number;
     numberOfSteps?: number;
     timeValue?: number;
-    domainRange?: { xMin: number, xMax: number; yMin: number, yMax: number };
+    domainRange?: DomainRange;
     options?: SamplingOptions;
     streaming?: boolean;
 }
@@ -29,7 +50,7 @@ let poolSize = 5;
 
 type SamplingCallbacks = {
     callback: (allSamples: any, guidance?: any) => void;
-    onStep?: (step: number, x_t: number[][]) => void;
+    onStep?: PerStepCallback;
 };
 
 let workerPool: Worker[] = [];
@@ -143,7 +164,7 @@ export function setSamplingPoolSize(size: number): void {
  *
  * @param requestId - The request ID to cancel
  */
-export function stopSamplingRequest(requestId: string): void {
+function stopSamplingRequest(requestId: string): void {
     const worker = requestIdToWorker.get(requestId);
     if (worker) {
         console.log('[Sampling Pool] Sending stop request:', requestId);
@@ -158,20 +179,13 @@ export function stopSamplingRequest(requestId: string): void {
  *
  * Uses round-robin to select a worker from the pool and routes responses
  * based on requestId. Optionally supports streaming per-step updates via onStep.
- *
- * @param samplingWorkerUrl - URL to the sampling worker script
- * @param type - Type of sampling operation to perform
- * @param data - Configuration data for the sampling operation
- * @param callback - Callback receiving sampled results
- * @param onStep - Optional callback invoked after each integration step
- * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
  */
 function callSamplingWorker(
     samplingWorkerUrl: string,
     type: SamplingType,
     data: SamplingMessageData,
     callback: (allSamples: any, guidance?: any) => void,
-    onStep?: (step: number, x_t: number[][]) => void
+    onStep?: PerStepCallback
 ): string {
     const worker = getNextWorker(samplingWorkerUrl);
     const requestId = crypto.randomUUID();
@@ -189,189 +203,244 @@ function callSamplingWorker(
     return requestId;
 }
 
-/**
- * Sample trajectories from random Gaussian initial points.
- *
- * Generates `numSamples` random points from a standard Gaussian distribution
- * and integrates them through the learned flow to produce trajectories.
- *
- * @param samplingWorkerUrl - URL to the sampling worker script
- * @param modelJSONPath - Path to the saved model (file path or IndexedDB URL)
- * @param trainingObjective - Training objective ('Flow Matching', 'Diffusion', etc.)
- * @param modelConfig - Model configuration object with dim and hidden size
- * @param numSamples - Number of random samples to generate
- * @param numberOfSteps - Number of integration steps for the ODE solver
- * @param callback - Callback receiving trajectories [timestep][sample][dim]
- * @param domainRange - Optional domain bounds for clipping
- * @param options - Optional sampling parameters (conditioning, guidance)
- * @param onStep - Optional callback invoked after each integration step for streaming
- * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
- */
-export function callSamplingWorkerThread(
-    samplingWorkerUrl: string,
-    modelJSONPath: string,
-    trainingObjective: string,
-    modelConfig: object,
-    numSamples: number,
-    numberOfSteps: number,
-    callback: (allSamples: any, guidance?: any) => void,
-    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
-    options: SamplingOptions = {},
-    onStep?: (step: number, x_t: number[][]) => void
-): string {
-    return callSamplingWorker(
-        samplingWorkerUrl,
-        'sample',
-        {
-            modelJSONPath,
-            trainingObjective,
-            modelConfig,
-            numSamples,
-            numberOfSteps,
-            domainRange,
-            options
-        },
-        callback,
-        onStep
-    );
-}
+// ===== FlowModelClient Class =====
 
 /**
- * Sample trajectories from specified initial points.
+ * Client for sampling from a trained flow model using web workers.
  *
- * Takes an array of initial points and integrates each through the learned
- * flow to produce trajectories. Useful for visualizing flow from specific
- * locations or for interactive click-to-sample functionality.
+ * Provides a clean, class-based API for flow-based sampling operations.
+ * Uses a shared worker pool for efficient parallel processing.
  *
- * @param samplingWorkerUrl - URL to the sampling worker script
- * @param modelJSONPath - Path to the saved model (file path or IndexedDB URL)
- * @param trainingObjective - Training objective ('Flow Matching', 'Diffusion', etc.)
- * @param modelConfig - Model configuration object with dim and hidden size
- * @param initialPoints - Array of starting points [[x, y], ...] to integrate
- * @param numberOfSteps - Number of integration steps for the ODE solver
- * @param callback - Callback receiving trajectories [timestep][sample][dim]
- * @param domainRange - Optional domain bounds for clipping
- * @param options - Optional sampling parameters (conditioning, guidance)
- * @param onStep - Optional callback invoked after each integration step for streaming
- * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
+ * @example
+ * ```typescript
+ * const client = new FlowModelClient(
+ *   '/workers/sampling.worker.js',
+ *   '/models/flow_matching_model.json',
+ *   'Flow Matching',
+ *   { dim: 2, hidden: 64 }
+ * );
+ *
+ * const { requestId, promise } = client.sampleFromInitialPoints(
+ *   [[0, 0], [1, 1]],
+ *   100,
+ *   { scheduler: 'euler' },
+ *   (step, x_t) => console.log(`Step ${step}:`, x_t)
+ * );
+ *
+ * const trajectories = await promise;
+ *
+ * // Cancel if needed
+ * client.stopRequest(requestId);
+ * ```
  */
-export function callSamplingWorkerThreadFromInitialPoints(
-    samplingWorkerUrl: string,
-    modelJSONPath: string,
-    trainingObjective: string,
-    modelConfig: object,
-    initialPoints: number[][],
-    numberOfSteps: number,
-    callback: (allSamples: any, guidance?: any) => void,
-    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
-    options: SamplingOptions = {},
-    onStep?: (step: number, x_t: number[][]) => void
-): string {
-    return callSamplingWorker(
-        samplingWorkerUrl,
-        'sample_from_initial_points',
-        {
-            modelJSONPath,
-            trainingObjective,
-            modelConfig,
-            initialPoints,
-            numberOfSteps,
-            domainRange,
-            options
-        },
-        callback,
-        onStep
-    );
-}
+export class FlowModelClient {
+    private workerUrl: string;
+    private modelJSONPath: string;
+    private trainingObjective: string;
+    private modelConfig: ModelConfig;
+    private domainRange: DomainRange | null;
 
-/**
- * Sample trajectories from a uniform grid of initial points.
- *
- * Creates a uniform grid of points within the specified domain and integrates
- * each through the learned flow. Useful for visualizing how the flow transforms
- * space uniformly across the domain.
- *
- * @param samplingWorkerUrl - URL to the sampling worker script
- * @param modelJSONPath - Path to the saved model (file path or IndexedDB URL)
- * @param trainingObjective - Training objective ('Flow Matching', 'Diffusion', etc.)
- * @param modelConfig - Model configuration object with dim and hidden size
- * @param gridResolution - Number of points along each axis (total = gridResolution^2)
- * @param numberOfSteps - Number of integration steps for the ODE solver
- * @param domainRange - Domain bounds defining the grid extent
- * @param callback - Callback receiving trajectories [timestep][sample][dim]
- * @param options - Optional sampling parameters (conditioning, guidance)
- * @param onStep - Optional callback invoked after each integration step for streaming
- * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
- */
-export function callSamplingWorkerThreadGrid(
-    samplingWorkerUrl: string,
-    modelJSONPath: string,
-    trainingObjective: string,
-    modelConfig: object,
-    gridResolution: number,
-    numberOfSteps: number,
-    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number },
-    callback: (allSamples: any, guidance?: any) => void,
-    options: SamplingOptions = {},
-    onStep?: (step: number, x_t: number[][]) => void
-): string {
-    return callSamplingWorker(
-        samplingWorkerUrl,
-        'sample_grid',
-        {
-            modelJSONPath,
-            trainingObjective,
-            modelConfig,
-            gridResolution,
-            numberOfSteps,
-            domainRange,
-            options
-        },
-        callback,
-        onStep
-    );
-}
+    /**
+     * Create a new FlowModelClient.
+     *
+     * @param workerUrl - URL to the sampling worker script
+     * @param modelJSONPath - Path to the saved model (file path or IndexedDB URL)
+     * @param trainingObjective - Training objective ('Flow Matching', 'Diffusion', etc.)
+     * @param modelConfig - Model configuration object with dim and hidden size
+     * @param domainRange - Optional domain bounds for clipping
+     */
+    constructor(
+        workerUrl: string,
+        modelJSONPath: string,
+        trainingObjective: string = "Flow Matching",
+        modelConfig: ModelConfig = { dim: 2, hidden: 64 },
+        domainRange: DomainRange | null = null
+    ) {
+        this.workerUrl = workerUrl;
+        this.modelJSONPath = modelJSONPath;
+        this.trainingObjective = trainingObjective;
+        this.modelConfig = modelConfig;
+        this.domainRange = domainRange;
+    }
 
-/**
- * Sample vector field values on a uniform grid
- *
- * This evaluates the model's forward function (velocity field) at each point
- * on a uniform grid, without performing any ODE integration. Useful for
- * visualizing flow fields.
- *
- * @param modelJSONPath - Path to the saved model in IndexedDB
- * @param trainingObjective - Training objective ('Flow Matching', etc.)
- * @param modelConfig - Model configuration object
- * @param gridResolution - Number of points along each axis
- * @param domainRange - Spatial domain to sample
- * @param callback - Callback receiving velocity vectors [gridRes*gridRes, dim]
- * @param timeValue - Time value at which to evaluate the field (default: 0.5)
- * @param options - Optional sampling parameters
- * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
- */
-export function callSamplingWorkerThreadVectorFieldGrid(
-    samplingWorkerUrl: string,
-    modelJSONPath: string,
-    trainingObjective: string,
-    modelConfig: object,
-    gridResolution: number,
-    domainRange: { xMin: number, xMax: number; yMin: number, yMax: number },
-    callback: (velocities: number[][][]) => void,
-    timeValue: number = 0.5,
-    options: SamplingOptions = {}
-): string {
-    return callSamplingWorker(
-        samplingWorkerUrl,
-        'vector_field_grid',
-        {
-            modelJSONPath,
-            trainingObjective,
-            modelConfig,
-            gridResolution,
-            timeValue,
-            domainRange,
-            options
-        },
-        callback
-    );
+    /**
+     * Cancel a sampling request by ID.
+     *
+     * @param requestId - The request ID to cancel (from a previous sampling call)
+     */
+    stopRequest(requestId: string): void {
+        stopSamplingRequest(requestId);
+    }
+
+    /**
+     * Sample trajectories from random Gaussian initial points.
+     *
+     * Generates `numSamples` random points from a standard Gaussian distribution
+     * and integrates them through the learned flow to produce trajectories.
+     *
+     * @param numSamples - Number of random samples to generate
+     * @param numberOfSteps - Number of integration steps for the ODE solver
+     * @param options - Optional sampling parameters (conditioning, guidance, scheduler)
+     * @param perStepCallback - Optional callback invoked after each integration step
+     * @returns Object with requestId (for cancellation) and promise (resolves to trajectories)
+     */
+    sample(
+        numSamples: number,
+        numberOfSteps: number = 100,
+        options: SamplingOptions = {},
+        perStepCallback?: PerStepCallback
+    ): SamplingResult<number[][][]> {
+        let resolvePromise: (value: number[][][]) => void;
+        const promise = new Promise<number[][][]>((resolve) => {
+            resolvePromise = resolve;
+        });
+
+        const requestId = callSamplingWorker(
+            this.workerUrl,
+            'sample',
+            {
+                modelJSONPath: this.modelJSONPath,
+                trainingObjective: this.trainingObjective,
+                modelConfig: this.modelConfig,
+                numSamples,
+                numberOfSteps,
+                domainRange: this.domainRange ?? undefined,
+                options
+            },
+            (allSamples) => resolvePromise(allSamples),
+            perStepCallback
+        );
+
+        return { requestId, promise };
+    }
+
+    /**
+     * Sample trajectories from specified initial points.
+     *
+     * Takes an array of initial points and integrates each through the learned
+     * flow to produce trajectories. Useful for visualizing flow from specific
+     * locations or for interactive click-to-sample functionality.
+     *
+     * @param initialPoints - Array of starting points [[x, y], ...] to integrate
+     * @param numberOfSteps - Number of integration steps for the ODE solver
+     * @param options - Optional sampling parameters (conditioning, guidance, scheduler)
+     * @param perStepCallback - Optional callback invoked after each integration step
+     * @returns Object with requestId (for cancellation) and promise (resolves to trajectories)
+     */
+    sampleFromInitialPoints(
+        initialPoints: number[][],
+        numberOfSteps: number = 100,
+        options: SamplingOptions = {},
+        perStepCallback?: PerStepCallback
+    ): SamplingResult<number[][][]> {
+        let resolvePromise: (value: number[][][]) => void;
+        const promise = new Promise<number[][][]>((resolve) => {
+            resolvePromise = resolve;
+        });
+
+        const requestId = callSamplingWorker(
+            this.workerUrl,
+            'sample_from_initial_points',
+            {
+                modelJSONPath: this.modelJSONPath,
+                trainingObjective: this.trainingObjective,
+                modelConfig: this.modelConfig,
+                initialPoints,
+                numberOfSteps,
+                domainRange: this.domainRange ?? undefined,
+                options
+            },
+            (allSamples) => resolvePromise(allSamples),
+            perStepCallback
+        );
+
+        return { requestId, promise };
+    }
+
+    /**
+     * Sample trajectories from a uniform grid of initial points.
+     *
+     * Creates a uniform grid of points within the specified domain and integrates
+     * each through the learned flow. Useful for visualizing how the flow transforms
+     * space uniformly across the domain.
+     *
+     * @param gridResolution - Number of points along each axis (total = gridResolution^2)
+     * @param domainRange - Domain bounds defining the grid extent
+     * @param numberOfSteps - Number of integration steps for the ODE solver
+     * @param options - Optional sampling parameters (conditioning, guidance, scheduler)
+     * @param perStepCallback - Optional callback invoked after each integration step
+     * @returns Object with requestId (for cancellation) and promise (resolves to trajectories)
+     */
+    sampleGrid(
+        gridResolution: number,
+        domainRange: DomainRange,
+        numberOfSteps: number = 100,
+        options: SamplingOptions = {},
+        perStepCallback?: PerStepCallback
+    ): SamplingResult<number[][][]> {
+        let resolvePromise: (value: number[][][]) => void;
+        const promise = new Promise<number[][][]>((resolve) => {
+            resolvePromise = resolve;
+        });
+
+        const requestId = callSamplingWorker(
+            this.workerUrl,
+            'sample_grid',
+            {
+                modelJSONPath: this.modelJSONPath,
+                trainingObjective: this.trainingObjective,
+                modelConfig: this.modelConfig,
+                gridResolution,
+                numberOfSteps,
+                domainRange,
+                options
+            },
+            (allSamples) => resolvePromise(allSamples),
+            perStepCallback
+        );
+
+        return { requestId, promise };
+    }
+
+    /**
+     * Sample vector field values on a uniform grid.
+     *
+     * This evaluates the model's forward function (velocity field) at each point
+     * on a uniform grid, without performing any ODE integration. Useful for
+     * visualizing flow fields.
+     *
+     * @param gridResolution - Number of points along each axis
+     * @param domainRange - Spatial domain to sample
+     * @param timeValue - Time value at which to evaluate the field (default: 0.5)
+     * @param options - Optional sampling parameters
+     * @returns Object with requestId (for cancellation) and promise (resolves to velocities)
+     */
+    vectorFieldGrid(
+        gridResolution: number,
+        domainRange: DomainRange,
+        timeValue: number = 0.5,
+        options: SamplingOptions = {}
+    ): SamplingResult<number[][][]> {
+        let resolvePromise: (value: number[][][]) => void;
+        const promise = new Promise<number[][][]>((resolve) => {
+            resolvePromise = resolve;
+        });
+
+        const requestId = callSamplingWorker(
+            this.workerUrl,
+            'vector_field_grid',
+            {
+                modelJSONPath: this.modelJSONPath,
+                trainingObjective: this.trainingObjective,
+                modelConfig: this.modelConfig,
+                gridResolution,
+                timeValue,
+                domainRange,
+                options
+            },
+            (velocities) => resolvePromise(velocities)
+        );
+
+        return { requestId, promise };
+    }
 }

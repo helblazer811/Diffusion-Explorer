@@ -5,7 +5,7 @@
   import { settings } from "$lib/settings";
   import * as sample from "$lib/flow_matching/sample";
   import * as train from "$lib/flow_matching/train";
-  import { callSamplingWorkerThreadFromInitialPoints, downloadJSON } from "@diffusion-explorer/diffusion";
+  import { FlowModelClient, downloadJSON } from "@diffusion-explorer/diffusion";
 
   // ===== DATA =====
   let leftTrajectories: number[][][] = []; // [timestep][sample][dim]
@@ -395,24 +395,20 @@
   /**
    * Generate trajectories from specific initial points using the sampling worker
    */
-  function generateFromInitialPoints(
+  async function generateFromInitialPoints(
     modelPath: string,
     initialPoints: number[][]
   ): Promise<number[][][]> {
-    return new Promise((resolve) => {
-      callSamplingWorkerThreadFromInitialPoints(
-        settings.samplingWorkerUrl,
-        modelPath,
-        "Flow Matching",
-        settings.trainingSettings.modelConfig,
-        initialPoints,
-        numSteps,
-        (allSamples: number[][][]) => {
-          resolve(allSamples);
-        },
-        settings.trainingSettings.domainRange
-      );
-    });
+    const client = new FlowModelClient(
+      settings.samplingWorkerUrl,
+      modelPath,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig,
+      settings.trainingSettings.domainRange
+    );
+
+    const { promise } = client.sampleFromInitialPoints(initialPoints, numSteps);
+    return promise;
   }
 
   /**
