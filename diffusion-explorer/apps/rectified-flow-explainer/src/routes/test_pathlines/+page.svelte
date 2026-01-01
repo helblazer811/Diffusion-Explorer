@@ -412,20 +412,10 @@
   }
 
   /**
-   * Generate uniform grid samples
+   * Generate uniform grid samples using component settings
    */
-  function generateUniformGridSamples(): number[][] {
-    const samples: number[][] = [];
-    const { xMin, xMax, yMin, yMax } = uniformGridDomainRange;
-
-    for (let i = 0; i < uniformGridResolution; i++) {
-      for (let j = 0; j < uniformGridResolution; j++) {
-        const x = xMin + (xMax - xMin) * (i / (uniformGridResolution - 1));
-        const y = yMin + (yMax - yMin) * (j / (uniformGridResolution - 1));
-        samples.push([x, y]);
-      }
-    }
-    return samples;
+  function generateLocalUniformGridSamples(): number[][] {
+    return generateUniformGridSamples(uniformGridResolution, uniformGridDomainRange);
   }
 
   /**
@@ -451,7 +441,7 @@
       // Generate shared initial points for both models
       generationStatus = "Generating initial points...";
       let initialPoints = initialPointSource === 'grid'
-        ? generateUniformGridSamples()
+        ? generateLocalUniformGridSamples()
         : sample.generateClippedGaussianSamples(numRandomSamples);
 
       // Clip samples to domain so trajectories don't start off screen
