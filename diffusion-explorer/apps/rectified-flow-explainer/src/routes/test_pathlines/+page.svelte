@@ -5,7 +5,7 @@
   import { settings } from "$lib/settings";
   import * as sample from "$lib/flow_matching/sample";
   import * as train from "$lib/flow_matching/train";
-  import { FlowModelClient, downloadJSON } from "@diffusion-explorer/diffusion";
+  import { FlowModelClient, downloadJSON, generateUniformGridSamples } from "@diffusion-explorer/diffusion";
 
   // ===== DATA =====
   let leftTrajectories: number[][][] = []; // [timestep][sample][dim]
@@ -495,15 +495,16 @@
   async function generateDenseGridTrajectories(
     modelPath: string
   ): Promise<number[][][]> {
-    const result = await sample.generateSamplesUniformGrid(
+    const client = await FlowModelClient.create(
+      settings.samplingWorkerUrl,
       modelPath,
-      denseGridResolution,
-      denseGridDomainRange,
-      denseGridNumSteps,
-      settings.trainingSettings,
-      settings.samplingWorkerUrl
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      denseGridDomainRange
     );
-    return result.allTimeSamples;
+    const initialPoints = generateUniformGridSamples(denseGridResolution, denseGridDomainRange);
+    const { promise } = client.sampleFromInitialPoints(initialPoints, denseGridNumSteps);
+    return promise;
   }
 
   // ===== PATHLINE FILTERING =====

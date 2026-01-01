@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { writable, type Writable } from "svelte/store";
-  import { downloadJSON } from "@diffusion-explorer/diffusion";
   import {
+    downloadJSON,
+    FlowModelClient,
     clipSamplesToRadius,
     clipAllRectifiedTrajectoriesToStartingRadius,
-  } from "$lib/flow_matching/utils";
+    generateUniformGridSamples,
+  } from "@diffusion-explorer/diffusion";
   import {
     settings,
     type VectorFieldData,
@@ -167,22 +169,27 @@
   }
 
   async function generateSamples(modelPath: string) {
-    const result = await sample.generateSamples(
+    const client = await FlowModelClient.create(
+      settings.samplingWorkerUrl,
       modelPath,
-      settings.samplingSettings.flowMatching.numSamples,
-      settings.samplingSettings.flowMatching.numSteps,
-      settings.trainingSettings,
-      settings.samplingWorkerUrl
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      settings.trainingSettings.domainRange
     );
-    allTimeSamples.set(result.allTimeSamples);
+    const { promise } = client.sample(
+      settings.samplingSettings.flowMatching.numSamples,
+      settings.samplingSettings.flowMatching.numSteps
+    );
+    const samples = await promise;
+    allTimeSamples.set(samples);
     sourceDistributionSamples.set(
       clipSamplesToRadius(
-        result.sourceDistribution,
+        samples[0],
         settings.stylingSettings.scatterPlot.clippingRadius
       )
     );
     downloadTrajectories();
-    return result.allTimeSamples;
+    return samples;
   }
 
   async function generateVectorField(modelPath: string) {
@@ -210,38 +217,44 @@
   }
 
   async function generateFlowMatchingGridSamples(modelPath: string) {
-    const result = await sample.generateSamplesUniformGrid(
+    const gridSettings = settings.samplingSettings.flowMatchingGrid;
+    const client = await FlowModelClient.create(
+      settings.samplingWorkerUrl,
       modelPath,
-      settings.samplingSettings.flowMatchingGrid.gridResolution,
-      settings.samplingSettings.flowMatchingGrid.gridDomainRange,
-      settings.samplingSettings.flowMatchingGrid.numSteps,
-      settings.trainingSettings,
-      settings.samplingWorkerUrl
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      gridSettings.gridDomainRange
     );
-    flowMatchingGridTrajectories.set(result.allTimeSamples);
+    const initialPoints = generateUniformGridSamples(gridSettings.gridResolution, gridSettings.gridDomainRange);
+    const { promise } = client.sampleFromInitialPoints(initialPoints, gridSettings.numSteps);
+    const samples = await promise;
+    flowMatchingGridTrajectories.set(samples);
     downloadFlowMatchingGridTrajectories();
-    return result.allTimeSamples;
+    return samples;
   }
 
   async function generateRectifiedFlowGridSamples(modelPath: string) {
     // Generate grid samples for each rectified step (before and after rectification)
     // We need the model from step 0 (before) and step 1+ (after)
     const gridTrajectories: number[][][][] = [];
+    const gridSettings = settings.samplingSettings.rectifiedFlowGrid;
 
     // For the "before" visualization, use the flow matching model (step 0)
-    const beforeResult = await sample.generateSamplesUniformGrid(
+    const client = await FlowModelClient.create(
+      settings.samplingWorkerUrl,
       modelPath, // This should be the final rectified model
-      settings.samplingSettings.rectifiedFlowGrid.gridResolution,
-      settings.samplingSettings.rectifiedFlowGrid.gridDomainRange,
-      settings.samplingSettings.rectifiedFlowGrid.numSteps,
-      settings.trainingSettings,
-      settings.samplingWorkerUrl
+      'Flow Matching',
+      settings.trainingSettings.modelConfig,
+      gridSettings.gridDomainRange
     );
-    gridTrajectories.push(beforeResult.allTimeSamples);
+    const initialPoints = generateUniformGridSamples(gridSettings.gridResolution, gridSettings.gridDomainRange);
+    const { promise } = client.sampleFromInitialPoints(initialPoints, gridSettings.numSteps);
+    const samples = await promise;
+    gridTrajectories.push(samples);
 
     // For now, we only have one model, so use same for "after"
     // In a full implementation, you'd sample from intermediate models
-    gridTrajectories.push(beforeResult.allTimeSamples);
+    gridTrajectories.push(samples);
 
     rectifiedFlowGridTrajectories.set(gridTrajectories);
     downloadRectifiedFlowGridTrajectories();
