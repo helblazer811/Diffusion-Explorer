@@ -323,8 +323,8 @@
 
   // Training state
   let isTraining = false;
-  let trainingWorker: Worker | null = null;
-  let rectifiedTrainingWorker: Worker | null = null;
+  let trainingRequestId: string | null = null;
+  let rectifiedTrainingRequestId: string | null = null;
   let flowMatchingModelPath: string | null = null;
   let rectifiedFlowModelPath: string | null = null;
 
@@ -364,12 +364,12 @@
 
     const result = await train.trainModel(
       settings.trainingSettings,
-      settings.trainWorkerUrl,
+      settings.flowModelWorkerUrl,
       () => { isTraining = true; },
       () => { isTraining = false; }
     );
 
-    trainingWorker = result.worker;
+    trainingRequestId = result.requestId;
     flowMatchingModelPath = result.modelPath;
     return result.modelPath;
   }
@@ -383,10 +383,10 @@
 
     const result = await train.trainRectifiedFlow(
       settings.trainingSettings,
-      settings.trainWorkerUrl
+      settings.flowModelWorkerUrl
     );
 
-    rectifiedTrainingWorker = result.worker;
+    rectifiedTrainingRequestId = result.requestId;
     rectifiedFlowModelPath = result.data.modelPath;
     isTraining = false;
     return result.data.modelPath;
@@ -400,7 +400,7 @@
     initialPoints: number[][]
   ): Promise<number[][][]> {
     const client = new FlowModelClient(
-      settings.samplingWorkerUrl,
+      settings.flowModelWorkerUrl,
       modelPath,
       "Flow Matching",
       settings.trainingSettings.modelConfig,
@@ -486,7 +486,7 @@
     modelPath: string
   ): Promise<number[][][]> {
     const client = await FlowModelClient.create(
-      settings.samplingWorkerUrl,
+      settings.flowModelWorkerUrl,
       modelPath,
       'Flow Matching',
       settings.trainingSettings.modelConfig,
@@ -573,12 +573,8 @@
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
     }
-    if (trainingWorker) {
-      trainingWorker.terminate();
-    }
-    if (rectifiedTrainingWorker) {
-      rectifiedTrainingWorker.terminate();
-    }
+    // Note: Workers are now pooled and managed by FlowModelClient,
+    // so no worker cleanup is needed here
   });
 </script>
 

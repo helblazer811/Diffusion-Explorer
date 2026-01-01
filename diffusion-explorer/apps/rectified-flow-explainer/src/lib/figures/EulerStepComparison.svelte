@@ -456,9 +456,6 @@
       );
     }
     leftCtx.globalAlpha = 1.0;
-
-    // Draw start point markers
-    drawStartPoints(leftCtx);
   }
 
   function drawRightBackground() {
@@ -486,9 +483,6 @@
       );
     }
     rightCtx.globalAlpha = 1.0;
-
-    // Draw start point markers
-    drawStartPoints(rightCtx);
   }
 
   // Draw error lines for left panel (called during end pause)
@@ -592,10 +586,6 @@
     // Draw target distribution on both
     drawScatterPlot(leftCtx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
     drawScatterPlot(rightCtx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
-
-    // Draw start points on both
-    drawStartPoints(leftCtx);
-    drawStartPoints(rightCtx);
   }
 
   // Handle canvas click - convert to domain coordinates and add/replace start point
