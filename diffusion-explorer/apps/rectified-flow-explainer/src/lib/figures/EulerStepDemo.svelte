@@ -169,34 +169,6 @@
     }
   }
 
-  // Sample trajectories for multiple points using Euler scheduler
-  // Returns { promise, getRequestId } for cancellation support
-  function sampleTrajectoriesCancellable(points, numSteps) {
-    let requestId = null;
-    const promise = new Promise((resolve) => {
-      requestId = callSamplingWorkerThreadFromInitialPoints(
-        settings.samplingWorkerUrl,
-        settings.flowMatchingModelPath,
-        "Flow Matching",
-        settings.trainingSettings.modelConfig,
-        points,
-        numSteps,
-        (allSamples) => {
-          // allSamples format: [timestep][sample][dim]
-          // Extract trajectories for each point
-          const trajectories = points.map((point, pointIdx) => [
-            point,
-            ...allSamples.map((ts) => [ts[pointIdx][0], ts[pointIdx][1]]),
-          ]);
-          resolve(trajectories);
-        },
-        settings.trainingSettings.domainRange,
-        { scheduler: "euler" }
-      );
-    });
-    return { promise, getRequestId: () => requestId };
-  }
-
   // Cancel all in-flight requests
   function cancelAllRequests() {
     if (groundTruthRequestId) {
@@ -210,23 +182,19 @@
   }
 
   // Compute all trajectories for all start points
-  // Hybrid approach: batch for ground truth, streaming for approximation
-  async function computeAllTrajectories() {
+  // Streams both ground truth and approximation in parallel for immediate feedback
+  function computeAllTrajectories() {
     // Cancel any in-progress requests
     cancelAllRequests();
 
     isLoading = true;
     isStreamingTrajectory = true;
 
-    // Ground truth: batch sampling with cancellation support
-    const gtRequest = sampleTrajectoriesCancellable(userStartPoints, GROUND_TRUTH_STEPS);
-    groundTruthRequestId = gtRequest.getRequestId();
-    groundTruthTrajectories = await gtRequest.promise;
-
-    // Initialize approximation trajectories with just starting points
+    // Initialize all trajectories with just starting points
+    groundTruthTrajectories = userStartPoints.map(p => [p]);
     approximationTrajectories = userStartPoints.map(p => [p]);
 
-    // Reset animation state
+    // Show initial state immediately and start animation
     isLoading = false;
     segmentIndex = 0;
     segmentProgress = 0;
@@ -234,7 +202,38 @@
     draw();
     startAnimation();
 
-    // Approximation: streaming sampling
+    let completedCount = 0;
+    const checkComplete = () => {
+      completedCount++;
+      if (completedCount >= 2) {
+        isStreamingTrajectory = false;
+      }
+    };
+
+    // Ground truth: streaming with many steps
+    groundTruthRequestId = callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig,
+      userStartPoints,
+      GROUND_TRUTH_STEPS,
+      () => {
+        groundTruthRequestId = null;
+        checkComplete();
+      },
+      settings.trainingSettings.domainRange,
+      { scheduler: "euler" },
+      // onStep - append new points to each ground truth trajectory
+      (_step, x_t) => {
+        groundTruthTrajectories = groundTruthTrajectories.map((traj, i) => [
+          ...traj,
+          [x_t[i][0], x_t[i][1]]
+        ]);
+      }
+    );
+
+    // Approximation: streaming with fewer steps
     activeRequestId = callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.flowMatchingModelPath,
@@ -242,10 +241,9 @@
       settings.trainingSettings.modelConfig,
       userStartPoints,
       NUM_STEPS,
-      // onComplete
       () => {
-        isStreamingTrajectory = false;
         activeRequestId = null;
+        checkComplete();
       },
       settings.trainingSettings.domainRange,
       { scheduler: "euler" },
