@@ -25,7 +25,7 @@
   import HighlightTrajectory from "$lib/figures/HighlightTrajectory.svelte";
   import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
-  import EulerCircularDemo from "$lib/figures/EulerCircularDemo.svelte";
+  import EulerStepDemo from "$lib/figures/EulerStepDemo.svelte";
   import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
   import CrownJewel from "$lib/figures/CrownJewel.svelte";
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
@@ -826,15 +826,24 @@
   </p>
 
   {#if showOtherFigures}
-    <EulerCircularDemo backgroundVisible={false}>
+    <EulerStepDemo
+      targetDistribution={$targetDistributionSamples}
+      flowMatchingVectorField={$vectorFieldData}
+      backgroundVisible={false}
+    >
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
-        <strong> Euler's method applied to a circular vector field. </strong>
-        A <span style="color: #f17720;">trajectory</span> is shown for a single
-        sample that is integrated according to the
-        <span style="color: #3b82f6;">velocity field</span>.
+        <strong> Euler integration through a time-dependent <span style="color: #3b82f6;">velocity field</span> <Katex math={"v_t(x)"} />. </strong>
+        The <span style="color: #22c55e;">ground truth</span> trajectory
+        is compared against the <span style="color: #f17720;">Euler approximation</span>, which takes
+        8 discrete steps along the direction of the <span style="color: #3b82f6;">velocity field</span>. Tap
+        <img
+          src="{base}/icons/tap.svg"
+          alt="tap"
+          style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+        /> to generate a sample.
       </div>
-    </EulerCircularDemo>
+    </EulerStepDemo>
   {/if}
 
   <h2 id="flow-matching">Flow Matching</h2>

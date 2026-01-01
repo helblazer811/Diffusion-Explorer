@@ -173,11 +173,12 @@
     ]);
   }
 
-  // Sample a trajectory from a model using Euler scheduler
-  async function sampleTrajectory(
+  // Sample trajectories for multiple points from a model using Euler scheduler
+  // Returns array of trajectories, one per point
+  async function sampleTrajectoriesBatch(
     modelPath,
     trainingObjective,
-    point,
+    points,
     numSteps
   ) {
     return new Promise((resolve) => {
@@ -186,17 +187,16 @@
         modelPath,
         trainingObjective,
         settings.trainingSettings.modelConfig,
-        [point],
+        points,
         numSteps,
         (allSamples) => {
           // allSamples format: [timestep][sample][dim]
-          // Extract single trajectory: [[x,y], [x,y], ...]
-          // Prepend initial point since callback doesn't include it
-          const trajectory = [
+          // Extract trajectories for each point
+          const trajectories = points.map((point, pointIdx) => [
             point,
-            ...allSamples.map((ts) => [ts[0][0], ts[0][1]]),
-          ];
-          resolve(trajectory);
+            ...allSamples.map((ts) => [ts[pointIdx][0], ts[pointIdx][1]]),
+          ]);
+          resolve(trajectories);
         },
         settings.trainingSettings.domainRange,
         { scheduler: "euler" } // Use basic Euler for this comparison figure
@@ -298,59 +298,47 @@
     flowMatchingTrajectories = {};
     rectifiedFlowTrajectories = {};
 
-    // First, sample the currently visible step count for all points
+    // First, sample the currently visible step count for all points (batched)
     const currentSteps = stepValues[currentStepIndex];
 
-    flowMatchingTrajectories[currentSteps] = [];
-    rectifiedFlowTrajectories[currentSteps] = [];
+    // Batch all points together for each model
+    flowMatchingTrajectories[currentSteps] = await sampleTrajectoriesBatch(
+      settings.flowMatchingModelPath,
+      "Flow Matching",
+      startPoints,
+      currentSteps
+    );
 
-    for (const point of startPoints) {
-      const fmTraj = await sampleTrajectory(
-        settings.flowMatchingModelPath,
-        "Flow Matching",
-        point,
-        currentSteps
-      );
-      flowMatchingTrajectories[currentSteps].push(fmTraj);
-
-      const rfTraj = await sampleTrajectory(
-        settings.rectifiedFlowModelPath,
-        "Flow Matching",
-        point,
-        currentSteps
-      );
-      rectifiedFlowTrajectories[currentSteps].push(rfTraj);
-    }
+    rectifiedFlowTrajectories[currentSteps] = await sampleTrajectoriesBatch(
+      settings.rectifiedFlowModelPath,
+      "Flow Matching",
+      startPoints,
+      currentSteps
+    );
 
     // Create controllers and start animation now that current step is ready
     isLoading = false;
     createAnimationControllers();
     startApproxAnimation();
 
-    // Then sample remaining step counts sequentially in background
+    // Then sample remaining step counts in background (batched by step count)
     for (const steps of stepValues) {
       if (steps === currentSteps) continue; // Already done
 
-      flowMatchingTrajectories[steps] = [];
-      rectifiedFlowTrajectories[steps] = [];
+      // Batch all points together for each model and step count
+      flowMatchingTrajectories[steps] = await sampleTrajectoriesBatch(
+        settings.flowMatchingModelPath,
+        "Flow Matching",
+        startPoints,
+        steps
+      );
 
-      for (const point of startPoints) {
-        const fmTraj = await sampleTrajectory(
-          settings.flowMatchingModelPath,
-          "Flow Matching",
-          point,
-          steps
-        );
-        flowMatchingTrajectories[steps].push(fmTraj);
-
-        const rfTraj = await sampleTrajectory(
-          settings.rectifiedFlowModelPath,
-          "Flow Matching",
-          point,
-          steps
-        );
-        rectifiedFlowTrajectories[steps].push(rfTraj);
-      }
+      rectifiedFlowTrajectories[steps] = await sampleTrajectoriesBatch(
+        settings.rectifiedFlowModelPath,
+        "Flow Matching",
+        startPoints,
+        steps
+      );
     }
   }
 

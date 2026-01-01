@@ -3,8 +3,26 @@ export interface VectorFieldStyleOptions {
   strokeWidth: number;     // Line width
   color: string;           // Arrow color
   opacity: number;         // Arrow opacity
-  headRadius?: number;     // Arrowhead radius (default: 8)
+  headRadius?: number;     // Arrowhead radius (default: 5)
   normalizeVectors?: boolean; // If true, all arrows same length (unit vectors)
+  showArrowHeads?: boolean;   // If false, draw lines without arrowheads (default: true)
+  centerQuiver?: boolean;     // If true, center arrows on grid points (default: false)
+}
+
+/**
+ * Draws a simple line segment (no arrowhead)
+ */
+export function drawLine(
+  ctx: CanvasRenderingContext2D,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number
+): void {
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
 }
 
 /**
@@ -72,6 +90,8 @@ export function drawVectorField(
   if (gridPositions.length === 0 || velocities.length === 0) return;
 
   const headRadius = style.headRadius ?? 5;
+  const showArrowHeads = style.showArrowHeads ?? true;
+  const centerQuiver = style.centerQuiver ?? false;
 
   // Calculate max velocity magnitude for normalization
   let maxMagnitude = 0;
@@ -85,9 +105,9 @@ export function drawVectorField(
   ctx.strokeStyle = style.color;
   ctx.fillStyle = style.color;
   ctx.lineWidth = style.strokeWidth;
-  ctx.globalAlpha = 1;
-  ctx.lineCap = 'butt';
-  ctx.lineJoin = 'miter';
+  ctx.globalAlpha = style.opacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
 
@@ -113,7 +133,27 @@ export function drawVectorField(
       dy = (vy / maxMagnitude) * style.arrowScale;
     }
 
-    drawArrow(ctx, x, y, x + dx, y + dy, headRadius);
+    // Calculate start and end points
+    let fromX: number, fromY: number, toX: number, toY: number;
+    if (centerQuiver) {
+      // Center the arrow on the grid point
+      fromX = x - dx / 2;
+      fromY = y - dy / 2;
+      toX = x + dx / 2;
+      toY = y + dy / 2;
+    } else {
+      // Arrow starts at grid point
+      fromX = x;
+      fromY = y;
+      toX = x + dx;
+      toY = y + dy;
+    }
+
+    if (showArrowHeads) {
+      drawArrow(ctx, fromX, fromY, toX, toY, headRadius);
+    } else {
+      drawLine(ctx, fromX, fromY, toX, toY);
+    }
   }
 
   ctx.restore();
