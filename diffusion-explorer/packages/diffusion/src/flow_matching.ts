@@ -1,6 +1,6 @@
 import * as tf from '@tensorflow/tfjs'
 import { Model } from './interfaces';
-import { sampleUniformGrid } from './utils';
+import { generateUniformGridSamples } from './utils';
 import { SchedulerType, SamplingOptions, getScheduler } from './schedulers';
 
 export class FlowModel extends Model {
@@ -384,8 +384,8 @@ export class FlowModel extends Model {
         perStepCallback?: (step: number, x_t: number[][]) => void,
         shouldStop: () => boolean = () => false
     ): Promise<tf.Tensor3D | null> {
-        // Generate uniform grid
-        const initialPoints = sampleUniformGrid(gridResolution, domainRange);
+        // Generate uniform grid as tensor
+        const initialPoints = generateUniformGridSamples(gridResolution, domainRange, true);
 
         // Sample from the initial points
         return this.sample_from_initial_points(initialPoints, num_total_steps, options, perStepCallback, shouldStop);

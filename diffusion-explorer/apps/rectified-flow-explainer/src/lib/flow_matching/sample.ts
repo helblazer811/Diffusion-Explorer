@@ -5,14 +5,12 @@ import {
   loadCachedVectorField,
   loadCachedRectifiedFlowTrajectories,
   validateModelPath,
+  generateUniformGridSamples,
+  generateClippedGaussianSamples,
   type VectorFieldData,
   type RectifiedFlowData
 } from '@diffusion-explorer/diffusion';
 import { type TrainingSettings } from '../settings';
-import {
-  generateUniformGridSamples,
-  generateClippedGaussianSamples
-} from './utils';
 
 // Re-export types for convenience
 export type { VectorFieldData, RectifiedFlowData, TrainingSettings };
@@ -25,64 +23,6 @@ export { loadTargetDistribution, loadCachedTrajectories, loadCachedVectorField, 
 
 // ========== SAMPLING FUNCTIONS ==========
 
-export async function generateSamples(
-  modelPath: string,
-  numSamples: number,
-  numberOfSteps: number,
-  settings: TrainingSettings,
-  samplingWorkerUrl: string
-): Promise<{ allTimeSamples: number[][][]; sourceDistribution: number[][] }> {
-  // Validate model path exists
-  await validateModelPath(modelPath);
-
-  const client = new FlowModelClient(
-    samplingWorkerUrl,
-    modelPath,
-    'Flow Matching',
-    settings.modelConfig,
-    settings.domainRange
-  );
-
-  const { promise } = client.sample(numSamples, numberOfSteps);
-  const allSamples = await promise;
-
-  console.log('Generated samples:', allSamples.length);
-  return {
-    allTimeSamples: allSamples,
-    sourceDistribution: allSamples[0]
-  };
-}
-
-export async function generateSamplesUniformGrid(
-  modelPath: string,
-  gridResolution: number,
-  gridDomainRange: { xMin: number; xMax: number; yMin: number; yMax: number },
-  numberOfSteps: number,
-  settings: TrainingSettings,
-  samplingWorkerUrl: string
-): Promise<{ allTimeSamples: number[][][]; sourceDistribution: number[][] }> {
-  // Validate model path exists
-  await validateModelPath(modelPath);
-
-  const client = new FlowModelClient(
-    samplingWorkerUrl,
-    modelPath,
-    'Flow Matching',
-    settings.modelConfig,
-    gridDomainRange
-  );
-
-  const initialPoints = generateUniformGridSamples(gridResolution, gridDomainRange);
-  const { promise } = client.sampleFromInitialPoints(initialPoints, numberOfSteps);
-  const allSamples = await promise;
-
-  console.log('Generated uniform grid samples:', allSamples.length, 'timesteps');
-  return {
-    allTimeSamples: allSamples,
-    sourceDistribution: allSamples[0]
-  };
-}
-
 export async function generateVectorField(
   modelPath: string,
   gridResolution: number,
@@ -91,12 +31,9 @@ export async function generateVectorField(
   settings: TrainingSettings,
   samplingWorkerUrl: string
 ): Promise<VectorFieldData> {
-  // Validate model path exists
-  await validateModelPath(modelPath);
-
   console.log('Generating vector field...');
 
-  const client = new FlowModelClient(
+  const client = await FlowModelClient.create(
     samplingWorkerUrl,
     modelPath,
     'Flow Matching',

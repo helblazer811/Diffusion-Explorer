@@ -3,7 +3,7 @@
  *    Supports cooperative cancellation via "stop" messages.
  */
 import * as tf from "@tensorflow/tfjs";
-import { FlowModel, sampleUniformGrid } from "@diffusion-explorer/diffusion";
+import { FlowModel, generateUniformGridSamples } from "@diffusion-explorer/diffusion";
 
 const backend = "webgl";
 const trainingObjectiveToModelClass = {
@@ -172,8 +172,8 @@ self.onmessage = async (e) => {
       const gridResolution = data.gridResolution;
       const gridDomainRange = data.domainRange;
 
-      // Generate uniform grid of points
-      const gridPoints = sampleUniformGrid(gridResolution, gridDomainRange) as tf.Tensor2D;
+      // Generate uniform grid of points as tensor
+      const gridPoints = generateUniformGridSamples(gridResolution, gridDomainRange, true);
       const numPoints = gridPoints.shape[0];
 
       // Create time tensor filled with the specified time value
