@@ -1,3 +1,51 @@
+import * as tf from '@tensorflow/tfjs';
+import { sampleMultivariateNormal } from '@diffusion-explorer/diffusion';
+
+// ========== GRID AND SAMPLING HELPERS ==========
+
+export function generateUniformGridSamples(
+  gridResolution: number,
+  domainRange: { xMin: number; xMax: number; yMin: number; yMax: number }
+): number[][] {
+  const samples: number[][] = [];
+  const { xMin, xMax, yMin, yMax } = domainRange;
+
+  for (let i = 0; i < gridResolution; i++) {
+    for (let j = 0; j < gridResolution; j++) {
+      const x = xMin + (xMax - xMin) * (i / (gridResolution - 1));
+      const y = yMin + (yMax - yMin) * (j / (gridResolution - 1));
+      samples.push([x, y]);
+    }
+  }
+  return samples;
+}
+
+export function generateClippedGaussianSamples(numSamples: number): number[][] {
+  return tf.tidy(() => {
+    const mean = [0, 0];
+    const cov = [[1, 0], [0, 1]];
+    const maxStdDev = 2.0;
+    const threshold = maxStdDev * Math.sqrt(2);
+
+    let allClippedSamples: number[][] = [];
+    let attempts = 0;
+    const maxAttempts = 10;
+    const batchSize = Math.ceil(numSamples * 1.5);
+
+    while (allClippedSamples.length < numSamples && attempts < maxAttempts) {
+      attempts++;
+      const rawSamplesTensor = sampleMultivariateNormal(mean, cov, batchSize) as tf.Tensor2D;
+      const rawSamplesArray = rawSamplesTensor.arraySync() as number[][];
+
+      const clippedBatch = clipSamplesToRadius(rawSamplesArray, threshold);
+      allClippedSamples = allClippedSamples.concat(clippedBatch);
+    }
+    return allClippedSamples.slice(0, numSamples);
+  });
+}
+
+// ========== CLIPPING FUNCTIONS ==========
+
 /**
  * Clip samples to only include those within a given radius from the origin.
  * @param samples Array of [x, y] coordinates
@@ -60,17 +108,4 @@ export function clipAllRectifiedTrajectoriesToStartingRadius(
   return allRectifiedTrajectories.map(rectStep =>
     clipTrajectoriesToStartingRadius(rectStep, radius)
   );
-}
-
-export function downloadJSON(data, filename = 'data.json') {
-    const jsonStr = JSON.stringify(data, null, 2); // pretty-print
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-
-    URL.revokeObjectURL(url); // Clean up
 }

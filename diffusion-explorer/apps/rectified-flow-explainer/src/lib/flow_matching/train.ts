@@ -1,7 +1,7 @@
-import * as tf from '@tensorflow/tfjs';
 import {
   callTrainingWorkerThread,
   callRectifiedFlowTrainingWorker,
+  downloadModelFromIndexedDB
 } from '@diffusion-explorer/diffusion';
 import {
   settings as globalSettings,
@@ -11,27 +11,6 @@ import {
 
 // Re-export types for convenience
 export type { RectifiedFlowData, TrainingSettings };
-
-// ========== HELPER FUNCTIONS ==========
-
-/**
- * Download a trained model from IndexedDB to the user's device.
- * Triggers a browser download of two files: {downloadName}.json and {downloadName}.weights.bin
- * @param modelPath The IndexedDB path (e.g., "indexeddb://Flow_Matching_123456")
- * @param downloadName The base filename for download (e.g., "flow_matching_model")
- */
-export async function downloadModelFromIndexedDB(
-  modelPath: string,
-  downloadName: string
-): Promise<void> {
-  try {
-    const model = await tf.loadLayersModel(modelPath);
-    await model.save(`downloads://${downloadName}`);
-    console.log(`Model downloaded as ${downloadName}.json and ${downloadName}.weights.bin`);
-  } catch (error) {
-    console.error(`Failed to download model from ${modelPath}:`, error);
-  }
-}
 
 // ========== TRAINING FUNCTIONS ==========
 

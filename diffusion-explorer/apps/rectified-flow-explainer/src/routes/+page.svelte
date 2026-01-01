@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { writable, type Writable } from "svelte/store";
+  import { downloadJSON } from "@diffusion-explorer/diffusion";
   import {
-    downloadJSON,
     clipSamplesToRadius,
     clipAllRectifiedTrajectoriesToStartingRadius,
   } from "$lib/flow_matching/utils";
@@ -265,118 +265,29 @@
   // ========== DOWNLOAD FUNCTIONS ==========
 
   function downloadTrajectories() {
-    const trajectories = $allTimeSamples;
-    if (!trajectories || trajectories.length === 0) {
-      console.error("No trajectories to download");
-      return;
-    }
-    const filename =
-      "flow_matching_trajectories_" + new Date().getTime() + ".json";
-    downloadJSON(trajectories, filename);
-    console.log(
-      "Trajectories downloaded:",
-      filename,
-      trajectories.length,
-      "timesteps"
-    );
+    if ($allTimeSamples?.length) downloadJSON($allTimeSamples, "flow_matching_trajectories.json");
   }
 
   function downloadVectorField() {
-    const field = $vectorFieldData;
-    if (!field) {
-      console.error("No vector field to download");
-      return;
-    }
-    const filename =
-      "flow_matching_vector_field_" + new Date().getTime() + ".json";
-    downloadJSON(field, filename);
-    console.log(
-      "Vector field downloaded:",
-      filename,
-      field.timeSteps.length,
-      "timesteps,",
-      field.gridResolution,
-      "x",
-      field.gridResolution,
-      "grid"
-    );
+    if ($vectorFieldData) downloadJSON($vectorFieldData, "flow_matching_vector_field.json");
   }
 
   function downloadRectifiedFlowData() {
-    const data = $rectifiedFlowData;
-    if (!data) {
-      console.error("No rectified flow data to download");
-      return;
-    }
-    const filename =
-      "rectified_flow_trajectories_" + new Date().getTime() + ".json";
-    downloadJSON(data, filename);
-    console.log(
-      "Rectified flow data downloaded:",
-      filename,
-      data.allRectifiedTrajectories.length,
-      "rectified steps"
-    );
+    if ($rectifiedFlowData) downloadJSON($rectifiedFlowData, "rectified_flow_trajectories.json");
   }
 
   function downloadFlowMatchingGridTrajectories() {
-    const trajectories = $flowMatchingGridTrajectories;
-    if (!trajectories || trajectories.length === 0) {
-      console.error("No flow matching grid trajectories to download");
-      return;
-    }
-    const filename =
-      "flow_matching_grid_trajectories_" + new Date().getTime() + ".json";
-    downloadJSON(trajectories, filename);
-    console.log(
-      "Flow matching grid trajectories downloaded:",
-      filename,
-      trajectories.length,
-      "timesteps"
-    );
+    if ($flowMatchingGridTrajectories?.length) downloadJSON($flowMatchingGridTrajectories, "flow_matching_grid_trajectories.json");
   }
 
   function downloadRectifiedFlowGridTrajectories() {
-    const trajectories = $rectifiedFlowGridTrajectories;
-    if (!trajectories || trajectories.length === 0) {
-      console.error("No rectified flow grid trajectories to download");
-      return;
+    if ($rectifiedFlowGridTrajectories?.length) {
+      downloadJSON({ allRectifiedTrajectories: $rectifiedFlowGridTrajectories, modelPath: "generated" }, "rectified_flow_grid_trajectories.json");
     }
-    const filename =
-      "rectified_flow_grid_trajectories_" + new Date().getTime() + ".json";
-    // Wrap in RectifiedFlowData format for consistency
-    const data = {
-      allRectifiedTrajectories: trajectories,
-      modelPath: "generated",
-    };
-    downloadJSON(data, filename);
-    console.log(
-      "Rectified flow grid trajectories downloaded:",
-      filename,
-      trajectories.length,
-      "rectified steps"
-    );
   }
 
   function downloadRectifiedFlowVectorField() {
-    const field = $rectifiedFlowVectorFieldData;
-    if (!field) {
-      console.error("No rectified flow vector field to download");
-      return;
-    }
-    const filename =
-      "rectified_flow_vector_field_" + new Date().getTime() + ".json";
-    downloadJSON(field, filename);
-    console.log(
-      "Rectified flow vector field downloaded:",
-      filename,
-      field.timeSteps.length,
-      "timesteps,",
-      field.gridResolution,
-      "x",
-      field.gridResolution,
-      "grid"
-    );
+    if ($rectifiedFlowVectorFieldData) downloadJSON($rectifiedFlowVectorFieldData, "rectified_flow_vector_field.json");
   }
 
   // ========== LIFECYCLE ==========
@@ -450,7 +361,7 @@
     }
 
     // Train and generate any missing flow matching data
-    let flowMatchingModelPath: string | null = null;
+    let flowMatchingModelPath: string | null = settings.flowMatchingModelPath;
 
     if (!flowMatchingTrajectoriesLoaded) {
       console.log("Training new flow matching model...");
@@ -463,7 +374,9 @@
         console.log("Training model for vector field generation...");
         flowMatchingModelPath = await trainModel();
       }
-      await generateVectorField(flowMatchingModelPath);
+      if (flowMatchingModelPath) {
+        await generateVectorField(flowMatchingModelPath);
+      }
     }
 
     if (!flowMatchingGridTrajectoriesLoaded) {
@@ -471,18 +384,18 @@
         console.log("Training model for grid trajectories...");
         flowMatchingModelPath = await trainModel();
       }
-      await generateFlowMatchingGridSamples(flowMatchingModelPath);
+      if (flowMatchingModelPath) {
+        await generateFlowMatchingGridSamples(flowMatchingModelPath);
+      }
     }
 
     // Train and generate any missing rectified flow data
-    let rectifiedFlowModelPath: string | null = null;
+    let rectifiedFlowModelPath: string | null = settings.rectifiedFlowModelPath;
+    console.log("Rectified flow model path:", rectifiedFlowModelPath);
 
-    if (!rectifiedFlowTrajectoriesLoaded) {
+    if (!rectifiedFlowTrajectoriesLoaded && !rectifiedFlowModelPath) {
       console.log("Training rectified flow...");
       rectifiedFlowModelPath = await trainRectifiedFlow();
-    } else {
-      // Get the model path from loaded data
-      rectifiedFlowModelPath = $rectifiedFlowData?.modelPath ?? null;
     }
 
     if (!rectifiedFlowGridTrajectoriesLoaded && rectifiedFlowModelPath) {
@@ -535,9 +448,9 @@
     <div class="caption">
       <span class="figure-number">Figure 1:</span>
       <strong>
-        A rectified flow model learns straighter <span style="color: #f17720;"
+        A rectified flow model (right) learns straighter <span style="color: #f17720;"
           >sampling paths</span
-        > than a standard flow matching model, enabling faster simulation.
+        > than a standard flow matching model (left), enabling faster simulation.
       </strong>
       Both models are trained to generate samples from the same
       <span style="color: #3b82f6;">target distribution</span>. The rectified
@@ -1401,13 +1314,11 @@
         <div class="caption">
           <span class="figure-number">Figure 15:</span>
           <strong>
-            Rectified flow enables accurate sampling with fewer Euler steps.
+            The straight trajectories of rectified flows enable accurate simulation with fewer Euler steps.
           </strong>
-          The <span style="color: #888888;">gray trajectory</span> shows the ground
-          truth (512 steps), while the <span style="color: #f17720;">orange trajectory</span>
-          shows the approximation using the selected number of steps. With curved
-          paths, few-step approximations deviate significantly from the true path.
-          With straight paths, even a single step can produce accurate results.
+          We compare the <span style="color: #f17720;">Euler approximations</span> of a flow matching model (left) and a rectified flow model (right) using varying numbers of steps.
+          We can see that the rectified flow's straighter trajectories allow for accurate approximations even with very few steps, leading to 
+          compared to the <span style="color: #22c55e;">ground truth</span> leading to lower <span style="color: #dc2626;">error</span>.
           Tap <img
             src="{base}/icons/tap.svg"
             alt="tap"

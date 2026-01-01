@@ -43,7 +43,7 @@
   export let targetPointRadius = 7;
 
   // Trajectory styling
-  export let groundTruthColor = "#888888";
+  export let groundTruthColor = "#22c55e";
   export let groundTruthOpacity = 0.8;
   export let approximationColor = "#f17720";
   export let approximationOpacity = 0.8;
@@ -107,12 +107,6 @@
 
   // Loading state
   let isLoading = true;
-
-  // Streaming state for ground truth trajectories (per start point)
-  let streamingLeftGroundTruths = []; // Array of pixel coordinate arrays
-  let streamingRightGroundTruths = [];
-  let isStreamingGroundTruth = false;
-  let streamingCompleteCount = 0;
 
   // Initialization
   let isInitialized = false;
@@ -207,138 +201,47 @@
   // Compute all trajectories for all start points
   async function computeAllTrajectories() {
     isLoading = true;
-    isStreamingGroundTruth = true;
-    streamingCompleteCount = 0;
 
-    const numPoints = startPoints.length;
-    const totalStreams = numPoints * 2; // Left and right for each point
-
-    // Clear previous ground truths
-    flowMatchingGroundTruths = [];
-    rectifiedFlowGroundTruths = [];
-
-    // Initialize streaming trajectories with start points
-    streamingLeftGroundTruths = startPoints.map((pt) => [
-      [xScale(pt[0]), yScale(pt[1])],
-    ]);
-    streamingRightGroundTruths = startPoints.map((pt) => [
-      [xScale(pt[0]), yScale(pt[1])],
+    // Load ground truth trajectories for both models in parallel
+    const [fmGroundTruths, rfGroundTruths] = await Promise.all([
+      sampleTrajectoriesBatch(settings.flowMatchingModelPath, "Flow Matching", startPoints, groundTruthSteps),
+      sampleTrajectoriesBatch(settings.rectifiedFlowModelPath, "Flow Matching", startPoints, groundTruthSteps)
     ]);
 
-    // Draw immediately to show initial points
-    draw();
+    flowMatchingGroundTruths = fmGroundTruths;
+    rectifiedFlowGroundTruths = rfGroundTruths;
 
-    // Helper to check if all ground truth samples are complete
-    async function onGroundTruthComplete() {
-      streamingCompleteCount++;
-      if (streamingCompleteCount >= totalStreams) {
-        isStreamingGroundTruth = false;
-
-        // Convert streaming trajectories to domain coordinates for storage
-        flowMatchingGroundTruths = streamingLeftGroundTruths.map((traj) =>
-          traj.map((p) => [xScale.invert(p[0]), yScale.invert(p[1])])
-        );
-        rectifiedFlowGroundTruths = streamingRightGroundTruths.map((traj) =>
-          traj.map((p) => [xScale.invert(p[0]), yScale.invert(p[1])])
-        );
-
-        // Now compute approximation trajectories
-        await computeApproximationTrajectories();
-      }
-    }
-
-    // Stream ground truth for each start point (using Euler scheduler)
-    startPoints.forEach((point, idx) => {
-      // Left model (Flow Matching)
-      callSamplingWorkerThreadFromInitialPoints(
-        settings.samplingWorkerUrl,
-        settings.flowMatchingModelPath,
-        "Flow Matching",
-        settings.trainingSettings.modelConfig,
-        [point],
-        groundTruthSteps,
-        onGroundTruthComplete,
-        settings.trainingSettings.domainRange,
-        { scheduler: "euler" },
-        (_step, x_t) => {
-          const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
-          streamingLeftGroundTruths[idx] = [
-            ...streamingLeftGroundTruths[idx],
-            newPoint,
-          ];
-          draw();
-        }
-      );
-
-      // Right model (Rectified Flow)
-      callSamplingWorkerThreadFromInitialPoints(
-        settings.samplingWorkerUrl,
-        settings.rectifiedFlowModelPath,
-        "Flow Matching",
-        settings.trainingSettings.modelConfig,
-        [point],
-        groundTruthSteps,
-        onGroundTruthComplete,
-        settings.trainingSettings.domainRange,
-        { scheduler: "euler" },
-        (_step, x_t) => {
-          const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
-          streamingRightGroundTruths[idx] = [
-            ...streamingRightGroundTruths[idx],
-            newPoint,
-          ];
-          draw();
-        }
-      );
-    });
-  }
-
-  // Compute approximation trajectories after ground truth is complete
-  async function computeApproximationTrajectories() {
+    // Now compute approximation trajectories for all step counts
     flowMatchingTrajectories = {};
     rectifiedFlowTrajectories = {};
 
-    // First, sample the currently visible step count for all points (batched)
     const currentSteps = stepValues[currentStepIndex];
 
-    // Batch all points together for each model
-    flowMatchingTrajectories[currentSteps] = await sampleTrajectoriesBatch(
-      settings.flowMatchingModelPath,
-      "Flow Matching",
-      startPoints,
-      currentSteps
-    );
+    // Load current step count first
+    const [fmApprox, rfApprox] = await Promise.all([
+      sampleTrajectoriesBatch(settings.flowMatchingModelPath, "Flow Matching", startPoints, currentSteps),
+      sampleTrajectoriesBatch(settings.rectifiedFlowModelPath, "Flow Matching", startPoints, currentSteps)
+    ]);
 
-    rectifiedFlowTrajectories[currentSteps] = await sampleTrajectoriesBatch(
-      settings.rectifiedFlowModelPath,
-      "Flow Matching",
-      startPoints,
-      currentSteps
-    );
+    flowMatchingTrajectories[currentSteps] = fmApprox;
+    rectifiedFlowTrajectories[currentSteps] = rfApprox;
 
-    // Create controllers and start animation now that current step is ready
+    // Start animation
     isLoading = false;
     createAnimationControllers();
     startApproxAnimation();
 
-    // Then sample remaining step counts in background (batched by step count)
+    // Load remaining step counts in background
     for (const steps of stepValues) {
-      if (steps === currentSteps) continue; // Already done
+      if (steps === currentSteps) continue;
 
-      // Batch all points together for each model and step count
-      flowMatchingTrajectories[steps] = await sampleTrajectoriesBatch(
-        settings.flowMatchingModelPath,
-        "Flow Matching",
-        startPoints,
-        steps
-      );
+      const [fmSteps, rfSteps] = await Promise.all([
+        sampleTrajectoriesBatch(settings.flowMatchingModelPath, "Flow Matching", startPoints, steps),
+        sampleTrajectoriesBatch(settings.rectifiedFlowModelPath, "Flow Matching", startPoints, steps)
+      ]);
 
-      rectifiedFlowTrajectories[steps] = await sampleTrajectoriesBatch(
-        settings.rectifiedFlowModelPath,
-        "Flow Matching",
-        startPoints,
-        steps
-      );
+      flowMatchingTrajectories[steps] = fmSteps;
+      rectifiedFlowTrajectories[steps] = rfSteps;
     }
   }
 
@@ -381,46 +284,6 @@
     }
   }
 
-  // Draw a partial trajectory up to a certain segment index (respects ctx.globalAlpha set by caller)
-  function drawPartialTrajectory(
-    ctx,
-    trajectory,
-    segmentIdx,
-    color,
-    lineWidth
-  ) {
-    if (!trajectory || trajectory.length < 2) return;
-
-    const endPointIndex = Math.min(segmentIdx + 1, trajectory.length - 1);
-    if (endPointIndex < 1) return;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    ctx.beginPath();
-    const [startX, startY] = [
-      xScale(trajectory[0][0]),
-      yScale(trajectory[0][1]),
-    ];
-    ctx.moveTo(startX, startY);
-
-    for (let i = 1; i <= endPointIndex; i++) {
-      const [x, y] = [xScale(trajectory[i][0]), yScale(trajectory[i][1])];
-      ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // Draw endpoint marker at current position
-    const currentPoint = trajectory[endPointIndex];
-    const [endX, endY] = [xScale(currentPoint[0]), yScale(currentPoint[1])];
-    ctx.beginPath();
-    ctx.arc(endX, endY, endpointRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
-  }
-
   // Draw start point markers for all start points
   function drawStartPoints(ctx) {
     for (const point of startPoints) {
@@ -441,30 +304,6 @@
       ctx.fill();
       ctx.globalAlpha = 1.0;
     }
-  }
-
-  // Draw streaming trajectory (already in pixel coordinates, respects ctx.globalAlpha set by caller)
-  function drawStreamingTrajectory(ctx, pixelTrajectory, color, lineWidth) {
-    if (!pixelTrajectory || pixelTrajectory.length < 2) return;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    ctx.beginPath();
-    ctx.moveTo(pixelTrajectory[0][0], pixelTrajectory[0][1]);
-    for (let i = 1; i < pixelTrajectory.length; i++) {
-      ctx.lineTo(pixelTrajectory[i][0], pixelTrajectory[i][1]);
-    }
-    ctx.stroke();
-
-    // Draw endpoint marker
-    const lastPoint = pixelTrajectory[pixelTrajectory.length - 1];
-    ctx.beginPath();
-    ctx.arc(lastPoint[0], lastPoint[1], endpointRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
   }
 
   // Draw error line (dashed) from ground truth endpoint to approximation endpoint
@@ -494,100 +333,6 @@
     ctx.stroke();
 
     ctx.setLineDash([]); // Reset to solid line
-  }
-
-  // Main draw function for a panel (handles arrays of trajectories)
-  function drawPanel(
-    ctx,
-    groundTruths,
-    approximations,
-    streamingGroundTruths = null,
-    segmentIdx = null
-  ) {
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    // 1. Draw target distribution (low opacity)
-    drawScatterPlot(
-      ctx,
-      scaledTargetDistribution,
-      targetPointRadius,
-      targetColor,
-      targetOpacity
-    );
-
-    // 2. Draw ground truth trajectories (gray, behind)
-    ctx.globalAlpha = groundTruthOpacity;
-    if (streamingGroundTruths && streamingGroundTruths.length > 0) {
-      // Use streaming trajectories (already in pixel coords)
-      for (const traj of streamingGroundTruths) {
-        if (traj && traj.length > 0) {
-          drawStreamingTrajectory(
-            ctx,
-            traj,
-            groundTruthColor,
-            trajectoryStrokeWidth
-          );
-        }
-      }
-    } else if (groundTruths && groundTruths.length > 0) {
-      for (const traj of groundTruths) {
-        drawTrajectory(
-          ctx,
-          traj,
-          groundTruthColor,
-          trajectoryStrokeWidth,
-          true
-        );
-      }
-    }
-
-    // 3. Draw approximation trajectories (orange, on top)
-    ctx.globalAlpha = approximationOpacity;
-    if (approximations && approximations.length > 0) {
-      for (const traj of approximations) {
-        if (segmentIdx !== null) {
-          // Animate partial trajectory
-          drawPartialTrajectory(
-            ctx,
-            traj,
-            segmentIdx,
-            approximationColor,
-            trajectoryStrokeWidth + 0.5
-          );
-        } else {
-          // Draw full trajectory
-          drawTrajectory(
-            ctx,
-            traj,
-            approximationColor,
-            trajectoryStrokeWidth + 0.5,
-            true
-          );
-        }
-      }
-    }
-
-    // 4. Draw start point markers (on top of everything)
-    ctx.globalAlpha = 1.0;
-    drawStartPoints(ctx);
-  }
-
-  // Draw both panels (used during streaming phase)
-  function draw() {
-    if (!leftCtx || !rightCtx) return;
-
-    const currentSteps = stepValues[currentStepIndex];
-    const leftApprox = flowMatchingTrajectories[currentSteps] || [];
-    const rightApprox = rectifiedFlowTrajectories[currentSteps] || [];
-
-    if (isStreamingGroundTruth) {
-      // During streaming, use streaming trajectories (no approx animation yet)
-      drawPanel(leftCtx, null, leftApprox, streamingLeftGroundTruths);
-      drawPanel(rightCtx, null, rightApprox, streamingRightGroundTruths);
-    }
-    // After streaming, animation controllers handle drawing
   }
 
   // Background drawing functions for animation controllers
@@ -741,11 +486,26 @@
     startApproxAnimation();
   }
 
+  // Draw only start points and target distribution (for immediate feedback)
+  function drawInitialState() {
+    if (!leftCtx || !rightCtx) return;
+
+    // Clear both canvases
+    leftCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+    rightCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Draw target distribution on both
+    drawScatterPlot(leftCtx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
+    drawScatterPlot(rightCtx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
+
+    // Draw start points on both
+    drawStartPoints(leftCtx);
+    drawStartPoints(rightCtx);
+  }
+
   // Handle canvas click - convert to domain coordinates and add/replace start point
   function handleCanvasClick(event, side) {
-    // Ignore clicks while trajectory generation is in progress (debounce)
-    if (isStreamingGroundTruth || isLoading) return;
-
+    // Stop animation
     stopApproxAnimation();
 
     const canvas = side === "left" ? leftCanvas : rightCanvas;
@@ -769,6 +529,9 @@
       // Replace oldest point (shift and push)
       startPoints = [...startPoints.slice(1), newPoint];
     }
+
+    // Immediately draw start points for visual feedback
+    drawInitialState();
 
     computeAllTrajectories();
   }
@@ -832,7 +595,7 @@
           bind:this={leftCanvas}
           class="panel-canvas"
           onclick={(e) => handleCanvasClick(e, "left")}
-          style="cursor: {isStreamingGroundTruth || isLoading ? 'wait' : 'pointer'};"
+          style="cursor: pointer;"
         ></canvas>
       </div>
     {/snippet}
@@ -855,7 +618,7 @@
           bind:this={rightCanvas}
           class="panel-canvas"
           onclick={(e) => handleCanvasClick(e, "right")}
-          style="cursor: {isStreamingGroundTruth || isLoading ? 'wait' : 'pointer'};"
+          style="cursor: pointer;"
         ></canvas>
       </div>
     {/snippet}
@@ -967,7 +730,7 @@
   }
 
   .legend-text {
-    font-size: 16px;
+    font-size: 18px;
     color: #666;
     font-family: Helvetica, Arial, sans-serif;
   }

@@ -1,3 +1,4 @@
+import { SchedulerType } from './schedulers';
 
 type SamplingType = 'sample' | 'sample_from_initial_points' | 'sample_grid' | 'vector_field_grid';
 
@@ -5,6 +6,7 @@ interface SamplingOptions {
     cond?: number[] | any;
     guidanceScale?: number;
     return_guidance?: boolean;
+    scheduler?: SchedulerType;
 }
 
 interface SamplingMessageData {
@@ -21,19 +23,93 @@ interface SamplingMessageData {
     streaming?: boolean;
 }
 
+// ===== Module-level state for singleton worker =====
+
+type SamplingCallbacks = {
+    callback: (allSamples: any, guidance?: any) => void;
+    onStep?: (step: number, x_t: number[][]) => void;
+};
+
+let samplingWorker: Worker | null = null;
+let callbacksByRequestId = new Map<string, SamplingCallbacks>();
+
 /**
- * Internal helper to create and communicate with a sampling worker.
+ * Lazily creates and returns the singleton sampling worker.
+ * Sets up message routing based on requestId.
+ */
+function getSamplingWorker(samplingWorkerUrl: string): Worker {
+    if (samplingWorker) return samplingWorker;
+
+    samplingWorker = new Worker(samplingWorkerUrl, { type: 'module' });
+
+    samplingWorker.onerror = (e) => {
+        console.error('[Sampling Worker Error]', {
+            message: e.message,
+            filename: e.filename,
+            lineno: e.lineno,
+            colno: e.colno
+        });
+    };
+
+    samplingWorker.onmessageerror = (e) => {
+        console.error('[Sampling Worker Message Error] Failed to deserialize message:', e);
+    };
+
+    samplingWorker.onmessage = (e) => {
+        const { requestId, type: msgType } = e.data;
+
+        const handlers = callbacksByRequestId.get(requestId);
+        if (!handlers) return;
+
+        if (msgType === 'step' && handlers.onStep) {
+            handlers.onStep(e.data.step, e.data.x_t);
+        }
+        else if (msgType === 'result') {
+            handlers.callback(e.data.allSamples, e.data.guidance);
+            callbacksByRequestId.delete(requestId);
+        }
+        else if (msgType === 'cancelled') {
+            console.log('[Sampling Worker] Request cancelled:', requestId);
+            callbacksByRequestId.delete(requestId);
+        }
+        else if (msgType === 'status') {
+            console.log('[Sampling Worker] status:', e.data.message);
+        }
+        else if (msgType === 'error') {
+            console.error('[Sampling Worker] error:', e.data.error);
+            callbacksByRequestId.delete(requestId);
+        }
+    };
+
+    return samplingWorker;
+}
+
+/**
+ * Send a cancellation signal for a specific sampling request.
+ * The worker will stop processing and ignore any pending results.
  *
- * Creates a new Web Worker, sends a sampling request, and routes
- * responses to the provided callback. Optionally supports streaming
- * per-step updates via the onStep callback.
+ * @param requestId - The request ID to cancel
+ */
+export function stopSamplingRequest(requestId: string): void {
+    if (samplingWorker) {
+        console.log('[Sampling Client] Sending stop request:', requestId);
+        samplingWorker.postMessage({ requestId, type: 'stop' });
+        callbacksByRequestId.delete(requestId);
+    }
+}
+
+/**
+ * Internal helper to communicate with the singleton sampling worker.
+ *
+ * Uses a lazily-created shared worker and routes responses based on
+ * requestId. Optionally supports streaming per-step updates via onStep.
  *
  * @param samplingWorkerUrl - URL to the sampling worker script
  * @param type - Type of sampling operation to perform
  * @param data - Configuration data for the sampling operation
  * @param callback - Callback receiving sampled results
  * @param onStep - Optional callback invoked after each integration step
- * @returns The created Worker instance
+ * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
  */
 function callSamplingWorker(
     samplingWorkerUrl: string,
@@ -41,26 +117,20 @@ function callSamplingWorker(
     data: SamplingMessageData,
     callback: (allSamples: any, guidance?: any) => void,
     onStep?: (step: number, x_t: number[][]) => void
-) {
-    const worker = new Worker(samplingWorkerUrl, { type: 'module' });
+): string {
+    const worker = getSamplingWorker(samplingWorkerUrl);
+    const requestId = crypto.randomUUID();
+
+    // Register callbacks for this request
+    callbacksByRequestId.set(requestId, { callback, onStep });
 
     // Enable streaming if onStep callback is provided
     const messageData = onStep ? { ...data, streaming: true } : data;
 
-    worker.onmessage = (e) => {
-        const { type: msgType } = e.data;
-        if (msgType === 'step' && onStep) {
-            onStep(e.data.step, e.data.x_t);
-        } else if (msgType === 'result') {
-            callback(e.data.allSamples, e.data.guidance);
-        } else if (msgType === 'status') {
-            console.log('Worker status:', e.data.message);
-        } else if (msgType === 'error') {
-            console.error('Worker error:', e.data.error);
-        }
-    };
-    worker.postMessage({ type, data: messageData });
-    return worker;
+    console.log('[Sampling Worker] Sending message:', { type, requestId, timestamp: Date.now() });
+    worker.postMessage({ requestId, type, data: messageData });
+
+    return requestId;
 }
 
 /**
@@ -79,7 +149,7 @@ function callSamplingWorker(
  * @param domainRange - Optional domain bounds for clipping
  * @param options - Optional sampling parameters (conditioning, guidance)
  * @param onStep - Optional callback invoked after each integration step for streaming
- * @returns The created Worker instance
+ * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
  */
 export function callSamplingWorkerThread(
     samplingWorkerUrl: string,
@@ -92,7 +162,7 @@ export function callSamplingWorkerThread(
     domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
     options: SamplingOptions = {},
     onStep?: (step: number, x_t: number[][]) => void
-) {
+): string {
     return callSamplingWorker(
         samplingWorkerUrl,
         'sample',
@@ -127,7 +197,7 @@ export function callSamplingWorkerThread(
  * @param domainRange - Optional domain bounds for clipping
  * @param options - Optional sampling parameters (conditioning, guidance)
  * @param onStep - Optional callback invoked after each integration step for streaming
- * @returns The created Worker instance
+ * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
  */
 export function callSamplingWorkerThreadFromInitialPoints(
     samplingWorkerUrl: string,
@@ -140,7 +210,7 @@ export function callSamplingWorkerThreadFromInitialPoints(
     domainRange: { xMin: number, xMax: number; yMin: number, yMax: number } | null = null,
     options: SamplingOptions = {},
     onStep?: (step: number, x_t: number[][]) => void
-) {
+): string {
     return callSamplingWorker(
         samplingWorkerUrl,
         'sample_from_initial_points',
@@ -175,7 +245,7 @@ export function callSamplingWorkerThreadFromInitialPoints(
  * @param callback - Callback receiving trajectories [timestep][sample][dim]
  * @param options - Optional sampling parameters (conditioning, guidance)
  * @param onStep - Optional callback invoked after each integration step for streaming
- * @returns The created Worker instance
+ * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
  */
 export function callSamplingWorkerThreadGrid(
     samplingWorkerUrl: string,
@@ -188,7 +258,7 @@ export function callSamplingWorkerThreadGrid(
     callback: (allSamples: any, guidance?: any) => void,
     options: SamplingOptions = {},
     onStep?: (step: number, x_t: number[][]) => void
-) {
+): string {
     return callSamplingWorker(
         samplingWorkerUrl,
         'sample_grid',
@@ -221,6 +291,7 @@ export function callSamplingWorkerThreadGrid(
  * @param callback - Callback receiving velocity vectors [gridRes*gridRes, dim]
  * @param timeValue - Time value at which to evaluate the field (default: 0.5)
  * @param options - Optional sampling parameters
+ * @returns The request ID for this sampling operation (can be used with stopSamplingRequest)
  */
 export function callSamplingWorkerThreadVectorFieldGrid(
     samplingWorkerUrl: string,
@@ -232,7 +303,7 @@ export function callSamplingWorkerThreadVectorFieldGrid(
     callback: (velocities: number[][][]) => void,
     timeValue: number = 0.5,
     options: SamplingOptions = {}
-) {
+): string {
     return callSamplingWorker(
         samplingWorkerUrl,
         'vector_field_grid',

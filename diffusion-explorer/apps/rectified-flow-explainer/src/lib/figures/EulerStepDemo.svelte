@@ -18,10 +18,10 @@
   export let flowMatchingVectorField = null;
 
   // Layout
-  export let canvasWidth = 400;
-  export let canvasHeight = 400;
-  export let marginWidth = 10;
-  export let marginHeight = 10;
+  export let canvasWidth = 450;
+  export let canvasHeight = 450;
+  export let marginWidth = 0;
+  export let marginHeight = 0;
   export let domainRange = { xMin: -1.9, xMax: 1.9, yMin: -1.9, yMax: 1.9 };
 
   // Labels
@@ -47,7 +47,7 @@
 
   // Vector field styling
   export let arrowColor = "#3b82f6";
-  export let arrowScale = 45;
+  export let arrowScale = 40;
   export let arrowWidth = 2.5;
   export let arrowOpacity = 0.6;
   export let showArrowHeads = false;
@@ -68,7 +68,7 @@
 
   // ===== CONSTANTS =====
 
-  const NUM_STEPS = 8;
+  const NUM_STEPS = 16;
   const GROUND_TRUTH_STEPS = 64;
 
   // Animation timing
@@ -106,10 +106,6 @@
 
   // Loading state
   let isLoading = true;
-
-  // Streaming state for ground truth trajectories
-  let streamingGroundTruths = [];
-  let isStreamingGroundTruth = false;
 
   // Initialization
   let isInitialized = false;
@@ -197,72 +193,22 @@
   // Compute all trajectories for all start points
   async function computeAllTrajectories() {
     isLoading = true;
-    isStreamingGroundTruth = true;
 
-    const numPoints = startPoints.length;
-
-    // Clear previous ground truths
-    groundTruthTrajectories = [];
-
-    // Initialize streaming trajectories with start points
-    streamingGroundTruths = startPoints.map((pt) => [
-      [xScale(pt[0]), yScale(pt[1])],
+    // Load ground truth and approximation trajectories in parallel
+    const [gtTrajectories, approxTrajectories] = await Promise.all([
+      sampleTrajectoriesBatch(startPoints, GROUND_TRUTH_STEPS),
+      sampleTrajectoriesBatch(startPoints, NUM_STEPS)
     ]);
 
-    // Draw immediately to show initial points
-    draw();
-
-    let completeCount = 0;
-
-    async function onGroundTruthComplete() {
-      completeCount++;
-      if (completeCount >= numPoints) {
-        isStreamingGroundTruth = false;
-
-        // Convert streaming trajectories to domain coordinates
-        groundTruthTrajectories = streamingGroundTruths.map((traj) =>
-          traj.map((p) => [xScale.invert(p[0]), yScale.invert(p[1])])
-        );
-
-        // Compute approximation trajectories
-        await computeApproximationTrajectories();
-      }
-    }
-
-    // Stream ground truth for each start point
-    startPoints.forEach((point, idx) => {
-      callSamplingWorkerThreadFromInitialPoints(
-        settings.samplingWorkerUrl,
-        settings.flowMatchingModelPath,
-        "Flow Matching",
-        settings.trainingSettings.modelConfig,
-        [point],
-        GROUND_TRUTH_STEPS,
-        onGroundTruthComplete,
-        settings.trainingSettings.domainRange,
-        { scheduler: "euler" },
-        (_step, x_t) => {
-          const newPoint = [xScale(x_t[0][0]), yScale(x_t[0][1])];
-          streamingGroundTruths[idx] = [
-            ...streamingGroundTruths[idx],
-            newPoint,
-          ];
-          draw();
-        }
-      );
-    });
-  }
-
-  // Compute approximation trajectories
-  async function computeApproximationTrajectories() {
-    // Batch all points together in a single call
-    approximationTrajectories = await sampleTrajectoriesBatch(startPoints, NUM_STEPS);
+    groundTruthTrajectories = gtTrajectories;
+    approximationTrajectories = approxTrajectories;
 
     // Start animation
     isLoading = false;
     segmentIndex = 0;
     segmentProgress = 0;
     showErrorLines = false;
+    draw();
     startAnimation();
   }
 
@@ -366,53 +312,6 @@
     }
   }
 
-  // Draw streaming trajectory (already in pixel coordinates)
-  function drawStreamingTrajectory(ctx, pixelTrajectory, color, lineWidth) {
-    if (!pixelTrajectory || pixelTrajectory.length < 2) return;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    ctx.beginPath();
-    ctx.moveTo(pixelTrajectory[0][0], pixelTrajectory[0][1]);
-    for (let i = 1; i < pixelTrajectory.length; i++) {
-      ctx.lineTo(pixelTrajectory[i][0], pixelTrajectory[i][1]);
-    }
-    ctx.stroke();
-
-    const lastPoint = pixelTrajectory[pixelTrajectory.length - 1];
-    ctx.beginPath();
-    ctx.arc(lastPoint[0], lastPoint[1], endpointRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
-  }
-
-  // Draw error line from ground truth endpoint to approximation endpoint
-  function drawErrorLine(ctx, groundTruthEndpoint, approxEndpoint, color, lineWidth) {
-    if (!groundTruthEndpoint || !approxEndpoint) return;
-
-    const [gtX, gtY] = [
-      xScale(groundTruthEndpoint[0]),
-      yScale(groundTruthEndpoint[1]),
-    ];
-    const [apX, apY] = [xScale(approxEndpoint[0]), yScale(approxEndpoint[1])];
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.setLineDash([6, 4]);
-    ctx.globalAlpha = 1.0;
-
-    ctx.beginPath();
-    ctx.moveTo(gtX, gtY);
-    ctx.lineTo(apX, apY);
-    ctx.stroke();
-
-    ctx.setLineDash([]);
-  }
-
-  // Draw during streaming phase
   function draw() {
     if (!ctx) return;
 
@@ -459,18 +358,10 @@
       ctx.restore();
     }
 
-    // Draw ground truth trajectories (streaming or complete)
+    // Draw ground truth trajectories
     ctx.globalAlpha = groundTruthOpacity;
-    if (isStreamingGroundTruth && streamingGroundTruths.length > 0) {
-      for (const traj of streamingGroundTruths) {
-        if (traj && traj.length > 0) {
-          drawStreamingTrajectory(ctx, traj, groundTruthColor, trajectoryStrokeWidth);
-        }
-      }
-    } else if (groundTruthTrajectories.length > 0) {
-      for (const traj of groundTruthTrajectories) {
-        drawTrajectoryOnCtx(ctx, traj, groundTruthColor, trajectoryStrokeWidth, true);
-      }
+    for (const traj of groundTruthTrajectories) {
+      drawTrajectoryOnCtx(ctx, traj, groundTruthColor, trajectoryStrokeWidth, true);
     }
     ctx.globalAlpha = 1.0;
 
@@ -578,7 +469,7 @@
 
   // Handle canvas click
   function handleCanvasClick(event) {
-    if (isStreamingGroundTruth || isLoading) return;
+    if (isLoading) return;
 
     stopAnimation();
 
@@ -640,19 +531,23 @@
         bind:this={canvas}
         class="panel-canvas"
         onclick={handleCanvasClick}
-        style="cursor: {isStreamingGroundTruth || isLoading ? 'wait' : 'pointer'};"
+        style="cursor: {isLoading ? 'wait' : 'pointer'};"
       ></canvas>
     </div>
 
     {#snippet footer()}
       <div class="legend">
         <div class="legend-item">
+          <span class="legend-color" style="background-color: {arrowColor};"></span>
+          <span class="legend-text">Velocity Field</span>
+        </div>
+        <div class="legend-item">
           <span class="legend-color" style="background-color: {groundTruthColor};"></span>
-          <span class="legend-text" style="color: {groundTruthColor};">Ground Truth</span>
+          <span class="legend-text">Ground Truth</span>
         </div>
         <div class="legend-item">
           <span class="legend-color" style="background-color: {approximationColor};"></span>
-          <span class="legend-text">Approximation (8 steps)</span>
+          <span class="legend-text">Approximation ({NUM_STEPS} steps)</span>
         </div>
       </div>
     {/snippet}
@@ -685,6 +580,7 @@
     justify-content: center;
     gap: 24px;
     flex-wrap: wrap;
+    margin-bottom: 16px;
   }
 
   .legend-item {
@@ -700,7 +596,7 @@
   }
 
   .legend-text {
-    font-size: 16px;
+    font-size: 18px;
     color: #666;
     font-family: Helvetica, Arial, sans-serif;
   }

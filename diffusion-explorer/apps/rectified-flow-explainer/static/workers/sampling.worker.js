@@ -53096,6 +53096,42 @@ function sampleUniformGrid(gridResolution, domainRange) {
   return initialPoints;
 }
 
+// ../../packages/diffusion/src/schedulers.ts
+function eulerStep(x_t, t_start, t_end, vectorField) {
+  return tidy(() => {
+    const t0 = t_start.reshape([x_t.shape[0], 1]);
+    const t1 = t_end.reshape([x_t.shape[0], 1]);
+    const dt = t1.sub(t0);
+    const velocity = vectorField(x_t, t0);
+    const update = velocity.mul(dt);
+    return x_t.add(update);
+  });
+}
+function eulerMidpointStep(x_t, t_start, t_end, vectorField) {
+  return tidy(() => {
+    const t0 = t_start.reshape([x_t.shape[0], 1]);
+    const t1 = t_end.reshape([x_t.shape[0], 1]);
+    const dt = t1.sub(t0);
+    const half_step = vectorField(x_t, t0).mul(dt).div(2);
+    const mid_point = x_t.add(half_step);
+    const t_mid = t0.add(dt.div(2));
+    const update = vectorField(mid_point, t_mid).mul(dt);
+    return x_t.add(update);
+  });
+}
+var SCHEDULERS = {
+  "euler": eulerStep,
+  "euler_midpoint": eulerMidpointStep
+};
+function getScheduler(scheduler) {
+  const stepFn = SCHEDULERS[scheduler];
+  if (!stepFn) {
+    const validSchedulers = Object.keys(SCHEDULERS).join(", ");
+    throw new Error(`Unknown scheduler: '${scheduler}'. Valid options are: ${validSchedulers}`);
+  }
+  return stepFn;
+}
+
 // ../../packages/diffusion/src/flow_matching.ts
 var FlowModel = class extends Model {
   constructor(dim = 2, hidden = 64) {
@@ -53161,14 +53197,16 @@ var FlowModel = class extends Model {
       const avgEpochLoss = epochLoss / batchCount;
       let intermediateSamples = null;
       if (epoch % updateInterval === 0) {
-        const allTimeSamples = this.sample(
+        const allTimeSamples = await this.sample(
           500,
           // number of samples
           30
           // number of steps
         );
-        const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0);
-        intermediateSamples = lastTimeStep.arraySync();
+        if (allTimeSamples) {
+          const lastTimeStep = allTimeSamples.gather(allTimeSamples.shape[0] - 1, 0);
+          intermediateSamples = lastTimeStep.arraySync();
+        }
       }
       endEpochCallback(epoch, intermediateSamples, avgEpochLoss);
       await nextFrame();
@@ -53228,10 +53266,14 @@ var FlowModel = class extends Model {
         // source distribution
       );
       if (rectifiedStep < num_rectified_steps - 1) {
-        const trajectories = this.sample_from_initial_points(
+        const trajectories = await this.sample_from_initial_points(
           x0_coupling,
           num_simulation_steps
         );
+        if (!trajectories) {
+          console.log(`Sampling cancelled at rectified step ${rectifiedStep}`);
+          break;
+        }
         const finalStep = trajectories.shape[0] - 1;
         const newX1 = trajectories.slice([finalStep, 0, 0], [1, numSamples, dim]).squeeze([0]);
         if (rectifiedStep > 0) {
@@ -53280,77 +53322,79 @@ var FlowModel = class extends Model {
     });
   }
   /**
-   * Integrate one step from t_start to t_end using midpoint method
+   * Integrate one step from t_start to t_end using the specified scheduler
    * @param x_t tf.Tensor2D of shape [batch, dim]
    * @param t_start tf.Tensor1D or tf.Tensor2D of shape [batch] or [batch, 1]
    * @param t_end tf.Tensor1D or tf.Tensor2D of shape [batch] or [batch, 1]
+   * @param scheduler The integration method to use (default: 'euler_midpoint')
    */
-  step(x_t, t_start, t_end) {
-    return tidy(() => {
-      const t0 = t_start.reshape([x_t.shape[0], 1]);
-      const t1 = t_end.reshape([x_t.shape[0], 1]);
-      const dt = t1.sub(t0);
-      const half_step = this.forward(x_t, t0).mul(dt).div(2);
-      const mid_point = x_t.add(half_step);
-      const t_mid = t0.add(dt.div(2));
-      const update = this.forward(mid_point, t_mid).mul(dt);
-      return x_t.add(update);
-    });
+  step(x_t, t_start, t_end, scheduler = "euler_midpoint") {
+    const stepFn = getScheduler(scheduler);
+    return stepFn(x_t, t_start, t_end, (x, t) => this.forward(x, t));
   }
   /**
    * Draw `num_samples` samples from the model at time step `t`
    * @param num_samples number of samples to draw
    * @param t timestep to draw samples at in [0, num_total_steps]
    * @param num_total_steps number of total steps to simulate the ODE
-   * @param options Optional parameters for future extensibility
+   * @param options Sampling options (scheduler, etc.)
    * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
-   * @returns tf.Tensor2D of shape [num_total_steps, num_samples, dim]
+   * @param shouldStop Optional callback to check if sampling should be cancelled
+   * @returns Promise<tf.Tensor3D | null> - null if cancelled
    */
-  sample(num_samples, num_total_steps = 100, options = {}, perStepCallback) {
+  async sample(num_samples, num_total_steps = 100, options = {}, perStepCallback, shouldStop = () => false) {
     const initial_points = randomNormal([num_samples, this.dim]);
-    return this.sample_from_initial_points(initial_points, num_total_steps, options, perStepCallback);
+    return this.sample_from_initial_points(initial_points, num_total_steps, options, perStepCallback, shouldStop);
   }
   /**
   * Draw samples from the model using the given initial points
   * @param initial_points tf.Tensor2D of shape [num_samples, dim]
   * @param num_total_steps Number of integration steps
-  * @param options Optional parameters for future extensibility
+  * @param options Sampling options (scheduler, etc.)
   * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
+  * @param shouldStop Optional callback to check if sampling should be cancelled
+  * @returns Promise<tf.Tensor3D | null> - null if cancelled
   */
-  sample_from_initial_points(initial_points, num_total_steps = 100, options = {}, perStepCallback) {
-    return tidy(() => {
-      const num_samples = initial_points.shape[0];
-      const x_0 = initial_points;
-      const t_steps = linspace(0, 1, num_total_steps + 1);
-      let all_step_data = [];
-      let x_t = x_0;
-      for (let i = 0; i < num_total_steps; i++) {
-        const t_i = t_steps.slice([i], [1]);
-        const t_i_repeated = tile(t_i, [num_samples]);
-        const t_next = t_steps.slice([i + 1], [1]);
-        const t_next_repeated = tile(t_next, [num_samples]);
-        x_t = this.step(x_t, t_i_repeated, t_next_repeated);
-        all_step_data.push(x_t);
-        if (perStepCallback) {
-          const x_t_array = x_t.arraySync();
-          perStepCallback(i, x_t_array);
-        }
+  async sample_from_initial_points(initial_points, num_total_steps = 100, options = {}, perStepCallback, shouldStop = () => false) {
+    const scheduler = options.scheduler ?? "euler_midpoint";
+    const num_samples = initial_points.shape[0];
+    const t_steps = linspace(0, 1, num_total_steps + 1);
+    let x_t = initial_points;
+    const all_step_data = [];
+    for (let i = 0; i < num_total_steps; i++) {
+      if (shouldStop()) {
+        t_steps.dispose();
+        all_step_data.forEach((t) => t.dispose());
+        return null;
       }
-      return stack(all_step_data);
-    });
+      const x_next = tidy(() => {
+        const t_i = tile(t_steps.slice([i], [1]), [num_samples]);
+        const t_next = tile(t_steps.slice([i + 1], [1]), [num_samples]);
+        return this.step(x_t, t_i, t_next, scheduler);
+      });
+      x_t = x_next;
+      all_step_data.push(x_t);
+      if (perStepCallback) {
+        perStepCallback(i, x_t.arraySync());
+      }
+      await nextFrame();
+    }
+    t_steps.dispose();
+    return stack(all_step_data);
   }
   /**
   * Sample from a uniform grid of initial points
   * @param gridResolution Number of points along each axis
   * @param domainRange The domain range for x and y coordinates
   * @param num_total_steps Number of flow steps
-  * @param options Optional parameters for future extensibility
+  * @param options Sampling options (scheduler, etc.)
   * @param perStepCallback Optional callback invoked after each integration step with (step, x_t)
-  * @returns Tensor of shape [num_total_steps, gridResolution * gridResolution, 2]
+  * @param shouldStop Optional callback to check if sampling should be cancelled
+  * @returns Promise<tf.Tensor3D | null> - null if cancelled
   */
-  sample_grid(gridResolution, domainRange, num_total_steps = 100, options = {}, perStepCallback) {
+  async sample_grid(gridResolution, domainRange, num_total_steps = 100, options = {}, perStepCallback, shouldStop = () => false) {
     const initialPoints = sampleUniformGrid(gridResolution, domainRange);
-    return this.sample_from_initial_points(initialPoints, num_total_steps, options, perStepCallback);
+    return this.sample_from_initial_points(initialPoints, num_total_steps, options, perStepCallback, shouldStop);
   }
   /**
    * Private helper: Sample trajectories for visualization
@@ -53358,22 +53402,29 @@ var FlowModel = class extends Model {
    * @param numSteps Number of ODE integration steps
    * @param numVisualizationSamples Maximum number of samples to visualize
    * @param returnFullTrajectories If true, returns full trajectories; if false, returns only final timestep
-   * @returns Full trajectories as 3D array or final timestep samples as 2D array
+   * @returns Full trajectories as 3D array or final timestep samples as 2D array, or null if cancelled
    */
   async sampleForVisualization(initialPoints, numSteps, numVisualizationSamples = 100, returnFullTrajectories = false) {
-    return tidy(() => {
-      const numSamples = initialPoints.shape[0];
-      const sampleCount = Math.min(numVisualizationSamples, numSamples);
-      const subset = initialPoints.slice([0, 0], [sampleCount, -1]);
-      const trajectories = this.sample_from_initial_points(subset, numSteps);
-      if (returnFullTrajectories) {
-        return trajectories.arraySync();
-      } else {
-        const finalStep = trajectories.shape[0] - 1;
-        const finalSamples = trajectories.slice([finalStep, 0, 0], [1, -1, -1]).squeeze([0]);
-        return finalSamples.arraySync();
-      }
-    });
+    const numSamples = initialPoints.shape[0];
+    const sampleCount = Math.min(numVisualizationSamples, numSamples);
+    const subset = initialPoints.slice([0, 0], [sampleCount, -1]);
+    const trajectories = await this.sample_from_initial_points(subset, numSteps);
+    if (!trajectories) {
+      subset.dispose();
+      return null;
+    }
+    let result;
+    if (returnFullTrajectories) {
+      result = trajectories.arraySync();
+    } else {
+      const finalStep = trajectories.shape[0] - 1;
+      const finalSamples = trajectories.slice([finalStep, 0, 0], [1, -1, -1]).squeeze([0]);
+      result = finalSamples.arraySync();
+      finalSamples.dispose();
+    }
+    subset.dispose();
+    trajectories.dispose();
+    return result;
   }
 };
 
@@ -53385,12 +53436,37 @@ var trainWorkerUrl = new URL("./workers/train.worker.ts", import.meta.url).href;
 var backend2 = "webgl";
 var trainingObjectiveToModelClass = {
   "Flow Matching": FlowModel
-  // Diffusion: DiffusionModel,
-  // "Conditional Diffusion": ConditionalDiffusionModel,
 };
+var cancelledRequests = /* @__PURE__ */ new Set();
+self.addEventListener("unhandledrejection", (event) => {
+  console.error("[Sampling Worker] Unhandled promise rejection:", event.reason);
+  self.postMessage({
+    type: "error",
+    error: `Unhandled rejection: ${event.reason?.message || String(event.reason)}`
+  });
+});
+self.addEventListener("error", (event) => {
+  console.error("[Sampling Worker] Uncaught error:", {
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno
+  });
+  self.postMessage({
+    type: "error",
+    error: `Uncaught error: ${event.message} at ${event.filename}:${event.lineno}`
+  });
+});
 self.onmessage = async (e) => {
+  const { requestId, type, data } = e.data;
+  if (type === "stop") {
+    cancelledRequests.add(requestId);
+    console.log("[Sampling Worker] Cancel requested:", requestId);
+    return;
+  }
+  const shouldStop = () => cancelledRequests.has(requestId);
   try {
-    const { type, data } = e.data;
+    console.log("[Sampling Worker] Received message:", { requestId, type, timestamp: Date.now() });
     const modelJSONPath = data.modelJSONPath;
     const trainingObjective = data.trainingObjective;
     const modelConfig = data.modelConfig;
@@ -53400,12 +53476,11 @@ self.onmessage = async (e) => {
     const options = data.options || {};
     const streaming = data.streaming || false;
     const perStepCallback = streaming ? (step4, x_t) => {
-      self.postMessage({ type: "step", step: step4, x_t });
+      if (!shouldStop()) {
+        self.postMessage({ requestId, type: "step", step: step4, x_t });
+      }
     } : void 0;
-    if (backend2 === "wasm") {
-      await setBackend("wasm");
-      await ready();
-    } else if (backend2 === "webgl") {
+    if (backend2 === "webgl") {
       await setBackend("webgl");
       await ready();
     } else {
@@ -53415,7 +53490,7 @@ self.onmessage = async (e) => {
     const ourModel = ModelClass.fromConfig(modelConfig);
     const tfModel = await loadLayersModel(modelJSONPath);
     ourModel.setModel(tfModel);
-    let allSamples;
+    let allSamples = null;
     let guidanceData = null;
     if (type === "sample") {
       const numSamples = data.numSamples;
@@ -53427,23 +53502,13 @@ self.onmessage = async (e) => {
           "int32"
         );
       }
-      const samplingResult = ourModel.sample(
+      allSamples = await ourModel.sample(
         numSamples,
         numberOfSteps,
         samplingOptions,
-        perStepCallback
+        perStepCallback,
+        shouldStop
       );
-      const return_guidance = options.return_guidance || false;
-      if (return_guidance && typeof samplingResult === "object" && samplingResult.traj) {
-        allSamples = samplingResult.traj;
-        guidanceData = {
-          epsCond: samplingResult.epsCond ? samplingResult.epsCond.arraySync() : null,
-          epsUncond: samplingResult.epsUncond ? samplingResult.epsUncond.arraySync() : null,
-          epsHat: samplingResult.epsHat ? samplingResult.epsHat.arraySync() : null
-        };
-      } else {
-        allSamples = samplingResult;
-      }
     } else if (type === "sample_from_initial_points") {
       const initialPoints = data.initialPoints;
       const initialPointsTensor = tensor(initialPoints);
@@ -53455,26 +53520,16 @@ self.onmessage = async (e) => {
           "int32"
         );
       }
-      const samplingResult = ourModel.sample_from_initial_points(
+      allSamples = await ourModel.sample_from_initial_points(
         initialPointsTensor,
         numberOfSteps,
         samplingOptions,
-        perStepCallback
+        perStepCallback,
+        shouldStop
       );
-      const return_guidance = options.return_guidance || false;
-      if (return_guidance && typeof samplingResult === "object" && samplingResult.traj) {
-        allSamples = samplingResult.traj;
-        guidanceData = {
-          epsCond: samplingResult.epsCond ? samplingResult.epsCond.arraySync() : null,
-          epsUncond: samplingResult.epsUncond ? samplingResult.epsUncond.arraySync() : null,
-          epsHat: samplingResult.epsHat ? samplingResult.epsHat.arraySync() : null
-        };
-      } else {
-        allSamples = samplingResult;
-      }
     } else if (type === "sample_grid") {
       const gridResolution = data.gridResolution;
-      const domainRange2 = data.domainRange;
+      const gridDomainRange = data.domainRange;
       const samplingOptions = { ...options };
       if (Array.isArray(samplingOptions.cond)) {
         samplingOptions.cond = tensor(
@@ -53483,28 +53538,18 @@ self.onmessage = async (e) => {
           "int32"
         );
       }
-      const samplingResult = ourModel.sample_grid(
+      allSamples = await ourModel.sample_grid(
         gridResolution,
-        domainRange2,
+        gridDomainRange,
         numberOfSteps,
         samplingOptions,
-        perStepCallback
+        perStepCallback,
+        shouldStop
       );
-      const return_guidance = options.return_guidance || false;
-      if (return_guidance && typeof samplingResult === "object" && samplingResult.traj) {
-        allSamples = samplingResult.traj;
-        guidanceData = {
-          epsCond: samplingResult.epsCond ? samplingResult.epsCond.arraySync() : null,
-          epsUncond: samplingResult.epsUncond ? samplingResult.epsUncond.arraySync() : null,
-          epsHat: samplingResult.epsHat ? samplingResult.epsHat.arraySync() : null
-        };
-      } else {
-        allSamples = samplingResult;
-      }
     } else if (type === "vector_field_grid") {
       const gridResolution = data.gridResolution;
-      const domainRange2 = data.domainRange;
-      const gridPoints = sampleUniformGrid(gridResolution, domainRange2);
+      const gridDomainRange = data.domainRange;
+      const gridPoints = sampleUniformGrid(gridResolution, gridDomainRange);
       const numPoints = gridPoints.shape[0];
       const t = fill([numPoints, 1], timeValue || 0.5);
       const velocities = ourModel.forward(gridPoints, t);
@@ -53514,6 +53559,7 @@ self.onmessage = async (e) => {
       t.dispose();
       velocities.dispose();
       self.postMessage({
+        requestId,
         type: "result",
         velocities: velocitiesArray,
         gridPoints: gridPointsArray
@@ -53522,20 +53568,34 @@ self.onmessage = async (e) => {
     } else {
       throw new Error(`Unknown message type: ${type}`);
     }
+    if (shouldStop() || allSamples === null) {
+      console.log("[Sampling Worker] Request cancelled:", requestId);
+      self.postMessage({ requestId, type: "cancelled" });
+      return;
+    }
     const allSamplesArray = allSamples.arraySync();
+    allSamples.dispose();
     const resultMessage = {
+      requestId,
       type: "result",
       allSamples: allSamplesArray
     };
     if (guidanceData) {
       resultMessage.guidance = guidanceData;
     }
+    console.log("[Sampling Worker] Sending result:", { requestId, type: "result", timestamp: Date.now() });
     self.postMessage(resultMessage);
   } catch (error) {
-    self.postMessage({
-      type: "error",
-      error: error instanceof Error ? error.message : String(error)
-    });
+    if (!shouldStop()) {
+      console.error("[Sampling Worker] Error in message handler:", error);
+      self.postMessage({
+        requestId,
+        type: "error",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  } finally {
+    cancelledRequests.delete(requestId);
   }
 };
 /*! Bundled license information:
