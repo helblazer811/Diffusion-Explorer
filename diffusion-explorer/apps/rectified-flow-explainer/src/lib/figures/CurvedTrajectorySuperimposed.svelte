@@ -3,7 +3,16 @@
   import * as d3 from "d3";
   import { Figure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
+  import { FlowModelClient } from "@diffusion-explorer/diffusion";
+
+  // Create sampling client
+  const flowMatchingClient = new FlowModelClient(
+    settings.samplingWorkerUrl,
+    settings.flowMatchingModelPath,
+    "Flow Matching",
+    settings.trainingSettings.modelConfig,
+    settings.trainingSettings.domainRange
+  );
 
   // ===== PROPS =====
 
@@ -160,7 +169,7 @@
   function sampleFromPoint(point) {
     // Cancel any in-progress request before starting new one
     if (activeRequestId) {
-      stopSamplingRequest(activeRequestId);
+      flowMatchingClient.stopRequest(activeRequestId);
       activeRequestId = null;
     }
 
@@ -185,18 +194,9 @@
     isPlaying = true;
 
     // Sample using streaming - use same number of steps as passed-in trajectories
-    activeRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.flowMatchingModelPath,
-      'Flow Matching',
-      settings.trainingSettings.modelConfig,
+    const result = flowMatchingClient.sampleFromInitialPoints(
       userStartPoints,
-      numTimeSteps, // match passed-in trajectory steps
-      () => {
-        isStreamingTrajectory = false;
-        activeRequestId = null;
-      }, // onComplete
-      settings.trainingSettings.domainRange,
+      numTimeSteps,
       {},
       // onStep callback - append new points for all trajectories
       (_step, x_t) => {
@@ -206,6 +206,11 @@
         ]);
       }
     );
+    activeRequestId = result.requestId;
+    result.promise.then(() => {
+      isStreamingTrajectory = false;
+      activeRequestId = null;
+    });
   }
 
   function draw() {

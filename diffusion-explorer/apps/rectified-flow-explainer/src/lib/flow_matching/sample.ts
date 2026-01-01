@@ -1,6 +1,5 @@
 import {
-  callSamplingWorkerThreadFromInitialPoints,
-  callSamplingWorkerThreadVectorFieldGrid,
+  FlowModelClient,
   loadTargetDistribution,
   loadCachedTrajectories,
   loadCachedVectorField,
@@ -36,27 +35,22 @@ export async function generateSamples(
   // Validate model path exists
   await validateModelPath(modelPath);
 
-  const modelConfig = settings.modelConfig;
-  const initialPoints = generateClippedGaussianSamples(numSamples);
+  const client = new FlowModelClient(
+    samplingWorkerUrl,
+    modelPath,
+    'Flow Matching',
+    settings.modelConfig,
+    settings.domainRange
+  );
 
-  return new Promise((resolve) => {
-    const worker = callSamplingWorkerThreadFromInitialPoints(
-      samplingWorkerUrl,
-      modelPath,
-      'Flow Matching',
-      modelConfig,
-      initialPoints,
-      numberOfSteps,
-      (allSamples: number[][][]) => {
-        console.log('Generated samples:', allSamples.length);
-        resolve({
-          allTimeSamples: allSamples,
-          sourceDistribution: allSamples[0]
-        });
-      },
-      settings.domainRange
-    );
-  });
+  const { promise } = client.sample(numSamples, numberOfSteps);
+  const allSamples = await promise;
+
+  console.log('Generated samples:', allSamples.length);
+  return {
+    allTimeSamples: allSamples,
+    sourceDistribution: allSamples[0]
+  };
 }
 
 export async function generateSamplesUniformGrid(
@@ -70,27 +64,23 @@ export async function generateSamplesUniformGrid(
   // Validate model path exists
   await validateModelPath(modelPath);
 
-  const modelConfig = settings.modelConfig;
-  const initialPoints = generateUniformGridSamples(gridResolution, gridDomainRange);
+  const client = new FlowModelClient(
+    samplingWorkerUrl,
+    modelPath,
+    'Flow Matching',
+    settings.modelConfig,
+    gridDomainRange
+  );
 
-  return new Promise((resolve) => {
-    const worker = callSamplingWorkerThreadFromInitialPoints(
-      samplingWorkerUrl,
-      modelPath,
-      'Flow Matching',
-      modelConfig,
-      initialPoints,
-      numberOfSteps,
-      (allSamples: number[][][]) => {
-        console.log('Generated uniform grid samples:', allSamples.length, 'timesteps');
-        resolve({
-          allTimeSamples: allSamples,
-          sourceDistribution: allSamples[0]
-        });
-      },
-      gridDomainRange
-    );
-  });
+  const initialPoints = generateUniformGridSamples(gridResolution, gridDomainRange);
+  const { promise } = client.sampleFromInitialPoints(initialPoints, numberOfSteps);
+  const allSamples = await promise;
+
+  console.log('Generated uniform grid samples:', allSamples.length, 'timesteps');
+  return {
+    allTimeSamples: allSamples,
+    sourceDistribution: allSamples[0]
+  };
 }
 
 export async function generateVectorField(
@@ -105,7 +95,14 @@ export async function generateVectorField(
   await validateModelPath(modelPath);
 
   console.log('Generating vector field...');
-  const modelConfig = settings.modelConfig;
+
+  const client = new FlowModelClient(
+    samplingWorkerUrl,
+    modelPath,
+    'Flow Matching',
+    settings.modelConfig,
+    domainRange
+  );
 
   // Generate time steps
   const timeSteps: number[] = [];
@@ -113,55 +110,19 @@ export async function generateVectorField(
     timeSteps.push(i / (numTimeSteps - 1));
   }
 
-  // Collect velocities and grid points for all time steps
+  // Generate grid points
+  const gridPoints: number[][] = generateUniformGridSamples(gridResolution, domainRange);
+
+  // Collect velocities for all time steps
   const allVelocities: number[][][] = [];
-  let gridPoints: number[][] = [];
 
   for (let i = 0; i < timeSteps.length; i++) {
     const t = timeSteps[i];
     console.log(`Sampling vector field at t=${t.toFixed(2)}...`);
 
-    // Use promise to wait for worker callback
-    const result = await new Promise<{ velocities: number[][]; gridPoints?: number[][] }>((resolve, reject) => {
-      const worker = callSamplingWorkerThreadVectorFieldGrid(
-        samplingWorkerUrl,
-        modelPath,
-        'Flow Matching',
-        modelConfig,
-        gridResolution,
-        domainRange,
-        (velocities: number[][]) => {
-          // Worker callback - need to access the raw message
-          resolve({ velocities: velocities as number[][] });
-        },
-        t
-      );
-
-      // Override the worker message handler to capture gridPoints
-      worker.onmessage = (e: MessageEvent) => {
-        if (e.data.type === 'result') {
-          resolve({
-            velocities: e.data.velocities,
-            gridPoints: e.data.gridPoints
-          });
-        } else if (e.data.type === 'error') {
-          reject(new Error(e.data.error));
-        }
-      };
-
-      // Add error handler
-      worker.onerror = (e) => {
-        console.error('[VectorField Worker Error]', e.message);
-        reject(new Error(e.message));
-      };
-    });
-
-    allVelocities.push(result.velocities);
-
-    // Capture grid points from first call (same for all time steps)
-    if (i === 0 && result.gridPoints) {
-      gridPoints = result.gridPoints;
-    }
+    const { promise } = client.vectorFieldGrid(gridResolution, domainRange, t);
+    const velocities = await promise;
+    allVelocities.push(velocities as unknown as number[][]);
   }
 
   // Create complete vector field data

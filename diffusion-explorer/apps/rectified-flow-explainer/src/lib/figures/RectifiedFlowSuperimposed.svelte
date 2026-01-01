@@ -3,7 +3,24 @@
   import * as d3 from "d3";
   import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
+  import { FlowModelClient } from "@diffusion-explorer/diffusion";
+
+  // Create sampling clients
+  const flowMatchingClient = new FlowModelClient(
+    settings.samplingWorkerUrl,
+    settings.flowMatchingModelPath,
+    "Flow Matching",
+    settings.trainingSettings.modelConfig,
+    settings.trainingSettings.domainRange
+  );
+
+  const rectifiedFlowClient = new FlowModelClient(
+    settings.samplingWorkerUrl,
+    settings.rectifiedFlowModelPath,
+    "Flow Matching",
+    settings.trainingSettings.modelConfig,
+    settings.trainingSettings.domainRange
+  );
 
   // ===== PROPS =====
 
@@ -192,11 +209,11 @@
   function sampleFromPoint(point) {
     // Cancel any in-progress requests before starting new ones
     if (activeFlowMatchingRequestId) {
-      stopSamplingRequest(activeFlowMatchingRequestId);
+      flowMatchingClient.stopRequest(activeFlowMatchingRequestId);
       activeFlowMatchingRequestId = null;
     }
     if (activeRectifiedFlowRequestId) {
-      stopSamplingRequest(activeRectifiedFlowRequestId);
+      rectifiedFlowClient.stopRequest(activeRectifiedFlowRequestId);
       activeRectifiedFlowRequestId = null;
     }
 
@@ -233,15 +250,9 @@
     }
 
     // Sample from left model (Flow Matching) with streaming
-    activeFlowMatchingRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.flowMatchingModelPath,
-      'Flow Matching',
-      settings.trainingSettings.modelConfig,
+    const fmResult = flowMatchingClient.sampleFromInitialPoints(
       userStartPoints,
-      numTimeSteps, // match passed-in trajectory steps
-      checkComplete, // onComplete
-      settings.trainingSettings.domainRange,
+      numTimeSteps,
       {},
       // onStep callback - append new points for all trajectories
       (_step, x_t) => {
@@ -251,17 +262,13 @@
         ]);
       }
     );
+    activeFlowMatchingRequestId = fmResult.requestId;
+    fmResult.promise.then(checkComplete);
 
     // Sample from right model (Rectified Flow) with streaming
-    activeRectifiedFlowRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.rectifiedFlowModelPath,
-      'Flow Matching',
-      settings.trainingSettings.modelConfig,
+    const rfResult = rectifiedFlowClient.sampleFromInitialPoints(
       userStartPoints,
-      numTimeSteps, // match passed-in trajectory steps
-      checkComplete, // onComplete
-      settings.trainingSettings.domainRange,
+      numTimeSteps,
       {},
       // onStep callback - append new points for all trajectories
       (_step, x_t) => {
@@ -271,6 +278,8 @@
         ]);
       }
     );
+    activeRectifiedFlowRequestId = rfResult.requestId;
+    rfResult.promise.then(checkComplete);
   }
 
   // Draw scatter plot + trajectories (using pre-scaled pixel coordinates)

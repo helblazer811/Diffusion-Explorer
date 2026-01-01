@@ -10,7 +10,24 @@
     progressivelyAnimateTrajectories,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
+  import { FlowModelClient } from "@diffusion-explorer/diffusion";
+
+  // Create sampling clients
+  const flowMatchingClient = new FlowModelClient(
+    settings.samplingWorkerUrl,
+    settings.flowMatchingModelPath,
+    "Flow Matching",
+    settings.trainingSettings.modelConfig,
+    settings.trainingSettings.domainRange
+  );
+
+  const rectifiedFlowClient = new FlowModelClient(
+    settings.samplingWorkerUrl,
+    settings.rectifiedFlowModelPath,
+    "Flow Matching",
+    settings.trainingSettings.modelConfig,
+    settings.trainingSettings.domainRange
+  );
 
   // ===== PROPS =====
 
@@ -176,44 +193,31 @@
   // Cancel all in-flight requests
   function cancelAllRequests() {
     if (fmGroundTruthRequestId) {
-      stopSamplingRequest(fmGroundTruthRequestId);
+      flowMatchingClient.stopRequest(fmGroundTruthRequestId);
       fmGroundTruthRequestId = null;
     }
     if (fmApproxRequestId) {
-      stopSamplingRequest(fmApproxRequestId);
+      flowMatchingClient.stopRequest(fmApproxRequestId);
       fmApproxRequestId = null;
     }
     if (rfGroundTruthRequestId) {
-      stopSamplingRequest(rfGroundTruthRequestId);
+      rectifiedFlowClient.stopRequest(rfGroundTruthRequestId);
       rfGroundTruthRequestId = null;
     }
     if (rfApproxRequestId) {
-      stopSamplingRequest(rfApproxRequestId);
+      rectifiedFlowClient.stopRequest(rfApproxRequestId);
       rfApproxRequestId = null;
     }
   }
 
   // Sample trajectories using batch mode (for background loading of remaining step counts)
-  function sampleTrajectoriesBatch(modelPath, trainingObjective, points, numSteps) {
-    return new Promise((resolve) => {
-      callSamplingWorkerThreadFromInitialPoints(
-        settings.samplingWorkerUrl,
-        modelPath,
-        trainingObjective,
-        settings.trainingSettings.modelConfig,
-        points,
-        numSteps,
-        (allSamples) => {
-          const trajectories = points.map((point, pointIdx) => [
-            point,
-            ...allSamples.map((ts) => [ts[pointIdx][0], ts[pointIdx][1]]),
-          ]);
-          resolve(trajectories);
-        },
-        settings.trainingSettings.domainRange,
-        { scheduler: "euler" }
-      );
-    });
+  async function sampleTrajectoriesBatch(client, points, numSteps) {
+    const { promise } = client.sampleFromInitialPoints(points, numSteps, { scheduler: "euler" });
+    const allSamples = await promise;
+    return points.map((point, pointIdx) => [
+      point,
+      ...allSamples.map((ts) => [ts[pointIdx][0], ts[pointIdx][1]]),
+    ]);
   }
 
   // Load remaining step counts in background (non-blocking)
@@ -224,8 +228,8 @@
       if (steps === currentSteps) continue;
 
       const [fmSteps, rfSteps] = await Promise.all([
-        sampleTrajectoriesBatch(settings.flowMatchingModelPath, "Flow Matching", userStartPoints, steps),
-        sampleTrajectoriesBatch(settings.rectifiedFlowModelPath, "Flow Matching", userStartPoints, steps)
+        sampleTrajectoriesBatch(flowMatchingClient, userStartPoints, steps),
+        sampleTrajectoriesBatch(rectifiedFlowClient, userStartPoints, steps)
       ]);
 
       flowMatchingTrajectories[steps] = fmSteps;
@@ -264,18 +268,9 @@
     };
 
     // FM Ground Truth - streaming
-    fmGroundTruthRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.flowMatchingModelPath,
-      "Flow Matching",
-      settings.trainingSettings.modelConfig,
+    const fmGtResult = flowMatchingClient.sampleFromInitialPoints(
       userStartPoints,
       groundTruthSteps,
-      () => {
-        fmGroundTruthRequestId = null;
-        checkComplete();
-      },
-      settings.trainingSettings.domainRange,
       { scheduler: "euler" },
       (_step, x_t) => {
         flowMatchingGroundTruths = flowMatchingGroundTruths.map((traj, i) => [
@@ -283,20 +278,16 @@
         ]);
       }
     );
+    fmGroundTruthRequestId = fmGtResult.requestId;
+    fmGtResult.promise.then(() => {
+      fmGroundTruthRequestId = null;
+      checkComplete();
+    });
 
     // RF Ground Truth - streaming
-    rfGroundTruthRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.rectifiedFlowModelPath,
-      "Flow Matching",
-      settings.trainingSettings.modelConfig,
+    const rfGtResult = rectifiedFlowClient.sampleFromInitialPoints(
       userStartPoints,
       groundTruthSteps,
-      () => {
-        rfGroundTruthRequestId = null;
-        checkComplete();
-      },
-      settings.trainingSettings.domainRange,
       { scheduler: "euler" },
       (_step, x_t) => {
         rectifiedFlowGroundTruths = rectifiedFlowGroundTruths.map((traj, i) => [
@@ -304,20 +295,16 @@
         ]);
       }
     );
+    rfGroundTruthRequestId = rfGtResult.requestId;
+    rfGtResult.promise.then(() => {
+      rfGroundTruthRequestId = null;
+      checkComplete();
+    });
 
     // FM Approximation - streaming
-    fmApproxRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.flowMatchingModelPath,
-      "Flow Matching",
-      settings.trainingSettings.modelConfig,
+    const fmApproxResult = flowMatchingClient.sampleFromInitialPoints(
       userStartPoints,
       currentSteps,
-      () => {
-        fmApproxRequestId = null;
-        checkComplete();
-      },
-      settings.trainingSettings.domainRange,
       { scheduler: "euler" },
       (_step, x_t) => {
         flowMatchingTrajectories[currentSteps] = flowMatchingTrajectories[currentSteps].map((traj, i) => [
@@ -327,20 +314,16 @@
         createAnimationControllers();
       }
     );
+    fmApproxRequestId = fmApproxResult.requestId;
+    fmApproxResult.promise.then(() => {
+      fmApproxRequestId = null;
+      checkComplete();
+    });
 
     // RF Approximation - streaming
-    rfApproxRequestId = callSamplingWorkerThreadFromInitialPoints(
-      settings.samplingWorkerUrl,
-      settings.rectifiedFlowModelPath,
-      "Flow Matching",
-      settings.trainingSettings.modelConfig,
+    const rfApproxResult = rectifiedFlowClient.sampleFromInitialPoints(
       userStartPoints,
       currentSteps,
-      () => {
-        rfApproxRequestId = null;
-        checkComplete();
-      },
-      settings.trainingSettings.domainRange,
       { scheduler: "euler" },
       (_step, x_t) => {
         rectifiedFlowTrajectories[currentSteps] = rectifiedFlowTrajectories[currentSteps].map((traj, i) => [
@@ -349,6 +332,11 @@
         createAnimationControllers();
       }
     );
+    rfApproxRequestId = rfApproxResult.requestId;
+    rfApproxResult.promise.then(() => {
+      rfApproxRequestId = null;
+      checkComplete();
+    });
   }
 
   // Draw a full trajectory path (respects ctx.globalAlpha set by caller)
