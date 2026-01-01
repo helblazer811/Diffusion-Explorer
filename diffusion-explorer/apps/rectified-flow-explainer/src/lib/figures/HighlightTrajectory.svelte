@@ -1,8 +1,7 @@
 <script>
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawMathjaxOnCanvas, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawMathjaxOnCanvas, drawTrajectoriesWithPreview, createSourceTargetScales } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { createSourceTargetScales } from "$lib/d3_helpers";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
 
   // Create sampling client

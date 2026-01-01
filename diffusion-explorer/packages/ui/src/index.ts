@@ -2,7 +2,17 @@
 export { default as Katex } from './components/Katex.svelte';
 export { default as Minimizable } from './components/Minimizable.svelte';
 export { default as Quote } from './components/Quote.svelte';
-export { plotKatexInSVG, type PlotKatexOptions, type Anchor } from './d3_utils';
+export {
+  plotKatexInSVG,
+  type PlotKatexOptions,
+  type Anchor,
+  createSourceTargetScales,
+  plotScatterAtCenter,
+  plotSourceTargetScatter,
+  plotLabel,
+  plotSourceTargetLabels,
+  dataToPixelX
+} from './d3_utils';
 
 // Layout components
 export { default as TableOfContents } from './components/TableOfContents.svelte';
@@ -41,3 +51,4 @@ export * from './plotting/vector_field';
 export * from './plotting/mathjax';
 export * from './plotting/katex';
 export * from './plotting/pathlines';
+export * from './plotting/mesh_grid';

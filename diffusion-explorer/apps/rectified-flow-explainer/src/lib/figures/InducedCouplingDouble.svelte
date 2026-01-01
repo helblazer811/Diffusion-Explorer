@@ -3,9 +3,8 @@
 <script>
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import { DoubleFigure } from '@diffusion-explorer/ui';
+  import { DoubleFigure, createSourceTargetScales, dataToPixelX } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
-  import { createSourceTargetScales, dataToPixelX } from '$lib/d3_helpers';
 
   // Caption slot (passed as default children)
   export let children = undefined;

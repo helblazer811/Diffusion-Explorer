@@ -2,9 +2,8 @@
 
 <script>
   import { onMount, onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, createSourceTargetScales } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { createSourceTargetScales } from "$lib/d3_helpers";
 
   // Caption slot (passed as default children)
   export let children = undefined;

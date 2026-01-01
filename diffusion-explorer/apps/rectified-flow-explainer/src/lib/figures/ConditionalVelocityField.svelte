@@ -1,8 +1,7 @@
 <script>
   import { onMount } from "svelte";
-  import { Figure, drawScatterPlot, drawArrow, drawMathjaxOnCanvas } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawArrow, drawMathjaxOnCanvas, createSourceTargetScales } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { createSourceTargetScales } from "$lib/d3_helpers";
 
   // ===== CAPTION =====
   export let children = undefined;

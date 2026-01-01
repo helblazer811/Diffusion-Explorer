@@ -3,9 +3,8 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours, createSourceTargetScales } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { createSourceTargetScales } from "$lib/d3_helpers";
 
   // Caption slot (passed as default children)
   export let children = undefined;
