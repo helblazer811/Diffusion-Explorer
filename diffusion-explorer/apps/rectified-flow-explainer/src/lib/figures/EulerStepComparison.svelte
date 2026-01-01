@@ -173,34 +173,6 @@
     ]);
   }
 
-  // Sample trajectories for multiple points from a model using Euler scheduler
-  // Returns { promise, getRequestId } for cancellation support
-  function sampleTrajectoriesCancellable(modelPath, trainingObjective, points, numSteps) {
-    let requestId = null;
-    const promise = new Promise((resolve) => {
-      requestId = callSamplingWorkerThreadFromInitialPoints(
-        settings.samplingWorkerUrl,
-        modelPath,
-        trainingObjective,
-        settings.trainingSettings.modelConfig,
-        points,
-        numSteps,
-        (allSamples) => {
-          // allSamples format: [timestep][sample][dim]
-          // Extract trajectories for each point
-          const trajectories = points.map((point, pointIdx) => [
-            point,
-            ...allSamples.map((ts) => [ts[pointIdx][0], ts[pointIdx][1]]),
-          ]);
-          resolve(trajectories);
-        },
-        settings.trainingSettings.domainRange,
-        { scheduler: "euler" } // Use basic Euler for this comparison figure
-      );
-    });
-    return { promise, getRequestId: () => requestId };
-  }
-
   // Cancel all in-flight requests
   function cancelAllRequests() {
     if (fmGroundTruthRequestId) {
@@ -221,60 +193,162 @@
     }
   }
 
-  // Compute all trajectories for all start points (batch approach with cancellation)
-  async function computeAllTrajectories() {
-    // Cancel any in-progress requests
-    cancelAllRequests();
+  // Sample trajectories using batch mode (for background loading of remaining step counts)
+  function sampleTrajectoriesBatch(modelPath, trainingObjective, points, numSteps) {
+    return new Promise((resolve) => {
+      callSamplingWorkerThreadFromInitialPoints(
+        settings.samplingWorkerUrl,
+        modelPath,
+        trainingObjective,
+        settings.trainingSettings.modelConfig,
+        points,
+        numSteps,
+        (allSamples) => {
+          const trajectories = points.map((point, pointIdx) => [
+            point,
+            ...allSamples.map((ts) => [ts[pointIdx][0], ts[pointIdx][1]]),
+          ]);
+          resolve(trajectories);
+        },
+        settings.trainingSettings.domainRange,
+        { scheduler: "euler" }
+      );
+    });
+  }
 
-    isLoading = true;
-
-    // Start ground truth requests and capture IDs
-    const fmGT = sampleTrajectoriesCancellable(settings.flowMatchingModelPath, "Flow Matching", userStartPoints, groundTruthSteps);
-    const rfGT = sampleTrajectoriesCancellable(settings.rectifiedFlowModelPath, "Flow Matching", userStartPoints, groundTruthSteps);
-
-    fmGroundTruthRequestId = fmGT.getRequestId();
-    rfGroundTruthRequestId = rfGT.getRequestId();
-
-    const [fmGroundTruths, rfGroundTruths] = await Promise.all([fmGT.promise, rfGT.promise]);
-
-    flowMatchingGroundTruths = fmGroundTruths;
-    rectifiedFlowGroundTruths = rfGroundTruths;
-
-    // Now compute approximation trajectories for current step count
-    flowMatchingTrajectories = {};
-    rectifiedFlowTrajectories = {};
-
+  // Load remaining step counts in background (non-blocking)
+  async function loadRemainingStepCounts() {
     const currentSteps = stepValues[currentStepIndex];
 
-    // Start approximation requests and capture IDs
-    const fmApproxReq = sampleTrajectoriesCancellable(settings.flowMatchingModelPath, "Flow Matching", userStartPoints, currentSteps);
-    const rfApproxReq = sampleTrajectoriesCancellable(settings.rectifiedFlowModelPath, "Flow Matching", userStartPoints, currentSteps);
-
-    fmApproxRequestId = fmApproxReq.getRequestId();
-    rfApproxRequestId = rfApproxReq.getRequestId();
-
-    const [fmApproxResult, rfApproxResult] = await Promise.all([fmApproxReq.promise, rfApproxReq.promise]);
-
-    flowMatchingTrajectories[currentSteps] = fmApproxResult;
-    rectifiedFlowTrajectories[currentSteps] = rfApproxResult;
-
-    // Start animation
-    isLoading = false;
-    createAnimationControllers();
-    startApproxAnimation();
-
-    // Load remaining step counts in background (no cancellation tracking needed)
     for (const steps of stepValues) {
       if (steps === currentSteps) continue;
 
       const [fmSteps, rfSteps] = await Promise.all([
-        sampleTrajectoriesCancellable(settings.flowMatchingModelPath, "Flow Matching", userStartPoints, steps).promise,
-        sampleTrajectoriesCancellable(settings.rectifiedFlowModelPath, "Flow Matching", userStartPoints, steps).promise
+        sampleTrajectoriesBatch(settings.flowMatchingModelPath, "Flow Matching", userStartPoints, steps),
+        sampleTrajectoriesBatch(settings.rectifiedFlowModelPath, "Flow Matching", userStartPoints, steps)
       ]);
 
       flowMatchingTrajectories[steps] = fmSteps;
       rectifiedFlowTrajectories[steps] = rfSteps;
     }
+  }
+
+  // Compute all trajectories for all start points
+  // Streams all 4 requests in parallel for immediate feedback
+  function computeAllTrajectories() {
+    // Cancel any in-progress requests
+    cancelAllRequests();
+
+    isLoading = true;
+
+    const currentSteps = stepValues[currentStepIndex];
+
+    // Initialize all trajectories with just starting points
+    flowMatchingGroundTruths = userStartPoints.map(p => [p]);
+    rectifiedFlowGroundTruths = userStartPoints.map(p => [p]);
+    flowMatchingTrajectories = { [currentSteps]: userStartPoints.map(p => [p]) };
+    rectifiedFlowTrajectories = { [currentSteps]: userStartPoints.map(p => [p]) };
+
+    // Draw initial state immediately
+    isLoading = false;
+    createAnimationControllers();
+    startApproxAnimation();
+
+    let completedCount = 0;
+    const checkComplete = () => {
+      completedCount++;
+      if (completedCount >= 4) {
+        // All initial requests done - load remaining step counts in background
+        loadRemainingStepCounts();
+      }
+    };
+
+    // FM Ground Truth - streaming
+    fmGroundTruthRequestId = callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig,
+      userStartPoints,
+      groundTruthSteps,
+      () => {
+        fmGroundTruthRequestId = null;
+        checkComplete();
+      },
+      settings.trainingSettings.domainRange,
+      { scheduler: "euler" },
+      (_step, x_t) => {
+        flowMatchingGroundTruths = flowMatchingGroundTruths.map((traj, i) => [
+          ...traj, [x_t[i][0], x_t[i][1]]
+        ]);
+      }
+    );
+
+    // RF Ground Truth - streaming
+    rfGroundTruthRequestId = callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.rectifiedFlowModelPath,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig,
+      userStartPoints,
+      groundTruthSteps,
+      () => {
+        rfGroundTruthRequestId = null;
+        checkComplete();
+      },
+      settings.trainingSettings.domainRange,
+      { scheduler: "euler" },
+      (_step, x_t) => {
+        rectifiedFlowGroundTruths = rectifiedFlowGroundTruths.map((traj, i) => [
+          ...traj, [x_t[i][0], x_t[i][1]]
+        ]);
+      }
+    );
+
+    // FM Approximation - streaming
+    fmApproxRequestId = callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig,
+      userStartPoints,
+      currentSteps,
+      () => {
+        fmApproxRequestId = null;
+        checkComplete();
+      },
+      settings.trainingSettings.domainRange,
+      { scheduler: "euler" },
+      (_step, x_t) => {
+        flowMatchingTrajectories[currentSteps] = flowMatchingTrajectories[currentSteps].map((traj, i) => [
+          ...traj, [x_t[i][0], x_t[i][1]]
+        ]);
+        // Recreate controllers to pick up new data
+        createAnimationControllers();
+      }
+    );
+
+    // RF Approximation - streaming
+    rfApproxRequestId = callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.rectifiedFlowModelPath,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig,
+      userStartPoints,
+      currentSteps,
+      () => {
+        rfApproxRequestId = null;
+        checkComplete();
+      },
+      settings.trainingSettings.domainRange,
+      { scheduler: "euler" },
+      (_step, x_t) => {
+        rectifiedFlowTrajectories[currentSteps] = rectifiedFlowTrajectories[currentSteps].map((traj, i) => [
+          ...traj, [x_t[i][0], x_t[i][1]]
+        ]);
+        createAnimationControllers();
+      }
+    );
   }
 
   // Draw a full trajectory path (respects ctx.globalAlpha set by caller)
