@@ -10,7 +10,7 @@
     progressivelyAnimateTrajectories,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
+  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
 
@@ -59,7 +59,7 @@
     [0.3, -0.7],
   ];
   export let startPointRadius = endpointRadius;
-  export let maxStartPoints = 5;
+  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
   export let backgroundVisible = true;
@@ -96,7 +96,13 @@
   let currentStepIndex = defaultStepIndex;
 
   // Starting points (domain coordinates) - supports multiple
-  let startPoints = [...defaultStartPoints];
+  let userStartPoints = [...defaultStartPoints];
+
+  // Request ID tracking for cancellation (4 separate requests)
+  let fmGroundTruthRequestId = null;
+  let fmApproxRequestId = null;
+  let rfGroundTruthRequestId = null;
+  let rfApproxRequestId = null;
 
   // Pre-computed trajectories for all step counts
   // Format: { steps: [traj1, traj2, ...] } where each traj is [[x,y], ...]
@@ -168,15 +174,11 @@
   }
 
   // Sample trajectories for multiple points from a model using Euler scheduler
-  // Returns array of trajectories, one per point
-  async function sampleTrajectoriesBatch(
-    modelPath,
-    trainingObjective,
-    points,
-    numSteps
-  ) {
-    return new Promise((resolve) => {
-      callSamplingWorkerThreadFromInitialPoints(
+  // Returns { promise, getRequestId } for cancellation support
+  function sampleTrajectoriesCancellable(modelPath, trainingObjective, points, numSteps) {
+    let requestId = null;
+    const promise = new Promise((resolve) => {
+      requestId = callSamplingWorkerThreadFromInitialPoints(
         settings.samplingWorkerUrl,
         modelPath,
         trainingObjective,
@@ -196,48 +198,78 @@
         { scheduler: "euler" } // Use basic Euler for this comparison figure
       );
     });
+    return { promise, getRequestId: () => requestId };
   }
 
-  // Compute all trajectories for all start points
+  // Cancel all in-flight requests
+  function cancelAllRequests() {
+    if (fmGroundTruthRequestId) {
+      stopSamplingRequest(fmGroundTruthRequestId);
+      fmGroundTruthRequestId = null;
+    }
+    if (fmApproxRequestId) {
+      stopSamplingRequest(fmApproxRequestId);
+      fmApproxRequestId = null;
+    }
+    if (rfGroundTruthRequestId) {
+      stopSamplingRequest(rfGroundTruthRequestId);
+      rfGroundTruthRequestId = null;
+    }
+    if (rfApproxRequestId) {
+      stopSamplingRequest(rfApproxRequestId);
+      rfApproxRequestId = null;
+    }
+  }
+
+  // Compute all trajectories for all start points (batch approach with cancellation)
   async function computeAllTrajectories() {
+    // Cancel any in-progress requests
+    cancelAllRequests();
+
     isLoading = true;
 
-    // Load ground truth trajectories for both models in parallel
-    const [fmGroundTruths, rfGroundTruths] = await Promise.all([
-      sampleTrajectoriesBatch(settings.flowMatchingModelPath, "Flow Matching", startPoints, groundTruthSteps),
-      sampleTrajectoriesBatch(settings.rectifiedFlowModelPath, "Flow Matching", startPoints, groundTruthSteps)
-    ]);
+    // Start ground truth requests and capture IDs
+    const fmGT = sampleTrajectoriesCancellable(settings.flowMatchingModelPath, "Flow Matching", userStartPoints, groundTruthSteps);
+    const rfGT = sampleTrajectoriesCancellable(settings.rectifiedFlowModelPath, "Flow Matching", userStartPoints, groundTruthSteps);
+
+    fmGroundTruthRequestId = fmGT.getRequestId();
+    rfGroundTruthRequestId = rfGT.getRequestId();
+
+    const [fmGroundTruths, rfGroundTruths] = await Promise.all([fmGT.promise, rfGT.promise]);
 
     flowMatchingGroundTruths = fmGroundTruths;
     rectifiedFlowGroundTruths = rfGroundTruths;
 
-    // Now compute approximation trajectories for all step counts
+    // Now compute approximation trajectories for current step count
     flowMatchingTrajectories = {};
     rectifiedFlowTrajectories = {};
 
     const currentSteps = stepValues[currentStepIndex];
 
-    // Load current step count first
-    const [fmApprox, rfApprox] = await Promise.all([
-      sampleTrajectoriesBatch(settings.flowMatchingModelPath, "Flow Matching", startPoints, currentSteps),
-      sampleTrajectoriesBatch(settings.rectifiedFlowModelPath, "Flow Matching", startPoints, currentSteps)
-    ]);
+    // Start approximation requests and capture IDs
+    const fmApproxReq = sampleTrajectoriesCancellable(settings.flowMatchingModelPath, "Flow Matching", userStartPoints, currentSteps);
+    const rfApproxReq = sampleTrajectoriesCancellable(settings.rectifiedFlowModelPath, "Flow Matching", userStartPoints, currentSteps);
 
-    flowMatchingTrajectories[currentSteps] = fmApprox;
-    rectifiedFlowTrajectories[currentSteps] = rfApprox;
+    fmApproxRequestId = fmApproxReq.getRequestId();
+    rfApproxRequestId = rfApproxReq.getRequestId();
+
+    const [fmApproxResult, rfApproxResult] = await Promise.all([fmApproxReq.promise, rfApproxReq.promise]);
+
+    flowMatchingTrajectories[currentSteps] = fmApproxResult;
+    rectifiedFlowTrajectories[currentSteps] = rfApproxResult;
 
     // Start animation
     isLoading = false;
     createAnimationControllers();
     startApproxAnimation();
 
-    // Load remaining step counts in background
+    // Load remaining step counts in background (no cancellation tracking needed)
     for (const steps of stepValues) {
       if (steps === currentSteps) continue;
 
       const [fmSteps, rfSteps] = await Promise.all([
-        sampleTrajectoriesBatch(settings.flowMatchingModelPath, "Flow Matching", startPoints, steps),
-        sampleTrajectoriesBatch(settings.rectifiedFlowModelPath, "Flow Matching", startPoints, steps)
+        sampleTrajectoriesCancellable(settings.flowMatchingModelPath, "Flow Matching", userStartPoints, steps).promise,
+        sampleTrajectoriesCancellable(settings.rectifiedFlowModelPath, "Flow Matching", userStartPoints, steps).promise
       ]);
 
       flowMatchingTrajectories[steps] = fmSteps;
@@ -286,7 +318,7 @@
 
   // Draw start point markers for all start points
   function drawStartPoints(ctx) {
-    for (const point of startPoints) {
+    for (const point of userStartPoints) {
       const [x, y] = [xScale(point[0]), yScale(point[1])];
 
       // Outer ring
@@ -505,8 +537,10 @@
 
   // Handle canvas click - convert to domain coordinates and add/replace start point
   function handleCanvasClick(event, side) {
-    // Stop animation
+    // Stop current animation and reset controllers
     stopApproxAnimation();
+    leftAnimationController?.reset();
+    rightAnimationController?.reset();
 
     const canvas = side === "left" ? leftCanvas : rightCanvas;
     const rect = canvas.getBoundingClientRect();
@@ -522,17 +556,16 @@
     const domainY = yScale.invert(clickY);
     const newPoint = [domainX, domainY];
 
-    // Add new point if under max, otherwise replace oldest
-    if (startPoints.length < maxStartPoints) {
-      startPoints = [...startPoints, newPoint];
-    } else {
-      // Replace oldest point (shift and push)
-      startPoints = [...startPoints.slice(1), newPoint];
+    // Add new point to buffer (FIFO with max limit)
+    userStartPoints = [...userStartPoints, newPoint];
+    if (userStartPoints.length > maxUserTrajectories) {
+      userStartPoints = userStartPoints.slice(-maxUserTrajectories);
     }
 
     // Immediately draw start points for visual feedback
     drawInitialState();
 
+    // Recompute all trajectories (cancels any in-progress requests)
     computeAllTrajectories();
   }
 

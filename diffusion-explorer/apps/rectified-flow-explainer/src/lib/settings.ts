@@ -91,6 +91,11 @@ export const settings = {
     }
   },
 
+  // ========== INTERACTIVE SETTINGS ==========
+  interactiveSettings: {
+    maxUserTrajectories: 5,  // Maximum concurrent user-drawn trajectories
+  },
+
   // ========== TRAINING SETTINGS ==========
   trainingSettings: {
     modelConfig: { dim: 2, hidden: 64 },

@@ -3,7 +3,7 @@
   import * as d3 from "d3";
   import { Figure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
+  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
 
@@ -42,7 +42,7 @@
   export let playingByDefault = true;
 
   // Interactive sampling
-  export let maxUserTrajectories = 5;
+  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
 
   // Background
   export let backgroundVisible = true;
@@ -94,6 +94,7 @@
   let userTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
   let hasUserTrajectory = false;
   let isStreamingTrajectory = false;
+  let activeRequestId = null; // Track active request for cancellation
 
   // ===== FUNCTIONS =====
 
@@ -157,6 +158,12 @@
 
   // Sample trajectories from all user start points using streaming
   function sampleFromPoint(point) {
+    // Cancel any in-progress request before starting new one
+    if (activeRequestId) {
+      stopSamplingRequest(activeRequestId);
+      activeRequestId = null;
+    }
+
     // Add new point to the list of user start points
     userStartPoints = [...userStartPoints, point];
 
@@ -178,7 +185,7 @@
     isPlaying = true;
 
     // Sample using streaming - use same number of steps as passed-in trajectories
-    callSamplingWorkerThreadFromInitialPoints(
+    activeRequestId = callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.flowMatchingModelPath,
       'Flow Matching',
@@ -187,6 +194,7 @@
       numTimeSteps, // match passed-in trajectory steps
       () => {
         isStreamingTrajectory = false;
+        activeRequestId = null;
       }, // onComplete
       settings.trainingSettings.domainRange,
       {},

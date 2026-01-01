@@ -9,7 +9,7 @@
     drawVectorField,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
+  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
 
@@ -60,7 +60,7 @@
     [0.3, -0.7],
   ];
   export let startPointRadius = endpointRadius;
-  export let maxStartPoints = 5;
+  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
   export let backgroundVisible = true;
@@ -97,12 +97,17 @@
   let scaledTargetDistribution = [];
   let gridPositions = [];
 
-  // Starting points (domain coordinates)
-  let startPoints = [...defaultStartPoints];
+  // User-defined start points (domain coordinates)
+  let userStartPoints = [...defaultStartPoints];
 
   // Trajectories
   let groundTruthTrajectories = [];
   let approximationTrajectories = [];
+
+  // Request ID tracking for cancellation
+  let groundTruthRequestId = null;
+  let activeRequestId = null;  // For approximation streaming
+  let isStreamingTrajectory = false;
 
   // Loading state
   let isLoading = true;
@@ -165,10 +170,11 @@
   }
 
   // Sample trajectories for multiple points using Euler scheduler
-  // Returns array of trajectories, one per point
-  async function sampleTrajectoriesBatch(points, numSteps) {
-    return new Promise((resolve) => {
-      callSamplingWorkerThreadFromInitialPoints(
+  // Returns { promise, getRequestId } for cancellation support
+  function sampleTrajectoriesCancellable(points, numSteps) {
+    let requestId = null;
+    const promise = new Promise((resolve) => {
+      requestId = callSamplingWorkerThreadFromInitialPoints(
         settings.samplingWorkerUrl,
         settings.flowMatchingModelPath,
         "Flow Matching",
@@ -188,28 +194,69 @@
         { scheduler: "euler" }
       );
     });
+    return { promise, getRequestId: () => requestId };
+  }
+
+  // Cancel all in-flight requests
+  function cancelAllRequests() {
+    if (groundTruthRequestId) {
+      stopSamplingRequest(groundTruthRequestId);
+      groundTruthRequestId = null;
+    }
+    if (activeRequestId) {
+      stopSamplingRequest(activeRequestId);
+      activeRequestId = null;
+    }
   }
 
   // Compute all trajectories for all start points
+  // Hybrid approach: batch for ground truth, streaming for approximation
   async function computeAllTrajectories() {
+    // Cancel any in-progress requests
+    cancelAllRequests();
+
     isLoading = true;
+    isStreamingTrajectory = true;
 
-    // Load ground truth and approximation trajectories in parallel
-    const [gtTrajectories, approxTrajectories] = await Promise.all([
-      sampleTrajectoriesBatch(startPoints, GROUND_TRUTH_STEPS),
-      sampleTrajectoriesBatch(startPoints, NUM_STEPS)
-    ]);
+    // Ground truth: batch sampling with cancellation support
+    const gtRequest = sampleTrajectoriesCancellable(userStartPoints, GROUND_TRUTH_STEPS);
+    groundTruthRequestId = gtRequest.getRequestId();
+    groundTruthTrajectories = await gtRequest.promise;
 
-    groundTruthTrajectories = gtTrajectories;
-    approximationTrajectories = approxTrajectories;
+    // Initialize approximation trajectories with just starting points
+    approximationTrajectories = userStartPoints.map(p => [p]);
 
-    // Start animation
+    // Reset animation state
     isLoading = false;
     segmentIndex = 0;
     segmentProgress = 0;
     showErrorLines = false;
     draw();
     startAnimation();
+
+    // Approximation: streaming sampling
+    activeRequestId = callSamplingWorkerThreadFromInitialPoints(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig,
+      userStartPoints,
+      NUM_STEPS,
+      // onComplete
+      () => {
+        isStreamingTrajectory = false;
+        activeRequestId = null;
+      },
+      settings.trainingSettings.domainRange,
+      { scheduler: "euler" },
+      // onStep - append new points to each approximation trajectory
+      (_step, x_t) => {
+        approximationTrajectories = approximationTrajectories.map((traj, i) => [
+          ...traj,
+          [x_t[i][0], x_t[i][1]]
+        ]);
+      }
+    );
   }
 
   // Draw a full trajectory path on a given context
@@ -294,7 +341,7 @@
 
   // Draw start point markers on a given context
   function drawStartPointsOnCtx(ctx, scaleX = xScale, scaleY = yScale) {
-    for (const point of startPoints) {
+    for (const point of userStartPoints) {
       const [x, y] = [scaleX(point[0]), scaleY(point[1])];
 
       ctx.beginPath();
@@ -471,7 +518,14 @@
   function handleCanvasClick(event) {
     if (isLoading) return;
 
+    // Stop animation and reset state
     stopAnimation();
+    segmentIndex = 0;
+    segmentProgress = 0;
+    showErrorLines = false;
+    isPaused = false;
+    pauseStartTime = null;
+    lastAnimationTime = null;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvasWidth / rect.width;
@@ -483,12 +537,13 @@
     const domainY = yScale.invert(clickY);
     const newPoint = [domainX, domainY];
 
-    if (startPoints.length < maxStartPoints) {
-      startPoints = [...startPoints, newPoint];
-    } else {
-      startPoints = [...startPoints.slice(1), newPoint];
+    // Add new point to buffer (FIFO with max limit)
+    userStartPoints = [...userStartPoints, newPoint];
+    if (userStartPoints.length > maxUserTrajectories) {
+      userStartPoints = userStartPoints.slice(-maxUserTrajectories);
     }
 
+    // Recompute all trajectories (cancels any in-progress requests)
     computeAllTrajectories();
   }
 

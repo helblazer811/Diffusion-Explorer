@@ -3,7 +3,7 @@
   import * as d3 from "d3";
   import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { callSamplingWorkerThreadFromInitialPoints } from "@diffusion-explorer/diffusion";
+  import { callSamplingWorkerThreadFromInitialPoints, stopSamplingRequest } from "@diffusion-explorer/diffusion";
 
   // ===== PROPS =====
 
@@ -47,7 +47,7 @@
   export let playingByDefault = true;
 
   // Interactive sampling
-  export let maxUserTrajectories = 5;
+  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
   export let onInitialized = undefined;
@@ -104,6 +104,8 @@
   let hasUserTrajectory = false;
   let isStreamingTrajectory = false;
   let streamingCompleteCount = 0;
+  let activeFlowMatchingRequestId = null; // Track active request for cancellation
+  let activeRectifiedFlowRequestId = null; // Track active request for cancellation
 
   // Visibility
   let figureIsActive;
@@ -188,6 +190,16 @@
 
   // Sample trajectories from all user start points using both models (streaming)
   function sampleFromPoint(point) {
+    // Cancel any in-progress requests before starting new ones
+    if (activeFlowMatchingRequestId) {
+      stopSamplingRequest(activeFlowMatchingRequestId);
+      activeFlowMatchingRequestId = null;
+    }
+    if (activeRectifiedFlowRequestId) {
+      stopSamplingRequest(activeRectifiedFlowRequestId);
+      activeRectifiedFlowRequestId = null;
+    }
+
     // Add new point to the list of user start points
     userStartPoints = [...userStartPoints, point];
 
@@ -215,11 +227,13 @@
       streamingCompleteCount++;
       if (streamingCompleteCount >= 2) {
         isStreamingTrajectory = false;
+        activeFlowMatchingRequestId = null;
+        activeRectifiedFlowRequestId = null;
       }
     }
 
     // Sample from left model (Flow Matching) with streaming
-    callSamplingWorkerThreadFromInitialPoints(
+    activeFlowMatchingRequestId = callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.flowMatchingModelPath,
       'Flow Matching',
@@ -239,7 +253,7 @@
     );
 
     // Sample from right model (Rectified Flow) with streaming
-    callSamplingWorkerThreadFromInitialPoints(
+    activeRectifiedFlowRequestId = callSamplingWorkerThreadFromInitialPoints(
       settings.samplingWorkerUrl,
       settings.rectifiedFlowModelPath,
       'Flow Matching',
