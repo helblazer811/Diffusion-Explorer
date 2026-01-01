@@ -52,6 +52,8 @@ export interface PlotContourOptions {
   // Scale functions to convert from data coordinates to pixel coordinates
   xScale: (x: number) => number;
   yScale: (y: number) => number;
+  // Minimum threshold value - contours below this are not rendered (default: undefined = no filter)
+  minThreshold?: number;
 }
 
 /**
@@ -157,6 +159,7 @@ export function plotContours(
     blendMode,
     xScale,
     yScale,
+    minThreshold,
   } = options;
 
   const { contours, domain, gridSize, minValue, maxValue } = computedContours;
@@ -184,7 +187,13 @@ export function plotContours(
 
   // Draw contours from highest to lowest value so denser regions are on top
   const sortedContours = [...contours].sort((a, b) => b.value - a.value);
-  for (const contour of sortedContours) {
+
+  // Filter out contours below minimum threshold if specified
+  const filteredContours = minThreshold !== undefined
+    ? sortedContours.filter(c => c.value >= minThreshold)
+    : sortedContours;
+
+  for (const contour of filteredContours) {
     // Use single fillColor if provided, otherwise use colorScale
     const color = fillColor ?? colorScale(normalizeValue(contour.value));
 
