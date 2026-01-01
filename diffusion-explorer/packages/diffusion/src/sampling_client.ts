@@ -23,39 +23,27 @@ interface SamplingMessageData {
     streaming?: boolean;
 }
 
-// ===== Module-level state for singleton worker =====
+// ===== Module-level state for worker pool =====
+
+let poolSize = 5;
 
 type SamplingCallbacks = {
     callback: (allSamples: any, guidance?: any) => void;
     onStep?: (step: number, x_t: number[][]) => void;
 };
 
-let samplingWorker: Worker | null = null;
+let workerPool: Worker[] = [];
+let workerPoolUrl: string | null = null;
+let nextWorkerIndex = 0;
 let callbacksByRequestId = new Map<string, SamplingCallbacks>();
+let requestIdToWorker = new Map<string, Worker>();
 
 /**
- * Lazily creates and returns the singleton sampling worker.
- * Sets up message routing based on requestId.
+ * Create a message handler for a worker in the pool.
+ * All workers share the same routing logic based on requestId.
  */
-function getSamplingWorker(samplingWorkerUrl: string): Worker {
-    if (samplingWorker) return samplingWorker;
-
-    samplingWorker = new Worker(samplingWorkerUrl, { type: 'module' });
-
-    samplingWorker.onerror = (e) => {
-        console.error('[Sampling Worker Error]', {
-            message: e.message,
-            filename: e.filename,
-            lineno: e.lineno,
-            colno: e.colno
-        });
-    };
-
-    samplingWorker.onmessageerror = (e) => {
-        console.error('[Sampling Worker Message Error] Failed to deserialize message:', e);
-    };
-
-    samplingWorker.onmessage = (e) => {
+function createMessageHandler(workerIndex: number) {
+    return (e: MessageEvent) => {
         const { requestId, type: msgType } = e.data;
 
         const handlers = callbacksByRequestId.get(requestId);
@@ -67,42 +55,109 @@ function getSamplingWorker(samplingWorkerUrl: string): Worker {
         else if (msgType === 'result') {
             handlers.callback(e.data.allSamples, e.data.guidance);
             callbacksByRequestId.delete(requestId);
+            requestIdToWorker.delete(requestId);
         }
         else if (msgType === 'cancelled') {
-            console.log('[Sampling Worker] Request cancelled:', requestId);
+            console.log(`[Sampling Worker ${workerIndex}] Request cancelled:`, requestId);
             callbacksByRequestId.delete(requestId);
+            requestIdToWorker.delete(requestId);
         }
         else if (msgType === 'status') {
-            console.log('[Sampling Worker] status:', e.data.message);
+            console.log(`[Sampling Worker ${workerIndex}] status:`, e.data.message);
         }
         else if (msgType === 'error') {
-            console.error('[Sampling Worker] error:', e.data.error);
+            console.error(`[Sampling Worker ${workerIndex}] error:`, e.data.error);
             callbacksByRequestId.delete(requestId);
+            requestIdToWorker.delete(requestId);
         }
     };
+}
 
-    return samplingWorker;
+/**
+ * Lazily creates and returns the worker pool.
+ * All workers share the same message routing logic.
+ */
+function initializeWorkerPool(samplingWorkerUrl: string): void {
+    // Already initialized with same URL
+    if (workerPool.length > 0 && workerPoolUrl === samplingWorkerUrl) return;
+
+    // Different URL - terminate old workers and create new pool
+    if (workerPoolUrl !== samplingWorkerUrl && workerPool.length > 0) {
+        workerPool.forEach(w => w.terminate());
+        workerPool = [];
+    }
+
+    workerPoolUrl = samplingWorkerUrl;
+
+    for (let i = 0; i < poolSize; i++) {
+        const worker = new Worker(samplingWorkerUrl, { type: 'module' });
+
+        worker.onerror = (e) => {
+            console.error(`[Sampling Worker ${i} Error]`, {
+                message: e.message,
+                filename: e.filename,
+                lineno: e.lineno,
+                colno: e.colno
+            });
+        };
+
+        worker.onmessageerror = (e) => {
+            console.error(`[Sampling Worker ${i} Message Error] Failed to deserialize message:`, e);
+        };
+
+        // All workers share the same onmessage handler pattern
+        worker.onmessage = createMessageHandler(i);
+
+        workerPool.push(worker);
+    }
+
+    console.log(`[Sampling Pool] Initialized ${poolSize} workers`);
+}
+
+/**
+ * Get next worker from pool using round-robin.
+ */
+function getNextWorker(samplingWorkerUrl: string): Worker {
+    initializeWorkerPool(samplingWorkerUrl);
+
+    const worker = workerPool[nextWorkerIndex];
+    nextWorkerIndex = (nextWorkerIndex + 1) % workerPool.length;
+    return worker;
+}
+
+/**
+ * Set the worker pool size. Must be called before any sampling operations.
+ * @param size Number of workers in the pool (default: 5)
+ */
+export function setSamplingPoolSize(size: number): void {
+    if (workerPool.length > 0) {
+        console.warn('[Sampling Pool] Cannot change pool size after initialization');
+        return;
+    }
+    poolSize = size;
 }
 
 /**
  * Send a cancellation signal for a specific sampling request.
- * The worker will stop processing and ignore any pending results.
+ * Looks up the correct worker and sends the stop message to it.
  *
  * @param requestId - The request ID to cancel
  */
 export function stopSamplingRequest(requestId: string): void {
-    if (samplingWorker) {
-        console.log('[Sampling Client] Sending stop request:', requestId);
-        samplingWorker.postMessage({ requestId, type: 'stop' });
+    const worker = requestIdToWorker.get(requestId);
+    if (worker) {
+        console.log('[Sampling Pool] Sending stop request:', requestId);
+        worker.postMessage({ requestId, type: 'stop' });
         callbacksByRequestId.delete(requestId);
+        requestIdToWorker.delete(requestId);
     }
 }
 
 /**
- * Internal helper to communicate with the singleton sampling worker.
+ * Internal helper to communicate with the worker pool.
  *
- * Uses a lazily-created shared worker and routes responses based on
- * requestId. Optionally supports streaming per-step updates via onStep.
+ * Uses round-robin to select a worker from the pool and routes responses
+ * based on requestId. Optionally supports streaming per-step updates via onStep.
  *
  * @param samplingWorkerUrl - URL to the sampling worker script
  * @param type - Type of sampling operation to perform
@@ -118,16 +173,17 @@ function callSamplingWorker(
     callback: (allSamples: any, guidance?: any) => void,
     onStep?: (step: number, x_t: number[][]) => void
 ): string {
-    const worker = getSamplingWorker(samplingWorkerUrl);
+    const worker = getNextWorker(samplingWorkerUrl);
     const requestId = crypto.randomUUID();
 
-    // Register callbacks for this request
+    // Register callbacks and track which worker has this request
     callbacksByRequestId.set(requestId, { callback, onStep });
+    requestIdToWorker.set(requestId, worker);
 
     // Enable streaming if onStep callback is provided
     const messageData = onStep ? { ...data, streaming: true } : data;
 
-    console.log('[Sampling Worker] Sending message:', { type, requestId, timestamp: Date.now() });
+    console.log('[Sampling Pool] Sending message:', { type, requestId, timestamp: Date.now() });
     worker.postMessage({ requestId, type, data: messageData });
 
     return requestId;
