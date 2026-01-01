@@ -291,33 +291,63 @@
     }
 
     // Draw in-progress clicked trajectory
-    if (clickedTrajectory && clickedTrajectory.length > 1) {
-      ctx.strokeStyle = settings.stylingSettings.trajectory.color;
-      ctx.lineWidth = settings.stylingSettings.trajectory.strokeWidth;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.globalAlpha = settings.stylingSettings.trajectory.progressOpacity;
-
+    if (clickedTrajectory && clickedTrajectory.length >= 1) {
       const targetSegmentIndex = Math.floor(time * (samplingSteps - 1));
       const endIdx = Math.min(targetSegmentIndex + 1, clickedTrajectory.length);
 
+      // Draw trajectory line if we have at least 2 points
       if (endIdx >= 2) {
+        ctx.strokeStyle = settings.stylingSettings.trajectory.color;
+        ctx.lineWidth = settings.stylingSettings.trajectory.strokeWidth;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.globalAlpha = settings.stylingSettings.trajectory.progressOpacity;
+
         ctx.beginPath();
         ctx.moveTo(clickedTrajectory[0][0], clickedTrajectory[0][1]);
         for (let i = 1; i < endIdx; i++) {
           ctx.lineTo(clickedTrajectory[i][0], clickedTrajectory[i][1]);
         }
         ctx.stroke();
-
-        // Draw point at current position
-        const lastPoint = clickedTrajectory[endIdx - 1];
-        ctx.fillStyle = settings.stylingSettings.trajectory.color;
-        ctx.beginPath();
-        ctx.arc(lastPoint[0], lastPoint[1], settings.stylingSettings.trajectory.endpointRadius, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.globalAlpha = 1.0;
       }
 
-      ctx.globalAlpha = 1.0;
+      // Draw point at current position
+      const currentPoint = clickedTrajectory[Math.max(0, endIdx - 1)];
+      ctx.fillStyle = settings.stylingSettings.trajectory.color;
+      ctx.beginPath();
+      ctx.arc(currentPoint[0], currentPoint[1], settings.stylingSettings.trajectory.endpointRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw LaTeX labels for in-progress trajectory
+      const startPoint = clickedTrajectory[0];
+      const latexColor = settings.stylingSettings.figureLatex.color;
+
+      // Draw "x" label at start
+      await drawMathjaxOnCanvas(
+        ctx,
+        "x",
+        startPoint[0],
+        startPoint[1],
+        latexFontSize,
+        0,
+        latexLabelOffsetY,
+        { color: latexColor }
+      );
+
+      // Draw "ψ_t(x)" label at current position (after initial movement)
+      if (time >= 0.05) {
+        await drawMathjaxOnCanvas(
+          ctx,
+          "\\psi_t(x)",
+          currentPoint[0],
+          currentPoint[1],
+          latexFontSize,
+          0,
+          latexLabelOffsetY,
+          { color: latexColor }
+        );
+      }
     }
 
     // Draw LaTeX labels directly on canvas
@@ -468,7 +498,7 @@
         min={0}
         max={1}
         onTogglePlay={toggleAnimation}
-        color="#f17720"
+        color={settings.stylingSettings.trajectory.color}
       />
     </div>
   {/snippet}

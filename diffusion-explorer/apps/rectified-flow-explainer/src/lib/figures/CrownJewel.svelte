@@ -69,7 +69,7 @@
   // Interactive sampling
   export let highlightedTrajectoryOpacity = 1.0;
   export let dimmedTrajectoryOpacity = 0.15;
-  export let maxUserTrajectories = 5;
+  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
   export let onInitialized = undefined;
