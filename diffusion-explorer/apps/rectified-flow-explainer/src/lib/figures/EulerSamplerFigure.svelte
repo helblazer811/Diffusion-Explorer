@@ -37,6 +37,7 @@
   // Label props
   export let labelFontSize = 52;
   export let labelColor = settings.stylingSettings.label.color;
+  export let labelOpacity = settings.stylingSettings.label.opacity;
   export let labelYShiftFactor = 0;
   export let highCurvatureLabel = 'Curved Function';
   export let lowCurvatureLabel = 'Almost Straight Function';
@@ -271,6 +272,7 @@
       .attr('text-anchor', 'middle')
       .attr('font-size', `${labelFontSize}px`)
       .attr('fill', labelColor)
+      .attr('opacity', labelOpacity)
       .text(label);
   }
 

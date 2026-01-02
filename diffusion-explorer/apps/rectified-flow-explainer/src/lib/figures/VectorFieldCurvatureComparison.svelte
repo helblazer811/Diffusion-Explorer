@@ -24,6 +24,7 @@
   export let rightLabel = 'Rectified Flow';
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelColor = settings.stylingSettings.label.color;
+  export let labelOpacity = settings.stylingSettings.label.opacity;
 
   // Arrow styling
   export let arrowColor = '#f17720';
@@ -290,7 +291,7 @@
   <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     {#snippet left()}
       <div class="panel-container" style="max-width: {canvasWidth}px;">
-        <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor};">
+        <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};">
           {leftLabel}
         </div>
         <canvas
@@ -302,7 +303,7 @@
 
     {#snippet right()}
       <div class="panel-container" style="max-width: {canvasWidth}px;">
-        <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor};">
+        <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};">
           {rightLabel}
         </div>
         <canvas

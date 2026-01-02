@@ -2,15 +2,9 @@
   import { onDestroy } from "svelte";
   import { Figure, TimeSlider, drawScatterPlot, drawMathjaxOnCanvas, drawTrajectoriesWithPreview, createSourceTargetScales } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { FlowModelClient } from "@diffusion-explorer/diffusion";
 
-  // Create sampling client
-  const flowMatchingClient = new FlowModelClient(
-    settings.flowModelWorkerUrl,
-    settings.flowMatchingModelPath,
-    "Flow Matching",
-    settings.trainingSettings.modelConfig
-  );
+  // FlowModelClient instance (passed from parent, created with correct base path)
+  export let flowMatchingClient = null;
 
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];

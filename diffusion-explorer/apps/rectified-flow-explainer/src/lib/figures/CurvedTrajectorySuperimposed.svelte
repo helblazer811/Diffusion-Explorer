@@ -1,20 +1,13 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onDestroy } from "svelte";
   import * as d3 from "d3";
   import { Figure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { FlowModelClient } from "@diffusion-explorer/diffusion";
-
-  // Create sampling client
-  const flowMatchingClient = new FlowModelClient(
-    settings.flowModelWorkerUrl,
-    settings.flowMatchingModelPath,
-    "Flow Matching",
-    settings.trainingSettings.modelConfig,
-    settings.trainingSettings.domainRange
-  );
 
   // ===== PROPS =====
+
+  // FlowModelClient instance (passed from parent, created with correct base path)
+  export let flowMatchingClient = null;
 
   // Caption slot
   export let children = undefined;
@@ -150,7 +143,8 @@
 
   // Handle canvas click - convert to domain coordinates and sample
   function handleCanvasClick(event) {
-    if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
+    // Client is passed as prop; check it's available
+    if (!flowMatchingClient) return;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvasWidth / rect.width;
@@ -167,6 +161,9 @@
 
   // Sample trajectories from all user start points using streaming
   function sampleFromPoint(point) {
+    // Ensure client is initialized
+    if (!flowMatchingClient) return;
+
     // Cancel any in-progress request before starting new one
     if (activeRequestId) {
       flowMatchingClient.stopRequest(activeRequestId);
@@ -386,13 +383,18 @@
 
   // ===== LIFECYCLE =====
 
-  onMount(() => {
-    // Initialization handled by reactive statement
-  });
+  // Note: FlowModelClient instance is now passed as props from +page.svelte
+  // This ensures it's created with the correct base path prefix
 
   onDestroy(() => {
+    // Cancel animation frame
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
+    }
+
+    // Cancel any pending worker requests to prevent orphaned promises
+    if (activeRequestId && flowMatchingClient) {
+      flowMatchingClient.stopRequest(activeRequestId);
     }
   });
 </script>

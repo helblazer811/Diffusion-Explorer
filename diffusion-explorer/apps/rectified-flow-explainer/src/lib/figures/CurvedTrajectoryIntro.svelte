@@ -2,15 +2,9 @@
   import { onDestroy } from "svelte";
   import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { FlowModelClient } from "@diffusion-explorer/diffusion";
 
-  // Create sampling client
-  const flowMatchingClient = new FlowModelClient(
-    settings.flowModelWorkerUrl,
-    settings.flowMatchingModelPath,
-    "Flow Matching",
-    settings.trainingSettings.modelConfig
-  );
+  // FlowModelClient instance (passed from parent, created with correct base path)
+  export let flowMatchingClient = null;
 
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
@@ -296,9 +290,10 @@
     const labelColor = settings.stylingSettings.label.color;
     const labelFontSize = settings.stylingSettings.label.fontSize;
     const labelFontWeight = settings.stylingSettings.label.fontWeight;
+    const labelOpacity = settings.stylingSettings.label.opacity;
     const labelFont = `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`;
-    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
-    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
+    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont, opacity: labelOpacity });
+    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont, opacity: labelOpacity });
 
     // Calculate current segment index from normalized time
     const segmentIndex = Math.floor(time * numSegments);
