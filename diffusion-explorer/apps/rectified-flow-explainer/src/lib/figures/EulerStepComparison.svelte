@@ -7,8 +7,9 @@
     DoubleFigure,
     drawScatterPlot,
     Slider,
-    progressivelyAnimateTrajectories,
     FigureLegend,
+    Clock,
+    Track,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -120,17 +121,69 @@
   // Initialization
   let isInitialized = false;
 
-  // Animation controllers for approximation trajectories (encapsulate animation state)
-  let leftAnimationController = null;
-  let rightAnimationController = null;
+  // Animation timing config (in ms)
+  const segmentDuration = 600;
+  const segmentPauseDuration = 400;
+  const endPauseDuration = 2500;
 
-  // Animation timing config
-  const animationConfig = {
-    segmentDuration: 600,
-    segmentPauseDuration: 400,
-    endPauseDuration: 2500,
-    loop: true,
-  };
+  // Animation state
+  let leftState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+  let rightState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+
+  // Tracks and clock for animation
+  let leftTrack = new Track();
+  let rightTrack = new Track();
+  const clock = new Clock();
+
+  // Create segment clip that animates through segments with pauses
+  function createSegmentClip(numSegments) {
+    const cycleTime = segmentDuration + segmentPauseDuration;
+    const segmentPhaseMs = numSegments * cycleTime;
+    const totalMs = segmentPhaseMs + endPauseDuration;
+    const segmentPhaseNormalized = segmentPhaseMs / totalMs;
+
+    return {
+      name: "Segments",
+      duration: segmentPhaseNormalized,
+      apply(t, _params, state) {
+        const absoluteTime = t * segmentPhaseMs;
+        const segmentIdx = Math.floor(absoluteTime / cycleTime);
+        const timeInCycle = absoluteTime % cycleTime;
+
+        state.segmentIndex = Math.min(segmentIdx, numSegments);
+        if (segmentIdx < numSegments && timeInCycle < segmentDuration) {
+          state.segmentProgress = timeInCycle / segmentDuration;
+        } else {
+          state.segmentProgress = 1;
+        }
+        state.inEndPause = false;
+      }
+    };
+  }
+
+  // Create end pause clip that triggers error line drawing
+  function createEndPauseClipWithCallback(duration, onEnter) {
+    let hasCalledOnEnter = false;
+    return {
+      name: "EndPause",
+      duration,
+      apply(_t, _params, state) {
+        state.inEndPause = true;
+        state.segmentProgress = 1;
+        if (!hasCalledOnEnter) {
+          hasCalledOnEnter = true;
+          onEnter?.();
+        }
+      },
+      reset() {
+        hasCalledOnEnter = false;
+      }
+    };
+  }
+
+  // Store end pause clips for reset
+  let leftEndPauseClip = null;
+  let rightEndPauseClip = null;
 
   // ===== FUNCTIONS =====
 
@@ -241,7 +294,7 @@
 
     // Draw initial state immediately
     isLoading = false;
-    createAnimationControllers();
+    setupTracks();
     startApproxAnimation();
 
     let completedCount = 0;
@@ -296,8 +349,8 @@
         flowMatchingTrajectories[currentSteps] = flowMatchingTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
-        // Recreate controllers to pick up new data and start them
-        createAnimationControllers();
+        // Recreate tracks to pick up new data and start them
+        setupTracks();
         startApproxAnimation();
       }
     );
@@ -316,8 +369,8 @@
         rectifiedFlowTrajectories[currentSteps] = rectifiedFlowTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
-        // Recreate controllers to pick up new data and start them
-        createAnimationControllers();
+        // Recreate tracks to pick up new data and start them
+        setupTracks();
         startApproxAnimation();
       }
     );
@@ -507,59 +560,169 @@
     }
   }
 
-  // Create and start animation controllers for both panels
-  function createAnimationControllers() {
+  // Draw partial trajectory with current segment being animated
+  function drawPartialTrajectory(ctx, trajectory, segmentIndex, segmentProgress, color, strokeWidth, pointRadius, opacity) {
+    if (!trajectory || trajectory.length < 2) return;
+
+    ctx.globalAlpha = opacity;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = strokeWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Draw completed segments
+    if (segmentIndex > 0) {
+      ctx.beginPath();
+      ctx.moveTo(xScale(trajectory[0][0]), yScale(trajectory[0][1]));
+      for (let i = 1; i <= segmentIndex && i < trajectory.length; i++) {
+        ctx.lineTo(xScale(trajectory[i][0]), yScale(trajectory[i][1]));
+      }
+      ctx.stroke();
+    }
+
+    // Draw current segment being animated (interpolated)
+    if (segmentIndex < trajectory.length - 1) {
+      const startIdx = segmentIndex;
+      const endIdx = segmentIndex + 1;
+      if (endIdx < trajectory.length) {
+        const startPt = trajectory[startIdx];
+        const endPt = trajectory[endIdx];
+        const interpX = xScale(startPt[0]) + (xScale(endPt[0]) - xScale(startPt[0])) * segmentProgress;
+        const interpY = yScale(startPt[1]) + (yScale(endPt[1]) - yScale(startPt[1])) * segmentProgress;
+
+        ctx.beginPath();
+        ctx.moveTo(xScale(startPt[0]), yScale(startPt[1]));
+        ctx.lineTo(interpX, interpY);
+        ctx.stroke();
+
+        // Draw current position marker
+        ctx.beginPath();
+        ctx.arc(interpX, interpY, pointRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+    } else if (trajectory.length > 0) {
+      // Animation complete - draw endpoint marker
+      const lastPt = trajectory[trajectory.length - 1];
+      ctx.beginPath();
+      ctx.arc(xScale(lastPt[0]), yScale(lastPt[1]), pointRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Draw approximation trajectories with current animation state
+  function drawApproximation(ctx, trajectories, state) {
+    for (const traj of trajectories) {
+      drawPartialTrajectory(
+        ctx,
+        traj,
+        state.segmentIndex,
+        state.segmentProgress,
+        approximationColor,
+        trajectoryStrokeWidth + 0.5,
+        endpointRadius,
+        approximationOpacity
+      );
+    }
+  }
+
+  // Calculate total animation duration in ms
+  function getTotalAnimationMs(numSegments) {
+    return numSegments * (segmentDuration + segmentPauseDuration) + endPauseDuration;
+  }
+
+  // Setup tracks for the current step count
+  function setupTracks() {
+    const currentSteps = stepValues[currentStepIndex];
+    const cycleTime = segmentDuration + segmentPauseDuration;
+    const segmentPhaseMs = currentSteps * cycleTime;
+    const totalMs = segmentPhaseMs + endPauseDuration;
+    const segmentPhaseNormalized = segmentPhaseMs / totalMs;
+    const endPauseNormalized = endPauseDuration / totalMs;
+
+    // Reset tracks
+    leftTrack = new Track();
+    rightTrack = new Track();
+
+    // Create clips
+    const leftSegmentClip = createSegmentClip(currentSteps);
+    leftEndPauseClip = createEndPauseClipWithCallback(endPauseNormalized, drawLeftErrorLines);
+    leftTrack.add(leftSegmentClip, 0);
+    leftTrack.add(leftEndPauseClip, segmentPhaseNormalized);
+
+    const rightSegmentClip = createSegmentClip(currentSteps);
+    rightEndPauseClip = createEndPauseClipWithCallback(endPauseNormalized, drawRightErrorLines);
+    rightTrack.add(rightSegmentClip, 0);
+    rightTrack.add(rightEndPauseClip, segmentPhaseNormalized);
+  }
+
+  // Draw a full frame (background + approximation)
+  function drawLeftFrame() {
+    drawLeftBackground();
     const currentSteps = stepValues[currentStepIndex];
     const leftApprox = flowMatchingTrajectories[currentSteps] || [];
+    drawApproximation(leftCtx, leftApprox, leftState);
+    if (leftState.inEndPause) {
+      drawLeftErrorLines();
+    }
+  }
+
+  function drawRightFrame() {
+    drawRightBackground();
+    const currentSteps = stepValues[currentStepIndex];
     const rightApprox = rectifiedFlowTrajectories[currentSteps] || [];
-
-    // Convert to pixel coordinates
-    const leftApproxPixel = leftApprox.map((traj) =>
-      traj.map((p) => [xScale(p[0]), yScale(p[1])])
-    );
-    const rightApproxPixel = rightApprox.map((traj) =>
-      traj.map((p) => [xScale(p[0]), yScale(p[1])])
-    );
-
-    const baseOptions = {
-      ...animationConfig,
-      strokeWidth: trajectoryStrokeWidth + 0.5,
-      pointRadius: endpointRadius,
-      color: approximationColor,
-      opacity: approximationOpacity,
-    };
-
-    leftAnimationController = progressivelyAnimateTrajectories(
-      leftCtx,
-      leftApproxPixel,
-      { ...baseOptions, onEndPause: drawLeftErrorLines },
-      drawLeftBackground
-    );
-
-    rightAnimationController = progressivelyAnimateTrajectories(
-      rightCtx,
-      rightApproxPixel,
-      { ...baseOptions, onEndPause: drawRightErrorLines },
-      drawRightBackground
-    );
+    drawApproximation(rightCtx, rightApprox, rightState);
+    if (rightState.inEndPause) {
+      drawRightErrorLines();
+    }
   }
 
   function startApproxAnimation() {
-    leftAnimationController?.start();
-    rightAnimationController?.start();
+    if (clock.isRunning) return;
+
+    const currentSteps = stepValues[currentStepIndex];
+    const totalMs = getTotalAnimationMs(currentSteps);
+
+    clock.start((dt) => {
+      // Convert real time (seconds) to normalized time
+      const normalizedDt = dt / (totalMs / 1000);
+
+      // Update both tracks
+      leftTrack.update(normalizedDt, {}, leftState);
+      rightTrack.update(normalizedDt, {}, rightState);
+
+      // Handle looping
+      if (leftTrack.time >= 1) {
+        leftTrack.reset();
+        rightTrack.reset();
+        leftEndPauseClip?.reset?.();
+        rightEndPauseClip?.reset?.();
+        leftState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+        rightState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+      }
+
+      drawLeftFrame();
+      drawRightFrame();
+    });
   }
 
   function stopApproxAnimation() {
-    leftAnimationController?.stop();
-    rightAnimationController?.stop();
+    clock.stop();
   }
 
   function resetApproxAnimation() {
     stopApproxAnimation();
-    leftAnimationController?.reset();
-    rightAnimationController?.reset();
-    // Recreate controllers to pick up any trajectory changes
-    createAnimationControllers();
+    leftTrack.reset();
+    rightTrack.reset();
+    leftEndPauseClip?.reset?.();
+    rightEndPauseClip?.reset?.();
+    leftState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+    rightState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+    // Recreate tracks to pick up any trajectory changes
+    setupTracks();
     startApproxAnimation();
   }
 
@@ -578,10 +741,14 @@
 
   // Handle canvas click - convert to domain coordinates and add/replace start point
   function handleCanvasClick(event, side) {
-    // Stop current animation and reset controllers
+    // Stop current animation and reset tracks
     stopApproxAnimation();
-    leftAnimationController?.reset();
-    rightAnimationController?.reset();
+    leftTrack.reset();
+    rightTrack.reset();
+    leftEndPauseClip?.reset?.();
+    rightEndPauseClip?.reset?.();
+    leftState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+    rightState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
 
     const canvas = side === "left" ? leftCanvas : rightCanvas;
     const rect = canvas.getBoundingClientRect();
