@@ -30,6 +30,7 @@ export const settings = {
   cachedFlowMatchingTrajectoriesPath: "cached_samples/flow_matching_trajectories.json" as string | null,
   cachedFlowMatchingVectorFieldPath: "cached_samples/flow_matching_vector_field.json" as string | null,
   cachedFlowMatchingGridTrajectoriesPath: "cached_samples/flow_matching_grid_trajectories.json" as string | null,
+  cachedReverseSamplingTrajectoriesPath: null as string | null,  // e.g., "cached_samples/reverse_sampling_trajectories.json"
 
   // Worker URLs (bundled to static/workers/ for production)
   trainWorkerUrl: '/workers/train.worker.js',
@@ -56,6 +57,11 @@ export const settings = {
       gridResolution: 8,
       numTimeSteps: 200,
       domainRange: { xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 }
+    },
+    // Reverse sampling (from target to source)
+    reverseSampling: {
+      numSamples: 50,
+      numSteps: 300
     }
   },
 

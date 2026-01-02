@@ -31,6 +31,8 @@ export type StepFunction = (
 export interface SamplingOptions {
   /** Scheduler/integrator to use (default: 'euler_midpoint') */
   scheduler?: SchedulerType;
+  /** If true, sample in reverse time (1 to 0) for inverting the flow (default: false) */
+  reverse?: boolean;
 }
 
 /**

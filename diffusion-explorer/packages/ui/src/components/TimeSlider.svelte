@@ -12,6 +12,8 @@
   export let showTicks = true;
   export let showTimeLabel = true;
   export let timeLabel = 'Time';
+  export let minLabel = 't=0';
+  export let maxLabel = 't=1';
   export let dragEnabled = true;
   export let onTogglePlay = () => {};
   export let onInput = () => {};  // Called when user drags slider
@@ -53,6 +55,8 @@
         {showTicks}
         showLabel={showTimeLabel}
         label={timeLabel}
+        {minLabel}
+        {maxLabel}
         {dragEnabled}
         {onInput}
       />
