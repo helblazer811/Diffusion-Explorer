@@ -1,9 +1,9 @@
 <!-- Compares flow matching vector field (curved) vs rectified flow vector field (straighter) -->
 
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onDestroy } from 'svelte';
   import * as d3 from 'd3';
-  import { DoubleFigure, TimeSlider, drawVectorField } from '@diffusion-explorer/ui';
+  import { DoubleFigure, TimeSlider, drawVectorField, Clock, Track, createPauseClip } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
 
   // ===== PROPS =====
@@ -68,13 +68,23 @@
   let leftGridPositions = [];
   let rightGridPositions = [];
 
-  // Animation
+  // Animation - Clock/Track system
   let time = 0;
-  let animationFrameId = null;
-  let animationStartTime = null;
-  let pausedElapsedTime = 0;
   let isPlaying = playingByDefault;
-  let isPausedByFigure = false;
+  let clock = null;
+  let track = null;
+
+  // State object mutated by clips
+  let animState = { time: 0 };
+
+  // Main animation clip (maps normalized time to state.time)
+  const mainClip = {
+    name: "Animation",
+    duration: 1,
+    apply(t, params, state) {
+      state.time = t;
+    }
+  };
 
   // Initialization
   let isInitialized = false;
@@ -187,103 +197,101 @@
     isInitialized = true;
   }
 
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-  }
+  // Initialize animation track with main clip and pause
+  function initializeAnimation() {
+    track = new Track();
 
-  function handleSliderInput() {
-    const now = performance.now();
-    animationStartTime = now - (time * animationDuration);
-    pausedElapsedTime = 0;
+    // Calculate normalized durations for track
+    const totalDuration = animationDuration + animationPauseTime;
+    const mainDuration = animationDuration / totalDuration;
+    const pauseClipDuration = animationPauseTime / totalDuration;
+
+    // Add main animation clip (0 to mainDuration of track time)
+    track.add({ ...mainClip, duration: mainDuration }, 0);
+    // Add pause clip (mainDuration to 1)
+    track.add(createPauseClip(pauseClipDuration), mainDuration);
+
+    clock = new Clock();
   }
 
   function startAnimation() {
-    let isPaused = false;
-    let pauseStartTime = null;
+    if (!clock || !track) return;
 
-    function animate(currentTime) {
-      if (isPausedByFigure) {
-        if (animationStartTime !== null && pausedElapsedTime === 0) {
-          pausedElapsedTime = currentTime - animationStartTime;
-        }
-        animationFrameId = requestAnimationFrame(animate);
-        return;
+    clock.start((dt) => {
+      // Convert real time delta to normalized track time
+      const totalDuration = (animationDuration + animationPauseTime) / 1000;
+      const normalizedDt = dt / totalDuration;
+
+      track.update(normalizedDt, {}, animState);
+      time = animState.time;
+
+      // Loop when track completes
+      if (track.time >= 1) {
+        track.reset();
+        animState.time = 0;
+        time = 0;
       }
 
-      if (pausedElapsedTime > 0) {
-        animationStartTime = currentTime - pausedElapsedTime;
-        pausedElapsedTime = 0;
-      }
-
-      if (animationStartTime === null) {
-        animationStartTime = currentTime;
-      }
-
-      const elapsed = currentTime - animationStartTime;
-
-      if (elapsed >= animationDuration) {
-        if (!isPaused) {
-          isPaused = true;
-          pauseStartTime = currentTime;
-          time = 1;
-          draw();
-        }
-
-        if (pauseStartTime && currentTime - pauseStartTime >= animationPauseTime) {
-          animationStartTime = currentTime;
-          isPaused = false;
-          pauseStartTime = null;
-          time = 0;
-        }
-      } else {
-        time = Math.min(elapsed / animationDuration, 1);
-        draw();
-      }
-
-      animationFrameId = requestAnimationFrame(animate);
-    }
-
-    animationFrameId = requestAnimationFrame(animate);
+      draw();
+    });
   }
 
   function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
+    if (clock) clock.stop();
+  }
+
+  function toggleAnimation() {
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      startAnimation();
+    } else {
+      stopAnimation();
+    }
+  }
+
+  function handleSliderInput() {
+    if (isPlaying) {
+      isPlaying = false;
+      stopAnimation();
+    }
+    animState.time = time;
+    draw();
+  }
+
+  function handleVisibilityChange(isActive) {
+    if (!isActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+      stopAnimation();
+    } else if (isActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+      startAnimation();
     }
   }
 
   // ===== REACTIVE EFFECTS =====
 
-  $: isPausedByFigure = !isPlaying;
-
-  $: if (figureIsActive && isInitialized) {
-    if (!$figureIsActive && isPlaying) {
-      wasPlayingBeforeHidden = true;
-      isPlaying = false;
-    } else if ($figureIsActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      isPlaying = true;
-    }
+  $: if (!isInitialized && isDataValid && leftCanvas && rightCanvas) {
+    initializeVisualization();
+    initializeAnimation();
+    if (isPlaying) startAnimation();
   }
 
+  // Handle visibility changes (pause when off-screen, resume when back)
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
+  }
+
+  // Redraw when time changes (e.g., slider drag)
   $: if (isInitialized && time !== undefined) {
     draw();
   }
 
-  $: if (!isInitialized && isDataValid && leftCanvas && rightCanvas) {
-    initializeVisualization();
-    startAnimation();
-  }
-
   // ===== LIFECYCLE =====
 
-  onMount(() => {
-    // Initialization handled by reactive statement
-  });
-
   onDestroy(() => {
-    stopAnimation();
+    if (clock) clock.stop();
   });
 </script>
 

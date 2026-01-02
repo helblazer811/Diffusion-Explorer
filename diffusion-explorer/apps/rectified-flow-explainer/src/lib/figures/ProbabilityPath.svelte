@@ -1,9 +1,9 @@
 <!-- This figure shows a source distribution mapped to a target distribution with animated intermediate samples. -->
 
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours, createSourceTargetScales } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours, createSourceTargetScales, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // Caption slot (passed as default children)
@@ -77,13 +77,23 @@
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
 
-  // Animation state
+  // Animation state - Clock/Track system
   let time = 0;
-  let animationFrameId = null;
-  let animationStartTime = null;
-  let pausedElapsedTime = 0;
   let isPlaying = playingByDefault;
-  let isPausedByFigure = false;
+  let clock = null;
+  let track = null;
+
+  // State object mutated by clips
+  let animState = { time: 0 };
+
+  // Main animation clip (maps normalized time to state.time)
+  const mainClip = {
+    name: "Animation",
+    duration: 1,
+    apply(t, params, state) {
+      state.time = t;
+    }
+  };
 
   // Visibility-based animation control
   let figureIsActive;
@@ -93,32 +103,34 @@
   // Derived
   $: numSteps = $allTimeSamples?.length || 1;
 
-  // Update isPausedByFigure when isPlaying changes
-  $: isPausedByFigure = !isPlaying;
-
-  // Pause animation when figure goes off-screen, resume when back
-  $: if (figureIsActive !== undefined && isInitialized) {
-    handleVisibilityChange($figureIsActive);
-  }
-
   function handleVisibilityChange(isActive) {
     if (!isActive && isPlaying) {
       wasPlayingBeforeHidden = true;
       isPlaying = false;
+      stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
       isPlaying = true;
+      startAnimation();
     }
   }
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
+    if (isPlaying) {
+      startAnimation();
+    } else {
+      stopAnimation();
+    }
   }
 
   function handleSliderInput() {
-    const now = performance.now();
-    animationStartTime = now - time * animationDuration;
-    pausedElapsedTime = 0;
+    if (isPlaying) {
+      isPlaying = false;
+      stopAnimation();
+    }
+    animState.time = time;
+    draw();
   }
 
   /**
@@ -313,63 +325,47 @@
     precomputeScatterCoords();
   }
 
+  // Initialize animation track with main clip and pause
+  function initializeAnimation() {
+    track = new Track();
+
+    // Calculate normalized durations for track
+    const totalDuration = animationDuration + animationPauseTime;
+    const mainDuration = animationDuration / totalDuration;
+    const pauseClipDuration = animationPauseTime / totalDuration;
+
+    // Add main animation clip (0 to mainDuration of track time)
+    track.add({ ...mainClip, duration: mainDuration }, 0);
+    // Add pause clip (mainDuration to 1)
+    track.add(createPauseClip(pauseClipDuration), mainDuration);
+
+    clock = new Clock();
+  }
+
   function startAnimation() {
-    let isPaused = false;
-    let pauseStartTime = null;
+    if (!clock || !track) return;
 
-    function animate(currentTime) {
-      if (isPausedByFigure) {
-        if (animationStartTime !== null && pausedElapsedTime === 0) {
-          pausedElapsedTime = currentTime - animationStartTime;
-        }
-        animationFrameId = requestAnimationFrame(animate);
-        return;
+    clock.start((dt) => {
+      // Convert real time delta to normalized track time
+      const totalDuration = (animationDuration + animationPauseTime) / 1000;
+      const normalizedDt = dt / totalDuration;
+
+      track.update(normalizedDt, {}, animState);
+      time = animState.time;
+
+      // Loop when track completes
+      if (track.time >= 1) {
+        track.reset();
+        animState.time = 0;
+        time = 0;
       }
 
-      if (pausedElapsedTime > 0) {
-        animationStartTime = currentTime - pausedElapsedTime;
-        pausedElapsedTime = 0;
-      }
-
-      if (animationStartTime === null) {
-        animationStartTime = currentTime;
-      }
-
-      const elapsed = currentTime - animationStartTime;
-
-      if (elapsed >= animationDuration) {
-        if (!isPaused) {
-          isPaused = true;
-          pauseStartTime = currentTime;
-          time = 1;
-          draw();
-        }
-
-        if (
-          pauseStartTime &&
-          currentTime - pauseStartTime >= animationPauseTime
-        ) {
-          animationStartTime = currentTime;
-          isPaused = false;
-          pauseStartTime = null;
-          time = 0;
-        }
-      } else {
-        time = Math.min(elapsed / animationDuration, 1);
-        draw();
-      }
-
-      animationFrameId = requestAnimationFrame(animate);
-    }
-
-    animationFrameId = requestAnimationFrame(animate);
+      draw();
+    });
   }
 
   function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
+    if (clock) clock.stop();
   }
 
   // Update visualization when time changes (e.g., from slider drag)
@@ -386,16 +382,20 @@
     canvas
   ) {
     initializeVisualization();
+    initializeAnimation();
     isInitialized = true;
     draw();
-    startAnimation();
+    if (isPlaying) startAnimation();
   }
 
-  // Animation control
-  $: if (isPlaying && isInitialized && !animationFrameId) startAnimation();
-  $: if (!isPlaying && animationFrameId) stopAnimation();
+  // Handle visibility changes (pause when off-screen, resume when back)
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
+  }
 
-  onDestroy(() => stopAnimation());
+  onDestroy(() => {
+    if (clock) clock.stop();
+  });
 </script>
 
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>

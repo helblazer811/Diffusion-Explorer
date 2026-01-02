@@ -1,7 +1,7 @@
 <script>
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ===== PROPS =====
@@ -82,15 +82,25 @@
   let xScale;
   let yScale;
 
-  // Animation
+  // Animation - Clock/Track system
   let time = 0;
   let currentSegmentIndex = 0;
-  let segmentAccumulator = 0;
   let isPlaying = playingByDefault;
-  let animationFrameId = null;
-  let lastTimestamp = null;
-  let isPaused = false;
-  let pauseStartTime = null;
+  let clock = null;
+  let track = null;
+
+  // State object mutated by clips
+  let animState = { time: 0, segmentIndex: 0 };
+
+  // Main animation clip (maps normalized time to state)
+  const mainClip = {
+    name: "Animation",
+    duration: 1,
+    apply(t, params, state) {
+      state.time = t;
+      state.segmentIndex = Math.floor(t * params.numSegments);
+    }
+  };
 
   // Initialization
   let isInitialized = false;
@@ -224,11 +234,14 @@
     userFlowMatchingTrajectories = userStartPoints.map(p => [[xScale(p[0]), yScale(p[1])]]);
     userRectifiedFlowTrajectories = userStartPoints.map(p => [[xScale(p[0]), yScale(p[1])]]);
 
-    // Reset and start animation
+    // Reset animation state and start
     currentSegmentIndex = 0;
-    segmentAccumulator = 0;
     time = 0;
+    animState.time = 0;
+    animState.segmentIndex = 0;
+    if (track) track.reset();
     isPlaying = true;
+    startAnimation();
 
     // Helper to check if both samples are complete
     function checkComplete() {
@@ -361,64 +374,57 @@
     draw(rightCtx, scaledRightTrajectories, currentSegmentIndex, userRectifiedFlowTrajectories);
   }
 
-  function animate(ts) {
-    if (!isPlaying) {
-      animationFrameId = null;
-      return;
-    }
-    if (lastTimestamp === null) lastTimestamp = ts;
-    const elapsed = ts - lastTimestamp;
-    lastTimestamp = ts;
+  // Initialize animation track with main clip and pause
+  function initializeAnimation() {
+    track = new Track();
 
-    if (isPaused && pauseStartTime !== null) {
-      if (ts - pauseStartTime >= pauseDuration) {
-        isPaused = false;
-        pauseStartTime = null;
-        currentSegmentIndex = 0;
-        segmentAccumulator = 0;
-        time = 0;
-        updateVisualization();
-      }
-      animationFrameId = requestAnimationFrame(animate);
-      return;
-    }
+    // Calculate normalized durations for track
+    const totalDuration = animationDuration + pauseDuration;
+    const mainDuration = animationDuration / totalDuration;
+    const pauseClipDuration = pauseDuration / totalDuration;
 
-    // Accumulate time and advance segments one at a time
-    segmentAccumulator += elapsed;
-    while (segmentAccumulator >= msPerSegment && currentSegmentIndex < numSegments) {
-      segmentAccumulator -= msPerSegment;
-      currentSegmentIndex += 1;
-    }
+    // Add main animation clip (0 to mainDuration of track time)
+    track.add({ ...mainClip, duration: mainDuration }, 0);
+    // Add pause clip (mainDuration to 1)
+    track.add(createPauseClip(pauseClipDuration), mainDuration);
 
-    // Keep time in sync for slider display
-    time = numSegments > 0 ? currentSegmentIndex / numSegments : 0;
-
-    updateVisualization();
-
-    if (currentSegmentIndex >= numSegments) {
-      isPaused = true;
-      pauseStartTime = ts;
-    }
-
-    animationFrameId = requestAnimationFrame(animate);
+    clock = new Clock();
   }
 
   function startAnimation() {
-    if (animationFrameId !== null) return;
-    lastTimestamp = null;
-    animationFrameId = requestAnimationFrame(animate);
+    if (!clock || !track) return;
+
+    clock.start((dt) => {
+      // Convert real time delta to normalized track time
+      const totalDuration = (animationDuration + pauseDuration) / 1000;
+      const normalizedDt = dt / totalDuration;
+
+      track.update(normalizedDt, { numSegments }, animState);
+      time = animState.time;
+      currentSegmentIndex = animState.segmentIndex;
+
+      // Loop when track completes
+      if (track.time >= 1) {
+        track.reset();
+        animState.time = 0;
+        animState.segmentIndex = 0;
+        time = 0;
+        currentSegmentIndex = 0;
+      }
+
+      updateVisualization();
+    });
   }
 
   function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
+    if (clock) clock.stop();
   }
 
   function togglePlayPause() {
     isPlaying = !isPlaying;
-    if (!isPlaying) {
+    if (isPlaying) {
+      startAnimation();
+    } else {
       stopAnimation();
     }
   }
@@ -431,7 +437,8 @@
     }
     // Convert slider time value to segment index
     currentSegmentIndex = Math.round(time * numSegments);
-    segmentAccumulator = 0;
+    animState.time = time;
+    animState.segmentIndex = currentSegmentIndex;
     updateVisualization();
   }
 
@@ -439,9 +446,11 @@
     if (!isActive && isPlaying) {
       wasPlayingBeforeHidden = true;
       isPlaying = false;
+      stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
       isPlaying = true;
+      startAnimation();
     }
   }
 
@@ -449,10 +458,12 @@
 
   $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
     initializeVisualization();
+    initializeAnimation();
+    if (isPlaying) startAnimation();
   }
 
-  $: if (isPlaying && pathsInitialized && !animationFrameId) startAnimation();
-  $: if (!isPlaying && animationFrameId) stopAnimation();
+  // Animation control - handled by togglePlayPause() and visibility changes
+  // Clock manages its own running state
 
   // Handle visibility changes (pause when off-screen, resume when back)
   $: if (figureIsActive !== undefined && isInitialized) {
@@ -465,10 +476,8 @@
   // This ensures they're created with the correct base path prefix
 
   onDestroy(() => {
-    // Cancel animation frame
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
-    }
+    // Stop clock animation
+    if (clock) clock.stop();
 
     // Cancel any pending worker requests to prevent orphaned promises
     if (activeFlowMatchingRequestId && flowMatchingClient) {
