@@ -1,4 +1,6 @@
 <script>
+  import { onMount, onDestroy } from 'svelte';
+
   // Props
   export let labels = ["Option 1", "Option 2", "Option 3"];  // Array of labels
   export let value = 0;  // Index of selected option (0, 1, 2, ...)
@@ -12,12 +14,37 @@
   export let gap = 5;  // px gap between buttons
   export let onchange = (newValue) => {};
 
-  // Button widths for slider positioning
+  // Button dimensions for slider positioning
   let buttonWidths = labels.map(() => 0);
+  let buttonHeights = labels.map(() => 0);
 
-  // Slider dimensions based on active button
+  // Responsive layout detection
+  let isVertical = false;
+  let mediaQuery;
+
+  onMount(() => {
+    mediaQuery = window.matchMedia('(max-width: 700px)');
+    isVertical = mediaQuery.matches;
+    mediaQuery.addEventListener('change', handleMediaChange);
+  });
+
+  onDestroy(() => {
+    if (mediaQuery) {
+      mediaQuery.removeEventListener('change', handleMediaChange);
+    }
+  });
+
+  function handleMediaChange(e) {
+    isVertical = e.matches;
+  }
+
+  // Horizontal slider dimensions (desktop)
   $: sliderWidth = buttonWidths[value] || 0;
   $: sliderX = buttonWidths.slice(0, value).reduce((sum, w) => sum + w + gap, 0);
+
+  // Vertical slider dimensions (mobile)
+  $: sliderHeight = buttonHeights[value] || 0;
+  $: sliderY = buttonHeights.slice(0, value).reduce((sum, h) => sum + h + gap, 0);
 
   function select(newValue) {
     if (newValue !== value) {
@@ -29,13 +56,17 @@
 
 <div
   class="toggle-container"
-  style="--border-radius: {borderRadius}px; --inactive-color: {inactiveColor}; --gap: {gap}px;"
+  class:vertical={isVertical}
+  style="--border-radius: {borderRadius}px; --inactive-color: {inactiveColor}; --gap: {gap}px; --active-color: {activeColor};"
 >
   <div
     class="toggle-slider"
+    class:vertical={isVertical}
     style="
-      width: {sliderWidth}px;
-      transform: translateX({sliderX}px);
+      {isVertical
+        ? `height: ${sliderHeight}px; transform: translateY(${sliderY}px); width: calc(100% - 8px);`
+        : `width: ${sliderWidth}px; transform: translateX(${sliderX}px);`
+      }
       --active-color: {activeColor};
       --border-radius: {borderRadius}px;
     "
@@ -43,6 +74,7 @@
   {#each labels as label, index}
     <button
       bind:clientWidth={buttonWidths[index]}
+      bind:clientHeight={buttonHeights[index]}
       class="toggle-option"
       class:active={value === index}
       onclick={() => select(index)}
@@ -79,7 +111,7 @@
     border-radius: calc(var(--border-radius) - 4px);
     border: 1px solid rgba(0, 0, 0, 0.1);
     box-sizing: border-box;
-    transition: transform 0.25s ease, width 0.25s ease;
+    transition: transform 0.25s ease, width 0.25s ease, height 0.25s ease;
     z-index: 0;
     pointer-events: none;
   }
@@ -117,10 +149,22 @@
     outline-offset: 2px;
   }
 
-  @media (max-width: 600px) {
-    .toggle-option {
-      font-size: 14px;
-      padding: 6px 12px;
-    }
+  /* Vertical layout for mobile */
+  .toggle-container.vertical {
+    flex-direction: column;
+    width: 100%;
+    display: flex;
+  }
+
+  .toggle-container.vertical .toggle-option {
+    width: 100%;
+    text-align: left;
+    font-size: 14px;
+    padding: 6px 12px;
+  }
+
+  .toggle-slider.vertical {
+    top: 4px;
+    left: 4px;
   }
 </style>
