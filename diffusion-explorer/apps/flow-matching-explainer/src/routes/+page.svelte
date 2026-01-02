@@ -4,6 +4,7 @@
   import { settings } from "$lib/settings";
   import { base } from "$app/paths";
   import Diffeomorphism from "$lib/figures/Diffeomorphism.svelte";
+  import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
 
   // Distribution samples
   let sourceDistributionSamples = [];
@@ -78,8 +79,28 @@
     {targetDistributionSamples}
     gridResolution={10}
   >
-    A diffeomorphism is a differentiable morphism between smooth manifolds.
+    A diffeomorphism smoothly transforms the source distribution (left) into the target distribution (right), preserving the topological structure of the space.
   </Diffeomorphism>
+</section>
+
+<hr class="section-divider" />
+
+<section id="reverse-sampling">
+  <h2 class="section-heading">Reverse Sampling</h2>
+  <p>
+    Flow matching models can also sample in reverse - mapping from the target
+    distribution back to the source distribution by reversing the time direction.
+  </p>
+  <ReverseSampling
+    {sourceDistributionSamples}
+    {targetDistributionSamples}
+    numTrajectorySamples={50}
+  >
+    <span class="figure-number">Figure:</span>
+    <strong>Reverse sampling trajectories.</strong>
+    Starting from points in the target distribution (right),
+    the model traces paths back to the source distribution (left).
+  </ReverseSampling>
 </section>
 
 <hr class="section-divider" />

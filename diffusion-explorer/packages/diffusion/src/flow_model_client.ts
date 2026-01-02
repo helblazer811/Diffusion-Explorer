@@ -26,6 +26,7 @@ export interface SamplingOptions {
     guidanceScale?: number;
     return_guidance?: boolean;
     scheduler?: SchedulerType;
+    reverse?: boolean;  // If true, sample in reverse time (1 to 0) for inverting the flow
 }
 
 export interface DomainRange {
@@ -53,6 +54,7 @@ export interface RectifiedConfig {
     batchSize: number;
     num_simulation_steps: number;
     sourceDistributionPath?: string;
+    testSourceDistributionPoints?: number[][];  // Optional test points for sampling visualization trajectories
 }
 
 // Callback types
@@ -275,6 +277,53 @@ export function setPoolSize(size: number): void {
         return;
     }
     poolSize = size;
+}
+
+/**
+ * Cancel all pending requests by rejecting their promises.
+ * Use this when navigating away from a page to prevent orphaned promises.
+ */
+export function cancelAllPendingRequests(): void {
+    const pendingCount = callbacksByRequestId.size;
+    if (pendingCount === 0) return;
+
+    console.log(`[FlowModel Pool] Cancelling ${pendingCount} pending requests`);
+
+    // Send stop messages to workers for all pending requests
+    for (const [requestId, callbacks] of callbacksByRequestId.entries()) {
+        const worker = requestIdToWorker.get(requestId);
+        if (worker) {
+            worker.postMessage({ requestId, type: 'stop' });
+        }
+        // Reject the promise so awaiting code doesn't hang
+        callbacks.reject(new Error('Request cancelled due to cleanup'));
+    }
+
+    // Clear all tracking maps
+    callbacksByRequestId.clear();
+    requestIdToWorker.clear();
+}
+
+/**
+ * Destroy the worker pool entirely.
+ * Cancels all pending requests and terminates all workers.
+ * Use this when the application is shutting down or on page unload.
+ */
+export function destroyWorkerPool(): void {
+    console.log('[FlowModel Pool] Destroying worker pool');
+
+    // Cancel all pending requests first
+    cancelAllPendingRequests();
+
+    // Terminate all workers
+    for (const worker of workerPool) {
+        worker.terminate();
+    }
+
+    // Reset pool state
+    workerPool = [];
+    workerPoolUrl = null;
+    nextWorkerIndex = 0;
 }
 
 // ===== FlowModelClient Class =====
