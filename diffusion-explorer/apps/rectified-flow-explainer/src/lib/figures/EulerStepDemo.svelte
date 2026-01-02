@@ -12,6 +12,7 @@
     Timeline,
     Track,
     createPauseClip,
+    FigureLegend,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -170,6 +171,13 @@
   $: segmentIndex = animationState.segmentIndex;
   $: segmentProgress = animationState.segmentProgress;
   $: showErrorLines = currentStep >= NUM_STEPS;
+
+  // Legend items
+  const legendItems = [
+    { type: 'line', color: arrowColor, label: 'Velocity Field' },
+    { type: 'line', color: groundTruthColor, label: 'Ground Truth' },
+    { type: 'line', color: approximationColor, label: `Approximation (${NUM_STEPS} steps)` },
+  ];
 
   // ===== FUNCTIONS =====
 
@@ -654,27 +662,7 @@
     </div>
 
     {#snippet footer()}
-      <div class="legend">
-        <div class="legend-item">
-          <span class="legend-color" style="background-color: {arrowColor};"
-          ></span>
-          <span class="legend-text">Velocity Field</span>
-        </div>
-        <div class="legend-item">
-          <span
-            class="legend-color"
-            style="background-color: {groundTruthColor};"
-          ></span>
-          <span class="legend-text">Ground Truth</span>
-        </div>
-        <div class="legend-item">
-          <span
-            class="legend-color"
-            style="background-color: {approximationColor};"
-          ></span>
-          <span class="legend-text">Approximation ({NUM_STEPS} steps)</span>
-        </div>
-      </div>
+      <FigureLegend items={legendItems} />
     {/snippet}
   </Figure>
 {:else}
@@ -700,32 +688,6 @@
     display: block;
   }
 
-  .legend {
-    display: flex;
-    justify-content: center;
-    gap: 24px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .legend-color {
-    width: 20px;
-    height: 4px;
-    border-radius: 2px;
-  }
-
-  .legend-text {
-    font-size: 18px;
-    color: #666;
-    font-family: Helvetica, Arial, sans-serif;
-  }
-
   .placeholder {
     padding: 2rem;
     text-align: center;
@@ -738,14 +700,6 @@
   @media (max-width: 600px) {
     .panel-label {
       font-size: 18px !important;
-    }
-
-    .legend {
-      gap: 12px;
-    }
-
-    .legend-text {
-      font-size: 11px;
     }
   }
 </style>

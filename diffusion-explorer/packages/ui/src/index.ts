@@ -25,6 +25,7 @@ export { default as Slider } from './components/Slider.svelte';
 export { default as TimeSlider } from './components/TimeSlider.svelte';
 export { default as TextToggleButton } from './components/TextToggleButton.svelte';
 export { default as MultiStateToggleButton } from './components/MultiStateToggleButton.svelte';
+export { default as FigureLegend } from './components/FigureLegend.svelte';
 
 // Algorithm components
 export { default as Algorithm } from './components/Algorithm.svelte';
