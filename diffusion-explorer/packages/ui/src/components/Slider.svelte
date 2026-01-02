@@ -27,10 +27,18 @@
   // When true with custom ticks, shows marks at each tick position
   export let showTickMarks = false;
 
+  // Snap fill to step boundaries (for discrete animations)
+  export let discreteFill = false;
+
   // Dynamic background gradient based on current value
   let sliderStyle;
   $: {
-    const fillPercent = ((value - min) / (max - min)) * 100;
+    let displayValue = value;
+    if (discreteFill && step > 0) {
+      // Snap to nearest step boundary
+      displayValue = Math.round((value - min) / step) * step + min;
+    }
+    const fillPercent = ((displayValue - min) / (max - min)) * 100;
     sliderStyle = `background: linear-gradient(to right, ${color} ${fillPercent}%, #d3d3d3 ${fillPercent}%)`;
   }
 </script>

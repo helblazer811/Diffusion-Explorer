@@ -18,6 +18,7 @@
   export let onTogglePlay = () => {};
   export let onInput = () => {};  // Called when user drags slider
   export let hideSpacerOnMobile = false;
+  export let discreteFill = false;  // Snap fill to step boundaries
 
   function handleTogglePlay() {
     onTogglePlay();
@@ -59,6 +60,7 @@
         {maxLabel}
         {dragEnabled}
         {onInput}
+        {discreteFill}
       />
     </div>
 
