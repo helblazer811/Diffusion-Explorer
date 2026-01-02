@@ -8,6 +8,10 @@
     TimeSlider,
     drawScatterPlot,
     drawVectorField,
+    Clock,
+    Timeline,
+    Track,
+    createPauseClip,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -45,8 +49,9 @@
   export let approximationOpacity = 0.8;
   export let errorColor = "#dc2626";
   export let trajectoryStrokeWidth = 3;
-  export let endpointRadius = settings.stylingSettings.trajectory.endpointRadius;
-  export let trajectoryHeadType = 'arrow'; // 'circle' or 'arrow'
+  export let endpointRadius =
+    settings.stylingSettings.trajectory.endpointRadius;
+  export let trajectoryHeadType = "arrow"; // 'circle' or 'arrow'
   export let trajectoryHeadRadius = 8;
 
   // Vector field styling
@@ -58,11 +63,10 @@
   export let centerQuiver = true;
 
   // Starting points
-  export let defaultStartPoints = [
-    [-1.5, -0.2],
-  ];
+  export let defaultStartPoints = [[-1.5, -0.2]];
   export let startPointRadius = endpointRadius;
-  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
+  export let maxUserTrajectories =
+    settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
   export let backgroundVisible = true;
@@ -107,7 +111,7 @@
 
   // Request ID tracking for cancellation
   let groundTruthRequestId = null;
-  let activeRequestId = null;  // For approximation streaming
+  let activeRequestId = null; // For approximation streaming
   let isStreamingTrajectory = false;
 
   // Loading state
@@ -116,19 +120,55 @@
   // Initialization
   let isInitialized = false;
 
-  // Animation state
-  let animationFrameId = null;
-  let time = 0; // 0 to 1
-  let isPlaying = true;
-  let lastAnimationTime = null;
-  let isPausedAtEnd = false;
-  let pauseStartTime = null;
+  // Animation state (owned by component, mutated by animation system)
+  let animationState = {
+    time: 0,
+    currentStep: 0,
+    segmentIndex: 0,
+    segmentProgress: 1,
+  };
 
-  // Derived animation values (computed from time)
-  // Time is discretized to step values: 0/NUM_STEPS, 1/NUM_STEPS, ..., NUM_STEPS/NUM_STEPS
-  $: currentStep = Math.round(time * NUM_STEPS);
-  $: segmentIndex = currentStep;
-  $: segmentProgress = 1; // Always show full segments (discrete stepping)
+  // Euler step clip - maps normalized time to discrete steps
+  const eulerStepClip = {
+    name: "EulerSteps",
+    duration: 1,
+    apply(t, { numSteps }, state) {
+      state.time = t;
+      state.currentStep = Math.round(t * numSteps);
+      state.segmentIndex = state.currentStep;
+      state.segmentProgress = 1;
+    }
+  };
+
+  // Animation system setup
+  // Calculate normalized durations for euler steps + pause
+  // Total animation = euler steps duration + pause duration
+  const EULER_REAL_DURATION = NUM_STEPS * STEP_DURATION; // 6400ms
+  const TOTAL_REAL_DURATION = EULER_REAL_DURATION + PAUSE_BEFORE_RESTART; // 7900ms
+  const eulerNormalizedDuration = EULER_REAL_DURATION / TOTAL_REAL_DURATION; // ~0.81
+  const pauseNormalizedDuration = PAUSE_BEFORE_RESTART / TOTAL_REAL_DURATION; // ~0.19
+
+  // Create track with euler + pause sequence
+  const track = new Track();
+  track.add({ ...eulerStepClip, duration: eulerNormalizedDuration }, 0);
+  track.add(createPauseClip(pauseNormalizedDuration), eulerNormalizedDuration);
+  track.duration = 1;
+
+  const timeline = new Timeline(track);
+  timeline.looping = true;
+
+  const clock = new Clock();
+
+  // Playback state
+  let isPlaying = true;
+
+  // Time value (bound to slider, updated by animation)
+  let time = 0;
+
+  // Derived values from animation state
+  $: currentStep = animationState.currentStep;
+  $: segmentIndex = animationState.segmentIndex;
+  $: segmentProgress = animationState.segmentProgress;
   $: showErrorLines = currentStep >= NUM_STEPS;
 
   // ===== FUNCTIONS =====
@@ -198,16 +238,13 @@
     isStreamingTrajectory = true;
 
     // Initialize all trajectories with just starting points
-    groundTruthTrajectories = userStartPoints.map(p => [p]);
-    approximationTrajectories = userStartPoints.map(p => [p]);
+    groundTruthTrajectories = userStartPoints.map((p) => [p]);
+    approximationTrajectories = userStartPoints.map((p) => [p]);
 
     // Show initial state immediately and start animation
     isLoading = false;
-    time = 0;
+    resetAnimation();
     isPlaying = true;
-    isPausedAtEnd = false;
-    pauseStartTime = null;
-    lastAnimationTime = null;
     draw();
     startAnimation();
 
@@ -228,7 +265,7 @@
       (_step, x_t) => {
         groundTruthTrajectories = groundTruthTrajectories.map((traj, i) => [
           ...traj,
-          [x_t[i][0], x_t[i][1]]
+          [x_t[i][0], x_t[i][1]],
         ]);
       }
     );
@@ -247,7 +284,7 @@
       (_step, x_t) => {
         approximationTrajectories = approximationTrajectories.map((traj, i) => [
           ...traj,
-          [x_t[i][0], x_t[i][1]]
+          [x_t[i][0], x_t[i][1]],
         ]);
       }
     );
@@ -259,7 +296,15 @@
   }
 
   // Draw a full trajectory path on a given context
-  function drawTrajectoryOnCtx(ctx, trajectory, color, lineWidth, showEndpoint = true, scaleX = xScale, scaleY = yScale) {
+  function drawTrajectoryOnCtx(
+    ctx,
+    trajectory,
+    color,
+    lineWidth,
+    showEndpoint = true,
+    scaleX = xScale,
+    scaleY = yScale
+  ) {
     if (!trajectory || trajectory.length < 2) return;
 
     ctx.strokeStyle = color;
@@ -291,7 +336,16 @@
   }
 
   // Draw partial trajectory up to segment with interpolation
-  function drawPartialTrajectoryOnCtx(ctx, trajectory, segIdx, progress, color, lineWidth, scaleX = xScale, scaleY = yScale) {
+  function drawPartialTrajectoryOnCtx(
+    ctx,
+    trajectory,
+    segIdx,
+    progress,
+    color,
+    lineWidth,
+    scaleX = xScale,
+    scaleY = yScale
+  ) {
     if (!trajectory || trajectory.length < 2) return;
 
     ctx.strokeStyle = color;
@@ -300,7 +354,10 @@
     ctx.lineJoin = "round";
 
     ctx.beginPath();
-    const [startX, startY] = [scaleX(trajectory[0][0]), scaleY(trajectory[0][1])];
+    const [startX, startY] = [
+      scaleX(trajectory[0][0]),
+      scaleY(trajectory[0][1]),
+    ];
     ctx.moveTo(startX, startY);
 
     // Draw complete segments
@@ -378,12 +435,20 @@
       const maxSegments = NUM_STEPS;
       const animationTime = (segmentIndex + segmentProgress) / maxSegments;
       const numTimeSteps = flowMatchingVectorField.timeSteps.length;
-      const timeIndex = Math.min(Math.floor(animationTime * numTimeSteps), numTimeSteps - 1);
+      const timeIndex = Math.min(
+        Math.floor(animationTime * numTimeSteps),
+        numTimeSteps - 1
+      );
 
       // Clip to domain range
       ctx.save();
       ctx.beginPath();
-      ctx.rect(marginWidth, marginHeight, canvasWidth - 2 * marginWidth, canvasHeight - 2 * marginHeight);
+      ctx.rect(
+        marginWidth,
+        marginHeight,
+        canvasWidth - 2 * marginWidth,
+        canvasHeight - 2 * marginHeight
+      );
       ctx.clip();
 
       drawVectorField(
@@ -407,7 +472,13 @@
     // Draw ground truth trajectories
     ctx.globalAlpha = groundTruthOpacity;
     for (const traj of groundTruthTrajectories) {
-      drawTrajectoryOnCtx(ctx, traj, groundTruthColor, trajectoryStrokeWidth, true);
+      drawTrajectoryOnCtx(
+        ctx,
+        traj,
+        groundTruthColor,
+        trajectoryStrokeWidth,
+        true
+      );
     }
     ctx.globalAlpha = 1.0;
 
@@ -428,78 +499,63 @@
     }
   }
 
-  // Draw during animation (just calls draw)
-  function drawAnimationFrame() {
-    draw();
-  }
-
-  // Animation loop - advances in discrete steps
-  function animate(timestamp) {
-    if (!isInitialized || isLoading || !isPlaying) {
-      animationFrameId = null;
-      return;
-    }
-
-    if (lastAnimationTime === null) {
-      lastAnimationTime = timestamp;
-    }
-
-    // Handle pause at end state
-    if (isPausedAtEnd) {
-      const pauseElapsed = timestamp - (pauseStartTime ?? timestamp);
-      if (pauseElapsed >= PAUSE_BEFORE_RESTART) {
-        // Restart animation
-        isPausedAtEnd = false;
-        pauseStartTime = null;
-        time = 0;
-        lastAnimationTime = timestamp;
-      }
-      drawAnimationFrame();
-      animationFrameId = requestAnimationFrame(animate);
-      return;
-    }
-
-    // Discrete stepping - advance one step when STEP_DURATION elapses
-    const elapsed = timestamp - lastAnimationTime;
-    if (elapsed >= STEP_DURATION) {
-      lastAnimationTime = timestamp;
-      const nextStep = currentStep + 1;
-      time = Math.min(nextStep / NUM_STEPS, 1);
-
-      // Check if animation complete
-      if (time >= 1) {
-        isPausedAtEnd = true;
-        pauseStartTime = timestamp;
-      }
-    }
-
-    drawAnimationFrame();
-    animationFrameId = requestAnimationFrame(animate);
-  }
-
+  // Animation control functions using new animation system
   function startAnimation() {
-    if (animationFrameId !== null) return;
-    lastAnimationTime = null;
-    animationFrameId = requestAnimationFrame(animate);
+    if (clock.isRunning) return;
+
+    clock.start((dt) => {
+      if (!isInitialized || isLoading) return;
+
+      // Convert real time (seconds) to normalized animation time
+      // Total duration includes euler steps + pause
+      const totalDurationSeconds = TOTAL_REAL_DURATION / 1000;
+      const normalizedDt = dt / totalDurationSeconds;
+
+      timeline.update(normalizedDt, { numSteps: NUM_STEPS }, animationState);
+
+      // Sync time for slider binding (scaled to euler portion only)
+      time = animationState.time;
+
+      // Trigger Svelte reactivity by reassigning
+      animationState = animationState;
+
+      draw();
+    });
   }
 
   function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
+    clock.stop();
+  }
+
+  function resetAnimation() {
+    timeline.reset();
+    animationState = {
+      time: 0,
+      currentStep: 0,
+      segmentIndex: 0,
+      segmentProgress: 1,
+    };
+    time = 0;
   }
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
     if (isPlaying) {
-      isPausedAtEnd = false;
-      pauseStartTime = null;
-      lastAnimationTime = null;
       startAnimation();
     } else {
       stopAnimation();
     }
+  }
+
+  // Handle slider scrubbing (when user manually changes time)
+  function handleSliderChange(newTime) {
+    // Update track time directly
+    track.time = newTime;
+    // Apply the clip to update animationState
+    track.update(0, { numSteps: NUM_STEPS }, animationState);
+    // Trigger reactivity
+    animationState = animationState;
+    draw();
   }
 
   // Handle canvas click
@@ -508,11 +564,8 @@
 
     // Stop animation and reset state
     stopAnimation();
-    time = 0;
+    resetAnimation();
     isPlaying = true;
-    isPausedAtEnd = false;
-    pauseStartTime = null;
-    lastAnimationTime = null;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvasWidth / rect.width;
@@ -550,13 +603,14 @@
     initializeVisualization();
   }
 
-  // Redraw when time changes (e.g., from slider)
-  $: if (isInitialized && time !== undefined) {
-    draw();
+  // Handle slider scrubbing - when time changes from slider (not from animation)
+  // This syncs the slider value back to the animation state
+  $: if (isInitialized && !clock.isRunning && time !== animationState.time) {
+    handleSliderChange(time);
   }
 
   // Start/stop animation when isPlaying changes
-  $: if (isInitialized && isPlaying && !animationFrameId) {
+  $: if (isInitialized && isPlaying && !clock.isRunning) {
     startAnimation();
   }
 
@@ -575,7 +629,10 @@
   <Figure {caption} {backgroundVisible}>
     <div class="panel-container" style="max-width: {canvasWidth}px;">
       {#if label}
-        <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};">
+        <div
+          class="panel-label"
+          style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};"
+        >
           {label}
         </div>
       {/if}
@@ -599,15 +656,22 @@
     {#snippet footer()}
       <div class="legend">
         <div class="legend-item">
-          <span class="legend-color" style="background-color: {arrowColor};"></span>
+          <span class="legend-color" style="background-color: {arrowColor};"
+          ></span>
           <span class="legend-text">Velocity Field</span>
         </div>
         <div class="legend-item">
-          <span class="legend-color" style="background-color: {groundTruthColor};"></span>
+          <span
+            class="legend-color"
+            style="background-color: {groundTruthColor};"
+          ></span>
           <span class="legend-text">Ground Truth</span>
         </div>
         <div class="legend-item">
-          <span class="legend-color" style="background-color: {approximationColor};"></span>
+          <span
+            class="legend-color"
+            style="background-color: {approximationColor};"
+          ></span>
           <span class="legend-text">Approximation ({NUM_STEPS} steps)</span>
         </div>
       </div>
