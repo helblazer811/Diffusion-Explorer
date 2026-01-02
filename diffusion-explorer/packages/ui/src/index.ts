@@ -53,3 +53,12 @@ export * from './plotting/mathjax';
 export * from './plotting/katex';
 export * from './plotting/pathlines';
 export * from './plotting/mesh_grid';
+
+// Animation utilities
+export {
+  Clock,
+  Timeline,
+  Track,
+  createPauseClip,
+  type Clip,
+} from './animation/animation';
