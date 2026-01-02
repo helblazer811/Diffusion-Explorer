@@ -656,6 +656,7 @@
         min={0}
         max={1}
         step={1 / NUM_STEPS}
+        discreteFill={true}
         onTogglePlay={toggleAnimation}
         color={approximationColor}
       />
