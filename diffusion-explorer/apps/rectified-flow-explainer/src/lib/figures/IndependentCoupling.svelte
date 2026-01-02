@@ -23,10 +23,11 @@
   export const marginHeight = 20;
   export const sourceLabelText = 'Source Distribution';
   export const targetLabelText = 'Target Distribution';
-  export const labelFontSize = settings.stylingSettings.label.fontSize;
-  export const labelColor = settings.stylingSettings.label.color;
-  export const outlineColor = settings.stylingSettings.label.outlineColor;
-  export const outlineOpacity = settings.stylingSettings.label.outlineOpacity;
+  const labelFontSize = settings.stylingSettings.label.fontSize;
+  const labelColor = settings.stylingSettings.label.color;
+  const labelOpacity = settings.stylingSettings.label.opacity;
+  const outlineColor = settings.stylingSettings.label.outlineColor;
+  const outlineOpacity = settings.stylingSettings.label.outlineOpacity;
   export const edgeColor = '#888';
   export const edgeOpacity = 0.3;
   export const edgeWidth = 2;
@@ -56,6 +57,7 @@
       targetLabelText,
       labelFontSize,
       labelColor,
+      labelOpacity,
       outlineColor,
       outlineOpacity
     });

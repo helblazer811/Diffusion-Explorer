@@ -10,26 +10,12 @@
     progressivelyAnimateTrajectories,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { FlowModelClient } from "@diffusion-explorer/diffusion";
-
-  // Create sampling clients
-  const flowMatchingClient = new FlowModelClient(
-    settings.flowModelWorkerUrl,
-    settings.flowMatchingModelPath,
-    "Flow Matching",
-    settings.trainingSettings.modelConfig,
-    settings.trainingSettings.domainRange
-  );
-
-  const rectifiedFlowClient = new FlowModelClient(
-    settings.flowModelWorkerUrl,
-    settings.rectifiedFlowModelPath,
-    "Flow Matching",
-    settings.trainingSettings.modelConfig,
-    settings.trainingSettings.domainRange
-  );
 
   // ===== PROPS =====
+
+  // FlowModelClient instances (passed from parent, created with correct base path)
+  export let flowMatchingClient = null;
+  export let rectifiedFlowClient = null;
 
   // Data
   export let targetDistribution = [];
@@ -47,6 +33,7 @@
   export let rightLabel = "Rectified Flow";
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelColor = settings.stylingSettings.label.color;
+  export let labelOpacity = settings.stylingSettings.label.opacity;
 
   // Subtitles
   export let leftSubtitle = "High Error with Few Steps";
@@ -667,7 +654,7 @@
       <div class="panel-container" style="max-width: {canvasWidth}px;">
         <div
           class="panel-label"
-          style="font-size: {labelFontSize}px; color: {labelColor};"
+          style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};"
         >
           {leftLabel}
         </div>
@@ -690,7 +677,7 @@
       <div class="panel-container" style="max-width: {canvasWidth}px;">
         <div
           class="panel-label"
-          style="font-size: {labelFontSize}px; color: {labelColor};"
+          style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};"
         >
           {rightLabel}
         </div>

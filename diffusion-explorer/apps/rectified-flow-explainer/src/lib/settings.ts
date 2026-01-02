@@ -46,9 +46,11 @@ export const settings = {
   cachedRectifiedFlowVectorFieldPath: "cached_samples/rectified_flow_vector_field.json" as string | null,
 
   // Worker URL (bundled to static/workers/ for production)
+  // Note: These are relative paths. The page component prefixes with base when creating clients.
   flowModelWorkerUrl: '/workers/flow_model.worker.js',
 
   // Model paths (null means train from scratch, otherwise load from path)
+  // Note: These are relative paths. The page component prefixes with base when creating clients.
   flowMatchingModelPath: "/models/flow_matching_model.json" as string | null,
   rectifiedFlowModelPath: "/models/rectified_flow_model.json" as string | null,
 
@@ -130,7 +132,8 @@ export const settings = {
       fontSize: 28,
       fontWeight: 400,
       yShiftFactor: 0.5,
-      color: '#666',
+      color: '#5e5e5eff',
+      opacity: 0.9,
       outlineColor: '#f9f9f9',
       outlineOpacity: 0.5
     },

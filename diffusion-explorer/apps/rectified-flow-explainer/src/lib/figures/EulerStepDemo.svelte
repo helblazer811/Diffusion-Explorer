@@ -10,18 +10,11 @@
     drawVectorField,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { FlowModelClient } from "@diffusion-explorer/diffusion";
-
-  // Create sampling client
-  const flowMatchingClient = new FlowModelClient(
-    settings.flowModelWorkerUrl,
-    settings.flowMatchingModelPath,
-    "Flow Matching",
-    settings.trainingSettings.modelConfig,
-    settings.trainingSettings.domainRange
-  );
 
   // ===== PROPS =====
+
+  // FlowModelClient instance (passed from parent, created with correct base path)
+  export let flowMatchingClient = null;
 
   // Data
   export let targetDistribution = [];
@@ -38,6 +31,7 @@
   export let label = "";
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelColor = settings.stylingSettings.label.color;
+  export let labelOpacity = settings.stylingSettings.label.opacity;
 
   // Target distribution styling
   export let targetColor = "#888888";
@@ -581,7 +575,7 @@
   <Figure {caption} {backgroundVisible}>
     <div class="panel-container" style="max-width: {canvasWidth}px;">
       {#if label}
-        <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor};">
+        <div class="panel-label" style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};">
           {label}
         </div>
       {/if}

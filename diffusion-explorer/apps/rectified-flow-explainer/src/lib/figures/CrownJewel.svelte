@@ -1,28 +1,14 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onDestroy } from "svelte";
   import * as d3 from "d3";
   import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
-  import { FlowModelClient } from "@diffusion-explorer/diffusion";
-
-  // Create sampling clients
-  const flowMatchingClient = new FlowModelClient(
-    settings.flowModelWorkerUrl,
-    settings.flowMatchingModelPath,
-    "Flow Matching",
-    settings.trainingSettings.modelConfig,
-    settings.trainingSettings.domainRange
-  );
-
-  const rectifiedFlowClient = new FlowModelClient(
-    settings.flowModelWorkerUrl,
-    settings.rectifiedFlowModelPath,
-    "Flow Matching",
-    settings.trainingSettings.modelConfig,
-    settings.trainingSettings.domainRange
-  );
 
   // ===== PROPS =====
+
+  // FlowModelClient instances (passed from parent, created with correct base path)
+  export let flowMatchingClient = null;
+  export let rectifiedFlowClient = null;
 
   // Data
   export let leftTrajectories = []; // [timestep][sample][dim]
@@ -42,6 +28,7 @@
   export let rightLabel = "Rectified Flow";
   export let labelFontSize = 30;
   export let labelColor = settings.stylingSettings.label.color;
+  export let labelOpacity = settings.stylingSettings.label.opacity;
 
   // Subtitles
   export let leftSubtitle = "Curved Paths Flow Slow";
@@ -512,12 +499,8 @@
 
   // Handle canvas click - convert to domain coordinates and sample
   function handleCanvasClick(event, side) {
-    if (
-      !settings.flowModelWorkerUrl ||
-      !settings.flowMatchingModelPath ||
-      !settings.rectifiedFlowModelPath
-    )
-      return;
+    // Clients are passed as props; check they're available
+    if (!flowMatchingClient || !rectifiedFlowClient) return;
 
     const canvas = side === "left" ? leftCanvas : rightCanvas;
     const rect = canvas.getBoundingClientRect();
@@ -538,6 +521,9 @@
 
   // Sample trajectories from all user start points using both models (streaming)
   function sampleFromPoint(point) {
+    // Ensure clients are initialized
+    if (!flowMatchingClient || !rectifiedFlowClient) return;
+
     // Cancel any in-flight requests from previous clicks
     if (activeFlowMatchingRequestId) {
       flowMatchingClient.stopRequest(activeFlowMatchingRequestId);
@@ -640,16 +626,24 @@
 
   // ===== LIFECYCLE =====
 
-  onMount(() => {
-    // Scales and animation are handled by the reactive statement
-  });
+  // Note: FlowModelClient instances are now passed as props from +page.svelte
+  // This ensures they're created with the correct base path prefix
 
   onDestroy(() => {
+    // Cancel animation frames
     if (leftAnimationFrameId) {
       cancelAnimationFrame(leftAnimationFrameId);
     }
     if (rightAnimationFrameId) {
       cancelAnimationFrame(rightAnimationFrameId);
+    }
+
+    // Cancel any pending worker requests to prevent orphaned promises
+    if (activeFlowMatchingRequestId && flowMatchingClient) {
+      flowMatchingClient.stopRequest(activeFlowMatchingRequestId);
+    }
+    if (activeRectifiedFlowRequestId && rectifiedFlowClient) {
+      rectifiedFlowClient.stopRequest(activeRectifiedFlowRequestId);
     }
   });
 </script>
@@ -665,7 +659,7 @@
       <div class="panel-container" style="max-width: {canvasWidth}px;">
         <div
           class="panel-label"
-          style="font-size: {labelFontSize}px; color: {labelColor};"
+          style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};"
         >
           {leftLabel}
         </div>
@@ -703,7 +697,7 @@
       <div class="panel-container" style="max-width: {canvasWidth}px;">
         <div
           class="panel-label"
-          style="font-size: {labelFontSize}px; color: {labelColor};"
+          style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};"
         >
           {rightLabel}
         </div>

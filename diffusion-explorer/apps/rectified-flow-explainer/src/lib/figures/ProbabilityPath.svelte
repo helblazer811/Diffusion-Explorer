@@ -30,6 +30,7 @@
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelFontWeight = settings.stylingSettings.label.fontWeight;
   export let labelColor = settings.stylingSettings.label.color;
+  export let labelOpacity = settings.stylingSettings.label.opacity;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
@@ -166,12 +167,14 @@
     drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
       font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
       color: labelColor,
+      opacity: labelOpacity,
       align: "center",
       baseline: "top",
     });
     drawText(ctx, targetLabelText, scales.targetCenterPixelX, textY, {
       font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
       color: labelColor,
+      opacity: labelOpacity,
       align: "center",
       baseline: "top",
     });

@@ -52,6 +52,7 @@
   export let rightLabel = 'Induced Coupling';
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelColor = settings.stylingSettings.label.color;
+  export let labelOpacity = settings.stylingSettings.label.opacity;
 
   // Background visibility
   export let backgroundVisible = true;
@@ -225,6 +226,7 @@
       .attr('text-anchor', 'middle')
       .attr('font-size', `${labelFontSize}px`)
       .attr('fill', labelColor)
+      .attr('opacity', labelOpacity)
       .text(label);
   }
 

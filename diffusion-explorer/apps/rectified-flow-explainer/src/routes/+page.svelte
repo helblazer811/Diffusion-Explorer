@@ -32,7 +32,7 @@
   import CrownJewel from "$lib/figures/CrownJewel.svelte";
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
   import IntersectingPaths from "$lib/figures/IntersectingPaths.svelte";
-  import InducedCouplingDouble from "$lib/figures/InducedCouplingDouble.svelte";
+  import InducedCouplingAnimated from "$lib/figures/InducedCouplingAnimated.svelte";
   import VectorFieldCurvatureComparison from "$lib/figures/VectorFieldCurvatureComparison.svelte";
   import ConditionalVelocityField from "$lib/figures/ConditionalVelocityField.svelte";
   import ConditionalFlowMatching from "$lib/figures/ConditionalFlowMatching.svelte";
@@ -77,6 +77,11 @@
   // Bibliography state
   let bibEntries: Map<string, BibEntry> | null = null;
   let citations: CitationInfo[] = [];
+
+  // Shared FlowModelClient instances (created in onMount with correct base path)
+  // These are passed as props to components that need them for interactive sampling
+  let flowMatchingClient: FlowModelClient | null = null;
+  let rectifiedFlowClient: FlowModelClient | null = null;
 
   // ========== WRAPPER FUNCTIONS ==========
 
@@ -306,16 +311,22 @@
   // ========== LIFECYCLE ==========
 
   onMount(async () => {
-    // Prefix paths with base for production deployment
-    if (settings.flowMatchingModelPath) {
-      settings.flowMatchingModelPath = `${base}${settings.flowMatchingModelPath}`;
-    }
-    if (settings.rectifiedFlowModelPath) {
-      settings.rectifiedFlowModelPath = `${base}${settings.rectifiedFlowModelPath}`;
-    }
-    if (settings.flowModelWorkerUrl) {
-      settings.flowModelWorkerUrl = `${base}${settings.flowModelWorkerUrl}`;
-    }
+    // Create shared FlowModelClient instances with correctly prefixed paths
+    // These are passed as props to components that need them for interactive sampling
+    flowMatchingClient = new FlowModelClient(
+      `${base}${settings.flowModelWorkerUrl}`,
+      `${base}${settings.flowMatchingModelPath}`,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig,
+      settings.trainingSettings.domainRange
+    );
+    rectifiedFlowClient = new FlowModelClient(
+      `${base}${settings.flowModelWorkerUrl}`,
+      `${base}${settings.rectifiedFlowModelPath}`,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig,
+      settings.trainingSettings.domainRange
+    );
 
     // Load target distribution first
     await loadTargetDistribution();
@@ -444,6 +455,8 @@
 
   <CrownJewel
     width={figureWidth}
+    {flowMatchingClient}
+    {rectifiedFlowClient}
     leftTrajectories={$flowMatchingGridTrajectories ?? []}
     rightTrajectories={$rectifiedFlowGridTrajectories?.[
       $rectifiedFlowGridTrajectories.length - 1
@@ -530,6 +543,7 @@
     <div id="figure-2">
       <CurvedTrajectoryIntro
         width={figureWidth}
+        {flowMatchingClient}
         sourceDistributionSamples={$sourceDistributionSamples}
         targetDistributionSamples={$targetDistributionSamples}
         allTimeSamples={$allTimeSamples}
@@ -687,6 +701,7 @@
   {#if showOtherFigures}
     <HighlightTrajectory
       width={figureWidth}
+      {flowMatchingClient}
       sourceDistributionSamples={$sourceDistributionSamples}
       targetDistributionSamples={$targetDistributionSamples}
       allTimeSamples={$allTimeSamples}
@@ -751,6 +766,7 @@
 
   {#if showOtherFigures}
     <EulerStepDemo
+      {flowMatchingClient}
       targetDistribution={$targetDistributionSamples}
       flowMatchingVectorField={$vectorFieldData}
       backgroundVisible={false}
@@ -993,6 +1009,7 @@
 
   <div id="figure-9">
     <CurvedTrajectorySuperimposed
+      {flowMatchingClient}
       trajectories={$flowMatchingGridTrajectories}
       sourceDistribution={$sourceDistributionSamples}
       targetDistribution={$targetDistributionSamples}
@@ -1246,23 +1263,25 @@
     from our source distribution through our learned flow model, we are guaranteed
     to get a coupling where trajectories do not intersect. By retraining on this
     coupling, we are effectively removing the conflicting velocities at intersection
-    points that caused curvature in the first place. As we repeat this process, the
-    trajectories become progressively straighter.
+    points that caused curvature in the first place. 
   </p>
   {#if showOtherFigures}
     <div id="figure-13">
-      <InducedCouplingDouble
-        allRectifiedTrajectories={$rectifiedFlowData?.allRectifiedTrajectories ??
-          []}
-        targetDistribution={$targetDistributionSamples}
-        backgroundVisible={false}
+      <InducedCouplingAnimated
+        width={figureWidth}
+        allTimeSamples={$allTimeSamples}
+        numPoints={50}
+        numLinesToDraw={50}
+        numTrajectoriesToShow={15}
       >
         <div class="caption">
-          <span class="figure-number">Figure 13:</span> 
-          <strong>The coupling induced by the flow model (right) produces less tangled paths than an independent coupling (left).</strong>
-          We connect each source point to its corresponding target point generated by the flow model with a line.
+          <span class="figure-number">Figure 13:</span>
+          <strong>The coupling induced by the flow model produces less tangled paths.</strong>
+          We start out with a naive independent coupling, where paths cross each other frequently. 
+          If we produce an induced coupling by flowing source points through the learned flow model, we get a coupling with
+          significantly fewer intersections. 
         </div>
-      </InducedCouplingDouble>
+      </InducedCouplingAnimated>
     </div>
   {/if}
   <h2 id="comparisons">Comparisons</h2>
@@ -1277,6 +1296,8 @@
     <div id="figure-14">
       <RectifiedFlowSuperimposed
         width={figureWidth}
+        {flowMatchingClient}
+        {rectifiedFlowClient}
         leftTrajectories={$flowMatchingGridTrajectories ?? []}
         rightTrajectories={$rectifiedFlowGridTrajectories?.[
           $rectifiedFlowGridTrajectories.length - 1
@@ -1319,6 +1340,8 @@
   {#if showOtherFigures}
     <div id="figure-15">
       <EulerStepComparison
+        {flowMatchingClient}
+        {rectifiedFlowClient}
         targetDistribution={$targetDistributionSamples}
         backgroundVisible={false}
         maxUserTrajectories={1}
