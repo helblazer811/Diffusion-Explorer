@@ -1,7 +1,7 @@
 <script>
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ===== PROPS =====
@@ -65,9 +65,7 @@
     settings.stylingSettings.trajectory.outline.enabled;
 
   // Animation
-  export let leftAnimationDuration = 10000;
-  export let rightAnimationDuration = 5000;
-  export let pauseDuration = 2000;
+  export let animationDuration = 10000;  // Total cycle duration (ms)
   export let playingByDefault = true;
 
   // Interactive sampling
@@ -89,14 +87,6 @@
     targetDistribution?.length > 0;
   $: numTimeSteps = isDataValid ? leftTrajectories.length : 1;
   $: numSegments = numTimeSteps - 1;
-  $: leftMsPerSegment =
-    numSegments > 0
-      ? leftAnimationDuration / numSegments
-      : leftAnimationDuration;
-  $: rightMsPerSegment =
-    numSegments > 0
-      ? rightAnimationDuration / numSegments
-      : rightAnimationDuration;
 
   // ===== STATE =====
 
@@ -111,25 +101,39 @@
   let xScale;
   let yScale;
 
-  // Animation - Shared state
+  // Animation state
   let isPlaying = playingByDefault;
-  let leftFinished = false;
-  let rightFinished = false;
-  let restartPauseStartTime = null;
-
-  // Animation - Left
   let leftTime = 0;
-  let leftCurrentSegmentIndex = 0;
-  let leftSegmentAccumulator = 0;
-  let leftAnimationFrameId = null;
-  let leftLastTimestamp = null;
-
-  // Animation - Right
   let rightTime = 0;
+  let leftCurrentSegmentIndex = 0;
   let rightCurrentSegmentIndex = 0;
-  let rightSegmentAccumulator = 0;
-  let rightAnimationFrameId = null;
-  let rightLastTimestamp = null;
+
+  // Segment clip - maps normalized time to segment index
+  const createSegmentClip = (duration) => ({
+    name: "Segments",
+    duration,
+    apply(t, params, state) {
+      state.time = t;
+      state.segmentIndex = Math.floor(t * params.numSegments);
+    }
+  });
+
+  // Left track: full animation over entire duration
+  const leftTrack = new Track();
+  leftTrack.add(createSegmentClip(1), 0);
+
+  // Right track: animation in first half, pause in second half
+  // This makes right animation 2x faster, then waits for left to catch up
+  const rightTrack = new Track();
+  rightTrack.add(createSegmentClip(0.5), 0);
+  rightTrack.add(createPauseClip(0.5), 0.5);
+
+  // Animation state objects (mutated by clips)
+  let leftState = { time: 0, segmentIndex: 0 };
+  let rightState = { time: 0, segmentIndex: 0 };
+
+  // Single clock drives both tracks
+  const clock = new Clock();
 
   // Initialization
   let isInitialized = false;
@@ -354,136 +358,58 @@
     );
   }
 
-  // Synchronized restart check (called from both animate functions)
-  function checkSynchronizedRestart(ts) {
-    if (leftFinished && rightFinished) {
-      if (restartPauseStartTime === null) {
-        restartPauseStartTime = ts;
-      } else if (ts - restartPauseStartTime >= pauseDuration) {
-        // Reset both animations
-        leftFinished = false;
-        rightFinished = false;
-        restartPauseStartTime = null;
-        leftCurrentSegmentIndex = 0;
-        leftSegmentAccumulator = 0;
-        leftTime = 0;
-        rightCurrentSegmentIndex = 0;
-        rightSegmentAccumulator = 0;
-        rightTime = 0;
-        updateLeftVisualization();
-        updateRightVisualization();
+  // Animation control using Clock/Track system
+  function startAnimation() {
+    if (clock.isRunning) return;
+
+    clock.start((dt) => {
+      if (!pathsInitialized) return;
+
+      // Convert real time (seconds) to normalized time
+      const normalizedDt = dt / (animationDuration / 1000);
+
+      // Update both tracks
+      leftTrack.update(normalizedDt, { numSegments }, leftState);
+      rightTrack.update(normalizedDt, { numSegments }, rightState);
+
+      // Sync state for visualization and slider binding
+      leftTime = leftState.time;
+      rightTime = rightState.time;
+      leftCurrentSegmentIndex = leftState.segmentIndex;
+      rightCurrentSegmentIndex = rightState.segmentIndex;
+
+      // Handle looping - reset when left track completes
+      if (leftTrack.time >= 1) {
+        leftTrack.reset();
+        rightTrack.reset();
+        leftState = { time: 0, segmentIndex: 0 };
+        rightState = { time: 0, segmentIndex: 0 };
       }
-    }
+
+      updateLeftVisualization();
+      updateRightVisualization();
+    });
   }
 
-  // Left animation
-  function animateLeft(ts) {
-    if (!isPlaying) {
-      leftAnimationFrameId = null;
-      return;
-    }
-    if (leftLastTimestamp === null) leftLastTimestamp = ts;
-    const elapsed = ts - leftLastTimestamp;
-    leftLastTimestamp = ts;
-
-    // Check for synchronized restart
-    checkSynchronizedRestart(ts);
-
-    // If already finished, just keep the animation frame going for restart check
-    if (leftFinished) {
-      leftAnimationFrameId = requestAnimationFrame(animateLeft);
-      return;
-    }
-
-    leftSegmentAccumulator += elapsed;
-    while (
-      leftSegmentAccumulator >= leftMsPerSegment &&
-      leftCurrentSegmentIndex < numSegments
-    ) {
-      leftSegmentAccumulator -= leftMsPerSegment;
-      leftCurrentSegmentIndex += 1;
-    }
-
-    leftTime = numSegments > 0 ? leftCurrentSegmentIndex / numSegments : 0;
-    updateLeftVisualization();
-
-    if (leftCurrentSegmentIndex >= numSegments) {
-      leftFinished = true;
-    }
-
-    leftAnimationFrameId = requestAnimationFrame(animateLeft);
+  function stopAnimation() {
+    clock.stop();
   }
 
-  function startLeftAnimation() {
-    if (leftAnimationFrameId !== null) return;
-    leftLastTimestamp = null;
-    leftAnimationFrameId = requestAnimationFrame(animateLeft);
+  function resetAnimation() {
+    leftTrack.reset();
+    rightTrack.reset();
+    leftState = { time: 0, segmentIndex: 0 };
+    rightState = { time: 0, segmentIndex: 0 };
+    leftTime = 0;
+    rightTime = 0;
+    leftCurrentSegmentIndex = 0;
+    rightCurrentSegmentIndex = 0;
   }
 
-  function stopLeftAnimation() {
-    if (leftAnimationFrameId !== null) {
-      cancelAnimationFrame(leftAnimationFrameId);
-      leftAnimationFrameId = null;
-    }
-  }
-
-  // Unified toggle for both animations
   function togglePlayPause() {
     isPlaying = !isPlaying;
     if (!isPlaying) {
-      stopLeftAnimation();
-      stopRightAnimation();
-    }
-  }
-
-  // Right animation
-  function animateRight(ts) {
-    if (!isPlaying) {
-      rightAnimationFrameId = null;
-      return;
-    }
-    if (rightLastTimestamp === null) rightLastTimestamp = ts;
-    const elapsed = ts - rightLastTimestamp;
-    rightLastTimestamp = ts;
-
-    // Check for synchronized restart
-    checkSynchronizedRestart(ts);
-
-    // If already finished, just keep the animation frame going for restart check
-    if (rightFinished) {
-      rightAnimationFrameId = requestAnimationFrame(animateRight);
-      return;
-    }
-
-    rightSegmentAccumulator += elapsed;
-    while (
-      rightSegmentAccumulator >= rightMsPerSegment &&
-      rightCurrentSegmentIndex < numSegments
-    ) {
-      rightSegmentAccumulator -= rightMsPerSegment;
-      rightCurrentSegmentIndex += 1;
-    }
-
-    rightTime = numSegments > 0 ? rightCurrentSegmentIndex / numSegments : 0;
-    updateRightVisualization();
-
-    if (rightCurrentSegmentIndex >= numSegments) {
-      rightFinished = true;
-    }
-
-    rightAnimationFrameId = requestAnimationFrame(animateRight);
-  }
-
-  function startRightAnimation() {
-    if (rightAnimationFrameId !== null) return;
-    rightLastTimestamp = null;
-    rightAnimationFrameId = requestAnimationFrame(animateRight);
-  }
-
-  function stopRightAnimation() {
-    if (rightAnimationFrameId !== null) {
-      cancelAnimationFrame(rightAnimationFrameId);
-      rightAnimationFrameId = null;
+      stopAnimation();
     }
   }
 
@@ -551,17 +477,7 @@
     userRectifiedFlowTrajectories = userStartPoints.map(p => [[xScale(p[0]), yScale(p[1])]]);
 
     // Reset and start animation immediately
-    leftCurrentSegmentIndex = 0;
-    rightCurrentSegmentIndex = 0;
-    leftSegmentAccumulator = 0;
-    rightSegmentAccumulator = 0;
-    leftTime = 0;
-    rightTime = 0;
-    leftFinished = false;
-    rightFinished = false;
-    restartPauseStartTime = null;
-    leftLastTimestamp = null;
-    rightLastTimestamp = null;
+    resetAnimation();
     isPlaying = true;
 
     // Helper to check if both samples are complete
@@ -611,13 +527,9 @@
     initializeVisualization();
   }
 
-  $: if (isPlaying && pathsInitialized && !leftAnimationFrameId)
-    startLeftAnimation();
-  $: if (!isPlaying && leftAnimationFrameId) stopLeftAnimation();
-
-  $: if (isPlaying && pathsInitialized && !rightAnimationFrameId)
-    startRightAnimation();
-  $: if (!isPlaying && rightAnimationFrameId) stopRightAnimation();
+  $: if (isPlaying && pathsInitialized && !clock.isRunning)
+    startAnimation();
+  $: if (!isPlaying && clock.isRunning) stopAnimation();
 
   // Handle visibility changes (pause when off-screen, resume when back)
   $: if (figureIsActive !== undefined && isInitialized) {
@@ -630,13 +542,8 @@
   // This ensures they're created with the correct base path prefix
 
   onDestroy(() => {
-    // Cancel animation frames
-    if (leftAnimationFrameId) {
-      cancelAnimationFrame(leftAnimationFrameId);
-    }
-    if (rightAnimationFrameId) {
-      cancelAnimationFrame(rightAnimationFrameId);
-    }
+    // Stop animation
+    stopAnimation();
 
     // Cancel any pending worker requests to prevent orphaned promises
     if (activeFlowMatchingRequestId && flowMatchingClient) {
