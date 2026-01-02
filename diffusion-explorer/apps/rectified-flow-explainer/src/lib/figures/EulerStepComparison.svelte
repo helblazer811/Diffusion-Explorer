@@ -8,6 +8,7 @@
     drawScatterPlot,
     Slider,
     progressivelyAnimateTrajectories,
+    FigureLegend,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -631,6 +632,13 @@
 
   $: currentSteps = stepValues[currentStepIndex];
 
+  // Legend items (reactive to update step count)
+  $: legendItems = [
+    { type: 'line', color: groundTruthColor, label: 'Ground Truth' },
+    { type: 'line', color: approximationColor, label: `Approximation (${currentSteps} ${currentSteps === 1 ? "step" : "steps"})` },
+    { type: 'dashed', color: errorColor, label: 'Error' },
+  ];
+
   // Generate ticks for slider (log scale positions)
   $: sliderTicks = stepValues.map((step, i) => ({
     position: i / (stepValues.length - 1),
@@ -698,32 +706,8 @@
 
     {#snippet footer()}
       <div class="footer-container">
-        <div class="legend">
-          <div class="legend-item">
-            <span
-              class="legend-color"
-              style="background-color: {groundTruthColor};"
-            ></span>
-            <span class="legend-text">Ground Truth</span>
-          </div>
-          <div class="legend-item">
-            <span
-              class="legend-color"
-              style="background-color: {approximationColor};"
-            ></span>
-            <span class="legend-text"
-              >Approximation ({currentSteps}
-              {currentSteps === 1 ? "step" : "steps"})</span
-            >
-          </div>
-          <div class="legend-item">
-            <span
-              class="legend-color"
-              style="background: repeating-linear-gradient(90deg, {errorColor} 0px, {errorColor} 4px, transparent 4px, transparent 7px);"
-            ></span>
-            <span class="legend-text">Error</span>
-          </div>
-        </div>
+        <FigureLegend items={legendItems} />
+        <div class="legend-spacer"></div>
         <Slider
           bind:value={currentStepIndex}
           min={0}
@@ -774,38 +758,16 @@
     width: 100%;
   }
 
+  .legend-spacer {
+    height: 16px;
+  }
+
   .slider-label-below {
     text-align: center;
     font-size: 16px;
     font-family: Helvetica, Arial, sans-serif;
     color: #7b7b7b;
     margin-top: 8px;
-  }
-
-  .legend {
-    display: flex;
-    justify-content: center;
-    gap: 24px;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .legend-color {
-    width: 20px;
-    height: 4px;
-    border-radius: 2px;
-  }
-
-  .legend-text {
-    font-size: 18px;
-    color: #666;
-    font-family: Helvetica, Arial, sans-serif;
   }
 
   .placeholder {
@@ -824,14 +786,6 @@
 
     .panel-subtitle {
       font-size: 13px !important;
-    }
-
-    .legend {
-      gap: 12px;
-    }
-
-    .legend-text {
-      font-size: 11px;
     }
   }
 
