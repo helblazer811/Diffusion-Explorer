@@ -52,6 +52,7 @@
   let linesDrawnCount = 0;
   let trajectoryTime = 0;
   let fadeOpacity = 1;
+  let inducedCouplingProgress = 0;  // Progress of induced coupling animation (0 to 1)
 
   // Pre-computed data
   let scales = null;
@@ -111,9 +112,9 @@
         fadeOpacity = 0;
         break;
       case 2:
-        // Induced Coupling - show all induced coupling lines
+        // Induced Coupling - show all induced coupling lines fully animated
         currentPhase = 'pause_at_end';
-        linesDrawnCount = numLinesToDraw;
+        inducedCouplingProgress = 1;
         break;
     }
 
@@ -290,20 +291,25 @@
     });
   }
 
-  function drawInducedCouplingLines(count) {
+  function drawInducedCouplingLines(progress = 1) {
     ctx.strokeStyle = couplingLineColor;
     ctx.lineWidth = couplingLineWidth;
     ctx.globalAlpha = couplingLineOpacity;
 
-    const linesToDraw = Math.min(count, numLinesToDraw, numPoints);
+    const linesToDraw = Math.min(numLinesToDraw, numPoints);
     for (let i = 0; i < linesToDraw; i++) {
       // Direct pairing: source[i] -> target[i] (not shuffled)
+      // Animate from target to source
       const [sx, sy] = sourcePixelCoords[i];
       const [tx, ty] = targetPixelCoords[i];
 
+      // Calculate the current end position based on progress (0 = at target, 1 = at source)
+      const currentX = tx + (sx - tx) * progress;
+      const currentY = ty + (sy - ty) * progress;
+
       ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(tx, ty);
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(currentX, currentY);
       ctx.stroke();
     }
 
@@ -351,12 +357,12 @@
         break;
 
       case 'induced_coupling':
-        drawInducedCouplingLines(linesDrawnCount);
+        drawInducedCouplingLines(inducedCouplingProgress);
         break;
 
       case 'pause_at_end':
-        // Show all induced coupling lines during pause
-        drawInducedCouplingLines(numLinesToDraw);
+        // Show all induced coupling lines fully drawn
+        drawInducedCouplingLines(1);
         break;
     }
   }
@@ -383,7 +389,7 @@
         break;
       case 'pause_after_trajectories':
         currentPhase = 'induced_coupling';
-        linesDrawnCount = 0;
+        inducedCouplingProgress = 0;
         break;
       case 'induced_coupling':
         currentPhase = 'pause_at_end';
@@ -412,11 +418,19 @@
         if (phaseProgress >= 1) advancePhase();
         break;
 
-      case 'naive_coupling':
-      case 'induced_coupling': {
+      case 'naive_coupling': {
         const totalLineDuration = numLinesToDraw * lineDrawDuration;
         phaseProgress += elapsed / totalLineDuration;
         linesDrawnCount = Math.min(Math.floor(phaseProgress * numLinesToDraw) + 1, numLinesToDraw);
+        if (phaseProgress >= 1) advancePhase();
+        break;
+      }
+
+      case 'induced_coupling': {
+        // Animate all lines simultaneously from target to source
+        const inducedCouplingDuration = 1500; // Duration for lines to animate
+        phaseProgress += elapsed / inducedCouplingDuration;
+        inducedCouplingProgress = Math.min(phaseProgress, 1);
         if (phaseProgress >= 1) advancePhase();
         break;
       }
