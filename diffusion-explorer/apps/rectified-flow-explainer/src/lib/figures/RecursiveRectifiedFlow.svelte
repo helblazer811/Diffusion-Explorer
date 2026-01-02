@@ -1,19 +1,16 @@
 <script>
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
+  import { Figure, PlayButton, MultiStateToggleButton, drawScatterPlot, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ===== PROPS =====
 
-  // FlowModelClient instance (passed from parent, created with correct base path)
-  export let flowMatchingClient = null;
-
   // Caption slot
   export let children = undefined;
 
-  // Data
-  export let trajectories = []; // [timestep][sample][dim]
+  // Data - 4D array: [reflowStep][timestep][sample][dim]
+  export let trajectories = [];
   export let targetDistribution = [];
 
   // Layout
@@ -31,11 +28,7 @@
   // Trajectory styling
   export let trajectoryColor = settings.stylingSettings.trajectory.color;
   export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-  export let trajectoryPointRadius = settings.stylingSettings.trajectory.endpointRadius;
   export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
-  export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
-  export let showTrajectoryPreview = false;
-  export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory visible with fade
   export let endpointRadius = settings.stylingSettings.trajectory.endpointRadius;
 
   // Animation
@@ -43,23 +36,34 @@
   export let pauseDuration = 1000;
   export let playingByDefault = true;
 
-  // Interactive sampling
-  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
-
   // Background
   export let backgroundVisible = true;
 
   // ===== DERIVED =====
 
   $: caption = children;
+
+  // Generate labels dynamically based on trajectory data
+  $: numReflowSteps = trajectories?.length || 0;
+  $: reflowLabels = numReflowSteps > 0
+    ? ["Flow Matching", ...Array.from({ length: numReflowSteps - 1 }, (_, i) => `Reflow ${i + 1}`)]
+    : [];
+
   $: isDataValid =
     trajectories?.length > 0 &&
+    trajectories[0]?.length > 0 &&
     targetDistribution?.length > 0;
-  $: numTimeSteps = isDataValid ? trajectories.length : 1;
+
+  // Current step trajectories
+  $: currentTrajectories = isDataValid ? trajectories[currentReflowStep] : [];
+  $: numTimeSteps = currentTrajectories?.length || 1;
   $: numSegments = numTimeSteps - 1;
   $: msPerSegment = numSegments > 0 ? animationDuration / numSegments : animationDuration;
 
   // ===== STATE =====
+
+  // Step selection
+  let currentReflowStep = 0;
 
   // Canvas
   let canvas;
@@ -101,13 +105,6 @@
   let scaledTargetDistribution = [];
   let scaledTrajectories = [];
 
-  // User-defined trajectory state (supports multiple trajectories)
-  let userStartPoints = []; // Array of [x, y] domain coordinates
-  let userTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
-  let hasUserTrajectory = false;
-  let isStreamingTrajectory = false;
-  let activeRequestId = null; // Track active request for cancellation
-
   // ===== FUNCTIONS =====
 
   function initializeScales() {
@@ -148,79 +145,7 @@
     if (!xScale || !yScale) return;
 
     scaledTargetDistribution = targetDistribution.map(p => [xScale(p[0]), yScale(p[1])]);
-    scaledTrajectories = transposeAndScale(trajectories);
-  }
-
-  // Handle canvas click - convert to domain coordinates and sample
-  function handleCanvasClick(event) {
-    // Client is passed as prop; check it's available
-    if (!flowMatchingClient) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvasWidth / rect.width;
-    const scaleY = canvasHeight / rect.height;
-    const clickX = (event.clientX - rect.left) * scaleX;
-    const clickY = (event.clientY - rect.top) * scaleY;
-
-    // Convert to domain coordinates using scale.invert()
-    const domainX = xScale.invert(clickX);
-    const domainY = yScale.invert(clickY);
-
-    sampleFromPoint([domainX, domainY]);
-  }
-
-  // Sample trajectories from all user start points using streaming
-  function sampleFromPoint(point) {
-    // Ensure client is initialized
-    if (!flowMatchingClient) return;
-
-    // Cancel any in-progress request before starting new one
-    if (activeRequestId) {
-      flowMatchingClient.stopRequest(activeRequestId);
-      activeRequestId = null;
-    }
-
-    // Add new point to the list of user start points
-    userStartPoints = [...userStartPoints, point];
-
-    // If we exceed the max, remove the oldest point
-    if (userStartPoints.length > maxUserTrajectories) {
-      userStartPoints = userStartPoints.slice(-maxUserTrajectories);
-    }
-
-    hasUserTrajectory = true;
-    isStreamingTrajectory = true;
-
-    // Initialize trajectory arrays with initial pixel points for all start points
-    userTrajectories = userStartPoints.map(p => [[xScale(p[0]), yScale(p[1])]]);
-
-    // Reset animation state and start
-    currentSegmentIndex = 0;
-    time = 0;
-    animState.time = 0;
-    animState.segmentIndex = 0;
-    if (track) track.reset();
-    isPlaying = true;
-    startAnimation();
-
-    // Sample using streaming - use same number of steps as passed-in trajectories
-    const result = flowMatchingClient.sampleFromInitialPoints(
-      userStartPoints,
-      numTimeSteps,
-      {},
-      // onStep callback - append new points for all trajectories
-      (_step, x_t) => {
-        userTrajectories = userTrajectories.map((traj, i) => [
-          ...traj,
-          [xScale(x_t[i][0]), yScale(x_t[i][1])]
-        ]);
-      }
-    );
-    activeRequestId = result.requestId;
-    result.promise.then(() => {
-      isStreamingTrajectory = false;
-      activeRequestId = null;
-    });
+    scaledTrajectories = transposeAndScale(currentTrajectories);
   }
 
   function draw() {
@@ -231,13 +156,12 @@
     // Draw target distribution
     drawScatterPlot(ctx, scaledTargetDistribution, distributionPointRadius, targetColor, targetOpacity);
 
-    // Draw default trajectories (dimmed if user has clicked)
-    const defaultOpacity = hasUserTrajectory ? 0.15 : trajectoryProgressOpacity;
+    // Draw trajectories up to current segment
     ctx.strokeStyle = trajectoryColor;
     ctx.lineWidth = trajectoryStrokeWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.globalAlpha = defaultOpacity;
+    ctx.globalAlpha = trajectoryProgressOpacity;
 
     for (const trajectory of scaledTrajectories) {
       const endIdx = Math.min(currentSegmentIndex + 1, trajectory.length);
@@ -264,30 +188,6 @@
     }
 
     ctx.globalAlpha = 1.0;
-
-    // Draw all user-defined trajectories (highlighted) on top
-    for (const userTrajectory of userTrajectories) {
-      if (userTrajectory && userTrajectory.length > 1) {
-        const userNumSegments = userTrajectory.length - 1;
-        const userSegmentIndex = Math.min(currentSegmentIndex, userNumSegments - 1);
-
-        drawTrajectoriesWithPreview(ctx, [userTrajectory], userSegmentIndex, {
-          strokeWidth: trajectoryStrokeWidth,
-          color: trajectoryColor,
-          progressOpacity: 1.0,
-          pointRadius: endpointRadius,
-          showPreview: false
-        });
-      } else if (userTrajectory && userTrajectory.length === 1) {
-        // Draw just the starting point for immediate feedback
-        const [x, y] = userTrajectory[0];
-        ctx.globalAlpha = 1.0;
-        ctx.beginPath();
-        ctx.arc(x, y, endpointRadius, 0, Math.PI * 2);
-        ctx.fillStyle = trajectoryColor;
-        ctx.fill();
-      }
-    }
   }
 
   function initializeVisualization() {
@@ -315,6 +215,31 @@
     track.add(createPauseClip(pauseClipDuration), mainDuration);
 
     clock = new Clock();
+  }
+
+  function resetAnimation() {
+    currentSegmentIndex = 0;
+    time = 0;
+    animState.time = 0;
+    animState.segmentIndex = 0;
+    if (track) track.reset();
+  }
+
+  function handleStepChange(newStep) {
+    if (newStep === currentReflowStep) return;
+    currentReflowStep = newStep;
+
+    // Recompute scaled trajectories for the new step
+    scaledTrajectories = transposeAndScale(trajectories[currentReflowStep]);
+
+    // Reset animation
+    resetAnimation();
+    draw();
+
+    // Restart animation if playing
+    if (isPlaying) {
+      startAnimation();
+    }
   }
 
   function startAnimation() {
@@ -355,17 +280,6 @@
     }
   }
 
-  function handleSliderInput() {
-    if (isPlaying) {
-      isPlaying = false;
-      stopAnimation();
-    }
-    currentSegmentIndex = Math.round(time * numSegments);
-    animState.time = time;
-    animState.segmentIndex = currentSegmentIndex;
-    draw();
-  }
-
   function handleVisibilityChange(isActive) {
     if (!isActive && isPlaying) {
       wasPlayingBeforeHidden = true;
@@ -386,9 +300,6 @@
     if (isPlaying) startAnimation();
   }
 
-  // Animation control - handled by togglePlayPause() and visibility changes
-  // Clock manages its own running state
-
   // Handle visibility changes (pause when off-screen, resume when back)
   $: if (figureIsActive !== undefined && isInitialized) {
     handleVisibilityChange($figureIsActive);
@@ -396,17 +307,8 @@
 
   // ===== LIFECYCLE =====
 
-  // Note: FlowModelClient instance is now passed as props from +page.svelte
-  // This ensures it's created with the correct base path prefix
-
   onDestroy(() => {
-    // Stop clock animation
     if (clock) clock.stop();
-
-    // Cancel any pending worker requests to prevent orphaned promises
-    if (activeRequestId && flowMatchingClient) {
-      flowMatchingClient.stopRequest(activeRequestId);
-    }
   });
 </script>
 
@@ -414,21 +316,23 @@
   <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     {#snippet children()}
       <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
-        <div style="width: 100%; max-width: {canvasWidth}px;">
+        <div style="position: relative; width: 100%; max-width: {canvasWidth}px;">
+          <PlayButton
+            {isPlaying}
+            onclick={togglePlayPause}
+            {time}
+            circleColor={trajectoryColor}
+          />
           <canvas
             bind:this={canvas}
-            onclick={handleCanvasClick}
-            style="cursor: pointer; width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
+            style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
           ></canvas>
-          <TimeSlider
-            bind:value={time}
-            {isPlaying}
-            min={0}
-            max={1}
-            step={numSegments > 0 ? 1 / numSegments : 0.01}
-            onTogglePlay={togglePlayPause}
-            onInput={handleSliderInput}
-            color={trajectoryColor}
+        </div>
+        <div style="margin-top: 12px;">
+          <MultiStateToggleButton
+            labels={reflowLabels}
+            value={currentReflowStep}
+            onchange={handleStepChange}
           />
         </div>
       </div>
@@ -436,7 +340,7 @@
   </Figure>
 {:else}
   <div class="placeholder">
-    <p>Loading curved trajectory visualization...</p>
+    <p>Loading recursive rectified flow visualization...</p>
   </div>
 {/if}
 

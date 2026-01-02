@@ -1,8 +1,8 @@
 <!-- Visualizes linear interpolation between source and target distributions with an animated dot. -->
 
 <script>
-  import { onMount, onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, createSourceTargetScales } from "@diffusion-explorer/ui";
+  import { onDestroy } from "svelte";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, createSourceTargetScales, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // Caption slot (passed as default children)
@@ -66,45 +66,66 @@
   let sourcePointPixel = [0, 0];
   let targetPointPixel = [0, 0];
 
-  // Animation state
+  // Animation state - Clock/Track system
   let isPlaying = playingByDefault;
-  let animationFrameId = null;
-  let time = 0.5;
-  let direction = 1; // 1 = forward, -1 = backward
-  let isPaused = false;
-  let pauseStartTime = null;
-  let lastTimestamp = null;
+  let time = 0;
   let isInitialized = false;
+  let clock = null;
+  let track = null;
+
+  // State object mutated by clips
+  let animState = { time: 0 };
+
+  // Forward clip (0→1)
+  const forwardClip = {
+    name: "Forward",
+    duration: 1,
+    apply(t, params, state) {
+      state.time = t;
+    }
+  };
+
+  // Backward clip (1→0)
+  const backwardClip = {
+    name: "Backward",
+    duration: 1,
+    apply(t, params, state) {
+      state.time = 1 - t;
+    }
+  };
 
   // Visibility-based animation control
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
 
-  // Pause animation when figure goes off-screen, resume when back
-  $: if (figureIsActive !== undefined && isInitialized) {
-    handleVisibilityChange($figureIsActive);
-  }
-
   function handleVisibilityChange(isActive) {
     if (!isActive && isPlaying) {
       wasPlayingBeforeHidden = true;
       isPlaying = false;
+      stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
       isPlaying = true;
+      startAnimation();
     }
   }
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
+    if (isPlaying) {
+      startAnimation();
+    } else {
+      stopAnimation();
+    }
   }
 
   function handleSliderInput() {
-    lastTimestamp = null;
-    if (isPaused) {
-      isPaused = false;
-      pauseStartTime = null;
+    if (isPlaying) {
+      isPlaying = false;
+      stopAnimation();
     }
+    animState.time = time;
+    draw();
   }
 
   // Canvas initialization
@@ -245,63 +266,48 @@
     );
   }
 
-  // Animation
-  function animate(timestamp) {
-    if (!isPlaying) {
-      animationFrameId = null;
-      return;
-    }
+  // Initialize animation track with bidirectional clips and pauses
+  function initializeAnimation() {
+    track = new Track();
 
-    if (lastTimestamp === null) {
-      lastTimestamp = timestamp;
-    }
+    // Total cycle: forward + pause + backward + pause
+    const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
+    const forwardDuration = animationDuration / totalCycleDuration;
+    const pauseNormalized = pauseDuration / totalCycleDuration;
 
-    const elapsed = timestamp - lastTimestamp;
+    // Add clips in sequence
+    track.add({ ...forwardClip, duration: forwardDuration }, 0);
+    track.add(createPauseClip(pauseNormalized), forwardDuration);
+    track.add({ ...backwardClip, duration: forwardDuration }, forwardDuration + pauseNormalized);
+    track.add(createPauseClip(pauseNormalized), 2 * forwardDuration + pauseNormalized);
 
-    // Handle pause at endpoints
-    if (isPaused && pauseStartTime !== null) {
-      const pauseElapsed = timestamp - pauseStartTime;
-      if (pauseElapsed >= pauseDuration) {
-        isPaused = false;
-        pauseStartTime = null;
-        lastTimestamp = timestamp;
-        direction = -direction;
-      }
-      animationFrameId = requestAnimationFrame(animate);
-      return;
-    }
-
-    // Update time based on direction
-    const deltaTime = elapsed / animationDuration;
-    time += direction * deltaTime;
-
-    // Clamp and handle endpoint pause
-    if (time >= 1.0) {
-      time = 1.0;
-      isPaused = true;
-      pauseStartTime = timestamp;
-    } else if (time <= 0.0) {
-      time = 0.0;
-      isPaused = true;
-      pauseStartTime = timestamp;
-    }
-
-    draw();
-    lastTimestamp = timestamp;
-    animationFrameId = requestAnimationFrame(animate);
+    clock = new Clock();
   }
 
   function startAnimation() {
-    if (animationFrameId !== null) return;
-    lastTimestamp = null;
-    animationFrameId = requestAnimationFrame(animate);
+    if (!clock || !track) return;
+
+    clock.start((dt) => {
+      // Convert real time delta to normalized track time
+      const totalCycleDuration = (2 * animationDuration + 2 * pauseDuration) / 1000;
+      const normalizedDt = dt / totalCycleDuration;
+
+      track.update(normalizedDt, {}, animState);
+      time = animState.time;
+
+      // Loop when track completes
+      if (track.time >= 1) {
+        track.reset();
+        animState.time = 0;
+        time = 0;
+      }
+
+      draw();
+    });
   }
 
   function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
+    if (clock) clock.stop();
   }
 
   function initializeVisualization() {
@@ -334,18 +340,15 @@
     canvas
   ) {
     initializeVisualization();
+    initializeAnimation();
     isInitialized = true;
     draw();
     if (isPlaying) startAnimation();
   }
 
-  // Handle play/pause changes
-  $: if (isPlaying && !animationFrameId && isInitialized) {
-    startAnimation();
-  }
-
-  $: if (!isPlaying && animationFrameId) {
-    stopAnimation();
+  // Handle visibility changes (pause when off-screen, resume when back)
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
   }
 
   // Update drawing when time changes (e.g., from slider drag)
@@ -354,7 +357,7 @@
   }
 
   onDestroy(() => {
-    stopAnimation();
+    if (clock) clock.stop();
   });
 </script>
 

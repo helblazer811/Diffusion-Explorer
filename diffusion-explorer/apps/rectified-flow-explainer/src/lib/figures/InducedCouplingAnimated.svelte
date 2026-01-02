@@ -1,6 +1,6 @@
 <script>
   import { onDestroy } from "svelte";
-  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales } from "@diffusion-explorer/ui";
+  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales, Clock } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // Data props (from parent)
@@ -65,8 +65,7 @@
 
   // Playback control
   let isPlaying = true;
-  let animationFrameId = null;
-  let lastTimestamp = null;
+  let clock = null;
 
   // Visibility tracking
   let figureIsActive;
@@ -94,8 +93,7 @@
 
   // Jump to a specific state when toggle button is clicked
   function jumpToState(newStateIndex) {
-    // Reset animation timing
-    lastTimestamp = null;
+    // Reset phase progress
     phaseProgress = 0;
 
     switch (newStateIndex) {
@@ -121,8 +119,8 @@
     // Redraw immediately
     draw();
 
-    // Restart animation if it was playing
-    if (isPlaying && !animationFrameId) {
+    // Restart animation if it was playing but clock isn't running
+    if (isPlaying && clock && !clock.isRunning) {
       startAnimation();
     }
   }
@@ -403,15 +401,7 @@
     phaseProgress = 0;
   }
 
-  function animate(timestamp) {
-    if (!isPlaying) {
-      animationFrameId = null;
-      return;
-    }
-
-    if (lastTimestamp === null) lastTimestamp = timestamp;
-    const elapsed = timestamp - lastTimestamp;
-
+  function updateAnimation(elapsed) {
     switch (currentPhase) {
       case 'distributions':
         phaseProgress += elapsed / pauseBetweenPhases;
@@ -464,30 +454,34 @@
     }
 
     draw();
-    lastTimestamp = timestamp;
-    animationFrameId = requestAnimationFrame(animate);
   }
 
   function startAnimation() {
-    if (animationFrameId !== null) return;
-    lastTimestamp = null;
-    animationFrameId = requestAnimationFrame(animate);
+    if (!clock) {
+      clock = new Clock();
+    }
+    if (clock.isRunning) return;
+
+    clock.start((dt) => {
+      // dt is in seconds, convert to ms for phase calculations
+      const elapsed = dt * 1000;
+      updateAnimation(elapsed);
+    });
   }
 
   function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
+    if (clock) clock.stop();
   }
 
   function handleVisibilityChange(isActive) {
     if (!isActive && isPlaying) {
       wasPlayingBeforeHidden = true;
       isPlaying = false;
+      stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
       isPlaying = true;
+      startAnimation();
     }
   }
 
@@ -506,8 +500,8 @@
   }
 
   // Animation control
-  $: if (isPlaying && initialized && !animationFrameId) startAnimation();
-  $: if (!isPlaying && animationFrameId) stopAnimation();
+  $: if (isPlaying && initialized && clock && !clock.isRunning) startAnimation();
+  $: if (!isPlaying && clock && clock.isRunning) stopAnimation();
 
   // Handle visibility changes
   $: if (figureIsActive !== undefined && initialized) {
