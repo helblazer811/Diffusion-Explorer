@@ -437,7 +437,8 @@
         strokeWidth: trajectoryStrokeWidth + 0.5,
         pointRadius: endpointRadius,
         progressOpacity: approximationOpacity,
-        showPreview: false
+        showPreview: false,
+        headStyle: { type: 'arrow', radius: endpointRadius * 2 }
       });
     }
   }
