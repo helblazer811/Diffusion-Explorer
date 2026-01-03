@@ -8,7 +8,7 @@
     TimeSlider,
     drawScatterPlot,
     drawVectorField,
-    drawPartialTrajectory,
+    drawTrajectoriesWithPreview,
     Clock,
     Track,
     createPauseClip,
@@ -425,19 +425,20 @@
       ctx.globalAlpha = 1.0;
     }
 
-    // Draw approximation trajectories (animated with interpolation)
+    // Draw approximation trajectories (step by step, no interpolation)
     if (approximationTrajectories.length > 0) {
-      for (const traj of approximationTrajectories) {
-        drawPartialTrajectory(ctx, traj, segmentIndex, animationState.segmentProgress, {
-          color: approximationColor,
-          strokeWidth: trajectoryStrokeWidth + 0.5,
-          pointRadius: endpointRadius,
-          opacity: approximationOpacity,
-          headType: 'circle',
-          xScale,
-          yScale
-        });
-      }
+      // Convert domain coordinates to pixel coordinates
+      const scaledApproxTrajectories = approximationTrajectories.map(traj =>
+        traj.map(point => [xScale(point[0]), yScale(point[1])])
+      );
+
+      drawTrajectoriesWithPreview(ctx, scaledApproxTrajectories, segmentIndex, {
+        color: approximationColor,
+        strokeWidth: trajectoryStrokeWidth + 0.5,
+        pointRadius: endpointRadius,
+        progressOpacity: approximationOpacity,
+        showPreview: false
+      });
     }
   }
 
