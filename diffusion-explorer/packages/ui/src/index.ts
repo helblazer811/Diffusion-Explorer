@@ -54,6 +54,7 @@ export * from './plotting/mathjax';
 export * from './plotting/katex';
 export * from './plotting/pathlines';
 export * from './plotting/mesh_grid';
+export { useCanvas2D } from './plotting/canvas';
 
 // Animation utilities
 export {

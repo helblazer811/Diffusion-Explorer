@@ -10,6 +10,7 @@
     FigureLegend,
     Clock,
     Track,
+    useCanvas2D,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -82,12 +83,14 @@
 
   // ===== STATE =====
 
-  // Canvas
-  let leftCanvas;
-  let rightCanvas;
-  let leftCtx;
-  let rightCtx;
-  let dpr = 1;
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
+  let leftCanvas = null;
+  let rightCanvas = null;
+  const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  const rightCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  // Tie ctx reactivity to canvas variables so it updates when action runs
+  $: leftCtx = leftCanvas && leftCanvas2d.ctx;
+  $: rightCtx = rightCanvas && rightCanvas2d.ctx;
 
   // Scales
   let xScale;
@@ -203,22 +206,6 @@
       .range([marginHeight, canvasHeight - marginHeight]);
   }
 
-  function initializeCanvas() {
-    dpr = window.devicePixelRatio || 1;
-
-    if (leftCanvas) {
-      leftCanvas.width = canvasWidth * dpr;
-      leftCanvas.height = canvasHeight * dpr;
-      leftCtx = leftCanvas.getContext("2d");
-      leftCtx.scale(dpr, dpr);
-    }
-    if (rightCanvas) {
-      rightCanvas.width = canvasWidth * dpr;
-      rightCanvas.height = canvasHeight * dpr;
-      rightCtx = rightCanvas.getContext("2d");
-      rightCtx.scale(dpr, dpr);
-    }
-  }
 
   function precomputeCoordinates() {
     if (!xScale || !yScale) return;
@@ -227,6 +214,14 @@
       xScale(p[0]),
       yScale(p[1]),
     ]);
+  }
+
+  // Generate a random starting point within the domain
+  function generateRandomStartPoint() {
+    const { xMin, xMax, yMin, yMax } = domainRange;
+    const x = xMin + Math.random() * (xMax - xMin);
+    const y = yMin + Math.random() * (yMax - yMin);
+    return [x, y];
   }
 
   // Cancel all in-flight requests
@@ -694,7 +689,7 @@
       leftTrack.update(normalizedDt, {}, leftState);
       rightTrack.update(normalizedDt, {}, rightState);
 
-      // Handle looping
+      // Handle looping - generate new random start point
       if (leftTrack.time >= 1) {
         leftTrack.reset();
         rightTrack.reset();
@@ -702,6 +697,14 @@
         rightEndPauseClip?.reset?.();
         leftState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
         rightState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+
+        // Generate a new random starting point for the next cycle
+        userStartPoints = [generateRandomStartPoint()];
+
+        // Stop animation and recompute trajectories (which will restart animation)
+        clock.stop();
+        computeAllTrajectories();
+        return;
       }
 
       drawLeftFrame();
@@ -785,7 +788,6 @@
     if (!leftCanvas || !rightCanvas || !isDataValid) return;
 
     initializeScales();
-    initializeCanvas();
     precomputeCoordinates();
     isInitialized = true;
     computeAllTrajectories();
@@ -841,6 +843,7 @@
         </div>
         <canvas
           bind:this={leftCanvas}
+          use:leftCanvas2d.bindCanvas
           class="panel-canvas"
           onclick={(e) => handleCanvasClick(e, "left")}
           style="cursor: pointer;"
@@ -864,6 +867,7 @@
         </div>
         <canvas
           bind:this={rightCanvas}
+          use:rightCanvas2d.bindCanvas
           class="panel-canvas"
           onclick={(e) => handleCanvasClick(e, "right")}
           style="cursor: pointer;"

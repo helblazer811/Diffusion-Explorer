@@ -2,7 +2,7 @@
 
 <script>
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, createSourceTargetScales, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, createSourceTargetScales, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // Caption slot (passed as default children)
@@ -54,10 +54,11 @@
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
-  // Canvas state
-  let canvas;
-  let ctx;
-  let dpr = 1;
+  // Canvas state - need both bind:this (for reactivity) and action (for DPR setup)
+  let canvas = null;
+  const canvas2d = useCanvas2D(width, height);
+  // Tie ctx reactivity to canvas variable so it updates when action runs
+  $: ctx = canvas && canvas2d.ctx;
 
   // Scales and pre-computed coordinates
   let scales = null;
@@ -126,16 +127,6 @@
     }
     animState.time = time;
     draw();
-  }
-
-  // Canvas initialization
-  function initializeCanvas() {
-    if (!canvas) return;
-    dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
   }
 
   // Pre-compute scatter coordinates
@@ -325,9 +316,6 @@
       yShiftFactor,
     });
 
-    // Initialize canvas
-    initializeCanvas();
-
     // Pre-compute scatter coordinates
     precomputeScatterCoords();
   }
@@ -367,6 +355,7 @@
       <div style="width: 100%; max-width: {width}px;">
         <canvas
           bind:this={canvas}
+          use:canvas2d.bindCanvas
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>

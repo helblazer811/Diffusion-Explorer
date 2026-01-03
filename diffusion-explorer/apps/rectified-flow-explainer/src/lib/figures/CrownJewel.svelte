@@ -1,7 +1,7 @@
 <script>
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ===== PROPS =====
@@ -90,12 +90,14 @@
 
   // ===== STATE =====
 
-  // Canvas
-  let leftCanvas;
-  let rightCanvas;
-  let leftCtx;
-  let rightCtx;
-  let dpr = 1;
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
+  let leftCanvas = null;
+  let rightCanvas = null;
+  const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  const rightCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  // Tie ctx reactivity to canvas variables so it updates when action runs
+  $: leftCtx = leftCanvas && leftCanvas2d.ctx;
+  $: rightCtx = rightCanvas && rightCanvas2d.ctx;
 
   // Scales
   let xScale;
@@ -178,23 +180,6 @@
       .range([marginHeight, canvasHeight - marginHeight]);
   }
 
-  // Initialize canvas contexts with high-DPI support
-  function initializeCanvas() {
-    dpr = window.devicePixelRatio || 1;
-
-    if (leftCanvas) {
-      leftCanvas.width = canvasWidth * dpr;
-      leftCanvas.height = canvasHeight * dpr;
-      leftCtx = leftCanvas.getContext("2d");
-      leftCtx.scale(dpr, dpr);
-    }
-    if (rightCanvas) {
-      rightCanvas.width = canvasWidth * dpr;
-      rightCanvas.height = canvasHeight * dpr;
-      rightCtx = rightCanvas.getContext("2d");
-      rightCtx.scale(dpr, dpr);
-    }
-  }
 
   // Transpose trajectories from [timestep][sample][dim] to [sample][timestep][x,y] and scale to pixels
   function transposeAndScale(trajectories) {
@@ -327,7 +312,6 @@
     if (!leftCanvas || !rightCanvas || !isDataValid) return;
 
     initializeScales();
-    initializeCanvas();
     precomputeCoordinates();
     pathsInitialized = true;
     updateLeftVisualization();
@@ -578,6 +562,7 @@
         </div>
         <canvas
           bind:this={leftCanvas}
+          use:leftCanvas2d.bindCanvas
           class="panel-canvas"
           onclick={(e) => handleCanvasClick(e, "left")}
           style="cursor: pointer;"
@@ -616,6 +601,7 @@
         </div>
         <canvas
           bind:this={rightCanvas}
+          use:rightCanvas2d.bindCanvas
           class="panel-canvas"
           onclick={(e) => handleCanvasClick(e, "right")}
           style="cursor: pointer;"
