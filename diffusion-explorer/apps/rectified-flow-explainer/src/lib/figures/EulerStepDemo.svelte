@@ -8,6 +8,7 @@
     TimeSlider,
     drawScatterPlot,
     drawVectorField,
+    drawPartialTrajectory,
     Clock,
     Track,
     createPauseClip,
@@ -131,18 +132,19 @@
     time: 0,
     currentStep: 0,
     segmentIndex: 0,
-    segmentProgress: 1,
+    segmentProgress: 0,
   };
 
-  // Euler step clip - maps normalized time to discrete steps
+  // Euler step clip - maps normalized time to step + segment progress
   const eulerStepClip = {
     name: "EulerSteps",
     duration: 1,
     apply(t, { numSteps }, state) {
       state.time = t;
-      state.currentStep = Math.round(t * numSteps);
+      const rawStep = t * numSteps;
+      state.currentStep = Math.floor(rawStep);
       state.segmentIndex = state.currentStep;
-      state.segmentProgress = 1;
+      state.segmentProgress = rawStep - state.currentStep;
     }
   };
 
@@ -172,7 +174,6 @@
   // Derived values from animation state
   $: currentStep = animationState.currentStep;
   $: segmentIndex = animationState.segmentIndex;
-  $: segmentProgress = animationState.segmentProgress;
   $: showErrorLines = currentStep >= NUM_STEPS;
 
   // Legend items
@@ -335,66 +336,6 @@
     }
   }
 
-  // Draw partial trajectory up to segment with interpolation
-  function drawPartialTrajectoryOnCtx(
-    ctx,
-    trajectory,
-    segIdx,
-    progress,
-    color,
-    lineWidth,
-    scaleX = xScale,
-    scaleY = yScale
-  ) {
-    if (!trajectory || trajectory.length < 2) return;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    ctx.beginPath();
-    const [startX, startY] = [
-      scaleX(trajectory[0][0]),
-      scaleY(trajectory[0][1]),
-    ];
-    ctx.moveTo(startX, startY);
-
-    // Draw complete segments
-    for (let i = 1; i <= segIdx && i < trajectory.length; i++) {
-      const [x, y] = [scaleX(trajectory[i][0]), scaleY(trajectory[i][1])];
-      ctx.lineTo(x, y);
-    }
-
-    // Draw partial segment with interpolation
-    if (segIdx < trajectory.length - 1 && progress > 0) {
-      const fromPt = trajectory[segIdx];
-      const toPt = trajectory[segIdx + 1];
-      const interpX = fromPt[0] + (toPt[0] - fromPt[0]) * progress;
-      const interpY = fromPt[1] + (toPt[1] - fromPt[1]) * progress;
-      ctx.lineTo(scaleX(interpX), scaleY(interpY));
-    }
-
-    ctx.stroke();
-
-    // Draw endpoint at current position
-    let endX, endY;
-    if (segIdx < trajectory.length - 1 && progress > 0) {
-      const fromPt = trajectory[segIdx];
-      const toPt = trajectory[segIdx + 1];
-      endX = scaleX(fromPt[0] + (toPt[0] - fromPt[0]) * progress);
-      endY = scaleY(fromPt[1] + (toPt[1] - fromPt[1]) * progress);
-    } else {
-      const pt = trajectory[Math.min(segIdx, trajectory.length - 1)];
-      endX = scaleX(pt[0]);
-      endY = scaleY(pt[1]);
-    }
-    ctx.beginPath();
-    ctx.arc(endX, endY, endpointRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
-  }
-
   // Draw start point markers on a given context
   function drawStartPointsOnCtx(ctx, scaleX = xScale, scaleY = yScale) {
     for (const point of userStartPoints) {
@@ -433,7 +374,7 @@
     if (hasVectorField) {
       // Calculate time from animation progress (0 to 1)
       const maxSegments = NUM_STEPS;
-      const animationTime = (segmentIndex + segmentProgress) / maxSegments;
+      const animationTime = segmentIndex / maxSegments;
       const numTimeSteps = flowMatchingVectorField.timeSteps.length;
       const timeIndex = Math.min(
         Math.floor(animationTime * numTimeSteps),
@@ -484,20 +425,19 @@
       ctx.globalAlpha = 1.0;
     }
 
-    // Draw approximation trajectories (animated)
+    // Draw approximation trajectories (animated with interpolation)
     if (approximationTrajectories.length > 0) {
-      ctx.globalAlpha = approximationOpacity;
       for (const traj of approximationTrajectories) {
-        drawPartialTrajectoryOnCtx(
-          ctx,
-          traj,
-          segmentIndex,
-          segmentProgress,
-          approximationColor,
-          trajectoryStrokeWidth + 0.5
-        );
+        drawPartialTrajectory(ctx, traj, segmentIndex, animationState.segmentProgress, {
+          color: approximationColor,
+          strokeWidth: trajectoryStrokeWidth + 0.5,
+          pointRadius: endpointRadius,
+          opacity: approximationOpacity,
+          headType: 'circle',
+          xScale,
+          yScale
+        });
       }
-      ctx.globalAlpha = 1.0;
     }
   }
 
@@ -535,7 +475,7 @@
       time: 0,
       currentStep: 0,
       segmentIndex: 0,
-      segmentProgress: 1,
+      segmentProgress: 0,
     };
     time = 0;
   }
