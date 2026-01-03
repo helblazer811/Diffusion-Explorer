@@ -5,6 +5,7 @@
     downloadJSON,
     FlowModelClient,
     clipSamplesToRadius,
+    clipTrajectoriesToStartingRadius,
     clipAllRectifiedTrajectoriesToStartingRadius,
     generateUniformGridSamples,
   } from "@diffusion-explorer/diffusion";
@@ -1279,9 +1280,9 @@
     <div id="figure-13">
       <InducedCouplingAnimated
         width={figureWidth}
-        allTimeSamples={$allTimeSamples}
         targetDistribution={$targetDistributionSamples}
-        reverseMode={true}
+        {flowMatchingClient}
+        numSteps={settings.samplingSettings.flowMatching.numSteps}
         numPoints={50}
         numLinesToDraw={50}
         numTrajectoriesToShow={15}
@@ -1311,9 +1312,12 @@
         {flowMatchingClient}
         {rectifiedFlowClient}
         leftTrajectories={$flowMatchingGridTrajectories ?? []}
-        rightTrajectories={$rectifiedFlowGridTrajectories?.[
-          $rectifiedFlowGridTrajectories.length - 1
-        ] ?? []}
+        rightTrajectories={$rectifiedFlowGridTrajectories?.[$rectifiedFlowGridTrajectories.length - 1]
+          ? clipTrajectoriesToStartingRadius(
+              $rectifiedFlowGridTrajectories[$rectifiedFlowGridTrajectories.length - 1],
+              2.5
+            )
+          : []}
         targetDistribution={$targetDistributionSamples}
         playingByDefault={true}
         backgroundVisible={false}
