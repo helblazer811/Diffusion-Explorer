@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { Figure, drawScatterPlot, drawArrow, drawMathjaxOnCanvas, createSourceTargetScales } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawArrow, drawMathjaxOnCanvas, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ===== CAPTION =====
@@ -66,9 +66,11 @@
   export let x1Pixel = { x: 540, y: 130 };
 
   // ===== STATE =====
-  let canvas;
-  let ctx;
-  let dpr = 1;
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
+  let canvas = null;
+  const canvas2d = useCanvas2D(width, height);
+  // Tie ctx reactivity to canvas variable so it updates when action runs
+  $: ctx = canvas && canvas2d.ctx;
   let scales = null;
   let isInitialized = false;
   let figureIsActive;
@@ -76,15 +78,6 @@
   // Pre-computed pixel coordinates
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
-
-  function initializeCanvas() {
-    if (!canvas) return;
-    dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
-  }
 
   function precomputeScatterCoords() {
     if (!scales) return;
@@ -279,7 +272,6 @@
     targetDistributionSamples.length > 0 &&
     !isInitialized
   ) {
-    initializeCanvas();
     initializeData();
     isInitialized = true;
     draw();
@@ -297,6 +289,7 @@
     <div style="width:100%;max-width:{width}px;">
       <canvas
         bind:this={canvas}
+        use:canvas2d.bindCanvas
         style="width:100%;height:auto;aspect-ratio:{width}/{height};"
       ></canvas>
     </div>

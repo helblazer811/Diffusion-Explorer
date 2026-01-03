@@ -1,7 +1,7 @@
 <script>
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ===== PROPS =====
@@ -61,10 +61,11 @@
 
   // ===== STATE =====
 
-  // Canvas
-  let canvas;
-  let ctx;
-  let dpr = 1;
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
+  let canvas = null;
+  const canvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  // Tie ctx reactivity to canvas variable so it updates when action runs
+  $: ctx = canvas && canvas2d.ctx;
 
   // Scales
   let xScale;
@@ -126,15 +127,6 @@
       .range([marginHeight, canvasHeight - marginHeight]);
   }
 
-  function initializeCanvas() {
-    if (!canvas) return;
-
-    dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasWidth * dpr;
-    canvas.height = canvasHeight * dpr;
-    ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
-  }
 
   function transposeAndScale(traj) {
     if (!xScale || !yScale || !traj?.length) return [];
@@ -154,7 +146,7 @@
   // Handle canvas click - convert to domain coordinates and sample
   function handleCanvasClick(event) {
     // Client is passed as prop; check it's available
-    if (!flowMatchingClient) return;
+    if (!flowMatchingClient || !canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvasWidth / rect.width;
@@ -294,7 +286,6 @@
     if (!canvas || !isDataValid) return;
 
     initializeScales();
-    initializeCanvas();
     precomputeCoordinates();
     isInitialized = true;
     draw();
@@ -417,6 +408,7 @@
         <div style="width: 100%; max-width: {canvasWidth}px;">
           <canvas
             bind:this={canvas}
+            use:canvas2d.bindCanvas
             onclick={handleCanvasClick}
             style="cursor: pointer; width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
           ></canvas>

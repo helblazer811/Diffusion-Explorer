@@ -1,6 +1,6 @@
 <script>
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales, Clock, Track, createPauseClip } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // FlowModelClient instance (passed from parent, created with correct base path)
@@ -32,10 +32,11 @@
   export let children = undefined;
   $: caption = children;
 
-  // Canvas state
-  let canvas;
-  let ctx;
-  let dpr = 1;
+  // Canvas state - need both bind:this (for reactivity) and action (for DPR setup)
+  let canvas = null;
+  const canvas2d = useCanvas2D(width, height);
+  // Tie ctx reactivity to canvas variable so it updates when action runs
+  $: ctx = canvas && canvas2d.ctx;
 
   // Animation state - Clock/Track system
   let time = 0;
@@ -129,22 +130,11 @@
     });
   }
 
-  // Initialize canvas
-  function initializeCanvas() {
-    if (!canvas) return;
-
-    dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-
-    ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
-  }
 
   // Handle canvas click - restricted to source distribution region
   function handleCanvasClick(event) {
     if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
-    if (!scales) return;
+    if (!scales || !canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = width / rect.width;
@@ -481,7 +471,6 @@
     targetDistributionSamples.length > 0 &&
     !initialized
   ) {
-    initializeCanvas();
     initializeData();
     initializeAnimation();
     initialized = true;
@@ -512,6 +501,7 @@
     >
       <canvas
         bind:this={canvas}
+        use:canvas2d.bindCanvas
         onclick={handleCanvasClick}
         style="cursor:pointer;width:100%;height:auto;max-width:{width}px;aspect-ratio:{width}/{height};"
       ></canvas>

@@ -13,6 +13,7 @@
     Track,
     createPauseClip,
     FigureLegend,
+    useCanvas2D,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -73,6 +74,10 @@
   export let backgroundVisible = true;
   export let children = undefined;
 
+  // Show/hide options
+  export let showGroundTruth = true;
+  export let showLegend = true;
+
   // ===== CONSTANTS =====
 
   const NUM_STEPS = 16;
@@ -90,10 +95,11 @@
 
   // ===== STATE =====
 
-  // Canvas
-  let canvas;
-  let ctx;
-  let dpr = 1;
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
+  let canvas = null;
+  const canvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  // Tie ctx reactivity to canvas variable so it updates when action runs
+  $: ctx = canvas && canvas2d.ctx;
 
   // Scales
   let xScale;
@@ -194,17 +200,6 @@
       .scaleLinear()
       .domain([domainRange.yMin, domainRange.yMax])
       .range([marginHeight, canvasHeight - marginHeight]);
-  }
-
-  function initializeCanvas() {
-    dpr = window.devicePixelRatio || 1;
-
-    if (canvas) {
-      canvas.width = canvasWidth * dpr;
-      canvas.height = canvasHeight * dpr;
-      ctx = canvas.getContext("2d");
-      ctx.scale(dpr, dpr);
-    }
   }
 
   function precomputeCoordinates() {
@@ -478,17 +473,19 @@
     }
 
     // Draw ground truth trajectories
-    ctx.globalAlpha = groundTruthOpacity;
-    for (const traj of groundTruthTrajectories) {
-      drawTrajectoryOnCtx(
-        ctx,
-        traj,
-        groundTruthColor,
-        trajectoryStrokeWidth,
-        true
-      );
+    if (showGroundTruth) {
+      ctx.globalAlpha = groundTruthOpacity;
+      for (const traj of groundTruthTrajectories) {
+        drawTrajectoryOnCtx(
+          ctx,
+          traj,
+          groundTruthColor,
+          trajectoryStrokeWidth,
+          true
+        );
+      }
+      ctx.globalAlpha = 1.0;
     }
-    ctx.globalAlpha = 1.0;
 
     // Draw approximation trajectories (animated)
     if (approximationTrajectories.length > 0) {
@@ -599,7 +596,6 @@
     if (!canvas || !isDataValid) return;
 
     initializeScales();
-    initializeCanvas();
     precomputeCoordinates();
     isInitialized = true;
     computeAllTrajectories();
@@ -646,6 +642,7 @@
       {/if}
       <canvas
         bind:this={canvas}
+        use:canvas2d.bindCanvas
         class="panel-canvas"
         onclick={handleCanvasClick}
         style="cursor: {isLoading ? 'wait' : 'pointer'};"
@@ -663,7 +660,9 @@
     </div>
 
     {#snippet footer()}
-      <FigureLegend items={legendItems} />
+      {#if showLegend}
+        <FigureLegend items={legendItems} />
+      {/if}
     {/snippet}
   </Figure>
 {:else}
