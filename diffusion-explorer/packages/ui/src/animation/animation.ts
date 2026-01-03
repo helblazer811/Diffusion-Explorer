@@ -16,6 +16,7 @@ type ScheduledClip<TParams, TState> = {
 export class Track<TParams, TState> {
   time = 0;
   duration = 1;
+  looping = false;
   clips: ScheduledClip<TParams, TState>[] = [];
 
   add(clip: Clip<TParams, TState>, start = 0): this {
@@ -27,6 +28,10 @@ export class Track<TParams, TState> {
     this.time = 0;
   }
 
+  get isAtEnd(): boolean {
+    return this.time >= this.duration;
+  }
+
   update(dt: number, params: TParams, state: TState): void {
     this.time = Math.min(this.time + dt, this.duration);
 
@@ -36,41 +41,10 @@ export class Track<TParams, TState> {
         clip.apply(localT, params, state);
       }
     }
-  }
-}
 
-// ===== Timeline =====
-// Timeline orchestrates a track with looping support
-export class Timeline<TParams, TState> {
-  track: Track<TParams, TState>;
-  looping = true;
-  paused = false;
-
-  constructor(track: Track<TParams, TState>) {
-    this.track = track;
-  }
-
-  reset(): void {
-    this.track.reset();
-    this.paused = false;
-  }
-
-  update(dt: number, params: TParams, state: TState): void {
-    if (this.paused) return;
-
-    this.track.update(dt, params, state);
-
-    if (this.track.time >= this.track.duration) {
-      if (this.looping) {
-        this.reset();
-      } else {
-        this.paused = true;
-      }
+    if (this.isAtEnd && this.looping) {
+      this.reset();
     }
-  }
-
-  get isAtEnd(): boolean {
-    return this.track.time >= this.track.duration;
   }
 }
 

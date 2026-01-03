@@ -9,7 +9,6 @@
     drawScatterPlot,
     drawVectorField,
     Clock,
-    Timeline,
     Track,
     createPauseClip,
     FigureLegend,
@@ -160,9 +159,7 @@
   track.add({ ...eulerStepClip, duration: eulerNormalizedDuration }, 0);
   track.add(createPauseClip(pauseNormalizedDuration), eulerNormalizedDuration);
   track.duration = 1;
-
-  const timeline = new Timeline(track);
-  timeline.looping = true;
+  track.looping = true;
 
   const clock = new Clock();
 
@@ -516,7 +513,7 @@
       const totalDurationSeconds = TOTAL_REAL_DURATION / 1000;
       const normalizedDt = dt / totalDurationSeconds;
 
-      timeline.update(normalizedDt, { numSteps: NUM_STEPS }, animationState);
+      track.update(normalizedDt, { numSteps: NUM_STEPS }, animationState);
 
       // Sync time for slider binding (scaled to euler portion only)
       time = animationState.time;
@@ -533,7 +530,7 @@
   }
 
   function resetAnimation() {
-    timeline.reset();
+    track.reset();
     animationState = {
       time: 0,
       currentStep: 0,
