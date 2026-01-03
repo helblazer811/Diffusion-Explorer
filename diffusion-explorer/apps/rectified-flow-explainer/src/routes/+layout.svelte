@@ -1,14 +1,9 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
 	import '../app.css';
 	import { TableOfContents } from '@diffusion-explorer/ui';
 
 	let { children } = $props();
 </script>
-
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
 
 <div class="top-nav">
 	<a href="https://alechelbling.com/blog.html" class="nav-link">Other Blogs</a>

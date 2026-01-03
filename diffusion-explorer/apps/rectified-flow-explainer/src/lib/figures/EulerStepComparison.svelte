@@ -6,7 +6,7 @@
   import {
     DoubleFigure,
     drawScatterPlot,
-    drawPartialTrajectory,
+    drawTrajectoriesWithPreview,
     Slider,
     FigureLegend,
     Clock,
@@ -558,17 +558,19 @@
 
   // Draw approximation trajectories with current animation state
   function drawApproximation(ctx, trajectories, state) {
-    for (const traj of trajectories) {
-      drawPartialTrajectory(ctx, traj, state.segmentIndex, state.segmentProgress, {
-        color: approximationColor,
-        strokeWidth: trajectoryStrokeWidth + 0.5,
-        pointRadius: endpointRadius,
-        opacity: approximationOpacity,
-        headType: 'circle',
-        xScale,
-        yScale
-      });
-    }
+    // Convert domain coordinates to pixel coordinates
+    const scaledTrajectories = trajectories.map(traj =>
+      traj.map(point => [xScale(point[0]), yScale(point[1])])
+    );
+
+    drawTrajectoriesWithPreview(ctx, scaledTrajectories, state.segmentIndex, {
+      color: approximationColor,
+      strokeWidth: trajectoryStrokeWidth + 0.5,
+      pointRadius: endpointRadius,
+      progressOpacity: approximationOpacity,
+      showPreview: false,
+      headStyle: { type: 'arrow', radius: endpointRadius * 2.5 }
+    });
   }
 
   // Calculate total animation duration in ms

@@ -1,9 +1,12 @@
+import { drawArrowHead } from './utils';
+
 export interface PartialTrajectoryOptions {
   color: string;
   strokeWidth: number;
   pointRadius: number;
   opacity?: number;           // Default: 1.0
   headType?: 'circle' | 'arrow';  // Default: 'circle'
+  arrowRadius?: number;       // Override arrow head size (default: pointRadius * 3.5)
   xScale: (x: number) => number;  // Domain to pixel scale
   yScale: (y: number) => number;  // Domain to pixel scale
 }
@@ -19,7 +22,6 @@ export interface HeadStyle {
   radius?: number;           // Radius for circle, or size for arrow (default: pointRadius)
   color?: string;            // Head color (default: same as trajectory color)
   opacity?: number;          // Head opacity (default: same as trajectory opacity)
-  arrowAngle?: number;       // Arrow head angle in radians (default: Math.PI / 6)
 }
 
 export interface TrajectoryStyleOptions {
@@ -32,63 +34,6 @@ export interface TrajectoryStyleOptions {
   showHeadMarker?: boolean; // Whether to show marker at trajectory head (default: true)
   outline?: TrajectoryOutlineOptions; // Optional outline around trajectory
   headStyle?: HeadStyle;    // Head marker styling (default: circle)
-}
-
-/**
- * Draws a head marker at the specified position.
- * @param ctx - Canvas 2D rendering context
- * @param x - X position
- * @param y - Y position
- * @param prevX - Previous X position (for arrow direction)
- * @param prevY - Previous Y position (for arrow direction)
- * @param style - Head style options
- * @param defaultRadius - Default radius if not specified in style
- * @param defaultColor - Default color if not specified in style
- * @param defaultOpacity - Default opacity if not specified in style
- */
-export function drawHeadMarker(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  prevX: number,
-  prevY: number,
-  style: HeadStyle | undefined,
-  defaultRadius: number,
-  defaultColor: string,
-  defaultOpacity: number
-): void {
-  const headType = style?.type ?? 'circle';
-  const radius = style?.radius ?? defaultRadius;
-  const color = style?.color ?? defaultColor;
-  const opacity = style?.opacity ?? defaultOpacity;
-
-  ctx.fillStyle = color;
-  ctx.globalAlpha = opacity;
-
-  if (headType === 'arrow') {
-    // Calculate direction from previous point
-    const angle = Math.atan2(y - prevY, x - prevX);
-    const arrowAngle = style?.arrowAngle ?? Math.PI / 6;
-
-    // Draw arrow head as a triangle
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(
-      x - radius * Math.cos(angle - arrowAngle),
-      y - radius * Math.sin(angle - arrowAngle)
-    );
-    ctx.lineTo(
-      x - radius * Math.cos(angle + arrowAngle),
-      y - radius * Math.sin(angle + arrowAngle)
-    );
-    ctx.closePath();
-    ctx.fill();
-  } else {
-    // Default: circle
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, 2 * Math.PI);
-    ctx.fill();
-  }
 }
 
 /**
@@ -112,7 +57,7 @@ export function drawPartialTrajectory(
   const { color, strokeWidth, pointRadius, xScale, yScale } = options;
   const opacity = options.opacity ?? 1.0;
   const headType = options.headType ?? 'circle';
-  const arrowRadius = pointRadius * 3.5;
+  const arrowRadius = options.arrowRadius ?? pointRadius * 3.5;
 
   // Determine if we're interpolating within a segment
   const isInterpolating = segmentIndex < trajectory.length - 1 && segmentProgress > 0;
@@ -191,12 +136,15 @@ export function drawPartialTrajectory(
 
   ctx.stroke();
 
-  // Draw head marker (arrow tip at actual endpoint)
-  const headStyle: HeadStyle = {
-    type: headType,
-    radius: headType === 'arrow' ? arrowRadius : pointRadius
-  };
-  drawHeadMarker(ctx, endX, endY, prevX, prevY, headStyle, pointRadius, color, opacity);
+  // Draw head marker
+  ctx.fillStyle = color;
+  if (headType === 'arrow') {
+    drawArrowHead(ctx, prevX, prevY, endX, endY, arrowRadius);
+  } else {
+    ctx.beginPath();
+    ctx.arc(endX, endY, pointRadius, 0, 2 * Math.PI);
+    ctx.fill();
+  }
 
   ctx.globalAlpha = 1.0;
 }
@@ -267,13 +215,19 @@ export function drawTrajectoriesWithOpacityGradient(
       const [mx, my] = points[headIdx];
       const prevIdx = Math.max(0, headIdx - 1);
       const [px, py] = points[prevIdx];
-      drawHeadMarker(
-        ctx, mx, my, px, py,
-        style.headStyle,
-        style.pointRadius,
-        style.color,
-        style.progressOpacity
-      );
+      const headType = style.headStyle?.type ?? 'circle';
+      const radius = style.headStyle?.radius ?? style.pointRadius;
+
+      ctx.fillStyle = style.headStyle?.color ?? style.color;
+      ctx.globalAlpha = style.headStyle?.opacity ?? style.progressOpacity;
+
+      if (headType === 'arrow') {
+        drawArrowHead(ctx, px, py, mx, my, radius);
+      } else {
+        ctx.beginPath();
+        ctx.arc(mx, my, radius, 0, 2 * Math.PI);
+        ctx.fill();
+      }
     }
   }
 
@@ -365,8 +319,12 @@ export function drawTrajectoriesWithPreview(
     const prevIdx = Math.max(0, markerIdx - 1);
     const [px, py] = points[prevIdx];
 
+    // Draw marker
+    const headType = style.headStyle?.type ?? 'circle';
+    const radius = style.headStyle?.radius ?? style.pointRadius;
+
     // Draw outline for marker if specified (only for circle type)
-    if (outline && (!style.headStyle || style.headStyle.type === 'circle')) {
+    if (outline && headType === 'circle') {
       ctx.beginPath();
       ctx.arc(mx, my, style.pointRadius + (outlineWidth - style.strokeWidth) / 2, 0, 2 * Math.PI);
       ctx.fillStyle = outlineColor;
@@ -374,14 +332,17 @@ export function drawTrajectoriesWithPreview(
       ctx.fill();
     }
 
-    // Draw main marker using head style
-    drawHeadMarker(
-      ctx, mx, my, px, py,
-      style.headStyle,
-      style.pointRadius,
-      style.color,
-      style.progressOpacity
-    );
+    // Draw main marker
+    ctx.fillStyle = style.headStyle?.color ?? style.color;
+    ctx.globalAlpha = style.headStyle?.opacity ?? style.progressOpacity;
+
+    if (headType === 'arrow') {
+      drawArrowHead(ctx, px, py, mx, my, radius);
+    } else {
+      ctx.beginPath();
+      ctx.arc(mx, my, radius, 0, 2 * Math.PI);
+      ctx.fill();
+    }
   }
 
   // Reset alpha
