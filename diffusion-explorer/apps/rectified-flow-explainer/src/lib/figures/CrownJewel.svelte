@@ -120,15 +120,21 @@
     }
   });
 
-  // Left track: full animation over entire duration
-  const leftTrack = new Track();
-  leftTrack.add(createSegmentClip(1), 0);
+  // Pause at end before looping (as fraction of total duration)
+  const endPauseFraction = 0.15;
+  const animationFraction = 1 - endPauseFraction;
 
-  // Right track: animation in first half, pause in second half
-  // This makes right animation 2x faster, then waits for left to catch up
+  // Left track: full animation, then pause at end
+  const leftTrack = new Track();
+  leftTrack.add(createSegmentClip(animationFraction), 0);
+  leftTrack.add(createPauseClip(endPauseFraction), animationFraction);
+
+  // Right track: animation in first half of animation time, pause while left catches up, then end pause
+  // Right animation takes half the time of left, so it's animationFraction/2
   const rightTrack = new Track();
-  rightTrack.add(createSegmentClip(0.5), 0);
-  rightTrack.add(createPauseClip(0.5), 0.5);
+  const rightAnimationDuration = animationFraction / 2;
+  rightTrack.add(createSegmentClip(rightAnimationDuration), 0);
+  rightTrack.add(createPauseClip(1 - rightAnimationDuration), rightAnimationDuration);
 
   // Animation state objects (mutated by clips)
   let leftState = { time: 0, segmentIndex: 0 };

@@ -59,7 +59,6 @@ export { useCanvas2D } from './plotting/canvas';
 // Animation utilities
 export {
   Clock,
-  Timeline,
   Track,
   createPauseClip,
   type Clip,
