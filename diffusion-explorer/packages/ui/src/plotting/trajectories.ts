@@ -1,3 +1,13 @@
+export interface PartialTrajectoryOptions {
+  color: string;
+  strokeWidth: number;
+  pointRadius: number;
+  opacity?: number;           // Default: 1.0
+  headType?: 'circle' | 'arrow';  // Default: 'circle'
+  xScale: (x: number) => number;  // Domain to pixel scale
+  yScale: (y: number) => number;  // Domain to pixel scale
+}
+
 export interface TrajectoryOutlineOptions {
   color?: string;      // Outline color (default: black)
   width?: number;      // Outline width in pixels (default: strokeWidth + 2)
@@ -36,7 +46,7 @@ export interface TrajectoryStyleOptions {
  * @param defaultColor - Default color if not specified in style
  * @param defaultOpacity - Default opacity if not specified in style
  */
-function drawHeadMarker(
+export function drawHeadMarker(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -79,6 +89,116 @@ function drawHeadMarker(
     ctx.arc(x, y, radius, 0, 2 * Math.PI);
     ctx.fill();
   }
+}
+
+/**
+ * Draws a partial trajectory up to the current segment with interpolation.
+ * Takes domain coordinates and scale functions.
+ * @param ctx - Canvas 2D rendering context
+ * @param trajectory - Single trajectory in domain coords: [timestep][x,y]
+ * @param segmentIndex - Current segment index (0-based)
+ * @param segmentProgress - Progress within current segment (0-1)
+ * @param options - Styling and scale options
+ */
+export function drawPartialTrajectory(
+  ctx: CanvasRenderingContext2D,
+  trajectory: number[][],
+  segmentIndex: number,
+  segmentProgress: number,
+  options: PartialTrajectoryOptions
+): void {
+  if (!trajectory || trajectory.length < 2) return;
+
+  const { color, strokeWidth, pointRadius, xScale, yScale } = options;
+  const opacity = options.opacity ?? 1.0;
+  const headType = options.headType ?? 'circle';
+  const arrowRadius = pointRadius * 3.5;
+
+  // Determine if we're interpolating within a segment
+  const isInterpolating = segmentIndex < trajectory.length - 1 && segmentProgress > 0;
+
+  // Calculate endpoint and previous point for direction
+  let endX: number, endY: number, prevX: number, prevY: number;
+
+  if (isInterpolating) {
+    const fromPt = trajectory[segmentIndex];
+    const toPt = trajectory[segmentIndex + 1];
+    const interpX = fromPt[0] + (toPt[0] - fromPt[0]) * segmentProgress;
+    const interpY = fromPt[1] + (toPt[1] - fromPt[1]) * segmentProgress;
+
+    endX = xScale(interpX);
+    endY = yScale(interpY);
+    prevX = xScale(fromPt[0]);
+    prevY = yScale(fromPt[1]);
+  } else {
+    const idx = Math.min(segmentIndex, trajectory.length - 1);
+    const pt = trajectory[idx];
+    const prevPt = trajectory[Math.max(0, idx - 1)];
+    endX = xScale(pt[0]);
+    endY = yScale(pt[1]);
+    prevX = xScale(prevPt[0]);
+    prevY = yScale(prevPt[1]);
+  }
+
+  // For arrows, calculate where line should stop (behind arrow base so line end is hidden)
+  let lineEndX = endX, lineEndY = endY;
+  if (headType === 'arrow') {
+    const dist = Math.hypot(endX - prevX, endY - prevY);
+    // Stop line a bit further back than arrow base to hide rectangular line end behind arrow
+    const lineStopDistance = arrowRadius + strokeWidth * 0.5;
+    if (dist > lineStopDistance) {
+      const angle = Math.atan2(endY - prevY, endX - prevX);
+      lineEndX = endX - lineStopDistance * Math.cos(angle);
+      lineEndY = endY - lineStopDistance * Math.sin(angle);
+    }
+  }
+
+  ctx.globalAlpha = opacity;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = strokeWidth;
+
+  // Use appropriate line styling based on head type
+  if (headType === 'arrow') {
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "miter";
+  } else {
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(xScale(trajectory[0][0]), yScale(trajectory[0][1]));
+
+  if (isInterpolating) {
+    // Draw completed segments up to (not including) current segment
+    for (let i = 1; i <= segmentIndex && i < trajectory.length; i++) {
+      ctx.lineTo(xScale(trajectory[i][0]), yScale(trajectory[i][1]));
+    }
+    // Draw partial segment to shortened line end
+    ctx.lineTo(lineEndX, lineEndY);
+  } else {
+    // Draw all segments up to (not including) the last point
+    const lastIdx = Math.min(segmentIndex, trajectory.length - 1);
+    for (let i = 1; i < lastIdx; i++) {
+      ctx.lineTo(xScale(trajectory[i][0]), yScale(trajectory[i][1]));
+    }
+    // Draw final segment to shortened line end
+    if (lastIdx > 0) {
+      ctx.lineTo(prevX, prevY);
+    }
+    ctx.lineTo(lineEndX, lineEndY);
+  }
+
+  ctx.stroke();
+
+  // Draw head marker (arrow tip at actual endpoint)
+  const headStyle: HeadStyle = {
+    type: headType,
+    radius: headType === 'arrow' ? arrowRadius : pointRadius
+  };
+  drawHeadMarker(ctx, endX, endY, prevX, prevY, headStyle, pointRadius, color, opacity);
+
+  ctx.globalAlpha = 1.0;
 }
 
 /**

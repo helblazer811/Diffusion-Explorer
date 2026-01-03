@@ -6,6 +6,7 @@
   import {
     DoubleFigure,
     drawScatterPlot,
+    drawPartialTrajectory,
     Slider,
     FigureLegend,
     Clock,
@@ -555,72 +556,18 @@
     }
   }
 
-  // Draw partial trajectory with current segment being animated
-  function drawPartialTrajectory(ctx, trajectory, segmentIndex, segmentProgress, color, strokeWidth, pointRadius, opacity) {
-    if (!trajectory || trajectory.length < 2) return;
-
-    ctx.globalAlpha = opacity;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = strokeWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    // Draw completed segments
-    if (segmentIndex > 0) {
-      ctx.beginPath();
-      ctx.moveTo(xScale(trajectory[0][0]), yScale(trajectory[0][1]));
-      for (let i = 1; i <= segmentIndex && i < trajectory.length; i++) {
-        ctx.lineTo(xScale(trajectory[i][0]), yScale(trajectory[i][1]));
-      }
-      ctx.stroke();
-    }
-
-    // Draw current segment being animated (interpolated)
-    if (segmentIndex < trajectory.length - 1) {
-      const startIdx = segmentIndex;
-      const endIdx = segmentIndex + 1;
-      if (endIdx < trajectory.length) {
-        const startPt = trajectory[startIdx];
-        const endPt = trajectory[endIdx];
-        const interpX = xScale(startPt[0]) + (xScale(endPt[0]) - xScale(startPt[0])) * segmentProgress;
-        const interpY = yScale(startPt[1]) + (yScale(endPt[1]) - yScale(startPt[1])) * segmentProgress;
-
-        ctx.beginPath();
-        ctx.moveTo(xScale(startPt[0]), yScale(startPt[1]));
-        ctx.lineTo(interpX, interpY);
-        ctx.stroke();
-
-        // Draw current position marker
-        ctx.beginPath();
-        ctx.arc(interpX, interpY, pointRadius, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
-        ctx.fill();
-      }
-    } else if (trajectory.length > 0) {
-      // Animation complete - draw endpoint marker
-      const lastPt = trajectory[trajectory.length - 1];
-      ctx.beginPath();
-      ctx.arc(xScale(lastPt[0]), yScale(lastPt[1]), pointRadius, 0, 2 * Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
-    }
-
-    ctx.globalAlpha = 1.0;
-  }
-
   // Draw approximation trajectories with current animation state
   function drawApproximation(ctx, trajectories, state) {
     for (const traj of trajectories) {
-      drawPartialTrajectory(
-        ctx,
-        traj,
-        state.segmentIndex,
-        state.segmentProgress,
-        approximationColor,
-        trajectoryStrokeWidth + 0.5,
-        endpointRadius,
-        approximationOpacity
-      );
+      drawPartialTrajectory(ctx, traj, state.segmentIndex, state.segmentProgress, {
+        color: approximationColor,
+        strokeWidth: trajectoryStrokeWidth + 0.5,
+        pointRadius: endpointRadius,
+        opacity: approximationOpacity,
+        headType: 'circle',
+        xScale,
+        yScale
+      });
     }
   }
 
