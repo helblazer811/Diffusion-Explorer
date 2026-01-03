@@ -162,6 +162,7 @@
     return false;
   }
 
+
   async function trainModel() {
     const result = await train.trainModel(
       settings.trainingSettings,
@@ -384,6 +385,7 @@
       );
     }
 
+
     // Train and generate any missing flow matching data
     let flowMatchingModelPath: string | null = settings.flowMatchingModelPath;
 
@@ -432,14 +434,20 @@
       await generateRectifiedFlowVectorField(rectifiedFlowModelPath);
     }
 
-    // Load bibliography and collect citations
+
+    // Load bibliography (citations will be collected after showOtherFigures becomes true)
     bibEntries = await loadBibliography(`${base}/bibliography.bib`);
-    await tick(); // Ensure DOM is ready
-    citations = collectCitations();
 
     // Note: Workers are now pooled and managed by FlowModelClient,
     // so no cleanup is needed here
   });
+
+  // Recollect citations when showOtherFigures changes (ensures all HoverableReferences are in DOM)
+  $: if (showOtherFigures && bibEntries) {
+    tick().then(() => {
+      citations = collectCitations();
+    });
+  }
 </script>
 
 <div class="title-header-wrapper">
@@ -771,12 +779,14 @@
       flowMatchingVectorField={$vectorFieldData}
       backgroundVisible={false}
       maxUserTrajectories={1}
+      showGroundTruth={false}
+      showLegend={false}
+      showArrowHeads={true}
     >
       <div class="caption">
         <span class="figure-number">Figure 5:</span>
         <strong> Euler integration through a time-dependent <span style="color: #3b82f6;">velocity field</span> <Katex math={"v_t(x)"} />. </strong>
-        The <span style="color: #22c55e;">ground truth</span> trajectory
-        is compared against the <span style="color: #f17720;">Euler approximation</span>, which takes
+        The <span style="color: #f17720;">Euler approximation</span> takes
         16 discrete steps along the direction of the <span style="color: #3b82f6;">velocity field</span>. Tap
         <img
           src="{base}/icons/tap.svg"
@@ -1270,6 +1280,8 @@
       <InducedCouplingAnimated
         width={figureWidth}
         allTimeSamples={$allTimeSamples}
+        targetDistribution={$targetDistributionSamples}
+        reverseMode={true}
         numPoints={50}
         numLinesToDraw={50}
         numTrajectoriesToShow={15}
@@ -1377,6 +1389,9 @@
         rectifiedFlowVectorField={$rectifiedFlowVectorFieldData}
         playingByDefault={true}
         backgroundVisible={false}
+        normalizeVectors={false}
+        showArrowHeads={true}
+        animationDuration={4000}
       >
         <div class="caption">
           <span class="figure-number">Figure 16:</span>
