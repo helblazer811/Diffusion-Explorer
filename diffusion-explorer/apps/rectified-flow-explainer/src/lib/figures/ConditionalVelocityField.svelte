@@ -1,17 +1,19 @@
 <script>
-  import { onMount } from "svelte";
   import { Figure, drawScatterPlot, drawArrow, drawMathjaxOnCanvas, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
-  // ===== CAPTION =====
-  export let children = undefined;
-  $: caption = children;
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
 
-  // ===== DATA PROPS =====
+  // Caption
+  export let children = undefined;
+
+  // Data props
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
 
-  // ===== LAYOUT PROPS =====
+  // Layout props
   export let width = 800;
   export let height = 450;
   export let marginWidth = 50;
@@ -20,52 +22,57 @@
   export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let yShiftFactor = -0.2;
 
-  // ===== SCATTER PLOT STYLING =====
+  // Scatter plot styling
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export let targetPointColor = settings.stylingSettings.scatterPlot.color;
 
-  // ===== PATH LINE STYLING =====
+  // Path line styling
   export let pathLineColor = "#888";
   export let pathLineOpacity = 0.25;
   export let pathLineWidth = 3;
   export let numPathLines = 15;
 
-  // ===== SELECTED TARGET POINT STYLING =====
+  // Selected target point styling
   export let selectedTargetColor = "#888";
   export let selectedTargetRadius = 5;
 
-  // ===== INTERMEDIATE POINT STYLING =====
+  // Intermediate point styling
   export let intermediatePointColor = "#f17720";
   export let intermediatePointRadius = 6;
 
-  // ===== CONDITIONAL VECTOR STYLING =====
+  // Conditional vector styling
   export let vectorColor = "#f17720";
   export let vectorOpacity = 1.0;
   export let vectorWidth = 4.5;
   export let vectorScale = 110;
   export let t = 0.4;
 
-  // ===== LABEL STYLING =====
+  // Label styling
   export let labelYShiftFactor = 0.5;
 
-  // ===== BACKGROUND =====
+  // Background
   export let backgroundVisible = true;
 
-  // ===== LATEX LABEL STYLING =====
+  // LaTeX label styling
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
-  // ===== STATE =====
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
+  $: caption = children;
+
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
+
   let scales = null;
   let isInitialized = false;
-  let figureIsActive;
 
   // Pre-computed pixel coordinates
   let sourcePixelCoords = [];
@@ -76,7 +83,10 @@
   let selectedSourceIndices = [];
   let selectedPathIndex = 0;
 
-  // ===== PRE-COMPUTE COORDINATES =====
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
+
   function precomputeScatterCoords() {
     if (!scales) return;
 
@@ -93,7 +103,6 @@
     ]);
   }
 
-  // ===== CANVAS DRAWING HELPERS =====
   function drawLine(x1, y1, x2, y2, color, lineW, opacity = 1) {
     ctx.save();
     ctx.globalAlpha = opacity;
@@ -116,7 +125,6 @@
     ctx.restore();
   }
 
-  // ===== SELECTION LOGIC =====
   function selectRandomIndices() {
     selectedTargetIndex = Math.floor(
       Math.random() * targetDistributionSamples.length
@@ -179,7 +187,42 @@
     return { x: pixelX, y: pixelY };
   }
 
-  // ===== MAIN DRAW FUNCTION =====
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
+    if (!canvas) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
+
+    selectRandomIndices();
+
+    scales = createSourceTargetScales(
+      sourceDistributionSamples,
+      targetDistributionSamples,
+      {
+        width,
+        height,
+        marginWidth,
+        marginHeight,
+        sourceCenterX,
+        targetCenterX,
+        yShiftFactor,
+      }
+    );
+
+    selectPathByAngle();
+    precomputeScatterCoords();
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
   async function draw() {
     if (!ctx || !scales || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
@@ -300,55 +343,23 @@
     }
   }
 
-  // ===== INITIALIZATION =====
-  function initializeVisualization() {
-    if (!canvas) return;
-    if (
-      sourceDistributionSamples.length === 0 ||
-      targetDistributionSamples.length === 0
-    )
-      return;
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
 
-    selectRandomIndices();
-
-    scales = createSourceTargetScales(
-      sourceDistributionSamples,
-      targetDistributionSamples,
-      {
-        width,
-        height,
-        marginWidth,
-        marginHeight,
-        sourceCenterX,
-        targetCenterX,
-        yShiftFactor,
-      }
-    );
-
-    selectPathByAngle();
-    precomputeScatterCoords();
-  }
-
-  // ===== REACTIVE INITIALIZATION =====
   $: if (
     !isInitialized &&
     sourceDistributionSamples.length > 0 &&
     targetDistributionSamples.length > 0 &&
     canvas
   ) {
-    initializeVisualization();
+    runInitialComputation();
     isInitialized = true;
     draw();
   }
-
-  onMount(() => {
-    return () => {
-      // Cleanup if needed
-    };
-  });
 </script>
 
-<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+<Figure {caption} {backgroundVisible}>
   {#snippet children()}
     <div style="width: 100%; max-width: {width}px;">
       <canvas

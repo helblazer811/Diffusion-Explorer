@@ -5,9 +5,12 @@
   import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
+
   // Caption slot (passed as default children)
   export let children = undefined;
-  $: caption = children;
 
   // Data props
   export let sourceDistributionSamples = [];
@@ -54,11 +57,22 @@
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
-  // Canvas state - need both bind:this (for reactivity) and action (for DPR setup)
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
+  $: caption = children;
+
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
+
+  // Animation state type
+  type AnimState = {
+    time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
+  };
 
   // Scales and pre-computed coordinates
   let scales = null;
@@ -71,59 +85,15 @@
   let isPlaying = playingByDefault;
   let time = 0;
   let isInitialized = false;
-  let timeline: Timeline<{ time: number }> | null = null;
-
-  // Forward clip (0→1) - reducer pattern
-  const forwardClip = {
-    name: "Forward",
-    duration: 1,
-    reduce(t: number) {
-      return { time: t };
-    }
-  };
-
-  // Backward clip (1→0) - reducer pattern
-  const backwardClip = {
-    name: "Backward",
-    duration: 1,
-    reduce(t: number) {
-      return { time: 1 - t };
-    }
-  };
+  let timeline: Timeline<AnimState> | null = null;
 
   // Visibility-based animation control
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
 
-  function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
-      wasPlayingBeforeHidden = true;
-      isPlaying = false;
-      stopAnimation();
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      isPlaying = true;
-      startAnimation();
-    }
-  }
-
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-  }
-
-  function handleSliderInput() {
-    // Sync timeline with slider using seek
-    if (timeline) {
-      // The time variable is already updated by the slider binding
-      // Timeline state is updated via onTick callback
-      timeline.seek(time);
-    }
-  }
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   // Pre-compute scatter coordinates
   function precomputeScatterCoords() {
@@ -177,10 +147,95 @@
     ctx.restore();
   }
 
-  // Main draw function - pure renderer: receives t from Timeline
-  async function draw(t: number) {
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
+    if (!canvas) return;
+    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+
+    // Create scales
+    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width,
+      height,
+      marginWidth,
+      marginHeight,
+      sourceCenterX,
+      targetCenterX,
+      yShiftFactor,
+    });
+
+    // Pre-compute scatter coordinates
+    precomputeScatterCoords();
+  }
+
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  // Forward clip (0→1) - reducer pattern
+  const forwardClip = {
+    name: "Forward",
+    duration: 1,
+    reduce(t: number) {
+      return { time: t };
+    }
+  };
+
+  // Backward clip (1→0) - reducer pattern
+  const backwardClip = {
+    name: "Backward",
+    duration: 1,
+    reduce(t: number) {
+      return { time: 1 - t };
+    }
+  };
+
+  function setupTimeline() {
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = { time: 0 };
+
+    // Total cycle: forward + pause + backward + pause
+    const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
+    const forwardDuration = animationDuration / totalCycleDuration;
+    const pauseNormalized = pauseDuration / totalCycleDuration;
+
+    // Add clips in sequence
+    timeline.add({ ...forwardClip, duration: forwardDuration }, 0);
+    timeline.add(createPauseClip(pauseNormalized), forwardDuration);
+    timeline.add({ ...backwardClip, duration: forwardDuration }, forwardDuration + pauseNormalized);
+    timeline.add(createPauseClip(pauseNormalized), 2 * forwardDuration + pauseNormalized);
+
+    // Set duration in seconds
+    timeline.duration = totalCycleDuration / 1000;
+    timeline.looping = true;
+
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      time = state.time;  // For slider binding
+      draw(state);
+    });
+  }
+
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
+  }
+
+  function stopAnimation() {
+    if (timeline) timeline.pause();
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
+  async function draw(state: AnimState) {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
+
+    const t = state.time;
 
     // Draw text labels
     const textY = marginHeight / 2;
@@ -253,60 +308,49 @@
     );
   }
 
-  // Initialize animation timeline with bidirectional clips and pauses
-  function initializeAnimation() {
-    timeline = new Timeline<{ time: number }>();
-    timeline.initialState = { time: 0 };
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
 
-    // Total cycle: forward + pause + backward + pause
-    const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
-    const forwardDuration = animationDuration / totalCycleDuration;
-    const pauseNormalized = pauseDuration / totalCycleDuration;
-
-    // Add clips in sequence
-    timeline.add({ ...forwardClip, duration: forwardDuration }, 0);
-    timeline.add(createPauseClip(pauseNormalized), forwardDuration);
-    timeline.add({ ...backwardClip, duration: forwardDuration }, forwardDuration + pauseNormalized);
-    timeline.add(createPauseClip(pauseNormalized), 2 * forwardDuration + pauseNormalized);
-
-    // Set duration in seconds
-    timeline.duration = totalCycleDuration / 1000;
-    timeline.looping = true;
-
-    // Register tick callback
-    timeline.onTick((_t, state) => {
-      time = state.time;  // For slider binding
-      draw(state.time);
-    });
+  function handleVisibilityChange(isActive) {
+    if (!isActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+      stopAnimation();
+    } else if (isActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+      startAnimation();
+    }
   }
 
-  function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+  function toggleAnimation() {
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      startAnimation();
+    } else {
+      stopAnimation();
+    }
   }
 
-  function stopAnimation() {
+  function handleSliderInput() {
+    // Sync timeline with slider using seek
+    if (timeline) {
+      timeline.seek(time);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
+  onDestroy(() => {
     if (timeline) timeline.pause();
-  }
+  });
 
-  function initializeVisualization() {
-    if (!canvas) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
-
-    // Create scales
-    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width,
-      height,
-      marginWidth,
-      marginHeight,
-      sourceCenterX,
-      targetCenterX,
-      yShiftFactor,
-    });
-
-    // Pre-compute scatter coordinates
-    precomputeScatterCoords();
-  }
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
 
   // Reactive initialization
   $: if (
@@ -315,10 +359,10 @@
     targetDistributionSamples.length > 0 &&
     canvas
   ) {
-    initializeVisualization();
-    initializeAnimation();
+    runInitialComputation();
+    setupTimeline();
     isInitialized = true;
-    draw(0);
+    draw(timeline!.initialState);
     if (isPlaying) startAnimation();
   }
 
@@ -328,13 +372,9 @@
   }
 
   // Update drawing when time changes (e.g., from slider drag)
-  $: if (isInitialized && time !== undefined) {
-    draw(time);
+  $: if (isInitialized && time !== undefined && timeline) {
+    draw(timeline.state);
   }
-
-  onDestroy(() => {
-    if (timeline) timeline.pause();
-  });
 </script>
 
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>

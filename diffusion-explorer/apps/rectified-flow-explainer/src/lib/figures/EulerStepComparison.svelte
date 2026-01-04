@@ -1,6 +1,6 @@
 <!-- Compares Euler sampler trajectories between Flow Matching and Rectified Flow with varying step counts -->
 
-<script>
+<script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
   import {
@@ -9,8 +9,7 @@
     drawTrajectoriesWithPreview,
     Slider,
     FigureLegend,
-    Clock,
-    Track,
+    Timeline,
     useCanvas2D,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
@@ -130,64 +129,112 @@
   const segmentPauseDuration = 400;
   const endPauseDuration = 2500;
 
-  // Animation state
-  let leftState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
-  let rightState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+  // Animation state (combined for single Timeline)
+  type AnimState = {
+    leftSegmentIndex: number;
+    leftSegmentProgress: number;
+    leftInEndPause: boolean;
+    rightSegmentIndex: number;
+    rightSegmentProgress: number;
+    rightInEndPause: boolean;
+  };
 
-  // Tracks and clock for animation
-  let leftTrack = new Track();
-  let rightTrack = new Track();
-  const clock = new Clock();
+  // Derived state for compatibility with draw functions
+  $: leftState = {
+    segmentIndex: timeline?.state?.leftSegmentIndex ?? 0,
+    segmentProgress: timeline?.state?.leftSegmentProgress ?? 0,
+    inEndPause: timeline?.state?.leftInEndPause ?? false
+  };
+  $: rightState = {
+    segmentIndex: timeline?.state?.rightSegmentIndex ?? 0,
+    segmentProgress: timeline?.state?.rightSegmentProgress ?? 0,
+    inEndPause: timeline?.state?.rightInEndPause ?? false
+  };
 
-  // Create segment clip that animates through segments with pauses
-  function createSegmentClip(numSegments) {
+  // Timeline for animation
+  let timeline: Timeline<AnimState> | null = null;
+
+  // Track previous end pause state for detecting transitions
+  let prevLeftInEndPause = false;
+  let prevRightInEndPause = false;
+
+  // Create segment clip for left side
+  function createLeftSegmentClip(numSegments: number, segmentPhaseMs: number, segmentPhaseNormalized: number) {
     const cycleTime = segmentDuration + segmentPauseDuration;
-    const segmentPhaseMs = numSegments * cycleTime;
-    const totalMs = segmentPhaseMs + endPauseDuration;
-    const segmentPhaseNormalized = segmentPhaseMs / totalMs;
-
     return {
-      name: "Segments",
+      name: "LeftSegments",
       duration: segmentPhaseNormalized,
-      apply(t, _params, state) {
+      reduce(t: number) {
         const absoluteTime = t * segmentPhaseMs;
         const segmentIdx = Math.floor(absoluteTime / cycleTime);
         const timeInCycle = absoluteTime % cycleTime;
 
-        state.segmentIndex = Math.min(segmentIdx, numSegments);
-        if (segmentIdx < numSegments && timeInCycle < segmentDuration) {
-          state.segmentProgress = timeInCycle / segmentDuration;
-        } else {
-          state.segmentProgress = 1;
-        }
-        state.inEndPause = false;
+        const segmentIndex = Math.min(segmentIdx, numSegments);
+        const segmentProgress = (segmentIdx < numSegments && timeInCycle < segmentDuration)
+          ? timeInCycle / segmentDuration
+          : 1;
+
+        return {
+          leftSegmentIndex: segmentIndex,
+          leftSegmentProgress: segmentProgress,
+          leftInEndPause: false
+        };
       }
     };
   }
 
-  // Create end pause clip that triggers error line drawing
-  function createEndPauseClipWithCallback(duration, onEnter) {
-    let hasCalledOnEnter = false;
+  // Create segment clip for right side
+  function createRightSegmentClip(numSegments: number, segmentPhaseMs: number, segmentPhaseNormalized: number) {
+    const cycleTime = segmentDuration + segmentPauseDuration;
     return {
-      name: "EndPause",
-      duration,
-      apply(_t, _params, state) {
-        state.inEndPause = true;
-        state.segmentProgress = 1;
-        if (!hasCalledOnEnter) {
-          hasCalledOnEnter = true;
-          onEnter?.();
-        }
-      },
-      reset() {
-        hasCalledOnEnter = false;
+      name: "RightSegments",
+      duration: segmentPhaseNormalized,
+      reduce(t: number) {
+        const absoluteTime = t * segmentPhaseMs;
+        const segmentIdx = Math.floor(absoluteTime / cycleTime);
+        const timeInCycle = absoluteTime % cycleTime;
+
+        const segmentIndex = Math.min(segmentIdx, numSegments);
+        const segmentProgress = (segmentIdx < numSegments && timeInCycle < segmentDuration)
+          ? timeInCycle / segmentDuration
+          : 1;
+
+        return {
+          rightSegmentIndex: segmentIndex,
+          rightSegmentProgress: segmentProgress,
+          rightInEndPause: false
+        };
       }
     };
   }
 
-  // Store end pause clips for reset
-  let leftEndPauseClip = null;
-  let rightEndPauseClip = null;
+  // Create end pause clip for left side
+  function createLeftEndPauseClip(duration: number) {
+    return {
+      name: "LeftEndPause",
+      duration,
+      reduce() {
+        return {
+          leftInEndPause: true,
+          leftSegmentProgress: 1
+        };
+      }
+    };
+  }
+
+  // Create end pause clip for right side
+  function createRightEndPauseClip(duration: number) {
+    return {
+      name: "RightEndPause",
+      duration,
+      reduce() {
+        return {
+          rightInEndPause: true,
+          rightSegmentProgress: 1
+        };
+      }
+    };
+  }
 
   // ===== FUNCTIONS =====
 
@@ -290,7 +337,7 @@
 
     // Draw initial state immediately
     isLoading = false;
-    setupTracks();
+    setupTimeline();
     startApproxAnimation();
 
     let completedCount = 0;
@@ -345,8 +392,8 @@
         flowMatchingTrajectories[currentSteps] = flowMatchingTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
-        // Recreate tracks to pick up new data and start them
-        setupTracks();
+        // Recreate timeline to pick up new data and start it
+        setupTimeline();
         startApproxAnimation();
       }
     );
@@ -365,8 +412,8 @@
         rectifiedFlowTrajectories[currentSteps] = rectifiedFlowTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
-        // Recreate tracks to pick up new data and start them
-        setupTracks();
+        // Recreate timeline to pick up new data and start it
+        setupTimeline();
         startApproxAnimation();
       }
     );
@@ -574,12 +621,12 @@
   }
 
   // Calculate total animation duration in ms
-  function getTotalAnimationMs(numSegments) {
+  function getTotalAnimationMs(numSegments: number) {
     return numSegments * (segmentDuration + segmentPauseDuration) + endPauseDuration;
   }
 
-  // Setup tracks for the current step count
-  function setupTracks() {
+  // Setup timeline for the current step count
+  function setupTimeline() {
     const currentSteps = stepValues[currentStepIndex];
     const cycleTime = segmentDuration + segmentPauseDuration;
     const segmentPhaseMs = currentSteps * cycleTime;
@@ -587,20 +634,62 @@
     const segmentPhaseNormalized = segmentPhaseMs / totalMs;
     const endPauseNormalized = endPauseDuration / totalMs;
 
-    // Reset tracks
-    leftTrack = new Track();
-    rightTrack = new Track();
+    // Create new timeline
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = {
+      leftSegmentIndex: 0,
+      leftSegmentProgress: 0,
+      leftInEndPause: false,
+      rightSegmentIndex: 0,
+      rightSegmentProgress: 0,
+      rightInEndPause: false
+    };
 
-    // Create clips
-    const leftSegmentClip = createSegmentClip(currentSteps);
-    leftEndPauseClip = createEndPauseClipWithCallback(endPauseNormalized, drawLeftErrorLines);
-    leftTrack.add(leftSegmentClip, 0);
-    leftTrack.add(leftEndPauseClip, segmentPhaseNormalized);
+    // Add clips for both sides
+    timeline.add(createLeftSegmentClip(currentSteps, segmentPhaseMs, segmentPhaseNormalized), 0);
+    timeline.add(createRightSegmentClip(currentSteps, segmentPhaseMs, segmentPhaseNormalized), 0);
+    timeline.add(createLeftEndPauseClip(endPauseNormalized), segmentPhaseNormalized);
+    timeline.add(createRightEndPauseClip(endPauseNormalized), segmentPhaseNormalized);
 
-    const rightSegmentClip = createSegmentClip(currentSteps);
-    rightEndPauseClip = createEndPauseClipWithCallback(endPauseNormalized, drawRightErrorLines);
-    rightTrack.add(rightSegmentClip, 0);
-    rightTrack.add(rightEndPauseClip, segmentPhaseNormalized);
+    // Set timeline duration in seconds
+    timeline.duration = totalMs / 1000;
+    timeline.looping = false; // We handle looping manually for regeneration
+
+    // Reset transition tracking
+    prevLeftInEndPause = false;
+    prevRightInEndPause = false;
+
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      // Detect transitions into end pause state to trigger error line drawing
+      if (state.leftInEndPause && !prevLeftInEndPause) {
+        drawLeftErrorLines();
+      }
+      if (state.rightInEndPause && !prevRightInEndPause) {
+        drawRightErrorLines();
+      }
+      prevLeftInEndPause = state.leftInEndPause;
+      prevRightInEndPause = state.rightInEndPause;
+
+      // Handle looping - generate new random start point
+      if (timeline && timeline.isAtEnd) {
+        timeline.pause();
+
+        // Generate a new random starting point for the next cycle
+        userStartPoints = [generateRandomStartPoint()];
+
+        // Reset transition tracking
+        prevLeftInEndPause = false;
+        prevRightInEndPause = false;
+
+        // Recompute trajectories (which will restart animation)
+        computeAllTrajectories();
+        return;
+      }
+
+      drawLeftFrame();
+      drawRightFrame();
+    });
   }
 
   // Draw a full frame (background + approximation)
@@ -625,56 +714,18 @@
   }
 
   function startApproxAnimation() {
-    if (clock.isRunning) return;
-
-    const currentSteps = stepValues[currentStepIndex];
-    const totalMs = getTotalAnimationMs(currentSteps);
-
-    clock.start((dt) => {
-      // Convert real time (seconds) to normalized time
-      const normalizedDt = dt / (totalMs / 1000);
-
-      // Update both tracks
-      leftTrack.update(normalizedDt, {}, leftState);
-      rightTrack.update(normalizedDt, {}, rightState);
-
-      // Handle looping - generate new random start point
-      if (leftTrack.time >= 1) {
-        leftTrack.reset();
-        rightTrack.reset();
-        leftEndPauseClip?.reset?.();
-        rightEndPauseClip?.reset?.();
-        leftState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
-        rightState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
-
-        // Generate a new random starting point for the next cycle
-        userStartPoints = [generateRandomStartPoint()];
-
-        // Stop animation and recompute trajectories (which will restart animation)
-        clock.stop();
-        computeAllTrajectories();
-        return;
-      }
-
-      drawLeftFrame();
-      drawRightFrame();
-    });
+    if (!timeline || timeline.isPlaying) return;
+    timeline.play();
   }
 
   function stopApproxAnimation() {
-    clock.stop();
+    if (timeline) timeline.pause();
   }
 
   function resetApproxAnimation() {
     stopApproxAnimation();
-    leftTrack.reset();
-    rightTrack.reset();
-    leftEndPauseClip?.reset?.();
-    rightEndPauseClip?.reset?.();
-    leftState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
-    rightState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
-    // Recreate tracks to pick up any trajectory changes
-    setupTracks();
+    // Recreate timeline to pick up any trajectory changes
+    setupTimeline();
     startApproxAnimation();
   }
 
@@ -693,14 +744,11 @@
 
   // Handle canvas click - convert to domain coordinates and add/replace start point
   function handleCanvasClick(event, side) {
-    // Stop current animation and reset tracks
+    // Stop current animation and reset
     stopApproxAnimation();
-    leftTrack.reset();
-    rightTrack.reset();
-    leftEndPauseClip?.reset?.();
-    rightEndPauseClip?.reset?.();
-    leftState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
-    rightState = { segmentIndex: 0, segmentProgress: 0, inEndPause: false };
+    if (timeline) timeline.reset();
+    prevLeftInEndPause = false;
+    prevRightInEndPause = false;
 
     const canvas = side === "left" ? leftCanvas : rightCanvas;
     const rect = canvas.getBoundingClientRect();

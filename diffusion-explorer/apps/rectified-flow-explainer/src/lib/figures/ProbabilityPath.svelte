@@ -6,9 +6,12 @@
   import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
+
   // Caption slot (passed as default children)
   export let children = undefined;
-  $: caption = children;
 
   // Data props (from parent +page.svelte)
   export let sourceDistributionSamples = [];
@@ -67,19 +70,25 @@
   export let latexLabelOffsetY = 20;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
-  // Canvas state - need both bind:this (for reactivity) and action (for DPR setup)
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
+  $: caption = children;
 
   // Scales and pre-computed coordinates
   let scales = null;
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
 
-  // Animation state type - derived values computed by clips (NOT time)
+  // Animation state type
   type AnimState = {
+    time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     currentStep: number;
     centerX: number;
   };
@@ -100,33 +109,9 @@
   // Derived
   $: numSteps = $allTimeSamples?.length || 1;
 
-  function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
-      wasPlayingBeforeHidden = true;
-      isPlaying = false;
-      stopAnimation();
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      isPlaying = true;
-      startAnimation();
-    }
-  }
-
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-  }
-
-  function handleSliderInput() {
-    // Sync timeline with slider using seek
-    if (timeline) {
-      timeline.seek(time);
-    }
-  }
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   /**
    * Compute pixel x position for a point at a given time
@@ -156,10 +141,101 @@
     ]);
   }
 
-  // Pure renderer - accepts time from Timeline + pre-computed state
-  async function draw(t: number, state: AnimState) {
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
+    if (!canvas) return;
+    if (
+      sourceDistributionSamples.length === 0 ||
+      targetDistributionSamples.length === 0
+    )
+      return;
+
+    // Create scales
+    scales = createSourceTargetScales(
+      sourceDistributionSamples,
+      targetDistributionSamples,
+      {
+        width,
+        height,
+        marginWidth,
+        marginHeight,
+        sourceCenterX,
+        targetCenterX,
+        yShiftFactor,
+        distributionScaleFactor,
+      }
+    );
+
+    // Pre-compute static scatter coordinates
+    precomputeScatterCoords();
+  }
+
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  function setupTimeline() {
+    // Cache numSteps for clip closure
+    cachedNumSteps = $allTimeSamples?.length || 1;
+
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = { time: 0, currentStep: 0, centerX: scales.sourceCenterPixelX };
+
+    // Calculate normalized durations for timeline
+    const totalDuration = animationDuration + animationPauseTime;
+    const mainDuration = animationDuration / totalDuration;
+    const pauseClipDuration = animationPauseTime / totalDuration;
+
+    // Main animation clip - computes derived state from t
+    const mainClip = {
+      name: "Animation",
+      duration: mainDuration,
+      reduce(t: number) {
+        return {
+          time: t,
+          currentStep: Math.round(t * (cachedNumSteps - 1)),
+          centerX: scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX)
+        };
+      }
+    };
+
+    // Add main animation clip (0 to mainDuration of timeline)
+    timeline.add(mainClip, 0);
+    // Add pause clip (mainDuration to 1)
+    timeline.add(createPauseClip(pauseClipDuration), mainDuration);
+
+    // Set timeline duration in seconds and enable looping
+    timeline.duration = totalDuration / 1000;
+    timeline.looping = true;
+
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      time = state.time;  // For slider binding
+      draw(state);
+    });
+  }
+
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
+  }
+
+  function stopAnimation() {
+    if (timeline) timeline.pause();
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
+  async function draw(state: AnimState) {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
+
+    const t = state.time;
 
     // Draw text labels
     const textY = marginHeight / 2;
@@ -277,87 +353,53 @@
     }
   }
 
-  function initializeVisualization() {
-    if (!canvas) return;
-    if (
-      sourceDistributionSamples.length === 0 ||
-      targetDistributionSamples.length === 0
-    )
-      return;
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
 
-    // Create scales
-    scales = createSourceTargetScales(
-      sourceDistributionSamples,
-      targetDistributionSamples,
-      {
-        width,
-        height,
-        marginWidth,
-        marginHeight,
-        sourceCenterX,
-        targetCenterX,
-        yShiftFactor,
-        distributionScaleFactor,
-      }
-    );
-
-    // Pre-compute static scatter coordinates
-    precomputeScatterCoords();
+  function handleVisibilityChange(isActive) {
+    if (!isActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+      stopAnimation();
+    } else if (isActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+      startAnimation();
+    }
   }
 
-  // Initialize animation timeline with main clip and pause
-  function initializeAnimation() {
-    // Cache numSteps for clip closure
-    cachedNumSteps = $allTimeSamples?.length || 1;
-
-    timeline = new Timeline<AnimState>();
-    timeline.initialState = { currentStep: 0, centerX: scales.sourceCenterPixelX };
-
-    // Calculate normalized durations for timeline
-    const totalDuration = animationDuration + animationPauseTime;
-    const mainDuration = animationDuration / totalDuration;
-    const pauseClipDuration = animationPauseTime / totalDuration;
-
-    // Main animation clip - computes derived state from t
-    const mainClip = {
-      name: "Animation",
-      duration: mainDuration,
-      reduce(t: number) {
-        return {
-          currentStep: Math.round(t * (cachedNumSteps - 1)),
-          centerX: scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX)
-        };
-      }
-    };
-
-    // Add main animation clip (0 to mainDuration of timeline)
-    timeline.add(mainClip, 0);
-    // Add pause clip (mainDuration to 1)
-    timeline.add(createPauseClip(pauseClipDuration), mainDuration);
-
-    // Set timeline duration in seconds and enable looping
-    timeline.duration = totalDuration / 1000;
-    timeline.looping = true;
-
-    // Register tick callback - t from Timeline, state from clips
-    timeline.onTick((t, state) => {
-      time = t;  // For slider binding
-      draw(t, state);
-    });
+  function toggleAnimation() {
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      startAnimation();
+    } else {
+      stopAnimation();
+    }
   }
 
-  function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+  function handleSliderInput() {
+    // Sync timeline with slider using seek
+    if (timeline) {
+      timeline.seek(time);
+    }
   }
 
-  function stopAnimation() {
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
+  onDestroy(() => {
     if (timeline) timeline.pause();
-  }
+  });
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
 
   // Update visualization when time changes (e.g., from slider drag)
   $: if (isInitialized && time !== undefined && timeline) {
-    draw(time, timeline.state);
+    draw(timeline.state);
   }
 
   // React to data changes and initialize visualization once
@@ -368,10 +410,10 @@
     $allTimeSamples?.length > 0 &&
     canvas
   ) {
-    initializeVisualization();
-    initializeAnimation();
+    runInitialComputation();
+    setupTimeline();
     isInitialized = true;
-    draw(0, timeline!.initialState);
+    draw(timeline!.initialState);
     if (isPlaying) startAnimation();
   }
 
@@ -379,10 +421,6 @@
   $: if (figureIsActive !== undefined && isInitialized) {
     handleVisibilityChange($figureIsActive);
   }
-
-  onDestroy(() => {
-    if (timeline) timeline.pause();
-  });
 </script>
 
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>

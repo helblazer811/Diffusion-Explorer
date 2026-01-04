@@ -3,43 +3,52 @@
   import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
+
   // FlowModelClient instance (passed from parent, created with correct base path)
   export let flowMatchingClient = null;
 
+  // Data props
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
   export let allTimeSamples; // [timestep][sample][dim]
+
+  // Animation settings
   export let animationDuration = 6000;
   export let playingByDefault = true;
   export let pauseBeforeRestart = 1000;
+
+  // Layout
   export let width = 750;
   export let height = 375;
   export let marginWidth = 50;
   export let marginHeight = 20;
+
+  // Trajectory settings
   export let numTrajectoriesToShow = 10;
   export let maxTrajectories = 30;
   export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
 
-  // User-defined trajectory state (matches CrownJewel naming)
-  let userStartPoints = []; // Array of [x, y] domain coordinates
-  let userTrajectories = []; // [trajectory][timestep][x,y] in pixel coordinates
-  let activeRequestId = null;
-  let isStreamingTrajectory = false;
-  let mostRecentTrajectoryIndices = []; // Indices of the most recently added trajectories
-  let hasUserTrajectory = false; // Track if user has clicked at all
-
   // Caption slot (passed as default children)
   export let children = undefined;
+
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
   $: caption = children;
 
-  // Canvas state - need both bind:this (for reactivity) and action (for DPR setup)
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
-  // Animation state type - derived values computed by clips (NOT time)
+  // Animation state type
   type AnimState = {
+    time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     segmentIndex: number;
   };
 
@@ -64,9 +73,21 @@
   let selectedTrajectoryIndices = [];
   let combinedMeanX = 0;
 
+  // User-defined trajectory state (matches CrownJewel naming)
+  let userStartPoints = []; // Array of [x, y] domain coordinates
+  let userTrajectories = []; // [trajectory][timestep][x,y] in pixel coordinates
+  let activeRequestId = null;
+  let isStreamingTrajectory = false;
+  let mostRecentTrajectoryIndices = []; // Indices of the most recently added trajectories
+  let hasUserTrajectory = false; // Track if user has clicked at all
+
   // Derived values
   $: numTimeSteps = allTimeSamples?.length || 1;
   $: numSegments = numTimeSteps - 1;
+
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   // Pick trajectories (first N samples)
   function selectTrajectoryIndices() {
@@ -125,118 +146,11 @@
     });
   }
 
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
 
-  // Handle canvas click - restricted to source distribution region
-  function handleCanvasClick(event) {
-    if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
-    if (!scales || !canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = width / rect.width;
-    const scaleY = height / rect.height;
-    const clickX = (event.clientX - rect.left) * scaleX;
-    const clickY = (event.clientY - rect.top) * scaleY;
-
-    // Restrict to source distribution region (left half of canvas)
-    const sourceRegionMaxX = width * 0.5;
-    if (clickX > sourceRegionMaxX) return;
-
-    // Convert pixel to domain coordinates
-    // Inverse of: pixelX = sourceCenterPixelX + (dataX - sourceMeanX) * xScaleFactor
-    const domainX = scales.sourceMeanX + (clickX - scales.sourceCenterPixelX) / scales.xScaleFactor;
-    const domainY = scales.yScale.invert(clickY);
-
-    // Cancel any in-progress request before adding new point
-    if (activeRequestId) {
-      flowMatchingClient.stopRequest(activeRequestId);
-      activeRequestId = null;
-    }
-
-    // Add new point to the list of user start points
-    userStartPoints = [...userStartPoints, [domainX, domainY]];
-
-    // If we exceed the max, remove the oldest point
-    if (userStartPoints.length > maxUserTrajectories) {
-      userStartPoints = userStartPoints.slice(-maxUserTrajectories);
-    }
-
-    // Start sampling all user points
-    sampleFromUserPoints();
-  }
-
-  // Sample trajectories from all user start points
-  function sampleFromUserPoints() {
-    if (userStartPoints.length === 0) return;
-
-    hasUserTrajectory = true;
-    isStreamingTrajectory = true;
-
-    // Initialize trajectories for each user point at t=0 position
-    userTrajectories = userStartPoints.map(point => {
-      const initialPixelX = getPixelX(point[0], combinedMeanX, 0);
-      const initialPixelY = scales.yScale(point[1]);
-      return [[initialPixelX, initialPixelY]];
-    });
-
-    // Reset animation and start
-    if (timeline) {
-      timeline.reset();
-      timeline.play();
-      isPlaying = true;
-    }
-
-    // Sample all user points with streaming
-    const result = flowMatchingClient.sampleFromInitialPoints(
-      userStartPoints,
-      numTimeSteps,
-      {},
-      // onStep - append each new point for all trajectories, transformed to pixel space
-      (step, x_t) => {
-        const t = (step + 1) / numTimeSteps;
-        userTrajectories = userTrajectories.map((traj, sampleIdx) => {
-          if (sampleIdx < x_t.length) {
-            const pixelX = getPixelX(x_t[sampleIdx][0], combinedMeanX, t);
-            const pixelY = scales.yScale(x_t[sampleIdx][1]);
-            return [...traj, [pixelX, pixelY]];
-          }
-          return traj;
-        });
-      }
-    );
-    activeRequestId = result.requestId;
-    result.promise.then(() => {
-      // Add all completed trajectories that have enough points
-      const validTrajectories = userTrajectories.filter(t => t && t.length > 1);
-      if (validTrajectories.length > 0) {
-        // Track where the new trajectories will be added
-        const startIdx = transformedTrajectories.length;
-        transformedTrajectories = [...transformedTrajectories, ...validTrajectories];
-        mostRecentTrajectoryIndices = validTrajectories.map((_, i) => startIdx + i);
-
-        // Remove random trajectories if over cap (but not the most recent ones)
-        while (transformedTrajectories.length > maxTrajectories) {
-          // Pick random index excluding the most recent trajectories
-          let randomIdx;
-          do {
-            randomIdx = Math.floor(Math.random() * transformedTrajectories.length);
-          } while (mostRecentTrajectoryIndices.includes(randomIdx));
-
-          transformedTrajectories = transformedTrajectories.filter((_, i) => i !== randomIdx);
-          // Adjust mostRecentTrajectoryIndices
-          mostRecentTrajectoryIndices = mostRecentTrajectoryIndices.map(idx =>
-            randomIdx < idx ? idx - 1 : idx
-          );
-        }
-      }
-      userTrajectories = [];
-      userStartPoints = [];
-      isStreamingTrajectory = false;
-      activeRequestId = null;
-    });
-  }
-
-  // Initialize scales and pre-compute all data
-  function initializeData() {
+  function runInitialComputation() {
     scales = createSourceTargetScales(
       sourceDistributionSamples,
       targetDistributionSamples,
@@ -256,8 +170,52 @@
     precomputeTrajectories();
   }
 
-  // Pure renderer - accepts time from Timeline + pre-computed state
-  function draw(t: number, state: AnimState) {
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  function setupTimeline() {
+    // Cache numSegments for clip closure
+    cachedNumSegments = numSegments;
+
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = { time: 0, segmentIndex: 0 };
+
+    // Set timeline duration in seconds (animation time, not including pause)
+    timeline.duration = animationDuration / 1000;
+    timeline.looping = true;
+    timeline.endPauseDuration = pauseBeforeRestart / 1000;
+
+    // Main animation clip - computes segmentIndex from normalized time
+    const mainClip = {
+      name: "Animation",
+      duration: 1,
+      reduce(t: number) {
+        // t is normalized [0, 1] within the clip
+        const normalizedTime = t / timeline!.duration;
+        return {
+          time: normalizedTime,
+          segmentIndex: Math.floor(normalizedTime * cachedNumSegments)
+        };
+      }
+    };
+
+    timeline.add(mainClip, 0);
+
+    // Register tick callback
+    timeline.onTick((t, state) => {
+      // Normalize timeline.time to [0, 1] for slider binding
+      time = t / timeline!.duration;
+      isPlaying = timeline!.isPlaying;
+      draw(state);
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
+  function draw(state: AnimState) {
     if (!ctx || !initialized) return;
 
     // Clear canvas
@@ -391,40 +349,116 @@
     }
   }
 
-  // Initialize animation timeline (Timeline owns Clock internally)
-  function initializeAnimation() {
-    // Cache numSegments for clip closure
-    cachedNumSegments = numSegments;
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
 
-    timeline = new Timeline<AnimState>();
-    timeline.initialState = { segmentIndex: 0 };
+  // Handle canvas click - restricted to source distribution region
+  function handleCanvasClick(event) {
+    if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
+    if (!scales || !canvas) return;
 
-    // Set timeline duration in seconds (animation time, not including pause)
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
-    timeline.endPauseDuration = pauseBeforeRestart / 1000;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const clickX = (event.clientX - rect.left) * scaleX;
+    const clickY = (event.clientY - rect.top) * scaleY;
 
-    // Main animation clip - computes segmentIndex from normalized time
-    const mainClip = {
-      name: "Animation",
-      duration: 1,
-      reduce(t: number) {
-        // t is normalized [0, 1] within the clip
-        const normalizedTime = t / timeline!.duration;
-        return {
-          segmentIndex: Math.floor(normalizedTime * cachedNumSegments)
-        };
+    // Restrict to source distribution region (left half of canvas)
+    const sourceRegionMaxX = width * 0.5;
+    if (clickX > sourceRegionMaxX) return;
+
+    // Convert pixel to domain coordinates
+    // Inverse of: pixelX = sourceCenterPixelX + (dataX - sourceMeanX) * xScaleFactor
+    const domainX = scales.sourceMeanX + (clickX - scales.sourceCenterPixelX) / scales.xScaleFactor;
+    const domainY = scales.yScale.invert(clickY);
+
+    // Cancel any in-progress request before adding new point
+    if (activeRequestId) {
+      flowMatchingClient.stopRequest(activeRequestId);
+      activeRequestId = null;
+    }
+
+    // Add new point to the list of user start points
+    userStartPoints = [...userStartPoints, [domainX, domainY]];
+
+    // If we exceed the max, remove the oldest point
+    if (userStartPoints.length > maxUserTrajectories) {
+      userStartPoints = userStartPoints.slice(-maxUserTrajectories);
+    }
+
+    // Start sampling all user points
+    sampleFromUserPoints();
+  }
+
+  // Sample trajectories from all user start points
+  function sampleFromUserPoints() {
+    if (userStartPoints.length === 0) return;
+
+    hasUserTrajectory = true;
+    isStreamingTrajectory = true;
+
+    // Initialize trajectories for each user point at t=0 position
+    userTrajectories = userStartPoints.map(point => {
+      const initialPixelX = getPixelX(point[0], combinedMeanX, 0);
+      const initialPixelY = scales.yScale(point[1]);
+      return [[initialPixelX, initialPixelY]];
+    });
+
+    // Reset animation and start
+    if (timeline) {
+      timeline.reset();
+      timeline.play();
+      isPlaying = true;
+    }
+
+    // Sample all user points with streaming
+    const result = flowMatchingClient.sampleFromInitialPoints(
+      userStartPoints,
+      numTimeSteps,
+      {},
+      // onStep - append each new point for all trajectories, transformed to pixel space
+      (step, x_t) => {
+        const t = (step + 1) / numTimeSteps;
+        userTrajectories = userTrajectories.map((traj, sampleIdx) => {
+          if (sampleIdx < x_t.length) {
+            const pixelX = getPixelX(x_t[sampleIdx][0], combinedMeanX, t);
+            const pixelY = scales.yScale(x_t[sampleIdx][1]);
+            return [...traj, [pixelX, pixelY]];
+          }
+          return traj;
+        });
       }
-    };
+    );
+    activeRequestId = result.requestId;
+    result.promise.then(() => {
+      // Add all completed trajectories that have enough points
+      const validTrajectories = userTrajectories.filter(t => t && t.length > 1);
+      if (validTrajectories.length > 0) {
+        // Track where the new trajectories will be added
+        const startIdx = transformedTrajectories.length;
+        transformedTrajectories = [...transformedTrajectories, ...validTrajectories];
+        mostRecentTrajectoryIndices = validTrajectories.map((_, i) => startIdx + i);
 
-    timeline.add(mainClip, 0);
+        // Remove random trajectories if over cap (but not the most recent ones)
+        while (transformedTrajectories.length > maxTrajectories) {
+          // Pick random index excluding the most recent trajectories
+          let randomIdx;
+          do {
+            randomIdx = Math.floor(Math.random() * transformedTrajectories.length);
+          } while (mostRecentTrajectoryIndices.includes(randomIdx));
 
-    // Register tick callback - t from Timeline, state from clips
-    timeline.onTick((t, state) => {
-      // Normalize timeline.time to [0, 1] for slider binding
-      time = t / timeline!.duration;
-      isPlaying = timeline!.isPlaying;
-      draw(time, state);
+          transformedTrajectories = transformedTrajectories.filter((_, i) => i !== randomIdx);
+          // Adjust mostRecentTrajectoryIndices
+          mostRecentTrajectoryIndices = mostRecentTrajectoryIndices.map(idx =>
+            randomIdx < idx ? idx - 1 : idx
+          );
+        }
+      }
+      userTrajectories = [];
+      userStartPoints = [];
+      isStreamingTrajectory = false;
+      activeRequestId = null;
     });
   }
 
@@ -441,6 +475,18 @@
     }
   }
 
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
+  onDestroy(() => {
+    if (timeline) timeline.pause();
+  });
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
+
   // Initialize when canvas and data are ready
   $: if (
     canvas &&
@@ -450,10 +496,10 @@
     targetDistributionSamples.length > 0 &&
     !initialized
   ) {
-    initializeData();
-    initializeAnimation();
+    runInitialComputation();
+    setupTimeline();
     initialized = true;
-    draw(0, timeline!.initialState);
+    draw(timeline!.initialState);
     if (isPlaying) timeline!.play();
   }
 
@@ -467,11 +513,7 @@
   }
 
   // Redraw when time changes (e.g., slider drag)
-  $: if (initialized && time !== undefined && timeline) draw(time, timeline.state);
-
-  onDestroy(() => {
-    if (timeline) timeline.pause();
-  });
+  $: if (initialized && time !== undefined && timeline) draw(timeline.state);
 </script>
 
 <Figure {caption} backgroundVisible={false} bind:isActive={figureIsActive}>

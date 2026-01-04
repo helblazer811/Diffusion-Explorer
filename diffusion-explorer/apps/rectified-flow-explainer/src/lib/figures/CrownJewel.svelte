@@ -4,7 +4,9 @@
   import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
-  // ===== PROPS =====
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
 
   // FlowModelClient instances (passed from parent, created with correct base path)
   export let flowMatchingClient = null;
@@ -78,7 +80,9 @@
   export let backgroundVisible = true;
   export let children = undefined;
 
-  // ===== DERIVED FROM PROPS =====
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
 
   $: caption = children;
   $: isDataValid =
@@ -87,8 +91,6 @@
     targetDistribution?.length > 0;
   $: numTimeSteps = isDataValid ? leftTrajectories.length : 1;
   $: numSegments = numTimeSteps - 1;
-
-  // ===== STATE =====
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let leftCanvas = null;
@@ -105,9 +107,9 @@
 
   // Animation state (combined for single Timeline)
   type AnimState = {
-    leftTime: number;
+    leftTime: number;   // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     leftSegmentIndex: number;
-    rightTime: number;
+    rightTime: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     rightSegmentIndex: number;
   };
 
@@ -127,30 +129,6 @@
   const endPauseFraction = 0.15;
   const animationFraction = 1 - endPauseFraction;
   const rightAnimationDuration = animationFraction / 2;
-
-  // Left segment clip - runs at full speed during animation phase
-  const leftSegmentClip = {
-    name: "LeftSegments",
-    duration: animationFraction,
-    reduce(t: number) {
-      return {
-        leftTime: t,
-        leftSegmentIndex: Math.floor(t * numSegments)
-      };
-    }
-  };
-
-  // Right segment clip - runs at 2x speed (completes in half the time)
-  const rightSegmentClip = {
-    name: "RightSegments",
-    duration: rightAnimationDuration,
-    reduce(t: number) {
-      return {
-        rightTime: t,
-        rightSegmentIndex: Math.floor(t * numSegments)
-      };
-    }
-  };
 
   // Timeline for animation
   let timeline: Timeline<AnimState> | null = null;
@@ -179,7 +157,9 @@
   let activeRectifiedFlowRequestId = null; // Track active request for cancellation
   let streamingCompleteCount = 0;
 
-  // ===== FUNCTIONS =====
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   function initializeScales() {
     if (!isDataValid) return;
@@ -252,6 +232,104 @@
         : undefined,
     };
   }
+
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
+    if (!leftCanvas || !rightCanvas || !isDataValid) return;
+
+    initializeScales();
+    precomputeCoordinates();
+    pathsInitialized = true;
+    updateLeftVisualization();
+    updateRightVisualization();
+    isInitialized = true;
+    onInitialized?.();
+  }
+
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  // Left segment clip - runs at full speed during animation phase
+  const leftSegmentClip = {
+    name: "LeftSegments",
+    duration: animationFraction,
+    reduce(t: number) {
+      return {
+        leftTime: t,
+        leftSegmentIndex: Math.floor(t * numSegments)
+      };
+    }
+  };
+
+  // Right segment clip - runs at 2x speed (completes in half the time)
+  const rightSegmentClip = {
+    name: "RightSegments",
+    duration: rightAnimationDuration,
+    reduce(t: number) {
+      return {
+        rightTime: t,
+        rightSegmentIndex: Math.floor(t * numSegments)
+      };
+    }
+  };
+
+  function setupTimeline() {
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = {
+      leftTime: 0,
+      leftSegmentIndex: 0,
+      rightTime: 0,
+      rightSegmentIndex: 0
+    };
+
+    // Add clips - both start at 0, right is faster
+    timeline.add(leftSegmentClip, 0);
+    timeline.add(rightSegmentClip, 0);
+
+    // Add pause clips
+    timeline.add(createPauseClip(endPauseFraction), animationFraction);
+    timeline.add(createPauseClip(1 - rightAnimationDuration), rightAnimationDuration);
+
+    // Set timeline duration in seconds and enable looping
+    timeline.duration = animationDuration / 1000;
+    timeline.looping = true;
+
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      leftTime = state.leftTime;
+      rightTime = state.rightTime;
+      leftCurrentSegmentIndex = state.leftSegmentIndex;
+      rightCurrentSegmentIndex = state.rightSegmentIndex;
+
+      updateLeftVisualization();
+      updateRightVisualization();
+    });
+  }
+
+  function startAnimation() {
+    if (!timeline || timeline.isPlaying) return;
+    timeline.play();
+  }
+
+  function stopAnimation() {
+    if (timeline) timeline.pause();
+  }
+
+  function resetAnimation() {
+    if (timeline) timeline.reset();
+    leftTime = 0;
+    rightTime = 0;
+    leftCurrentSegmentIndex = 0;
+    rightCurrentSegmentIndex = 0;
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
 
   // Draw trajectories (clears and redraws each frame)
   // Pure renderer: receives pre-computed state, only derives userSegmentIndex from logicalTime + trajectory length
@@ -329,18 +407,6 @@
     ctx.globalAlpha = 1.0;
   }
 
-  function initializeVisualization() {
-    if (!leftCanvas || !rightCanvas || !isDataValid) return;
-
-    initializeScales();
-    precomputeCoordinates();
-    pathsInitialized = true;
-    updateLeftVisualization();
-    updateRightVisualization();
-    isInitialized = true;
-    onInitialized?.();
-  }
-
   function updateLeftVisualization() {
     if (!isDataValid || !leftCtx) return;
     draw(
@@ -361,56 +427,9 @@
     );
   }
 
-  // Initialize timeline with clips
-  function initializeTimeline() {
-    timeline = new Timeline<AnimState>();
-    timeline.initialState = {
-      leftTime: 0,
-      leftSegmentIndex: 0,
-      rightTime: 0,
-      rightSegmentIndex: 0
-    };
-
-    // Add clips - both start at 0, right is faster
-    timeline.add(leftSegmentClip, 0);
-    timeline.add(rightSegmentClip, 0);
-
-    // Add pause clips
-    timeline.add(createPauseClip(endPauseFraction), animationFraction);
-    timeline.add(createPauseClip(1 - rightAnimationDuration), rightAnimationDuration);
-
-    // Set timeline duration in seconds and enable looping
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
-
-    // Register tick callback
-    timeline.onTick((_t, state) => {
-      leftTime = state.leftTime;
-      rightTime = state.rightTime;
-      leftCurrentSegmentIndex = state.leftSegmentIndex;
-      rightCurrentSegmentIndex = state.rightSegmentIndex;
-
-      updateLeftVisualization();
-      updateRightVisualization();
-    });
-  }
-
-  function startAnimation() {
-    if (!timeline || timeline.isPlaying) return;
-    timeline.play();
-  }
-
-  function stopAnimation() {
-    if (timeline) timeline.pause();
-  }
-
-  function resetAnimation() {
-    if (timeline) timeline.reset();
-    leftTime = 0;
-    rightTime = 0;
-    leftCurrentSegmentIndex = 0;
-    rightCurrentSegmentIndex = 0;
-  }
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
 
   function togglePlayPause() {
     isPlaying = !isPlaying;
@@ -571,23 +590,9 @@
     rfResult.promise.then(checkComplete);
   }
 
-  // ===== REACTIVE EFFECTS =====
-
-  $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
-    initializeVisualization();
-    initializeTimeline();
-  }
-
-  $: if (isPlaying && pathsInitialized && timeline && !timeline.isPlaying)
-    startAnimation();
-  $: if (!isPlaying && timeline?.isPlaying) stopAnimation();
-
-  // Handle visibility changes (pause when off-screen, resume when back)
-  $: if (figureIsActive !== undefined && isInitialized) {
-    handleVisibilityChange($figureIsActive);
-  }
-
-  // ===== LIFECYCLE =====
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
 
   // Note: FlowModelClient instances are now passed as props from +page.svelte
   // This ensures they're created with the correct base path prefix
@@ -604,6 +609,24 @@
       rectifiedFlowClient.stopRequest(activeRectifiedFlowRequestId);
     }
   });
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
+
+  $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
+    runInitialComputation();
+    setupTimeline();
+  }
+
+  $: if (isPlaying && pathsInitialized && timeline && !timeline.isPlaying)
+    startAnimation();
+  $: if (!isPlaying && timeline?.isPlaying) stopAnimation();
+
+  // Handle visibility changes (pause when off-screen, resume when back)
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
+  }
 </script>
 
 {#if isDataValid}

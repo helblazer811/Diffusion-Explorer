@@ -16,7 +16,9 @@
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
-  // ===== PROPS =====
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
 
   // FlowModelClient instance (passed from parent, created with correct base path)
   export let flowMatchingClient = null;
@@ -77,27 +79,31 @@
   export let showGroundTruth = true;
   export let showLegend = true;
 
-  // ===== CONSTANTS =====
-
+  // Constants
   const NUM_STEPS = 16;
   const GROUND_TRUTH_STEPS = 64;
-
-  // Animation timing
   const STEP_DURATION = 400; // Duration per Euler step in ms
   const PAUSE_BEFORE_RESTART = 1500;
 
-  // ===== DERIVED FROM PROPS =====
-
+  // Derived from props
   $: caption = children;
   $: isDataValid = targetDistribution?.length > 0;
   $: hasVectorField = flowMatchingVectorField?.velocities?.length > 0;
 
-  // ===== STATE =====
+  // Legend items
+  const legendItems = [
+    { type: 'line', color: arrowColor, label: 'Velocity Field' },
+    { type: 'line', color: groundTruthColor, label: 'Ground Truth' },
+    { type: 'line', color: approximationColor, label: `Approximation (${NUM_STEPS} steps)` },
+  ];
 
-  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
+  // Canvas
   let canvas = null;
   const canvas2d = useCanvas2D(canvasWidth, canvasHeight);
-  // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
   // Scales
@@ -117,86 +123,39 @@
 
   // Request ID tracking for cancellation
   let groundTruthRequestId = null;
-  let activeRequestId = null; // For approximation streaming
+  let activeRequestId = null;
   let isStreamingTrajectory = false;
 
   // Loading state
   let isLoading = true;
-
-  // Initialization
   let isInitialized = false;
 
-  // Animation system setup
-  // Calculate normalized durations for euler steps + pause
-  const EULER_REAL_DURATION = NUM_STEPS * STEP_DURATION; // 6400ms
-  const TOTAL_REAL_DURATION = EULER_REAL_DURATION + PAUSE_BEFORE_RESTART; // 7900ms
-  const eulerNormalizedDuration = EULER_REAL_DURATION / TOTAL_REAL_DURATION; // ~0.81
-  const pauseNormalizedDuration = PAUSE_BEFORE_RESTART / TOTAL_REAL_DURATION; // ~0.19
-
   // Animation state type
-  type AnimationState = {
-    time: number;
+  type AnimState = {
+    time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     currentStep: number;
     segmentIndex: number;
     segmentProgress: number;
   };
 
-  // Euler step clip - maps normalized time to step + segment progress (reducer pattern)
-  const eulerStepClip = {
-    name: "EulerSteps",
-    duration: eulerNormalizedDuration,
-    reduce(t: number) {
-      const rawStep = t * NUM_STEPS;
-      const currentStep = Math.floor(rawStep);
-      return {
-        time: t,
-        currentStep,
-        segmentIndex: currentStep,
-        segmentProgress: rawStep - currentStep,
-      };
-    }
-  };
-
-  // Create timeline with euler + pause sequence
-  const timeline = new Timeline<AnimationState>();
-  timeline.initialState = {
-    time: 0,
-    currentStep: 0,
-    segmentIndex: 0,
-    segmentProgress: 0,
-  };
-  timeline.add(eulerStepClip, 0);
-  timeline.add(createPauseClip(pauseNormalizedDuration), eulerNormalizedDuration);
-  timeline.duration = TOTAL_REAL_DURATION / 1000; // Duration in seconds
-  timeline.looping = true;
-
-  // Playback state (bound to TimeSlider)
+  // Timeline and playback state
+  let timeline: Timeline<AnimState> | null = null;
   let isPlaying = true;
-
-  // Time value (bound to slider, updated by animation)
   let time = 0;
-
-  // Animation state (updated from timeline on each tick)
-  let animState: AnimationState = timeline.initialState;
+  let animState: AnimState = { time: 0, currentStep: 0, segmentIndex: 0, segmentProgress: 0 };
 
   // Derived values from animation state
   $: currentStep = animState.currentStep;
   $: segmentIndex = animState.segmentIndex;
   $: showErrorLines = currentStep >= NUM_STEPS;
 
-  // Legend items
-  const legendItems = [
-    { type: 'line', color: arrowColor, label: 'Velocity Field' },
-    { type: 'line', color: groundTruthColor, label: 'Ground Truth' },
-    { type: 'line', color: approximationColor, label: `Approximation (${NUM_STEPS} steps)` },
-  ];
-
-  // ===== FUNCTIONS =====
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   function initializeScales() {
     if (!isDataValid) return;
 
-    // Always use domainRange prop
     xScale = d3
       .scaleLinear()
       .domain([domainRange.xMin, domainRange.xMax])
@@ -216,7 +175,6 @@
       yScale(p[1]),
     ]);
 
-    // Pre-compute vector field grid positions
     if (hasVectorField && flowMatchingVectorField.gridPoints) {
       gridPositions = flowMatchingVectorField.gridPoints.map((p) => [
         xScale(p[0]),
@@ -225,7 +183,6 @@
     }
   }
 
-  // Cancel all in-flight requests
   function cancelAllRequests() {
     if (groundTruthRequestId) {
       flowMatchingClient.stopRequest(groundTruthRequestId);
@@ -237,24 +194,32 @@
     }
   }
 
-  // Compute all trajectories for all start points
-  // Streams both ground truth and approximation in parallel for immediate feedback
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
+    if (!canvas || !isDataValid) return;
+
+    initializeScales();
+    precomputeCoordinates();
+    isInitialized = true;
+    computeAllTrajectories();
+  }
+
   function computeAllTrajectories() {
-    // Cancel any in-progress requests
     cancelAllRequests();
 
     isLoading = true;
     isStreamingTrajectory = true;
 
-    // Initialize all trajectories with just starting points
     groundTruthTrajectories = userStartPoints.map((p) => [p]);
     approximationTrajectories = userStartPoints.map((p) => [p]);
 
-    // Show initial state immediately and start animation
     isLoading = false;
     resetAnimation();
     isPlaying = true;
-    draw(timeline.initialState);
+    draw(timeline!.initialState);
     startAnimation();
 
     let completedCount = 0;
@@ -270,7 +235,6 @@
       userStartPoints,
       GROUND_TRUTH_STEPS,
       { scheduler: "euler" },
-      // onStep - append new points to each ground truth trajectory
       (_step, x_t) => {
         groundTruthTrajectories = groundTruthTrajectories.map((traj, i) => [
           ...traj,
@@ -289,7 +253,6 @@
       userStartPoints,
       NUM_STEPS,
       { scheduler: "euler" },
-      // onStep - append new points to each approximation trajectory
       (_step, x_t) => {
         approximationTrajectories = approximationTrajectories.map((traj, i) => [
           ...traj,
@@ -304,7 +267,80 @@
     });
   }
 
-  // Draw a full trajectory path on a given context
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  function setupTimeline() {
+    const EULER_REAL_DURATION = NUM_STEPS * STEP_DURATION;
+    const TOTAL_REAL_DURATION = EULER_REAL_DURATION + PAUSE_BEFORE_RESTART;
+    const eulerNormalizedDuration = EULER_REAL_DURATION / TOTAL_REAL_DURATION;
+    const pauseNormalizedDuration = PAUSE_BEFORE_RESTART / TOTAL_REAL_DURATION;
+
+    const eulerStepClip = {
+      name: "EulerSteps",
+      duration: eulerNormalizedDuration,
+      reduce(t: number) {
+        const rawStep = t * NUM_STEPS;
+        const currentStep = Math.floor(rawStep);
+        return {
+          time: t,
+          currentStep,
+          segmentIndex: currentStep,
+          segmentProgress: rawStep - currentStep,
+        };
+      }
+    };
+
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = {
+      time: 0,
+      currentStep: 0,
+      segmentIndex: 0,
+      segmentProgress: 0,
+    };
+    timeline.add(eulerStepClip, 0);
+    timeline.add(createPauseClip(pauseNormalizedDuration), eulerNormalizedDuration);
+    timeline.duration = TOTAL_REAL_DURATION / 1000;
+    timeline.looping = true;
+
+    timeline.onTick((t, state) => {
+      if (!isInitialized || isLoading) return;
+      time = t / timeline!.duration;
+      animState = state;
+      draw(state);
+    });
+  }
+
+  function startAnimation() {
+    if (!timeline || timeline.isPlaying) return;
+    timeline.play();
+  }
+
+  function stopAnimation() {
+    if (timeline) timeline.pause();
+  }
+
+  function resetAnimation() {
+    if (!timeline) return;
+    timeline.reset();
+    animState = timeline.initialState;
+    time = 0;
+  }
+
+  function toggleAnimation() {
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      startAnimation();
+    } else {
+      stopAnimation();
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
   function drawTrajectoryOnCtx(
     ctx,
     trajectory,
@@ -344,7 +380,6 @@
     }
   }
 
-  // Draw start point markers on a given context
   function drawStartPointsOnCtx(ctx, scaleX = xScale, scaleY = yScale) {
     for (const point of userStartPoints) {
       const [x, y] = [scaleX(point[0]), scaleY(point[1])];
@@ -364,15 +399,14 @@
     }
   }
 
-  // Pure renderer: receives AnimationState, only derives timeIndex from external data
-  function draw(state: AnimationState) {
+  function draw(state: AnimState) {
     if (!ctx) return;
 
     const { segmentIndex } = state;
 
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw target distribution (low opacity background)
+    // Draw target distribution
     drawScatterPlot(
       ctx,
       scaledTargetDistribution,
@@ -381,9 +415,8 @@
       targetOpacity
     );
 
-    // Draw vector field if available (clipped to domain range)
+    // Draw vector field if available
     if (hasVectorField) {
-      // timeIndex derived here because numTimeSteps is external reactive data
       const maxSegments = NUM_STEPS;
       const animationTime = segmentIndex / maxSegments;
       const numTimeSteps = flowMatchingVectorField.timeSteps.length;
@@ -392,7 +425,6 @@
         numTimeSteps - 1
       );
 
-      // Clip to domain range
       ctx.save();
       ctx.beginPath();
       ctx.rect(
@@ -436,9 +468,8 @@
       ctx.globalAlpha = 1.0;
     }
 
-    // Draw approximation trajectories (step by step, no interpolation)
+    // Draw approximation trajectories
     if (approximationTrajectories.length > 0) {
-      // Convert domain coordinates to pixel coordinates
       const scaledApproxTrajectories = approximationTrajectories.map(traj =>
         traj.map(point => [xScale(point[0]), yScale(point[1])])
       );
@@ -454,54 +485,17 @@
     }
   }
 
-  // Animation control using Timeline
-  // Register tick callback for animation updates
-  timeline.onTick((t, state) => {
-    if (!isInitialized || isLoading) return;
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
 
-    const animationState = state as AnimationState;
-    // Update local state from timeline (t is in seconds, normalize for slider)
-    time = t / timeline.duration;
-    animState = animationState;
-    draw(animationState);
-  });
-
-  function startAnimation() {
-    if (timeline.isPlaying) return;
-    timeline.play();
-  }
-
-  function stopAnimation() {
-    timeline.pause();
-  }
-
-  function resetAnimation() {
-    timeline.reset();
-    animState = timeline.initialState;
-    time = 0;
-  }
-
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-  }
-
-  // Handle slider scrubbing (when user manually changes time)
   function handleSliderChange(newTime: number) {
-    // Seek uses normalized time [0, 1]
-    timeline.seek(newTime);
-    // State is updated via onTick callback
+    if (timeline) timeline.seek(newTime);
   }
 
-  // Handle canvas click
   function handleCanvasClick(event) {
     if (isLoading) return;
 
-    // Stop animation and reset state
     stopAnimation();
     resetAnimation();
     isPlaying = true;
@@ -516,51 +510,41 @@
     const domainY = yScale.invert(clickY);
     const newPoint = [domainX, domainY];
 
-    // Add new point to buffer (FIFO with max limit)
     userStartPoints = [...userStartPoints, newPoint];
     if (userStartPoints.length > maxUserTrajectories) {
       userStartPoints = userStartPoints.slice(-maxUserTrajectories);
     }
 
-    // Recompute all trajectories (cancels any in-progress requests)
     computeAllTrajectories();
   }
 
-  function initializeVisualization() {
-    if (!canvas || !isDataValid) return;
-
-    initializeScales();
-    precomputeCoordinates();
-    isInitialized = true;
-    computeAllTrajectories();
-  }
-
-  // ===== REACTIVE EFFECTS =====
-
-  $: if (isDataValid && canvas && !isInitialized) {
-    initializeVisualization();
-  }
-
-  // Handle slider scrubbing - when time changes from slider (not from animation)
-  // This syncs the slider value back to the animation state
-  $: if (isInitialized && !timeline.isPlaying && time !== animState.time) {
-    handleSliderChange(time);
-  }
-
-  // Start/stop animation when isPlaying changes
-  $: if (isInitialized && isPlaying && !timeline.isPlaying) {
-    startAnimation();
-  }
-
-  // ===== LIFECYCLE =====
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
 
   onMount(() => {
-    // Initialization handled by reactive statement
+    setupTimeline();
   });
 
   onDestroy(() => {
     stopAnimation();
   });
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
+
+  $: if (isDataValid && canvas && !isInitialized && timeline) {
+    runInitialComputation();
+  }
+
+  $: if (isInitialized && timeline && !timeline.isPlaying && time !== animState.time) {
+    handleSliderChange(time);
+  }
+
+  $: if (isInitialized && timeline && isPlaying && !timeline.isPlaying) {
+    startAnimation();
+  }
 </script>
 
 {#if isDataValid}
