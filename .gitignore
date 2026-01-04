@@ -1,5 +1,6 @@
 *.aep
 node_modules/
+.svelte-kit/
 After\ Effects/
 other-visualizations/visualizations/logo/LogoVideoFrames
 other-visualizations/visualizations/ddpm_vs_ddim/plots/*.png
