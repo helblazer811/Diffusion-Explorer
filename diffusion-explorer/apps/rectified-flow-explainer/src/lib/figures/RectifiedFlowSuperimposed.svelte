@@ -1,7 +1,7 @@
-<script>
+<script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ===== PROPS =====
@@ -84,23 +84,21 @@
   let xScale;
   let yScale;
 
-  // Animation - Clock/Track system
+  // Animation - Timeline system
   let time = 0;
   let currentSegmentIndex = 0;
   let isPlaying = playingByDefault;
-  let clock = null;
-  let track = null;
+  let timeline: Timeline<{ time: number; segmentIndex: number }> | null = null;
 
-  // State object mutated by clips
-  let animState = { time: 0, segmentIndex: 0 };
-
-  // Main animation clip (maps normalized time to state)
+  // Main animation clip (reducer pattern, closes over numSegments)
   const mainClip = {
     name: "Animation",
     duration: 1,
-    apply(t, params, state) {
-      state.time = t;
-      state.segmentIndex = Math.floor(t * params.numSegments);
+    reduce(t: number) {
+      return {
+        time: t,
+        segmentIndex: Math.floor(t * numSegments)
+      };
     }
   };
 
@@ -222,9 +220,7 @@
     // Reset animation state and start
     currentSegmentIndex = 0;
     time = 0;
-    animState.time = 0;
-    animState.segmentIndex = 0;
-    if (track) track.reset();
+    if (timeline) timeline.reset();
     isPlaying = true;
     startAnimation();
 
@@ -346,62 +342,53 @@
     initializeScales();
     precomputeCoordinates();
     pathsInitialized = true;
-    updateVisualization();
+    updateVisualization(0);
     isInitialized = true;
     onInitialized?.();
   }
 
-  function updateVisualization() {
+  // Pure renderer: receives segmentIndex explicitly
+  function updateVisualization(segmentIndex: number) {
     if (!isDataValid || !leftCtx || !rightCtx) return;
 
-    draw(leftCtx, scaledLeftTrajectories, currentSegmentIndex, userFlowMatchingTrajectories);
-    draw(rightCtx, scaledRightTrajectories, currentSegmentIndex, userRectifiedFlowTrajectories);
+    draw(leftCtx, scaledLeftTrajectories, segmentIndex, userFlowMatchingTrajectories);
+    draw(rightCtx, scaledRightTrajectories, segmentIndex, userRectifiedFlowTrajectories);
   }
 
-  // Initialize animation track with main clip and pause
+  // Initialize animation timeline with main clip and pause
   function initializeAnimation() {
-    track = new Track();
+    timeline = new Timeline<{ time: number; segmentIndex: number }>();
+    timeline.initialState = { time: 0, segmentIndex: 0 };
 
-    // Calculate normalized durations for track
+    // Calculate normalized durations for timeline
     const totalDuration = animationDuration + pauseDuration;
     const mainDuration = animationDuration / totalDuration;
     const pauseClipDuration = pauseDuration / totalDuration;
 
-    // Add main animation clip (0 to mainDuration of track time)
-    track.add({ ...mainClip, duration: mainDuration }, 0);
+    // Add main animation clip (0 to mainDuration of timeline)
+    timeline.add({ ...mainClip, duration: mainDuration }, 0);
     // Add pause clip (mainDuration to 1)
-    track.add(createPauseClip(pauseClipDuration), mainDuration);
+    timeline.add(createPauseClip(pauseClipDuration), mainDuration);
 
-    clock = new Clock();
-  }
+    // Set timeline duration in seconds and enable looping
+    timeline.duration = totalDuration / 1000;
+    timeline.looping = true;
 
-  function startAnimation() {
-    if (!clock || !track) return;
-
-    clock.start((dt) => {
-      // Convert real time delta to normalized track time
-      const totalDuration = (animationDuration + pauseDuration) / 1000;
-      const normalizedDt = dt / totalDuration;
-
-      track.update(normalizedDt, { numSegments }, animState);
-      time = animState.time;
-      currentSegmentIndex = animState.segmentIndex;
-
-      // Loop when track completes
-      if (track.time >= 1) {
-        track.reset();
-        animState.time = 0;
-        animState.segmentIndex = 0;
-        time = 0;
-        currentSegmentIndex = 0;
-      }
-
-      updateVisualization();
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      time = state.time;  // For slider binding
+      currentSegmentIndex = state.segmentIndex;
+      updateVisualization(state.segmentIndex);
     });
   }
 
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
+  }
+
   function stopAnimation() {
-    if (clock) clock.stop();
+    if (timeline) timeline.pause();
   }
 
   function togglePlayPause() {
@@ -414,16 +401,10 @@
   }
 
   function handleSliderInput() {
-    // When user drags the slider, stop playback
-    if (isPlaying) {
-      isPlaying = false;
-      stopAnimation();
+    // Sync timeline with slider using seek
+    if (timeline) {
+      timeline.seek(time);
     }
-    // Convert slider time value to segment index
-    currentSegmentIndex = Math.round(time * numSegments);
-    animState.time = time;
-    animState.segmentIndex = currentSegmentIndex;
-    updateVisualization();
   }
 
   function handleVisibilityChange(isActive) {
@@ -460,8 +441,8 @@
   // This ensures they're created with the correct base path prefix
 
   onDestroy(() => {
-    // Stop clock animation
-    if (clock) clock.stop();
+    // Stop timeline animation
+    if (timeline) timeline.pause();
 
     // Cancel any pending worker requests to prevent orphaned promises
     if (activeFlowMatchingRequestId && flowMatchingClient) {

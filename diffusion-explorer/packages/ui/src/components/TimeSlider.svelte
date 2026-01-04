@@ -15,13 +15,48 @@
   export let minLabel = 't=0';
   export let maxLabel = 't=1';
   export let dragEnabled = true;
-  export let onTogglePlay = () => {};
-  export let onInput = () => {};  // Called when user drags slider
   export let hideSpacerOnMobile = false;
   export let discreteFill = false;  // Snap fill to step boundaries
 
-  function handleTogglePlay() {
-    onTogglePlay();
+  // Optional Timeline instance - when provided, TimeSlider controls the timeline directly
+  // This enables seamless scrubbing while animation is playing
+  // See: packages/ui/src/animation/animation.ts for Timeline documentation
+  export let timeline = null;
+
+  // Optional callbacks (not required when using timeline)
+  export let onTogglePlay = null;  // Called when play/pause is clicked
+  export let onInput = null;       // Called when slider is dragged (receives numeric value)
+
+  // Toggle play/pause - uses timeline methods if available, otherwise calls callback
+  function togglePlay() {
+    if (timeline && 'play' in timeline && 'pause' in timeline) {
+      // Use Timeline's play/pause methods
+      if (timeline.isPlaying) {
+        timeline.pause();
+      } else {
+        timeline.play();
+      }
+      isPlaying = timeline.isPlaying;
+    } else if (onTogglePlay) {
+      // Legacy: let callback handle the toggle (avoids double-toggle)
+      onTogglePlay();
+    } else {
+      // No timeline and no callback: toggle via two-way binding
+      isPlaying = !isPlaying;
+    }
+  }
+
+  // Handle slider input - use timeline.seek() if available
+  function handleSliderInput(event) {
+    const newValue = parseFloat(event.currentTarget.value);
+
+    if (timeline && 'seek' in timeline) {
+      // Use Timeline's seek method (triggers tick callback, applies clips)
+      timeline.seek(newValue);
+    }
+
+    // Call optional user callback with the VALUE (not event)
+    if (onInput) onInput(newValue);
   }
 </script>
 
@@ -29,7 +64,7 @@
   <div class="time-slider-inner">
     <button
       class="play-button"
-      onclick={handleTogglePlay}
+      onclick={togglePlay}
       aria-label={isPlaying ? 'Pause' : 'Play'}
       {disabled}
     >
@@ -59,7 +94,7 @@
         {minLabel}
         {maxLabel}
         {dragEnabled}
-        {onInput}
+        onInput={handleSliderInput}
         {discreteFill}
       />
     </div>

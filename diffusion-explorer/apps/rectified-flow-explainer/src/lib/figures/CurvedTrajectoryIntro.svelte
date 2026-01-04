@@ -1,6 +1,6 @@
-<script>
+<script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // FlowModelClient instance (passed from parent, created with correct base path)
@@ -38,24 +38,19 @@
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
-  // Animation state - Clock/Track system
-  let time = 0;
+  // Animation state type - derived values computed by clips (NOT time)
+  type AnimState = {
+    segmentIndex: number;
+  };
+
+  // Animation state - Timeline system (Timeline owns Clock internally)
+  let time = 0;  // Normalized time [0, 1] for slider binding
   let isPlaying = playingByDefault;
   let initialized = false;
-  let clock = null;
-  let track = null;
+  let timeline: Timeline<AnimState> | null = null;
 
-  // State object mutated by clips
-  let animState = { time: 0 };
-
-  // Main animation clip (maps normalized time to state.time)
-  const mainClip = {
-    name: "Animation",
-    duration: 1,
-    apply(t, params, state) {
-      state.time = t;
-    }
-  };
+  // Cached numSegments for clip closure
+  let cachedNumSegments = 0;
 
   // Visibility tracking
   let figureIsActive;
@@ -183,12 +178,12 @@
       return [[initialPixelX, initialPixelY]];
     });
 
-    // Reset animation state and start
-    time = 0;
-    animState.time = 0;
-    if (track) track.reset();
-    isPlaying = true;
-    startAnimation();
+    // Reset animation and start
+    if (timeline) {
+      timeline.reset();
+      timeline.play();
+      isPlaying = true;
+    }
 
     // Sample all user points with streaming
     const result = flowMatchingClient.sampleFromInitialPoints(
@@ -261,8 +256,8 @@
     precomputeTrajectories();
   }
 
-  // Main draw function
-  function draw() {
+  // Pure renderer - accepts time from Timeline + pre-computed state
+  function draw(t: number, state: AnimState) {
     if (!ctx || !initialized) return;
 
     // Clear canvas
@@ -295,8 +290,8 @@
     drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont, opacity: labelOpacity });
     drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont, opacity: labelOpacity });
 
-    // Calculate current segment index from normalized time
-    const segmentIndex = Math.floor(time * numSegments);
+    // Use pre-computed segment index from state
+    const { segmentIndex } = state;
 
     // Trajectory styling from settings
     const trajectoryColor = settings.stylingSettings.trajectory.color;
@@ -362,6 +357,7 @@
     }
 
     // Draw in-progress user trajectories (full opacity, synced with animation time)
+    // Note: segmentIndex from state is used here too
     if (userTrajectories.length > 0) {
       ctx.strokeStyle = trajectoryColor;
       ctx.lineWidth = trajectoryStrokeWidth;
@@ -369,13 +365,10 @@
       ctx.lineJoin = "round";
       ctx.globalAlpha = 1.0; // Full opacity for user-drawn trajectories
 
-      // Calculate how much of each trajectory to draw based on time
-      const targetSegmentIndex = Math.floor(time * numSegments);
-
       for (const trajectory of userTrajectories) {
         if (!trajectory || trajectory.length < 2) continue;
 
-        const endIdx = Math.min(targetSegmentIndex + 1, trajectory.length);
+        const endIdx = Math.min(segmentIndex + 1, trajectory.length);
 
         if (endIdx >= 2) {
           ctx.beginPath();
@@ -398,67 +391,53 @@
     }
   }
 
-  // Initialize animation track with main clip and pause
+  // Initialize animation timeline (Timeline owns Clock internally)
   function initializeAnimation() {
-    track = new Track();
+    // Cache numSegments for clip closure
+    cachedNumSegments = numSegments;
 
-    // Calculate normalized durations for track
-    const totalDuration = animationDuration + pauseBeforeRestart;
-    const mainDuration = animationDuration / totalDuration;
-    const pauseDuration = pauseBeforeRestart / totalDuration;
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = { segmentIndex: 0 };
 
-    // Add main animation clip (0 to mainDuration of track time)
-    track.add({ ...mainClip, duration: mainDuration }, 0);
-    // Add pause clip (mainDuration to 1)
-    track.add(createPauseClip(pauseDuration), mainDuration);
+    // Set timeline duration in seconds (animation time, not including pause)
+    timeline.duration = animationDuration / 1000;
+    timeline.looping = true;
+    timeline.endPauseDuration = pauseBeforeRestart / 1000;
 
-    clock = new Clock();
-  }
-
-  function startAnimation() {
-    if (!clock || !track) return;
-
-    clock.start((dt) => {
-      // Convert real time delta to normalized track time
-      const totalDuration = (animationDuration + pauseBeforeRestart) / 1000;
-      const normalizedDt = dt / totalDuration;
-
-      track.update(normalizedDt, {}, animState);
-      time = animState.time;
-
-      // Loop when track completes
-      if (track.time >= 1) {
-        track.reset();
-        animState.time = 0;
-        time = 0;
+    // Main animation clip - computes segmentIndex from normalized time
+    const mainClip = {
+      name: "Animation",
+      duration: 1,
+      reduce(t: number) {
+        // t is normalized [0, 1] within the clip
+        const normalizedTime = t / timeline!.duration;
+        return {
+          segmentIndex: Math.floor(normalizedTime * cachedNumSegments)
+        };
       }
+    };
 
-      draw();
+    timeline.add(mainClip, 0);
+
+    // Register tick callback - t from Timeline, state from clips
+    timeline.onTick((t, state) => {
+      // Normalize timeline.time to [0, 1] for slider binding
+      time = t / timeline!.duration;
+      isPlaying = timeline!.isPlaying;
+      draw(time, state);
     });
   }
 
-  function stopAnimation() {
-    if (clock) clock.stop();
-  }
-
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-  }
-
   function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
+    if (!timeline) return;
+    if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
+      timeline.pause();
       isPlaying = false;
-      stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
+      timeline.play();
       isPlaying = true;
-      startAnimation();
     }
   }
 
@@ -474,12 +453,13 @@
     initializeData();
     initializeAnimation();
     initialized = true;
-    draw();
-    if (isPlaying) startAnimation();
+    draw(0, timeline!.initialState);
+    if (isPlaying) timeline!.play();
   }
 
-  // Animation control - handled by toggleAnimation() and visibility changes
-  // Clock manages its own running state
+  // Animation control - reactive to isPlaying (two-way bound from TimeSlider)
+  $: if (isPlaying && initialized && timeline && !timeline.isPlaying) timeline.play();
+  $: if (!isPlaying && timeline?.isPlaying) timeline.pause();
 
   // Handle visibility changes (pause when off-screen, resume when back)
   $: if (figureIsActive !== undefined && initialized) {
@@ -487,10 +467,10 @@
   }
 
   // Redraw when time changes (e.g., slider drag)
-  $: if (initialized && time !== undefined) draw();
+  $: if (initialized && time !== undefined && timeline) draw(time, timeline.state);
 
   onDestroy(() => {
-    if (clock) clock.stop();
+    if (timeline) timeline.pause();
   });
 </script>
 
@@ -510,7 +490,7 @@
         bind:isPlaying
         min={0}
         max={1}
-        onTogglePlay={toggleAnimation}
+        {timeline}
         color={settings.stylingSettings.trajectory.color}
       />
     </div>

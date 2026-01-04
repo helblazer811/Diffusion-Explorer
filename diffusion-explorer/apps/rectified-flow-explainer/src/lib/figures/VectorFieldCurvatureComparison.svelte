@@ -1,9 +1,9 @@
 <!-- Compares flow matching vector field (curved) vs rectified flow vector field (straighter) -->
 
-<script>
+<script lang="ts">
   import { onDestroy } from 'svelte';
   import * as d3 from 'd3';
-  import { DoubleFigure, TimeSlider, drawVectorField, Clock, Track, createPauseClip, useCanvas2D } from '@diffusion-explorer/ui';
+  import { DoubleFigure, TimeSlider, drawVectorField, Timeline, createPauseClip, useCanvas2D } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
 
   // ===== PROPS =====
@@ -70,21 +70,17 @@
   let leftGridPositions = [];
   let rightGridPositions = [];
 
-  // Animation - Clock/Track system
+  // Animation - Timeline system
   let time = 0;
   let isPlaying = playingByDefault;
-  let clock = null;
-  let track = null;
+  let timeline: Timeline<{ time: number }> | null = null;
 
-  // State object mutated by clips
-  let animState = { time: 0 };
-
-  // Main animation clip (maps normalized time to state.time)
+  // Main animation clip (reducer pattern)
   const mainClip = {
     name: "Animation",
     duration: 1,
-    apply(t, params, state) {
-      state.time = t;
+    reduce(t: number) {
+      return { time: t };
     }
   };
 
@@ -123,7 +119,8 @@
   }
 
 
-  function draw() {
+  // Pure renderer: receives t, computes timeIndex from external data
+  function draw(t: number) {
     if (!leftCtx || !rightCtx || !isDataValid) return;
 
     // Clear canvases
@@ -131,11 +128,12 @@
     rightCtx.clearRect(0, 0, canvasWidth, canvasHeight);
 
     // Map time (0-1) to time indices for each vector field
+    // timeIndex computed here because numSteps is external reactive data
     const leftNumSteps = flowMatchingVectorField.timeSteps.length;
     const rightNumSteps = rectifiedFlowVectorField.timeSteps.length;
 
-    const leftTimeIndex = Math.min(Math.floor(time * leftNumSteps), leftNumSteps - 1);
-    const rightTimeIndex = Math.min(Math.floor(time * rightNumSteps), rightNumSteps - 1);
+    const leftTimeIndex = Math.min(Math.floor(t * leftNumSteps), leftNumSteps - 1);
+    const rightTimeIndex = Math.min(Math.floor(t * rightNumSteps), rightNumSteps - 1);
 
     const style = {
       arrowScale,
@@ -176,51 +174,43 @@
     rightGridPositions = calculateGridPositions(rectifiedFlowVectorField, rightScales);
 
     // Initial draw
-    draw();
+    draw(0);
     isInitialized = true;
   }
 
-  // Initialize animation track with main clip and pause
+  // Initialize animation timeline with main clip and pause
   function initializeAnimation() {
-    track = new Track();
+    timeline = new Timeline<{ time: number }>();
+    timeline.initialState = { time: 0 };
 
-    // Calculate normalized durations for track
+    // Calculate normalized durations for timeline
     const totalDuration = animationDuration + animationPauseTime;
     const mainDuration = animationDuration / totalDuration;
     const pauseClipDuration = animationPauseTime / totalDuration;
 
-    // Add main animation clip (0 to mainDuration of track time)
-    track.add({ ...mainClip, duration: mainDuration }, 0);
+    // Add main animation clip (0 to mainDuration of timeline)
+    timeline.add({ ...mainClip, duration: mainDuration }, 0);
     // Add pause clip (mainDuration to 1)
-    track.add(createPauseClip(pauseClipDuration), mainDuration);
+    timeline.add(createPauseClip(pauseClipDuration), mainDuration);
 
-    clock = new Clock();
-  }
+    // Set timeline duration in seconds and enable looping
+    timeline.duration = totalDuration / 1000;
+    timeline.looping = true;
 
-  function startAnimation() {
-    if (!clock || !track) return;
-
-    clock.start((dt) => {
-      // Convert real time delta to normalized track time
-      const totalDuration = (animationDuration + animationPauseTime) / 1000;
-      const normalizedDt = dt / totalDuration;
-
-      track.update(normalizedDt, {}, animState);
-      time = animState.time;
-
-      // Loop when track completes
-      if (track.time >= 1) {
-        track.reset();
-        animState.time = 0;
-        time = 0;
-      }
-
-      draw();
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      time = state.time;  // For slider binding
+      draw(state.time);
     });
   }
 
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
+  }
+
   function stopAnimation() {
-    if (clock) clock.stop();
+    if (timeline) timeline.pause();
   }
 
   function toggleAnimation() {
@@ -233,12 +223,10 @@
   }
 
   function handleSliderInput() {
-    if (isPlaying) {
-      isPlaying = false;
-      stopAnimation();
+    // Sync timeline with slider using seek
+    if (timeline) {
+      timeline.seek(time);
     }
-    animState.time = time;
-    draw();
   }
 
   function handleVisibilityChange(isActive) {
@@ -268,13 +256,13 @@
 
   // Redraw when time changes (e.g., slider drag)
   $: if (isInitialized && time !== undefined) {
-    draw();
+    draw(time);
   }
 
   // ===== LIFECYCLE =====
 
   onDestroy(() => {
-    if (clock) clock.stop();
+    if (timeline) timeline.pause();
   });
 </script>
 

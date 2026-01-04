@@ -1,8 +1,8 @@
 <!-- Visualizes linear interpolation between source and target distributions with an animated dot. -->
 
-<script>
+<script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, createSourceTargetScales, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // Caption slot (passed as default children)
@@ -67,31 +67,27 @@
   let sourcePointPixel = [0, 0];
   let targetPointPixel = [0, 0];
 
-  // Animation state - Clock/Track system
+  // Animation state - Timeline system
   let isPlaying = playingByDefault;
   let time = 0;
   let isInitialized = false;
-  let clock = null;
-  let track = null;
+  let timeline: Timeline<{ time: number }> | null = null;
 
-  // State object mutated by clips
-  let animState = { time: 0 };
-
-  // Forward clip (0→1)
+  // Forward clip (0→1) - reducer pattern
   const forwardClip = {
     name: "Forward",
     duration: 1,
-    apply(t, params, state) {
-      state.time = t;
+    reduce(t: number) {
+      return { time: t };
     }
   };
 
-  // Backward clip (1→0)
+  // Backward clip (1→0) - reducer pattern
   const backwardClip = {
     name: "Backward",
     duration: 1,
-    apply(t, params, state) {
-      state.time = 1 - t;
+    reduce(t: number) {
+      return { time: 1 - t };
     }
   };
 
@@ -121,12 +117,12 @@
   }
 
   function handleSliderInput() {
-    if (isPlaying) {
-      isPlaying = false;
-      stopAnimation();
+    // Sync timeline with slider using seek
+    if (timeline) {
+      // The time variable is already updated by the slider binding
+      // Timeline state is updated via onTick callback
+      timeline.seek(time);
     }
-    animState.time = time;
-    draw();
   }
 
   // Pre-compute scatter coordinates
@@ -181,8 +177,8 @@
     ctx.restore();
   }
 
-  // Main draw function
-  async function draw() {
+  // Main draw function - pure renderer: receives t from Timeline
+  async function draw(t: number) {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -222,9 +218,9 @@
     drawCircle(sourcePointPixel[0], sourcePointPixel[1], pointRadius, animatedDotColor);
     drawCircle(targetPointPixel[0], targetPointPixel[1], pointRadius, animatedDotColor);
 
-    // Draw animated dot at current time position
-    const currentX = sourcePointPixel[0] + time * (targetPointPixel[0] - sourcePointPixel[0]);
-    const currentY = sourcePointPixel[1] + time * (targetPointPixel[1] - sourcePointPixel[1]);
+    // Draw animated dot at current time position (trivial lerps use t directly)
+    const currentX = sourcePointPixel[0] + t * (targetPointPixel[0] - sourcePointPixel[0]);
+    const currentY = sourcePointPixel[1] + t * (targetPointPixel[1] - sourcePointPixel[1]);
     drawCircle(currentX, currentY, animatedDotRadius, animatedDotColor);
 
     // Draw LaTeX labels directly on canvas
@@ -243,7 +239,7 @@
     );
 
     // x_t above animated dot (visible when not at endpoints)
-    if (time >= 0.07 && time <= 0.93) {
+    if (t >= 0.07 && t <= 0.93) {
       await drawMathjaxOnCanvas(
         ctx, "x_t", currentX, currentY,
         latexFontSize, 0, latexLabelOffsetY, { color: lineColor }
@@ -257,9 +253,10 @@
     );
   }
 
-  // Initialize animation track with bidirectional clips and pauses
+  // Initialize animation timeline with bidirectional clips and pauses
   function initializeAnimation() {
-    track = new Track();
+    timeline = new Timeline<{ time: number }>();
+    timeline.initialState = { time: 0 };
 
     // Total cycle: forward + pause + backward + pause
     const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
@@ -267,38 +264,29 @@
     const pauseNormalized = pauseDuration / totalCycleDuration;
 
     // Add clips in sequence
-    track.add({ ...forwardClip, duration: forwardDuration }, 0);
-    track.add(createPauseClip(pauseNormalized), forwardDuration);
-    track.add({ ...backwardClip, duration: forwardDuration }, forwardDuration + pauseNormalized);
-    track.add(createPauseClip(pauseNormalized), 2 * forwardDuration + pauseNormalized);
+    timeline.add({ ...forwardClip, duration: forwardDuration }, 0);
+    timeline.add(createPauseClip(pauseNormalized), forwardDuration);
+    timeline.add({ ...backwardClip, duration: forwardDuration }, forwardDuration + pauseNormalized);
+    timeline.add(createPauseClip(pauseNormalized), 2 * forwardDuration + pauseNormalized);
 
-    clock = new Clock();
-  }
+    // Set duration in seconds
+    timeline.duration = totalCycleDuration / 1000;
+    timeline.looping = true;
 
-  function startAnimation() {
-    if (!clock || !track) return;
-
-    clock.start((dt) => {
-      // Convert real time delta to normalized track time
-      const totalCycleDuration = (2 * animationDuration + 2 * pauseDuration) / 1000;
-      const normalizedDt = dt / totalCycleDuration;
-
-      track.update(normalizedDt, {}, animState);
-      time = animState.time;
-
-      // Loop when track completes
-      if (track.time >= 1) {
-        track.reset();
-        animState.time = 0;
-        time = 0;
-      }
-
-      draw();
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      time = state.time;  // For slider binding
+      draw(state.time);
     });
   }
 
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
+  }
+
   function stopAnimation() {
-    if (clock) clock.stop();
+    if (timeline) timeline.pause();
   }
 
   function initializeVisualization() {
@@ -330,7 +318,7 @@
     initializeVisualization();
     initializeAnimation();
     isInitialized = true;
-    draw();
+    draw(0);
     if (isPlaying) startAnimation();
   }
 
@@ -341,11 +329,11 @@
 
   // Update drawing when time changes (e.g., from slider drag)
   $: if (isInitialized && time !== undefined) {
-    draw();
+    draw(time);
   }
 
   onDestroy(() => {
-    if (clock) clock.stop();
+    if (timeline) timeline.pause();
   });
 </script>
 
