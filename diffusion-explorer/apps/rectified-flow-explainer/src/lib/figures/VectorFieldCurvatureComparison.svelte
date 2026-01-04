@@ -6,7 +6,9 @@
   import { DoubleFigure, TimeSlider, drawVectorField, Timeline, createPauseClip, useCanvas2D } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
 
-  // ===== PROPS =====
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
 
   // Data
   export let flowMatchingVectorField = null;
@@ -44,14 +46,14 @@
   export let backgroundVisible = true;
   export let children = undefined;
 
-  // ===== DERIVED FROM PROPS =====
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
 
   $: caption = children;
   $: isDataValid =
     flowMatchingVectorField?.velocities?.length > 0 &&
     rectifiedFlowVectorField?.velocities?.length > 0;
-
-  // ===== STATE =====
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let leftCanvas = null;
@@ -61,6 +63,11 @@
   // Tie ctx reactivity to canvas variables so it updates when action runs
   $: leftCtx = leftCanvas && leftCanvas2d.ctx;
   $: rightCtx = rightCanvas && rightCanvas2d.ctx;
+
+  // Animation state type
+  type AnimState = {
+    time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
+  };
 
   // Scales
   let leftScales = null;
@@ -73,16 +80,7 @@
   // Animation - Timeline system
   let time = 0;
   let isPlaying = playingByDefault;
-  let timeline: Timeline<{ time: number }> | null = null;
-
-  // Main animation clip (reducer pattern)
-  const mainClip = {
-    name: "Animation",
-    duration: 1,
-    reduce(t: number) {
-      return { time: t };
-    }
-  };
+  let timeline: Timeline<AnimState> | null = null;
 
   // Initialization
   let isInitialized = false;
@@ -91,7 +89,9 @@
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
 
-  // ===== FUNCTIONS =====
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   function initializeScales(vectorFieldData) {
     if (!vectorFieldData) return null;
@@ -118,10 +118,79 @@
     ]);
   }
 
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
 
-  // Pure renderer: receives t, computes timeIndex from external data
-  function draw(t: number) {
+  function runInitialComputation() {
+    if (!leftCanvas || !rightCanvas || !isDataValid) return;
+
+    // Initialize scales for each panel
+    leftScales = initializeScales(flowMatchingVectorField);
+    rightScales = initializeScales(rectifiedFlowVectorField);
+
+    // Calculate grid positions (pixel coords)
+    leftGridPositions = calculateGridPositions(flowMatchingVectorField, leftScales);
+    rightGridPositions = calculateGridPositions(rectifiedFlowVectorField, rightScales);
+
+    isInitialized = true;
+  }
+
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  // Main animation clip (reducer pattern)
+  const mainClip = {
+    name: "Animation",
+    duration: 1,
+    reduce(t: number) {
+      return { time: t };
+    }
+  };
+
+  function setupTimeline() {
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = { time: 0 };
+
+    // Calculate normalized durations for timeline
+    const totalDuration = animationDuration + animationPauseTime;
+    const mainDuration = animationDuration / totalDuration;
+    const pauseClipDuration = animationPauseTime / totalDuration;
+
+    // Add main animation clip (0 to mainDuration of timeline)
+    timeline.add({ ...mainClip, duration: mainDuration }, 0);
+    // Add pause clip (mainDuration to 1)
+    timeline.add(createPauseClip(pauseClipDuration), mainDuration);
+
+    // Set timeline duration in seconds and enable looping
+    timeline.duration = totalDuration / 1000;
+    timeline.looping = true;
+
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      time = state.time;  // For slider binding
+      draw(state);
+    });
+  }
+
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
+  }
+
+  function stopAnimation() {
+    if (timeline) timeline.pause();
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
+  function draw(state: AnimState) {
     if (!leftCtx || !rightCtx || !isDataValid) return;
+
+    const t = state.time;
 
     // Clear canvases
     leftCtx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -162,56 +231,9 @@
     );
   }
 
-  function initializeVisualization() {
-    if (!leftCanvas || !rightCanvas || !isDataValid) return;
-
-    // Initialize scales for each panel
-    leftScales = initializeScales(flowMatchingVectorField);
-    rightScales = initializeScales(rectifiedFlowVectorField);
-
-    // Calculate grid positions (pixel coords)
-    leftGridPositions = calculateGridPositions(flowMatchingVectorField, leftScales);
-    rightGridPositions = calculateGridPositions(rectifiedFlowVectorField, rightScales);
-
-    // Initial draw
-    draw(0);
-    isInitialized = true;
-  }
-
-  // Initialize animation timeline with main clip and pause
-  function initializeAnimation() {
-    timeline = new Timeline<{ time: number }>();
-    timeline.initialState = { time: 0 };
-
-    // Calculate normalized durations for timeline
-    const totalDuration = animationDuration + animationPauseTime;
-    const mainDuration = animationDuration / totalDuration;
-    const pauseClipDuration = animationPauseTime / totalDuration;
-
-    // Add main animation clip (0 to mainDuration of timeline)
-    timeline.add({ ...mainClip, duration: mainDuration }, 0);
-    // Add pause clip (mainDuration to 1)
-    timeline.add(createPauseClip(pauseClipDuration), mainDuration);
-
-    // Set timeline duration in seconds and enable looping
-    timeline.duration = totalDuration / 1000;
-    timeline.looping = true;
-
-    // Register tick callback
-    timeline.onTick((_t, state) => {
-      time = state.time;  // For slider binding
-      draw(state.time);
-    });
-  }
-
-  function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
-  }
-
-  function stopAnimation() {
-    if (timeline) timeline.pause();
-  }
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
 
   function toggleAnimation() {
     isPlaying = !isPlaying;
@@ -241,11 +263,22 @@
     }
   }
 
-  // ===== REACTIVE EFFECTS =====
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
+  onDestroy(() => {
+    if (timeline) timeline.pause();
+  });
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
 
   $: if (!isInitialized && isDataValid && leftCanvas && rightCanvas) {
-    initializeVisualization();
-    initializeAnimation();
+    runInitialComputation();
+    setupTimeline();
+    draw(timeline!.initialState);
     if (isPlaying) startAnimation();
   }
 
@@ -255,15 +288,9 @@
   }
 
   // Redraw when time changes (e.g., slider drag)
-  $: if (isInitialized && time !== undefined) {
-    draw(time);
+  $: if (isInitialized && time !== undefined && timeline) {
+    draw(timeline.state);
   }
-
-  // ===== LIFECYCLE =====
-
-  onDestroy(() => {
-    if (timeline) timeline.pause();
-  });
 </script>
 
 {#if isDataValid}

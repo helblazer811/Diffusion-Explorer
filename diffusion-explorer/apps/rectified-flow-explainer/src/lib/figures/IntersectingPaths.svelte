@@ -1,13 +1,15 @@
 <!-- Visualizes intersecting linear paths between source and target distributions with velocity vectors at intersection. -->
 
 <script>
-  import { onMount } from "svelte";
   import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjaxOnCanvas, createSourceTargetScales, dataToPixelX, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
+
   // Caption slot (passed as default children)
   export let children = undefined;
-  $: caption = children;
 
   // Data props
   export let sourceDistributionSamples = [];
@@ -60,11 +62,18 @@
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
-  // Canvas state - need both bind:this (for reactivity) and action (for DPR setup)
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
+  $: caption = children;
+
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
+
   let scales = null;
   let isInitialized = false;
 
@@ -76,6 +85,10 @@
   let line1Coords = null; // sourcePointB -> targetPointB
   let line2Coords = null; // sourcePointA -> targetPointA
   let intersection = null;
+
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   function normalize(v) {
     const len = Math.hypot(v.x, v.y);
@@ -139,7 +152,11 @@
     intersection = findIntersection(line1Coords, line2Coords);
   }
 
-  function initializeData() {
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
     scales = createSourceTargetScales(
       sourceDistributionSamples,
       targetDistributionSamples,
@@ -156,6 +173,10 @@
     precomputeScatterCoords();
     computeLineCoords();
   }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
 
   async function draw() {
     if (!ctx || !scales) return;
@@ -372,20 +393,20 @@
     );
   }
 
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
+
   $: if (
     canvas &&
     sourceDistributionSamples.length > 0 &&
     targetDistributionSamples.length > 0 &&
     !isInitialized
   ) {
-    initializeData();
+    runInitialComputation();
     isInitialized = true;
     draw();
   }
-
-  onMount(() => {
-    return () => {};
-  });
 </script>
 
 <Figure {caption} {backgroundVisible}>

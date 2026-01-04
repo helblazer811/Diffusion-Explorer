@@ -1,7 +1,11 @@
-<script>
+<script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales, Clock, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
+
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
 
   // Ground truth target distribution (displayed on right side along with generated endpoints)
   export let targetDistribution = null;
@@ -33,23 +37,36 @@
 
   // Caption slot
   export let children = undefined;
+
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
   $: caption = children;
 
   // Styling
   const sourcePointColor = settings.stylingSettings.scatterPlot.color;
   const targetPointColor = '#f17720';
-  const generatedPointColor = '#f17720';  // Same as target for consistency
   const couplingLineColor = '#888';
   const couplingLineOpacity = 0.5;
   const couplingLineWidth = 2;
 
-  // Canvas state - need both bind:this (for reactivity) and action (for DPR setup)
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
   // Animation phase state machine
+  type PhaseState = {
+    phase: string;
+    phaseProgress: number;
+    linesDrawnCount: number;
+    trajectoryTime: number;
+    fadeOpacity: number;
+    inducedCouplingProgress: number;
+  };
+
   let currentPhase = 'distributions';
   let phaseProgress = 0;
   let linesDrawnCount = 0;
@@ -73,7 +90,8 @@
 
   // Playback control
   let isPlaying = true;
-  let clock = null;
+  let timeline: Timeline<PhaseState> | null = null;
+  let lastTickTime = 0;
 
   // Visibility tracking
   let figureIsActive;
@@ -99,32 +117,9 @@
     }
   })();
 
-  function jumpToState(newStateIndex) {
-    phaseProgress = 0;
-
-    switch (newStateIndex) {
-      case 0:
-        currentPhase = 'pause_after_naive';
-        linesDrawnCount = numLinesToDraw;
-        fadeOpacity = 1;
-        break;
-      case 1:
-        currentPhase = 'trajectories';
-        trajectoryTime = 0;
-        fadeOpacity = 0;
-        break;
-      case 2:
-        currentPhase = 'pause_at_end';
-        inducedCouplingProgress = 1;
-        break;
-    }
-
-    draw();
-
-    if (isPlaying && clock && !clock.isRunning) {
-      startAnimation();
-    }
-  }
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -159,8 +154,8 @@
 
       // Re-initialize data with new trajectories and redraw
       if (canvas && ctx) {
-        initializeData();
-        draw();
+        runInitialComputation();
+        draw(getCurrentState());
       }
     } catch (error) {
       console.error('[InducedCouplingAnimated] Error generating trajectories:', error);
@@ -169,7 +164,22 @@
     }
   }
 
-  function initializeData() {
+  function getCurrentState(): PhaseState {
+    return {
+      phase: currentPhase,
+      phaseProgress,
+      linesDrawnCount,
+      trajectoryTime,
+      fadeOpacity,
+      inducedCouplingProgress
+    };
+  }
+
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
     if (!generatedTrajectories || generatedTrajectories.length === 0) return;
 
     numTimeSteps = generatedTrajectories.length;
@@ -250,131 +260,9 @@
     });
   }
 
-  function drawSourceDistribution() {
-    drawScatterPlot(
-      ctx,
-      sourcePixelCoords,
-      settings.stylingSettings.scatterPlot.radius,
-      sourcePointColor,
-      settings.stylingSettings.scatterPlot.opacity
-    );
-  }
-
-  function drawTargetDistribution() {
-    // Draw all target points (ground truth + generated endpoints)
-    drawScatterPlot(
-      ctx,
-      targetPixelCoords,
-      settings.stylingSettings.scatterPlot.radius,
-      targetPointColor,
-      settings.stylingSettings.scatterPlot.opacity
-    );
-  }
-
-  function drawLabels() {
-    const labelColor = settings.stylingSettings.label.color;
-    const labelFontSize = settings.stylingSettings.label.fontSize;
-    const labelFontWeight = settings.stylingSettings.label.fontWeight;
-    const labelOpacity = settings.stylingSettings.label.opacity;
-    const labelFont = `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`;
-    const labelY = marginTop / 2 + 5;
-    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, labelY, { color: labelColor, font: labelFont, opacity: labelOpacity });
-    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, labelY, { color: labelColor, font: labelFont, opacity: labelOpacity });
-  }
-
-  function drawNaiveCouplingLines(count, opacity = couplingLineOpacity) {
-    ctx.strokeStyle = couplingLineColor;
-    ctx.lineWidth = couplingLineWidth;
-    ctx.globalAlpha = opacity;
-
-    const linesToDraw = Math.min(count, numLinesToDraw, numPoints);
-    for (let i = 0; i < linesToDraw; i++) {
-      const [sx, sy] = sourcePixelCoords[i];
-      // Connect to random target from full target pool
-      const targetIdx = shuffledTargetIndices[i % shuffledTargetIndices.length];
-      const [tx, ty] = targetPixelCoords[targetIdx];
-
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(tx, ty);
-      ctx.stroke();
-    }
-
-    ctx.globalAlpha = 1;
-  }
-
-  function drawAnimatedTrajectories(time) {
-    const segmentIndex = Math.floor(time * (numTimeSteps - 1));
-
-    drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
-      strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
-      color: settings.stylingSettings.trajectory.color,
-      progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
-      pointRadius: settings.stylingSettings.trajectory.endpointRadius,
-      showPreview: false,
-      previewOpacity: 0
-    });
-  }
-
-  function drawInducedCouplingLines(progress = 1) {
-    ctx.strokeStyle = couplingLineColor;
-    ctx.lineWidth = couplingLineWidth;
-    ctx.globalAlpha = couplingLineOpacity;
-
-    const linesToDraw = Math.min(numLinesToDraw, numPoints, generatedEndpointPixelCoords.length);
-    for (let i = 0; i < linesToDraw; i++) {
-      // Direct pairing: source[i] -> generated endpoint[i]
-      const [sx, sy] = sourcePixelCoords[i];
-      const [tx, ty] = generatedEndpointPixelCoords[i];
-
-      // Animate from source to target (showing the flow created this pairing)
-      const endX = sx + (tx - sx) * progress;
-      const endY = sy + (ty - sy) * progress;
-
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
-    }
-
-    ctx.globalAlpha = 1;
-  }
-
-  function draw() {
-    if (!ctx || !initialized) return;
-
-    ctx.clearRect(0, 0, width, height);
-
-    drawSourceDistribution();
-    drawTargetDistribution();
-    drawLabels();
-
-    switch (currentPhase) {
-      case 'distributions':
-        break;
-      case 'naive_coupling':
-        drawNaiveCouplingLines(linesDrawnCount);
-        break;
-      case 'pause_after_naive':
-        drawNaiveCouplingLines(numLinesToDraw);
-        break;
-      case 'fade_out':
-        drawNaiveCouplingLines(numLinesToDraw, fadeOpacity * couplingLineOpacity);
-        break;
-      case 'trajectories':
-        drawAnimatedTrajectories(trajectoryTime);
-        break;
-      case 'pause_after_trajectories':
-        drawAnimatedTrajectories(1);
-        break;
-      case 'induced_coupling':
-        drawInducedCouplingLines(inducedCouplingProgress);
-        break;
-      case 'pause_at_end':
-        drawInducedCouplingLines(1);
-        break;
-    }
-  }
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
 
   function advancePhase() {
     switch (currentPhase) {
@@ -411,7 +299,7 @@
     phaseProgress = 0;
   }
 
-  function updateAnimation(elapsed) {
+  function updateAnimation(elapsed: number) {
     switch (currentPhase) {
       case 'distributions':
         phaseProgress += elapsed / pauseBetweenPhases;
@@ -455,26 +343,208 @@
         break;
     }
 
-    draw();
+    draw(getCurrentState());
   }
 
-  function startAnimation() {
-    if (!clock) {
-      clock = new Clock();
-    }
-    if (clock.isRunning) return;
+  function setupTimeline() {
+    timeline = new Timeline<PhaseState>();
+    timeline.initialState = getCurrentState();
 
-    clock.start((dt) => {
-      const elapsed = dt * 1000;
+    // Use a simple clip that tracks time for delta calculation
+    timeline.add({
+      name: "PhaseAnimation",
+      duration: 1,
+      reduce(t: number) {
+        return getCurrentState();
+      }
+    }, 0);
+
+    // Set a long duration for continuous animation
+    timeline.duration = 1000; // seconds
+    timeline.looping = true;
+
+    lastTickTime = 0;
+
+    // Register tick callback
+    timeline.onTick((t, _state) => {
+      const currentTime = t * timeline.duration * 1000; // Convert to ms
+      const elapsed = lastTickTime === 0 ? 16.67 : currentTime - lastTickTime;
+      lastTickTime = currentTime;
       updateAnimation(elapsed);
     });
   }
 
-  function stopAnimation() {
-    if (clock) clock.stop();
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
   }
 
-  function handleVisibilityChange(isActive) {
+  function stopAnimation() {
+    if (timeline) timeline.pause();
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
+  function drawSourceDistribution() {
+    drawScatterPlot(
+      ctx,
+      sourcePixelCoords,
+      settings.stylingSettings.scatterPlot.radius,
+      sourcePointColor,
+      settings.stylingSettings.scatterPlot.opacity
+    );
+  }
+
+  function drawTargetDistribution() {
+    // Draw all target points (ground truth + generated endpoints)
+    drawScatterPlot(
+      ctx,
+      targetPixelCoords,
+      settings.stylingSettings.scatterPlot.radius,
+      targetPointColor,
+      settings.stylingSettings.scatterPlot.opacity
+    );
+  }
+
+  function drawLabels() {
+    const labelColor = settings.stylingSettings.label.color;
+    const labelFontSize = settings.stylingSettings.label.fontSize;
+    const labelFontWeight = settings.stylingSettings.label.fontWeight;
+    const labelOpacity = settings.stylingSettings.label.opacity;
+    const labelFont = `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`;
+    const labelY = marginTop / 2 + 5;
+    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, labelY, { color: labelColor, font: labelFont, opacity: labelOpacity });
+    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, labelY, { color: labelColor, font: labelFont, opacity: labelOpacity });
+  }
+
+  function drawNaiveCouplingLines(count: number, opacity = couplingLineOpacity) {
+    ctx.strokeStyle = couplingLineColor;
+    ctx.lineWidth = couplingLineWidth;
+    ctx.globalAlpha = opacity;
+
+    const linesToDraw = Math.min(count, numLinesToDraw, numPoints);
+    for (let i = 0; i < linesToDraw; i++) {
+      const [sx, sy] = sourcePixelCoords[i];
+      // Connect to random target from full target pool
+      const targetIdx = shuffledTargetIndices[i % shuffledTargetIndices.length];
+      const [tx, ty] = targetPixelCoords[targetIdx];
+
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+  }
+
+  function drawAnimatedTrajectories(time: number) {
+    const segmentIndex = Math.floor(time * (numTimeSteps - 1));
+
+    drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
+      strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+      color: settings.stylingSettings.trajectory.color,
+      progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+      pointRadius: settings.stylingSettings.trajectory.endpointRadius,
+      showPreview: false,
+      previewOpacity: 0
+    });
+  }
+
+  function drawInducedCouplingLines(progress = 1) {
+    ctx.strokeStyle = couplingLineColor;
+    ctx.lineWidth = couplingLineWidth;
+    ctx.globalAlpha = couplingLineOpacity;
+
+    const linesToDraw = Math.min(numLinesToDraw, numPoints, generatedEndpointPixelCoords.length);
+    for (let i = 0; i < linesToDraw; i++) {
+      // Direct pairing: source[i] -> generated endpoint[i]
+      const [sx, sy] = sourcePixelCoords[i];
+      const [tx, ty] = generatedEndpointPixelCoords[i];
+
+      // Animate from source to target (showing the flow created this pairing)
+      const endX = sx + (tx - sx) * progress;
+      const endY = sy + (ty - sy) * progress;
+
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+  }
+
+  function draw(state: PhaseState) {
+    if (!ctx || !initialized) return;
+
+    ctx.clearRect(0, 0, width, height);
+
+    drawSourceDistribution();
+    drawTargetDistribution();
+    drawLabels();
+
+    switch (state.phase) {
+      case 'distributions':
+        break;
+      case 'naive_coupling':
+        drawNaiveCouplingLines(state.linesDrawnCount);
+        break;
+      case 'pause_after_naive':
+        drawNaiveCouplingLines(numLinesToDraw);
+        break;
+      case 'fade_out':
+        drawNaiveCouplingLines(numLinesToDraw, state.fadeOpacity * couplingLineOpacity);
+        break;
+      case 'trajectories':
+        drawAnimatedTrajectories(state.trajectoryTime);
+        break;
+      case 'pause_after_trajectories':
+        drawAnimatedTrajectories(1);
+        break;
+      case 'induced_coupling':
+        drawInducedCouplingLines(state.inducedCouplingProgress);
+        break;
+      case 'pause_at_end':
+        drawInducedCouplingLines(1);
+        break;
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
+
+  function jumpToState(newStateIndex: number) {
+    phaseProgress = 0;
+
+    switch (newStateIndex) {
+      case 0:
+        currentPhase = 'pause_after_naive';
+        linesDrawnCount = numLinesToDraw;
+        fadeOpacity = 1;
+        break;
+      case 1:
+        currentPhase = 'trajectories';
+        trajectoryTime = 0;
+        fadeOpacity = 0;
+        break;
+      case 2:
+        currentPhase = 'pause_at_end';
+        inducedCouplingProgress = 1;
+        break;
+    }
+
+    draw(getCurrentState());
+
+    if (isPlaying && timeline && !timeline.isPlaying) {
+      startAnimation();
+    }
+  }
+
+  function handleVisibilityChange(isActive: boolean) {
     if (!isActive && isPlaying) {
       wasPlayingBeforeHidden = true;
       isPlaying = false;
@@ -485,6 +555,16 @@
       startAnimation();
     }
   }
+
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
+  onDestroy(() => stopAnimation());
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
 
   // Generate trajectories when flowMatchingClient is available
   $: if (
@@ -503,22 +583,21 @@
     generatedTrajectories.length > 0 &&
     !initialized
   ) {
-    initializeData();
+    runInitialComputation();
     initialized = true;
-    draw();
+    setupTimeline();
+    draw(getCurrentState());
     if (isPlaying) startAnimation();
   }
 
   // Animation control
-  $: if (isPlaying && initialized && clock && !clock.isRunning) startAnimation();
-  $: if (!isPlaying && clock && clock.isRunning) stopAnimation();
+  $: if (isPlaying && initialized && timeline && !timeline.isPlaying) startAnimation();
+  $: if (!isPlaying && timeline && timeline.isPlaying) stopAnimation();
 
   // Handle visibility changes
   $: if (figureIsActive !== undefined && initialized) {
     handleVisibilityChange($figureIsActive);
   }
-
-  onDestroy(() => stopAnimation());
 </script>
 
 <Figure {caption} backgroundVisible={false} bind:isActive={figureIsActive}>

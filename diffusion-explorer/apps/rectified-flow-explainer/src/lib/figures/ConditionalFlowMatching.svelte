@@ -1,17 +1,19 @@
 <script>
-  import { onMount } from "svelte";
   import { Figure, drawScatterPlot, drawArrow, drawMathjaxOnCanvas, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
-  // ===== CAPTION =====
-  export let children = undefined;
-  $: caption = children;
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
 
-  // ===== DATA PROPS =====
+  // Caption
+  export let children = undefined;
+
+  // Data props
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
 
-  // ===== LAYOUT PROPS =====
+  // Layout props
   export let width = 800;
   export let height = 450;
   export let marginWidth = 50;
@@ -20,64 +22,73 @@
   export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let yShiftFactor = -0.2;
 
-  // ===== SCATTER PLOT STYLING =====
+  // Scatter plot styling
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export let targetPointColor = settings.stylingSettings.scatterPlot.color;
 
-  // ===== PATH LINE STYLING (between x_0 and x_1) =====
+  // Path line styling (between x_0 and x_1)
   export let lineColor = "#888";
   export let lineOpacity = 0.25;
   export let lineWidth = 3;
 
-  // ===== SELECTED POINT STYLING (x_0 and x_1) =====
+  // Selected point styling (x_0 and x_1)
   export let selectedPointColor = "#888";
   export let selectedPointRadius = 5;
 
-  // ===== INTERMEDIATE POINT STYLING =====
+  // Intermediate point styling
   export let intermediatePointColor = "#f17720";
   export let intermediatePointRadius = 6;
 
-  // ===== CONDITIONAL VECTOR STYLING (v_t) =====
+  // Conditional vector styling (v_t)
   export let vectorColor = "#f17720";
   export let vectorOpacity = 1.0;
   export let vectorWidth = 2.5;
   export let vectorScale = 150;
   export let t = 0.3;
 
-  // ===== NOISY VECTOR STYLING (v_t^\theta) =====
+  // Noisy vector styling (v_t^\theta)
   export let noisyVectorColor = "#22c55e";
   export let noiseVector = [15, -90]; // [dx, dy] in pixels
 
-  // ===== DASHED LINE STYLING =====
+  // Dashed line styling
   export let dashedLineColor = "#ef4444";
   export let dashedLineWidth = 2;
 
-  // ===== BACKGROUND =====
+  // Background
   export let backgroundVisible = true;
 
-  // ===== LATEX LABEL STYLING =====
+  // LaTeX label styling
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
-  // ===== FIXED POINT POSITIONS (pixel coords) =====
+  // Fixed point positions (pixel coords)
   export let x0Pixel = { x: 180, y: 170 };
   export let x1Pixel = { x: 540, y: 130 };
 
-  // ===== STATE =====
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
+  $: caption = children;
+
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
+
   let scales = null;
   let isInitialized = false;
-  let figureIsActive;
 
   // Pre-computed pixel coordinates
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
+
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   function precomputeScatterCoords() {
     if (!scales) return;
@@ -99,7 +110,11 @@
     });
   }
 
-  function initializeData() {
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
     scales = createSourceTargetScales(
       sourceDistributionSamples,
       targetDistributionSamples,
@@ -115,6 +130,10 @@
     );
     precomputeScatterCoords();
   }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
 
   async function draw() {
     if (!ctx || !scales) return;
@@ -266,25 +285,23 @@
     );
   }
 
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
+
   $: if (
     canvas &&
     sourceDistributionSamples.length > 0 &&
     targetDistributionSamples.length > 0 &&
     !isInitialized
   ) {
-    initializeData();
+    runInitialComputation();
     isInitialized = true;
     draw();
   }
-
-  onMount(() => {
-    return () => {
-      // Cleanup if needed
-    };
-  });
 </script>
 
-<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+<Figure {caption} {backgroundVisible}>
   {#snippet children()}
     <div style="width:100%;max-width:{width}px;">
       <canvas

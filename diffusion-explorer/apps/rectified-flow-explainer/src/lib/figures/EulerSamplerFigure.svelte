@@ -1,9 +1,13 @@
 <script>
   import * as tf from '@tensorflow/tfjs';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import * as d3 from 'd3';
   import { DoubleFigure, PlayButton } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
+
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
 
   // Layout props
   export let width = 400;
@@ -31,9 +35,6 @@
   export let repeatAnimation = true;
   export let repeatDelay = 1500;
 
-  // Computed domain from numSteps and deltaT
-  $: domain = [0, numSteps * deltaT];
-
   // Label props
   export let labelFontSize = 52;
   export let labelColor = settings.stylingSettings.label.color;
@@ -45,7 +46,25 @@
   // Caption
   export let children = undefined;
 
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
   $: caption = children;
+
+  // Computed domain from numSteps and deltaT
+  $: domain = [0, numSteps * deltaT];
+
+  // Calculate total cycle duration
+  $: totalCycleDuration = fullAnimationDelay + numSteps * perStepDuration + (numSteps - 1) * perStepDelay;
+
+  // Y-scale factors for each panel
+  const highCurvatureYScaleFactor = 1;
+  const lowCurvatureYScaleFactor = 5;
+
+  // SVG element references
+  let leftSvg;
+  let rightSvg;
 
   // Visibility-based animation control
   let figureIsActive;
@@ -60,105 +79,12 @@
   let animationStartTime = 0;
   let timeTrackingFrameId = null;
 
-  // Calculate total cycle duration
-  $: totalCycleDuration = fullAnimationDelay + numSteps * perStepDuration + (numSteps - 1) * perStepDelay;
-
-  function startTimeTracking() {
-    animationStartTime = performance.now();
-    trackTime();
-  }
-
-  function trackTime() {
-    if (!isPlaying) {
-      timeTrackingFrameId = null;
-      return;
-    }
-
-    const elapsed = performance.now() - animationStartTime;
-    const cycleTime = totalCycleDuration + repeatDelay;
-    const timeInCycle = elapsed % cycleTime;
-
-    // During animation (not in repeat delay)
-    if (timeInCycle < totalCycleDuration) {
-      normalizedTime = Math.min(1, (timeInCycle - fullAnimationDelay) / (totalCycleDuration - fullAnimationDelay));
-      if (normalizedTime < 0) normalizedTime = 0;
-    } else {
-      // During repeat delay, show full circle
-      normalizedTime = 1;
-    }
-
-    timeTrackingFrameId = requestAnimationFrame(trackTime);
-  }
-
-  function togglePlayPause() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      shouldAnimate = true;
-      restartAnimations();
-    } else {
-      shouldAnimate = false;
-      stopAllAnimations();
-    }
-  }
-
-  // Pause animation when figure goes off-screen, resume when back
-  $: if (figureIsActive && isInitialized) {
-    if (!$figureIsActive && shouldAnimate) {
-      wasAnimatingBeforeHidden = true;
-      shouldAnimate = false;
-      stopAllAnimations();
-    } else if ($figureIsActive && wasAnimatingBeforeHidden) {
-      wasAnimatingBeforeHidden = false;
-      shouldAnimate = true;
-      restartAnimations();
-    }
-  }
-
   // Store animation data for restart
   let animationData = null;
 
-  function stopAllAnimations() {
-    // Cancel all pending timeouts
-    activeTimeoutIds.forEach(id => clearTimeout(id));
-    activeTimeoutIds = [];
-    // Interrupt all D3 transitions
-    if (leftSvg) d3.select(leftSvg).selectAll('*').interrupt();
-    if (rightSvg) d3.select(rightSvg).selectAll('*').interrupt();
-    // Stop time tracking
-    if (timeTrackingFrameId) {
-      cancelAnimationFrame(timeTrackingFrameId);
-      timeTrackingFrameId = null;
-    }
-  }
-
-  function restartAnimations() {
-    if (!animationData) return;
-    // Stop any existing animations first
-    stopAllAnimations();
-    const { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler } = animationData;
-    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, highCurvatureYScaleFactor, highCurvatureLabel, 0);
-    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, lowCurvatureYScaleFactor, lowCurvatureLabel, 0);
-    // Restart time tracking
-    if (isPlaying) {
-      startTimeTracking();
-    }
-  }
-
-  function scheduleTimeout(fn, delay) {
-    const id = setTimeout(() => {
-      // Remove from active list when executed
-      activeTimeoutIds = activeTimeoutIds.filter(tid => tid !== id);
-      fn();
-    }, delay);
-    activeTimeoutIds.push(id);
-    return id;
-  }
-
-  const highCurvatureYScaleFactor = 1;
-  const lowCurvatureYScaleFactor = 5;
-
-  let leftSvg;
-  let rightSvg;
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   // ODE Functions
   function highCurvatureODE(t, y) {
@@ -245,35 +171,102 @@
     return points;
   }
 
-  // Plot Labels
-  function plotLabels(svg, label, xScale, yScale) {
-    if (!svg) return;
+  function scheduleTimeout(fn, delay) {
+    const id = setTimeout(() => {
+      // Remove from active list when executed
+      activeTimeoutIds = activeTimeoutIds.filter(tid => tid !== id);
+      fn();
+    }, delay);
+    activeTimeoutIds.push(id);
+    return id;
+  }
 
-    const d3Svg = d3.select(svg);
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
 
-    // Remove existing label if it exists
-    d3Svg.select('.curve-label').remove();
+  function runInitialComputation() {
+    // Generate data for both functions
+    const [t0, tEnd] = domain;
+    const y0 = 0;
 
-    // Calculate center x position
-    const xDomain = xScale.domain();
-    const xCenter = (xDomain[0] + xDomain[1]) / 2;
+    // High-curvature data
+    const highCurvatureEuler = eulerMethod(highCurvatureODE, t0, y0, tEnd, deltaT);
+    const highCurvatureGT = generateGroundTruthPoints(highCurvatureGroundTruth, t0, tEnd, groundTruthDeltaT);
 
-    // Calculate top y position with shift factor
-    const yDomain = yScale.domain();
-    const yTop = yDomain[1];
-    const yRange = yDomain[1] - yDomain[0];
-    const yShift = yRange * labelYShiftFactor;
+    // Low-curvature data
+    const lowCurvatureEuler = eulerMethod(lowCurvatureODE, t0, y0, tEnd, deltaT);
+    const lowCurvatureGT = generateGroundTruthPoints(lowCurvatureGroundTruth, t0, tEnd, groundTruthDeltaT);
 
-    // Add label at the top center, shifted down by labelYShiftFactor
-    d3Svg.append('text')
-      .attr('class', 'curve-label')
-      .attr('x', xScale(xCenter))
-      .attr('y', yScale(yTop - yShift) - 5)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor)
-      .attr('opacity', labelOpacity)
-      .text(label);
+    // Store animation data for restart
+    animationData = { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler };
+
+    // Plot both with same animation delay so they start in sync
+    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, highCurvatureYScaleFactor, highCurvatureLabel, fullAnimationDelay);
+    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, lowCurvatureYScaleFactor, lowCurvatureLabel, fullAnimationDelay);
+
+    isInitialized = true;
+
+    // Start time tracking for play button circle
+    startTimeTracking();
+  }
+
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  function startTimeTracking() {
+    animationStartTime = performance.now();
+    trackTime();
+  }
+
+  function trackTime() {
+    if (!isPlaying) {
+      timeTrackingFrameId = null;
+      return;
+    }
+
+    const elapsed = performance.now() - animationStartTime;
+    const cycleTime = totalCycleDuration + repeatDelay;
+    const timeInCycle = elapsed % cycleTime;
+
+    // During animation (not in repeat delay)
+    if (timeInCycle < totalCycleDuration) {
+      normalizedTime = Math.min(1, (timeInCycle - fullAnimationDelay) / (totalCycleDuration - fullAnimationDelay));
+      if (normalizedTime < 0) normalizedTime = 0;
+    } else {
+      // During repeat delay, show full circle
+      normalizedTime = 1;
+    }
+
+    timeTrackingFrameId = requestAnimationFrame(trackTime);
+  }
+
+  function stopAllAnimations() {
+    // Cancel all pending timeouts
+    activeTimeoutIds.forEach(id => clearTimeout(id));
+    activeTimeoutIds = [];
+    // Interrupt all D3 transitions
+    if (leftSvg) d3.select(leftSvg).selectAll('*').interrupt();
+    if (rightSvg) d3.select(rightSvg).selectAll('*').interrupt();
+    // Stop time tracking
+    if (timeTrackingFrameId) {
+      cancelAnimationFrame(timeTrackingFrameId);
+      timeTrackingFrameId = null;
+    }
+  }
+
+  function restartAnimations() {
+    if (!animationData) return;
+    // Stop any existing animations first
+    stopAllAnimations();
+    const { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler } = animationData;
+    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, highCurvatureYScaleFactor, highCurvatureLabel, 0);
+    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, lowCurvatureYScaleFactor, lowCurvatureLabel, 0);
+    // Restart time tracking
+    if (isPlaying) {
+      startTimeTracking();
+    }
   }
 
   // Animate individual Euler line segments
@@ -365,6 +358,41 @@
     }
   }
 
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
+  // Plot Labels
+  function plotLabels(svg, label, xScale, yScale) {
+    if (!svg) return;
+
+    const d3Svg = d3.select(svg);
+
+    // Remove existing label if it exists
+    d3Svg.select('.curve-label').remove();
+
+    // Calculate center x position
+    const xDomain = xScale.domain();
+    const xCenter = (xDomain[0] + xDomain[1]) / 2;
+
+    // Calculate top y position with shift factor
+    const yDomain = yScale.domain();
+    const yTop = yDomain[1];
+    const yRange = yDomain[1] - yDomain[0];
+    const yShift = yRange * labelYShiftFactor;
+
+    // Add label at the top center, shifted down by labelYShiftFactor
+    d3Svg.append('text')
+      .attr('class', 'curve-label')
+      .attr('x', xScale(xCenter))
+      .attr('y', yScale(yTop - yShift) - 5)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', `${labelFontSize}px`)
+      .attr('fill', labelColor)
+      .attr('opacity', labelOpacity)
+      .text(label);
+  }
+
   // Plot Curves
   function plotCurves(svg, groundTruth, eulerData, yScaleFactor = 1, label = '', animDelay = fullAnimationDelay) {
     if (!svg) return;
@@ -400,40 +428,57 @@
     }
   }
 
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
+
+  function togglePlayPause() {
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      shouldAnimate = true;
+      restartAnimations();
+    } else {
+      shouldAnimate = false;
+      stopAllAnimations();
+    }
+  }
+
+  function handleVisibilityChange(isActive) {
+    if (!isActive && shouldAnimate) {
+      wasAnimatingBeforeHidden = true;
+      shouldAnimate = false;
+      stopAllAnimations();
+    } else if (isActive && wasAnimatingBeforeHidden) {
+      wasAnimatingBeforeHidden = false;
+      shouldAnimate = true;
+      restartAnimations();
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
   onMount(() => {
-    // Generate data for both functions
-    const [t0, tEnd] = domain;
-    const y0 = 0;
-
-    // High-curvature data
-    const highCurvatureEuler = eulerMethod(highCurvatureODE, t0, y0, tEnd, deltaT);
-    const highCurvatureGT = generateGroundTruthPoints(highCurvatureGroundTruth, t0, tEnd, groundTruthDeltaT);
-
-    // Low-curvature data
-    const lowCurvatureEuler = eulerMethod(lowCurvatureODE, t0, y0, tEnd, deltaT);
-    const lowCurvatureGT = generateGroundTruthPoints(lowCurvatureGroundTruth, t0, tEnd, groundTruthDeltaT);
-
-    // Store animation data for restart
-    animationData = { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler };
-
-    // Plot both with same animation delay so they start in sync
-    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, highCurvatureYScaleFactor, highCurvatureLabel, fullAnimationDelay);
-    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, lowCurvatureYScaleFactor, lowCurvatureLabel, fullAnimationDelay);
-
-    isInitialized = true;
-
-    // Start time tracking for play button circle
-    startTimeTracking();
-
-    // Cleanup timeouts on unmount
-    return () => {
-      activeTimeoutIds.forEach(id => clearTimeout(id));
-      activeTimeoutIds = [];
-      if (timeTrackingFrameId) {
-        cancelAnimationFrame(timeTrackingFrameId);
-      }
-    };
+    runInitialComputation();
   });
+
+  onDestroy(() => {
+    activeTimeoutIds.forEach(id => clearTimeout(id));
+    activeTimeoutIds = [];
+    if (timeTrackingFrameId) {
+      cancelAnimationFrame(timeTrackingFrameId);
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
+
+  // Pause animation when figure goes off-screen, resume when back
+  $: if (figureIsActive && isInitialized) {
+    handleVisibilityChange($figureIsActive);
+  }
 </script>
 
 <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>

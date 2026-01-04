@@ -5,22 +5,26 @@
   import { Figure, plotSourceTargetLabels, plotSourceTargetScatter, createSourceTargetScales, dataToPixelX } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
 
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
+
   // Caption slot (passed as default children)
   export let children = undefined;
-  $: caption = children;
 
   // Data props (from parent)
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
 
+  // Layout
   export const height = 450;
   export const width = 800;
-  export const sourcePointColor = settings.stylingSettings.scatterPlot.color;
-  export const targetPointColor = '#f17720';
   export const sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
   export const targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export const marginWidth = 50;
   export const marginHeight = 20;
+
+  // Labels
   export const sourceLabelText = 'Source Distribution';
   export const targetLabelText = 'Target Distribution';
   const labelFontSize = settings.stylingSettings.label.fontSize;
@@ -28,24 +32,98 @@
   const labelOpacity = settings.stylingSettings.label.opacity;
   const outlineColor = settings.stylingSettings.label.outlineColor;
   const outlineOpacity = settings.stylingSettings.label.outlineOpacity;
-  export const edgeColor = '#888';
-  export const edgeOpacity = 0.3;
-  export const edgeWidth = 2;
+
+  // Styling
+  export const sourcePointColor = settings.stylingSettings.scatterPlot.color;
+  export const targetPointColor = '#f17720';
   export const pointRadius = settings.stylingSettings.scatterPlot.radius;
   export const pointOpacity = 0.4; // Custom: different from default
   export const yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
+
+  // Edge styling
+  export const edgeColor = '#888';
+  export const edgeOpacity = 0.3;
+  export const edgeWidth = 2;
+  export const dashed = false;
+
+  // Hover styling
   export const hoverEdgeColor = '#555';
   export const hoverEdgeWidth = 3;
   export const hoverEdgeOpacity = 0.8;
   export const hoverPointOpacity = 0.9;
-  export const dashed = false;
 
   // Background visibility
   export let backgroundVisible = true;
 
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
+  $: caption = children;
+
   let svgElement;
   let scales = null;
   let isInitialized = false;
+
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
+
+  function addHoverAttributes(svg) {
+    // Add hover-related attributes to scatter circles
+    svg.select('#sourceScatter').selectAll('circle')
+      .attr('data-index', (d, i) => i)
+      .attr('data-original-opacity', pointOpacity)
+      .style('cursor', 'pointer');
+
+    svg.select('#targetScatter').selectAll('circle')
+      .attr('data-index', (d, i) => i)
+      .attr('data-original-opacity', pointOpacity)
+      .style('cursor', 'pointer');
+  }
+
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
+    if (!svgElement) return;
+    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+
+    const svg = d3.select(svgElement);
+
+    // Create groups (plotSourceTargetScatter and plotSourceTargetLabels expect these)
+    svg.append('g').attr('id', 'sourceScatter');
+    svg.append('g').attr('id', 'targetScatter');
+    svg.append('g').attr('id', 'labels');
+
+    // Create scales using proportional positioning
+    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
+    });
+
+    // Plot coupling edges first (so they're behind scatter points)
+    // Note: we pass original target points, dataToPixelX handles the pixel positioning
+    const { shuffledTargets } = plotCoupling(sourceDistributionSamples, targetDistributionSamples);
+
+    // Plot scatter using d3_helpers
+    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, scales, {
+      sourcePointColor,
+      targetPointColor,
+      pointRadius,
+      pointOpacity
+    });
+
+    // Add hover attributes and handlers
+    addHoverAttributes(svg);
+    plotLabels();
+    setupPointHoverHandlers(targetDistributionSamples, shuffledTargets);
+    isInitialized = true;
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
 
   function plotLabels() {
     if (!svgElement || !scales) return;
@@ -61,19 +139,6 @@
       outlineColor,
       outlineOpacity
     });
-  }
-
-  function addHoverAttributes(svg) {
-    // Add hover-related attributes to scatter circles
-    svg.select('#sourceScatter').selectAll('circle')
-      .attr('data-index', (d, i) => i)
-      .attr('data-original-opacity', pointOpacity)
-      .style('cursor', 'pointer');
-
-    svg.select('#targetScatter').selectAll('circle')
-      .attr('data-index', (d, i) => i)
-      .attr('data-original-opacity', pointOpacity)
-      .style('cursor', 'pointer');
   }
 
   function plotCoupling(sourcePoints, targetPoints) {
@@ -166,6 +231,10 @@
     return { couplingData, shuffledTargets };
   }
 
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
+
   function setupPointHoverHandlers(targetPoints, shuffledTargets) {
     if (!svgElement) return;
 
@@ -250,47 +319,16 @@
       });
   }
 
-  function initializeVisualization() {
-    if (!svgElement) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
-
-    const svg = d3.select(svgElement);
-
-    // Create groups (plotSourceTargetScatter and plotSourceTargetLabels expect these)
-    svg.append('g').attr('id', 'sourceScatter');
-    svg.append('g').attr('id', 'targetScatter');
-    svg.append('g').attr('id', 'labels');
-
-    // Create scales using proportional positioning
-    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor
-    });
-
-    // Plot coupling edges first (so they're behind scatter points)
-    // Note: we pass original target points, dataToPixelX handles the pixel positioning
-    const { shuffledTargets } = plotCoupling(sourceDistributionSamples, targetDistributionSamples);
-
-    // Plot scatter using d3_helpers
-    plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, scales, {
-      sourcePointColor,
-      targetPointColor,
-      pointRadius,
-      pointOpacity
-    });
-
-    // Add hover attributes and handlers
-    addHoverAttributes(svg);
-    plotLabels();
-    setupPointHoverHandlers(targetDistributionSamples, shuffledTargets);
-    isInitialized = true;
-  }
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
 
   // Reactive initialization
   $: if (!isInitialized &&
          sourceDistributionSamples.length > 0 &&
          targetDistributionSamples.length > 0 &&
          svgElement) {
-    initializeVisualization();
+    runInitialComputation();
   }
 </script>
 

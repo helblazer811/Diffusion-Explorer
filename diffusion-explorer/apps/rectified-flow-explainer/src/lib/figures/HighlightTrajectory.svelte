@@ -3,25 +3,32 @@
   import { Figure, TimeSlider, drawScatterPlot, drawMathjaxOnCanvas, drawTrajectoriesWithPreview, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
+
   // FlowModelClient instance (passed from parent, created with correct base path)
   export let flowMatchingClient = null;
 
+  // Data props
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
   export let allTimeSamples; // [timestep][sample][dim]
+
+  // Animation settings
   export let animationDuration = 6000;
   export let playingByDefault = true;
   export let pauseBeforeRestart = 1000;
+
+  // Layout
   export let width = 750;
   export let height = 350;
   export let marginWidth = 50;
   export let marginHeight = 20;
+
+  // Trajectory settings
   export let numTrajectoriesToShow = 1;
   export let samplingSteps = 200;
-
-  // In-progress clicked trajectory state
-  let clickedTrajectory = null; // [[x,y], ...] in pixel coordinates being built
-  let isStreamingTrajectory = false;
 
   // LaTeX label styling
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
@@ -29,16 +36,22 @@
 
   // Caption slot (passed as default children)
   export let children = undefined;
+
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
   $: caption = children;
 
-  // Canvas state - need both bind:this (for reactivity) and action (for DPR setup)
+  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
-  // Animation state type - derived values computed by clips (NOT time)
+  // Animation state type
   type AnimState = {
+    time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     segmentIndex: number;        // For regular trajectories
     clickedSegmentIndex: number; // For in-progress clicked trajectory
   };
@@ -61,9 +74,17 @@
   let targetPixelCoords = [];
   let combinedMeanX = 0;
 
+  // In-progress clicked trajectory state
+  let clickedTrajectory = null; // [[x,y], ...] in pixel coordinates being built
+  let isStreamingTrajectory = false;
+
   // Visibility tracking
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
+
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   // Pick trajectories (first N samples)
   function selectTrajectoryIndices() {
@@ -133,93 +154,6 @@
     });
   }
 
-
-  // Handle canvas click - restricted to source distribution region
-  function handleCanvasClick(event) {
-    // Ignore clicks while sampling is in progress
-    if (isStreamingTrajectory) return;
-    if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
-    if (!scales || !canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = width / rect.width;
-    const scaleY = height / rect.height;
-    const clickX = (event.clientX - rect.left) * scaleX;
-    const clickY = (event.clientY - rect.top) * scaleY;
-
-    // Restrict to source distribution region (left half of canvas)
-    const sourceRegionMaxX = width * 0.5;
-    if (clickX > sourceRegionMaxX) return;
-
-    // Convert pixel to domain coordinates
-    const domainX = scales.sourceMeanX + (clickX - scales.sourceCenterPixelX) / scales.xScaleFactor;
-    const domainY = scales.yScale.invert(clickY);
-
-    sampleFromPoint([domainX, domainY]);
-  }
-
-  // Sample from a clicked point using streaming
-  function sampleFromPoint(point) {
-    isStreamingTrajectory = true;
-
-    // Initialize with click point scaled to t=0 position
-    const initialPixelX = getPixelX(point[0], combinedMeanX, 0);
-    const initialPixelY = scales.yScale(point[1]);
-    clickedTrajectory = [[initialPixelX, initialPixelY]];
-
-    // Clear existing trajectories - will be replaced by user's trajectory
-    transformedTrajectories = [];
-
-    // Reset animation state and start
-    time = 0;
-    if (timeline) timeline.reset();
-    isPlaying = true;
-    startAnimation();
-
-    // Sample with streaming
-    const result = flowMatchingClient.sampleFromInitialPoints(
-      [point],
-      samplingSteps,
-      {},
-      // onStep - append each new point, transformed to pixel space
-      (step, x_t) => {
-        const t = (step + 1) / samplingSteps;
-        const pixelX = getPixelX(x_t[0][0], combinedMeanX, t);
-        const pixelY = scales.yScale(x_t[0][1]);
-        clickedTrajectory = [...clickedTrajectory, [pixelX, pixelY]];
-      }
-    );
-    result.promise.then(() => {
-      if (clickedTrajectory && clickedTrajectory.length > 1) {
-        // Replace with user's trajectory
-        transformedTrajectories = [clickedTrajectory];
-      }
-      clickedTrajectory = null;
-      isStreamingTrajectory = false;
-    });
-  }
-
-  // Initialize scales and pre-compute data
-  function initializeData() {
-    scales = createSourceTargetScales(
-      sourceDistributionSamples,
-      targetDistributionSamples,
-      {
-        width,
-        height,
-        marginWidth,
-        marginHeight,
-        sourceCenterX: settings.stylingSettings.layout.sourceCenterX,
-        targetCenterX: settings.stylingSettings.layout.targetCenterX,
-        yShiftFactor: settings.stylingSettings.scatterPlot.yShiftFactor,
-      }
-    );
-
-    selectTrajectoryIndices();
-    precomputeScatterCoords();
-    precomputeTrajectories();
-  }
-
   // Get point at a specific progress (0-1) along a trajectory
   function getPointAtProgress(trajectoryIndex, progress) {
     const traj = transformedTrajectories[trajectoryIndex];
@@ -241,9 +175,92 @@
     return traj[traj.length - 1];
   }
 
-  // Pure renderer - accepts time from Timeline + pre-computed state
-  async function draw(t: number, state: AnimState) {
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function runInitialComputation() {
+    scales = createSourceTargetScales(
+      sourceDistributionSamples,
+      targetDistributionSamples,
+      {
+        width,
+        height,
+        marginWidth,
+        marginHeight,
+        sourceCenterX: settings.stylingSettings.layout.sourceCenterX,
+        targetCenterX: settings.stylingSettings.layout.targetCenterX,
+        yShiftFactor: settings.stylingSettings.scatterPlot.yShiftFactor,
+      }
+    );
+
+    selectTrajectoryIndices();
+    precomputeScatterCoords();
+    precomputeTrajectories();
+  }
+
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  function setupTimeline() {
+    // Cache numTimesteps for clip closure
+    cachedNumTimesteps = allTimeSamples?.length || 1;
+
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = { time: 0, segmentIndex: 0, clickedSegmentIndex: 0 };
+
+    // Calculate normalized durations for timeline
+    const totalDuration = animationDuration + pauseBeforeRestart;
+    const mainDuration = animationDuration / totalDuration;
+    const pauseNormalized = pauseBeforeRestart / totalDuration;
+
+    // Main animation clip - computes both segment indices
+    const mainClip = {
+      name: "Animation",
+      duration: mainDuration,
+      reduce(t: number) {
+        return {
+          time: t,
+          segmentIndex: Math.floor(t * (cachedNumTimesteps - 1)),
+          clickedSegmentIndex: Math.floor(t * (samplingSteps - 1))
+        };
+      }
+    };
+
+    // Add main animation clip (0 to mainDuration of timeline)
+    timeline.add(mainClip, 0);
+    // Add pause clip (mainDuration to 1)
+    timeline.add(createPauseClip(pauseNormalized), mainDuration);
+
+    // Set timeline duration in seconds and enable looping
+    timeline.duration = totalDuration / 1000;
+    timeline.looping = true;
+
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      time = state.time;  // For slider binding
+      draw(state);
+    });
+  }
+
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
+  }
+
+  function stopAnimation() {
+    if (timeline) timeline.pause();
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
+  async function draw(state: AnimState) {
     if (!ctx || !initialized) return;
+
+    const t = state.time;
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -371,54 +388,73 @@
     }
   }
 
-  // Initialize animation timeline with main clip and pause
-  function initializeAnimation() {
-    // Cache numTimesteps for clip closure
-    cachedNumTimesteps = allTimeSamples?.length || 1;
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
 
-    timeline = new Timeline<AnimState>();
-    timeline.initialState = { segmentIndex: 0, clickedSegmentIndex: 0 };
+  // Handle canvas click - restricted to source distribution region
+  function handleCanvasClick(event) {
+    // Ignore clicks while sampling is in progress
+    if (isStreamingTrajectory) return;
+    if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
+    if (!scales || !canvas) return;
 
-    // Calculate normalized durations for timeline
-    const totalDuration = animationDuration + pauseBeforeRestart;
-    const mainDuration = animationDuration / totalDuration;
-    const pauseNormalized = pauseBeforeRestart / totalDuration;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const clickX = (event.clientX - rect.left) * scaleX;
+    const clickY = (event.clientY - rect.top) * scaleY;
 
-    // Main animation clip - computes both segment indices
-    const mainClip = {
-      name: "Animation",
-      duration: mainDuration,
-      reduce(t: number) {
-        return {
-          segmentIndex: Math.floor(t * (cachedNumTimesteps - 1)),
-          clickedSegmentIndex: Math.floor(t * (samplingSteps - 1))
-        };
+    // Restrict to source distribution region (left half of canvas)
+    const sourceRegionMaxX = width * 0.5;
+    if (clickX > sourceRegionMaxX) return;
+
+    // Convert pixel to domain coordinates
+    const domainX = scales.sourceMeanX + (clickX - scales.sourceCenterPixelX) / scales.xScaleFactor;
+    const domainY = scales.yScale.invert(clickY);
+
+    sampleFromPoint([domainX, domainY]);
+  }
+
+  // Sample from a clicked point using streaming
+  function sampleFromPoint(point) {
+    isStreamingTrajectory = true;
+
+    // Initialize with click point scaled to t=0 position
+    const initialPixelX = getPixelX(point[0], combinedMeanX, 0);
+    const initialPixelY = scales.yScale(point[1]);
+    clickedTrajectory = [[initialPixelX, initialPixelY]];
+
+    // Clear existing trajectories - will be replaced by user's trajectory
+    transformedTrajectories = [];
+
+    // Reset animation state and start
+    time = 0;
+    if (timeline) timeline.reset();
+    isPlaying = true;
+    startAnimation();
+
+    // Sample with streaming
+    const result = flowMatchingClient.sampleFromInitialPoints(
+      [point],
+      samplingSteps,
+      {},
+      // onStep - append each new point, transformed to pixel space
+      (step, x_t) => {
+        const t = (step + 1) / samplingSteps;
+        const pixelX = getPixelX(x_t[0][0], combinedMeanX, t);
+        const pixelY = scales.yScale(x_t[0][1]);
+        clickedTrajectory = [...clickedTrajectory, [pixelX, pixelY]];
       }
-    };
-
-    // Add main animation clip (0 to mainDuration of timeline)
-    timeline.add(mainClip, 0);
-    // Add pause clip (mainDuration to 1)
-    timeline.add(createPauseClip(pauseNormalized), mainDuration);
-
-    // Set timeline duration in seconds and enable looping
-    timeline.duration = totalDuration / 1000;
-    timeline.looping = true;
-
-    // Register tick callback - t from Timeline, state from clips
-    timeline.onTick((t, state) => {
-      time = t;  // For slider binding
-      draw(t, state);
+    );
+    result.promise.then(() => {
+      if (clickedTrajectory && clickedTrajectory.length > 1) {
+        // Replace with user's trajectory
+        transformedTrajectories = [clickedTrajectory];
+      }
+      clickedTrajectory = null;
+      isStreamingTrajectory = false;
     });
-  }
-
-  function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
-  }
-
-  function stopAnimation() {
-    if (timeline) timeline.pause();
   }
 
   function toggleAnimation() {
@@ -437,27 +473,6 @@
     }
   }
 
-  // Initialize when canvas and data are ready
-  $: if (
-    canvas &&
-    allTimeSamples &&
-    allTimeSamples.length > 0 &&
-    sourceDistributionSamples.length > 0 &&
-    targetDistributionSamples.length > 0 &&
-    !initialized
-  ) {
-    initializeData();
-    initializeAnimation();
-    initialized = true;
-    draw(0, timeline!.initialState);
-    if (playingByDefault) startAnimation();
-  }
-
-  // Handle visibility changes (separate from initialization)
-  $: if (figureIsActive !== undefined && initialized) {
-    handleVisibilityChange($figureIsActive);
-  }
-
   function handleVisibilityChange(isActive) {
     if (!isActive && isPlaying) {
       wasPlayingBeforeHidden = true;
@@ -470,15 +485,41 @@
     }
   }
 
-  // Animation control - handled by toggleAnimation() and visibility changes
-  // Clock manages its own running state
-
-  // Redraw when time changes (e.g., slider drag)
-  $: if (initialized && time !== undefined && timeline) draw(time, timeline.state);
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
 
   onDestroy(() => {
     if (timeline) timeline.pause();
   });
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
+
+  // Initialize when canvas and data are ready
+  $: if (
+    canvas &&
+    allTimeSamples &&
+    allTimeSamples.length > 0 &&
+    sourceDistributionSamples.length > 0 &&
+    targetDistributionSamples.length > 0 &&
+    !initialized
+  ) {
+    runInitialComputation();
+    setupTimeline();
+    initialized = true;
+    draw(timeline!.initialState);
+    if (playingByDefault) startAnimation();
+  }
+
+  // Handle visibility changes (separate from initialization)
+  $: if (figureIsActive !== undefined && initialized) {
+    handleVisibilityChange($figureIsActive);
+  }
+
+  // Redraw when time changes (e.g., slider drag)
+  $: if (initialized && time !== undefined && timeline) draw(timeline.state);
 </script>
 
 <Figure {caption} bind:isActive={figureIsActive} backgroundVisible={false}>
