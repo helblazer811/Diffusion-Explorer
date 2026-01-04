@@ -5,6 +5,10 @@
 	let { children } = $props();
 </script>
 
+<svelte:head>
+	<title>Visualizing Rectified Flows</title>
+</svelte:head>
+
 <div class="top-nav">
 	<a href="https://alechelbling.com/blog.html" class="nav-link">Other Blogs</a>
 	<a

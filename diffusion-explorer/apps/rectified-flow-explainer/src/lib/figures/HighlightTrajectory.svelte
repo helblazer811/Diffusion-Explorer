@@ -1,6 +1,16 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawMathjaxOnCanvas, drawTrajectoriesWithPreview, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import {
+    Figure,
+    TimeSlider,
+    drawScatterPlot,
+    drawMathjaxOnCanvas,
+    drawTrajectories,
+    createSourceTargetScales,
+    Timeline,
+    createPauseClip,
+    useCanvas2D,
+  } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -31,7 +41,8 @@
   export let samplingSteps = 200;
 
   // LaTeX label styling
-  export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
+  export let latexLabelOffsetY =
+    settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
   // Caption slot (passed as default children)
@@ -50,17 +61,15 @@
   $: ctx = canvas && canvas2d.ctx;
 
   // Animation state type
-  type AnimState = {
-    time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
-    segmentIndex: number;        // For regular trajectories
+  type AnimationState = {
+    time: number; // WARNING: Using time in draw() is an antipattern. Prefer derived state.
+    segmentIndex: number; // For regular trajectories
     clickedSegmentIndex: number; // For in-progress clicked trajectory
   };
 
   // Animation state - Timeline system
-  let time = 0;
-  let isPlaying = playingByDefault;
   let initialized = false;
-  let timeline: Timeline<AnimState> | null = null;
+  let timeline: Timeline<AnimationState> | null = null;
 
   // Cached values for clip closure
   let cachedNumTimesteps = 1;
@@ -207,8 +216,12 @@
     // Cache numTimesteps for clip closure
     cachedNumTimesteps = allTimeSamples?.length || 1;
 
-    timeline = new Timeline<AnimState>();
-    timeline.initialState = { time: 0, segmentIndex: 0, clickedSegmentIndex: 0 };
+    timeline = new Timeline<AnimationState>();
+    timeline.initialState = {
+      time: 0,
+      segmentIndex: 0,
+      clickedSegmentIndex: 0,
+    };
 
     // Calculate normalized durations for timeline
     const totalDuration = animationDuration + pauseBeforeRestart;
@@ -223,9 +236,9 @@
         return {
           time: t,
           segmentIndex: Math.floor(t * (cachedNumTimesteps - 1)),
-          clickedSegmentIndex: Math.floor(t * (samplingSteps - 1))
+          clickedSegmentIndex: Math.floor(t * (samplingSteps - 1)),
         };
-      }
+      },
     };
 
     // Add main animation clip (0 to mainDuration of timeline)
@@ -239,7 +252,6 @@
 
     // Register tick callback
     timeline.onTick((_t, state) => {
-      time = state.time;  // For slider binding
       draw(state);
     });
   }
@@ -257,7 +269,7 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  async function draw(state: AnimState) {
+  async function draw(state: AnimationState) {
     if (!ctx || !initialized) return;
 
     const t = state.time;
@@ -265,7 +277,7 @@
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Draw scatter plots
+    // --- Static Background ---
     drawScatterPlot(
       ctx,
       sourcePixelCoords,
@@ -282,21 +294,23 @@
       settings.stylingSettings.scatterPlot.opacity
     );
 
+    // --- Dynamic Foreground ---
     // Draw the single trajectory (if exists)
     if (transformedTrajectories.length > 0) {
-      drawTrajectoriesWithPreview(ctx, transformedTrajectories, state.segmentIndex, {
+      drawTrajectories(ctx, transformedTrajectories, state.segmentIndex, {
         strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
         color: settings.stylingSettings.trajectory.color,
         progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
         pointRadius: settings.stylingSettings.trajectory.endpointRadius,
-        showPreview: false,
-        previewOpacity: 0,
       });
     }
 
     // Draw in-progress clicked trajectory
     if (clickedTrajectory && clickedTrajectory.length >= 1) {
-      const endIdx = Math.min(state.clickedSegmentIndex + 1, clickedTrajectory.length);
+      const endIdx = Math.min(
+        state.clickedSegmentIndex + 1,
+        clickedTrajectory.length
+      );
 
       // Draw trajectory line if we have at least 2 points
       if (endIdx >= 2) {
@@ -319,7 +333,13 @@
       const currentPoint = clickedTrajectory[Math.max(0, endIdx - 1)];
       ctx.fillStyle = settings.stylingSettings.trajectory.color;
       ctx.beginPath();
-      ctx.arc(currentPoint[0], currentPoint[1], settings.stylingSettings.trajectory.endpointRadius, 0, Math.PI * 2);
+      ctx.arc(
+        currentPoint[0],
+        currentPoint[1],
+        settings.stylingSettings.trajectory.endpointRadius,
+        0,
+        Math.PI * 2
+      );
       ctx.fill();
 
       // Draw LaTeX labels for in-progress trajectory
@@ -410,7 +430,9 @@
     if (clickX > sourceRegionMaxX) return;
 
     // Convert pixel to domain coordinates
-    const domainX = scales.sourceMeanX + (clickX - scales.sourceCenterPixelX) / scales.xScaleFactor;
+    const domainX =
+      scales.sourceMeanX +
+      (clickX - scales.sourceCenterPixelX) / scales.xScaleFactor;
     const domainY = scales.yScale.invert(clickY);
 
     sampleFromPoint([domainX, domainY]);
@@ -429,9 +451,7 @@
     transformedTrajectories = [];
 
     // Reset animation state and start
-    time = 0;
     if (timeline) timeline.reset();
-    isPlaying = true;
     startAnimation();
 
     // Sample with streaming
@@ -457,30 +477,13 @@
     });
   }
 
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-  }
-
-  function handleSliderInput() {
-    // Sync timeline with slider using seek
-    if (timeline) {
-      timeline.seek(time);
-    }
-  }
-
   function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
+    if (!timeline) return;
+    if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
-      isPlaying = false;
       stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
-      isPlaying = true;
       startAnimation();
     }
   }
@@ -517,9 +520,6 @@
   $: if (figureIsActive !== undefined && initialized) {
     handleVisibilityChange($figureIsActive);
   }
-
-  // Redraw when time changes (e.g., slider drag)
-  $: if (initialized && time !== undefined && timeline) draw(timeline.state);
 </script>
 
 <Figure {caption} bind:isActive={figureIsActive} backgroundVisible={false}>
@@ -536,11 +536,7 @@
         ></canvas>
       </div>
       <TimeSlider
-        bind:value={time}
-        bind:isPlaying
-        min={0}
-        max={1}
-        onTogglePlay={toggleAnimation}
+        {timeline}
         color={settings.stylingSettings.trajectory.color}
       />
     </div>

@@ -1,4 +1,6 @@
-<script>
+<script lang="ts">
+  import { onDestroy } from 'svelte';
+  import type { Timeline } from '../animation/animation';
   import Slider from './Slider.svelte';
 
   // Props
@@ -21,11 +23,43 @@
   // Optional Timeline instance - when provided, TimeSlider controls the timeline directly
   // This enables seamless scrubbing while animation is playing
   // See: packages/ui/src/animation/animation.ts for Timeline documentation
-  export let timeline = null;
+  export let timeline: Timeline<unknown> | null = null;
 
   // Optional callbacks (not required when using timeline)
-  export let onTogglePlay = null;  // Called when play/pause is clicked
-  export let onInput = null;       // Called when slider is dragged (receives numeric value)
+  export let onTogglePlay: (() => void) | null = null;  // Called when play/pause is clicked
+  export let onInput: ((value: number) => void) | null = null;  // Called when slider is dragged (receives numeric value)
+
+  // Internal state (synced from timeline when provided)
+  let sliderValue = 0;
+  let playing = false;
+  let unsubscribe: (() => void) | null = null;
+
+  // Subscribe to timeline tick updates when timeline changes
+  $: if (timeline) {
+    // Sync initial state
+    sliderValue = timeline.time / timeline.duration;
+    playing = timeline.isPlaying;
+
+    // Subscribe to updates (replaces any previous subscription)
+    unsubscribe?.();
+    unsubscribe = timeline.onTick((t) => {
+      sliderValue = t / timeline.duration;
+      playing = timeline.isPlaying;
+    });
+  } else {
+    // No timeline: use legacy props
+    unsubscribe?.();
+    unsubscribe = null;
+  }
+
+  // Sync legacy props to internal state when not using timeline
+  $: if (!timeline) {
+    sliderValue = value;
+    playing = isPlaying;
+  }
+
+  // Cleanup on component destroy
+  onDestroy(() => unsubscribe?.());
 
   // Toggle play/pause - uses timeline methods if available, otherwise calls callback
   function togglePlay() {
@@ -36,13 +70,14 @@
       } else {
         timeline.play();
       }
-      isPlaying = timeline.isPlaying;
+      playing = timeline.isPlaying;
     } else if (onTogglePlay) {
       // Legacy: let callback handle the toggle (avoids double-toggle)
       onTogglePlay();
     } else {
       // No timeline and no callback: toggle via two-way binding
       isPlaying = !isPlaying;
+      playing = isPlaying;
     }
   }
 
@@ -58,6 +93,20 @@
     // Call optional user callback with the VALUE (not event)
     if (onInput) onInput(newValue);
   }
+
+  // Handle drag start - pause time progression while seeking
+  function handleDragStart() {
+    if (timeline && 'startSeeking' in timeline) {
+      timeline.startSeeking();
+    }
+  }
+
+  // Handle drag end - resume time progression
+  function handleDragEnd() {
+    if (timeline && 'endSeeking' in timeline) {
+      timeline.endSeeking();
+    }
+  }
 </script>
 
 <div class="time-slider-container" class:disabled>
@@ -65,10 +114,10 @@
     <button
       class="play-button"
       onclick={togglePlay}
-      aria-label={isPlaying ? 'Pause' : 'Play'}
+      aria-label={playing ? 'Pause' : 'Play'}
       {disabled}
     >
-      {#if isPlaying}
+      {#if playing}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <rect x="6" y="4" width="4" height="16" />
           <rect x="14" y="4" width="4" height="16" />
@@ -82,7 +131,7 @@
 
     <div class="slider-wrapper">
       <Slider
-        bind:value
+        value={sliderValue}
         {min}
         {max}
         {step}
@@ -95,6 +144,8 @@
         {maxLabel}
         {dragEnabled}
         onInput={handleSliderInput}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         {discreteFill}
       />
     </div>

@@ -87,16 +87,14 @@
   let targetPixelCoords = [];
 
   // Animation state type
-  type AnimState = {
+  type AnimationState = {
     time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     currentStep: number;
     centerX: number;
   };
 
   // Animation state - Timeline system
-  let time = 0;
-  let isPlaying = playingByDefault;
-  let timeline: Timeline<AnimState> | null = null;
+  let timeline: Timeline<AnimationState> | null = null;
 
   // Cached numSteps for clip closure
   let cachedNumSteps = 1;
@@ -181,7 +179,7 @@
     // Cache numSteps for clip closure
     cachedNumSteps = $allTimeSamples?.length || 1;
 
-    timeline = new Timeline<AnimState>();
+    timeline = new Timeline<AnimationState>();
     timeline.initialState = { time: 0, currentStep: 0, centerX: scales.sourceCenterPixelX };
 
     // Calculate normalized durations for timeline
@@ -213,7 +211,6 @@
 
     // Register tick callback
     timeline.onTick((_t, state) => {
-      time = state.time;  // For slider binding
       draw(state);
     });
   }
@@ -231,12 +228,11 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  async function draw(state: AnimState) {
+  async function draw(state: AnimationState) {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
 
-    const t = state.time;
-
+    // --- Static Background ---
     // Draw text labels
     const textY = marginHeight / 2;
     drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
@@ -275,6 +271,9 @@
         pointOpacity
       );
     }
+
+    // --- Dynamic Foreground ---
+    const t = state.time;
 
     // Draw intermediate distribution (contours and/or scatter)
     const allSamples = $allTimeSamples;
@@ -358,32 +357,16 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
+    if (!timeline) return;
+    if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
-      isPlaying = false;
       stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
-      isPlaying = true;
       startAnimation();
     }
   }
 
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-  }
-
-  function handleSliderInput() {
-    // Sync timeline with slider using seek
-    if (timeline) {
-      timeline.seek(time);
-    }
-  }
 
   // ----------------------------------------------------------------
   // Lifecycle
@@ -397,11 +380,6 @@
   // Reactive Blocks
   // ----------------------------------------------------------------
 
-  // Update visualization when time changes (e.g., from slider drag)
-  $: if (isInitialized && time !== undefined && timeline) {
-    draw(timeline.state);
-  }
-
   // React to data changes and initialize visualization once
   $: if (
     !isInitialized &&
@@ -414,7 +392,7 @@
     setupTimeline();
     isInitialized = true;
     draw(timeline!.initialState);
-    if (isPlaying) startAnimation();
+    if (playingByDefault) startAnimation();
   }
 
   // Handle visibility changes (pause when off-screen, resume when back)
@@ -435,15 +413,7 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider
-        bind:value={time}
-        bind:isPlaying
-        min={0}
-        max={1}
-        onTogglePlay={toggleAnimation}
-        onInput={handleSliderInput}
-        color="#f17720"
-      />
+      <TimeSlider {timeline} color="#f17720" />
     </div>
   {/snippet}
 </Figure>

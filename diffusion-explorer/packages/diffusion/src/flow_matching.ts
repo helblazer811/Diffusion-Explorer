@@ -151,7 +151,8 @@ export class FlowModel extends Model {
         stopTraining: () => boolean = () => false,
         endEpochCallback: (epoch: number, rectifiedStep: number, intermediateSamples: number[][] | null, loss?: number) => void = () => {},
         endRectifiedStepCallback: (rectifiedStep: number, trajectories: number[][][] | null) => void = () => {},
-        test_source_distribution: tf.Tensor2D | null = null
+        test_source_distribution: tf.Tensor2D | null = null,
+        reverseSampling: boolean = false
     ): Promise<void> {
         const numSamples = data.shape[0];
         const dim = data.shape[1];
@@ -201,32 +202,63 @@ export class FlowModel extends Model {
 
             // Sample to get new coupling (except on last step)
             if (rectifiedStep < num_rectified_steps - 1) {
-                // Generate trajectories from x0_coupling
-                const trajectories = await this.sample_from_initial_points(
-                    x0_coupling,
-                    num_simulation_steps
-                );
+                if (reverseSampling) {
+                    // REVERSE: Sample backward from x1 to get new x0
+                    const trajectories = await this.sample_from_initial_points(
+                        x1_coupling,
+                        num_simulation_steps,
+                        { reverse: true }  // Time goes 1 → 0
+                    );
 
-                // Handle cancellation
-                if (!trajectories) {
-                    console.log(`Sampling cancelled at rectified step ${rectifiedStep}`);
-                    break;
+                    // Handle cancellation
+                    if (!trajectories) {
+                        console.log(`Sampling cancelled at rectified step ${rectifiedStep}`);
+                        break;
+                    }
+
+                    // Extract final point (at t=0) as new source coupling
+                    const finalStep = trajectories.shape[0] - 1;
+                    const newX0 = trajectories.slice([finalStep, 0, 0], [1, numSamples, dim])
+                                              .squeeze([0]);
+
+                    // Update coupling: keep same x1, pair with generated x0
+                    // Dispose old x0_coupling if it's not the original source
+                    if (rectifiedStep > 0 || shouldDisposeX0) {
+                        x0_coupling.dispose();
+                    }
+                    x0_coupling = newX0;
+                    shouldDisposeX0 = true; // We now own x0_coupling
+
+                    // Dispose trajectories tensor
+                    trajectories.dispose();
+                } else {
+                    // FORWARD (default): Sample from x0 to get new x1
+                    const trajectories = await this.sample_from_initial_points(
+                        x0_coupling,
+                        num_simulation_steps
+                    );
+
+                    // Handle cancellation
+                    if (!trajectories) {
+                        console.log(`Sampling cancelled at rectified step ${rectifiedStep}`);
+                        break;
+                    }
+
+                    // Extract final timestep (t=1) as new x1
+                    const finalStep = trajectories.shape[0] - 1;
+                    const newX1 = trajectories.slice([finalStep, 0, 0], [1, numSamples, dim])
+                                              .squeeze([0]);
+
+                    // Update coupling: keep same x0, pair with generated x1
+                    // Dispose old x1_coupling if it's not the original data
+                    if (rectifiedStep > 0) {
+                        x1_coupling.dispose();
+                    }
+                    x1_coupling = newX1;
+
+                    // Dispose trajectories tensor
+                    trajectories.dispose();
                 }
-
-                // Extract final timestep (t=1) as new x1
-                const finalStep = trajectories.shape[0] - 1;
-                const newX1 = trajectories.slice([finalStep, 0, 0], [1, numSamples, dim])
-                                          .squeeze([0]);
-
-                // Update coupling: keep same x0, pair with generated x1
-                // Dispose old x1_coupling if it's not the original data
-                if (rectifiedStep > 0) {
-                    x1_coupling.dispose();
-                }
-                x1_coupling = newX1;
-
-                // Dispose trajectories tensor
-                trajectories.dispose();
             }
 
             // Sample trajectories for visualization using test distribution if provided
@@ -245,12 +277,13 @@ export class FlowModel extends Model {
             }
         }
 
-        // Cleanup - only dispose x0 if we created it
+        // Cleanup - only dispose x0 if we created/replaced it
         if (shouldDisposeX0) {
             x0_coupling.dispose();
         }
-        // Dispose x1_coupling if it's not the original data
-        if (num_rectified_steps > 0) {
+        // Dispose x1_coupling only if it was replaced (forward mode with multiple steps)
+        // In reverse mode, x1 stays as original data and shouldn't be disposed
+        if (!reverseSampling && num_rectified_steps > 1) {
             x1_coupling.dispose();
         }
     }

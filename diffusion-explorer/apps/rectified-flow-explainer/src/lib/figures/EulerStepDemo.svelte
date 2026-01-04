@@ -8,7 +8,7 @@
     TimeSlider,
     drawScatterPlot,
     drawVectorField,
-    drawTrajectoriesWithPreview,
+    drawTrajectories,
     Timeline,
     createPauseClip,
     FigureLegend,
@@ -131,7 +131,7 @@
   let isInitialized = false;
 
   // Animation state type
-  type AnimState = {
+  type AnimationState = {
     time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     currentStep: number;
     segmentIndex: number;
@@ -139,10 +139,8 @@
   };
 
   // Timeline and playback state
-  let timeline: Timeline<AnimState> | null = null;
-  let isPlaying = true;
-  let time = 0;
-  let animState: AnimState = { time: 0, currentStep: 0, segmentIndex: 0, segmentProgress: 0 };
+  let timeline: Timeline<AnimationState> | null = null;
+  let animState: AnimationState = { time: 0, currentStep: 0, segmentIndex: 0, segmentProgress: 0 };
 
   // Derived values from animation state
   $: currentStep = animState.currentStep;
@@ -292,7 +290,7 @@
       }
     };
 
-    timeline = new Timeline<AnimState>();
+    timeline = new Timeline<AnimationState>();
     timeline.initialState = {
       time: 0,
       currentStep: 0,
@@ -306,7 +304,6 @@
 
     timeline.onTick((t, state) => {
       if (!isInitialized || isLoading) return;
-      time = t / timeline!.duration;
       animState = state;
       draw(state);
     });
@@ -325,16 +322,6 @@
     if (!timeline) return;
     timeline.reset();
     animState = timeline.initialState;
-    time = 0;
-  }
-
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
   }
 
   // ----------------------------------------------------------------
@@ -399,14 +386,14 @@
     }
   }
 
-  function draw(state: AnimState) {
+  function draw(state: AnimationState) {
     if (!ctx) return;
 
     const { segmentIndex } = state;
 
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw target distribution
+    // --- Static Background ---
     drawScatterPlot(
       ctx,
       scaledTargetDistribution,
@@ -415,6 +402,7 @@
       targetOpacity
     );
 
+    // --- Dynamic Foreground ---
     // Draw vector field if available
     if (hasVectorField) {
       const maxSegments = NUM_STEPS;
@@ -474,12 +462,11 @@
         traj.map(point => [xScale(point[0]), yScale(point[1])])
       );
 
-      drawTrajectoriesWithPreview(ctx, scaledApproxTrajectories, segmentIndex, {
+      drawTrajectories(ctx, scaledApproxTrajectories, segmentIndex, {
         color: approximationColor,
         strokeWidth: trajectoryStrokeWidth + 0.5,
         pointRadius: endpointRadius,
         progressOpacity: approximationOpacity,
-        showPreview: false,
         headStyle: { type: 'arrow', radius: endpointRadius * 2 }
       });
     }
@@ -489,16 +476,11 @@
   // Event Handlers
   // ----------------------------------------------------------------
 
-  function handleSliderChange(newTime: number) {
-    if (timeline) timeline.seek(newTime);
-  }
-
   function handleCanvasClick(event) {
     if (isLoading) return;
 
     stopAnimation();
     resetAnimation();
-    isPlaying = true;
 
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvasWidth / rect.width;
@@ -516,6 +498,7 @@
     }
 
     computeAllTrajectories();
+    startAnimation();
   }
 
   // ----------------------------------------------------------------
@@ -536,14 +519,6 @@
 
   $: if (isDataValid && canvas && !isInitialized && timeline) {
     runInitialComputation();
-  }
-
-  $: if (isInitialized && timeline && !timeline.isPlaying && time !== animState.time) {
-    handleSliderChange(time);
-  }
-
-  $: if (isInitialized && timeline && isPlaying && !timeline.isPlaying) {
-    startAnimation();
   }
 </script>
 
@@ -566,14 +541,9 @@
         style="cursor: {isLoading ? 'wait' : 'pointer'};"
       ></canvas>
       <TimeSlider
-        bind:value={time}
-        bind:isPlaying
-        min={0}
-        max={1}
+        {timeline}
         step={1 / NUM_STEPS}
         discreteFill={true}
-        onTogglePlay={toggleAnimation}
-        onInput={handleSliderChange}
         color={approximationColor}
       />
     </div>

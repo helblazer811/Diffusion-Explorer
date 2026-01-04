@@ -8,7 +8,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import * as d3 from 'd3';
-  import { Figure, TimeSlider, Slider, drawVectorField, drawTrajectoriesWithPreview } from '@diffusion-explorer/ui';
+  import { Figure, TimeSlider, Slider, drawVectorField, drawTrajectories } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
 
   // ===== PROPS =====
@@ -196,7 +196,7 @@
 
     // Draw trajectory with preview
     const segmentIndex = Math.floor(time * numSegments);
-    drawTrajectoriesWithPreview(ctx, [scaledTrajectory], segmentIndex, {
+    drawTrajectories(ctx, [scaledTrajectory], segmentIndex, {
       strokeWidth: trajectoryWidth,
       color: trajectoryColor,
       progressOpacity: 1.0,

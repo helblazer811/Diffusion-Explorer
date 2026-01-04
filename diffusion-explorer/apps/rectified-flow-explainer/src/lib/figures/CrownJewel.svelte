@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectories, computeContours, plotContours, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -106,17 +106,11 @@
   let yScale;
 
   // Animation state (combined for single Timeline)
-  type AnimState = {
+  type AnimationState = {
     leftTime: number;   // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     leftSegmentIndex: number;
     rightTime: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     rightSegmentIndex: number;
-  };
-
-  // Draw receives state for each canvas (logicalTime for user trajectory segment computation)
-  type DrawState = {
-    segmentIndex: number;
-    logicalTime: number;  // leftTime or rightTime
   };
 
   let isPlaying = playingByDefault;
@@ -131,7 +125,7 @@
   const rightAnimationDuration = animationFraction / 2;
 
   // Timeline for animation
-  let timeline: Timeline<AnimState> | null = null;
+  let timeline: Timeline<AnimationState> | null = null;
 
   // Initialization
   let isInitialized = false;
@@ -221,6 +215,7 @@
       strokeWidth: trajectoryStrokeWidth,
       color: trajectoryColor,
       progressOpacity: opacity,
+      showPreview: true,
       previewOpacity: trajectoryPreviewOpacity,
       pointRadius: trajectoryPointRadius,
       outline: showTrajectoryOutline
@@ -336,17 +331,19 @@
   function draw(
     ctx: CanvasRenderingContext2D,
     scaledTrajectories: number[][][],
-    state: DrawState,
+    state: AnimationState,
+    panel: 'left' | 'right',
     userTrajectories: number[][][]
   ) {
     if (!ctx) return;
 
-    const { segmentIndex, logicalTime } = state;
+    const segmentIndex = panel === 'left' ? state.leftSegmentIndex : state.rightSegmentIndex;
+    const logicalTime = panel === 'left' ? state.leftTime : state.rightTime;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw target distribution (behind trajectories)
+    // --- Static Background ---
     // Draw contour plot if enabled
     if (showTargetContour && computedTargetContours) {
       plotContours(ctx, computedTargetContours, {
@@ -370,11 +367,12 @@
       );
     }
 
+    // --- Dynamic Foreground ---
     // Draw default trajectories
     const defaultOpacity = hasUserTrajectory
       ? dimmedTrajectoryOpacity
       : trajectoryProgressOpacity;
-    drawTrajectoriesWithPreview(
+    drawTrajectories(
       ctx,
       scaledTrajectories,
       segmentIndex,
@@ -387,7 +385,7 @@
       if (userTrajectory && userTrajectory.length > 1) {
         const userNumSegments = userTrajectory.length - 1;
         const userSegmentIndex = Math.floor(logicalTime * userNumSegments);
-        drawTrajectoriesWithPreview(
+        drawTrajectories(
           ctx,
           [userTrajectory],
           userSegmentIndex,
@@ -407,24 +405,23 @@
     ctx.globalAlpha = 1.0;
   }
 
+  function getCurrentState(): AnimationState {
+    return {
+      leftTime,
+      leftSegmentIndex: leftCurrentSegmentIndex,
+      rightTime,
+      rightSegmentIndex: rightCurrentSegmentIndex
+    };
+  }
+
   function updateLeftVisualization() {
     if (!isDataValid || !leftCtx) return;
-    draw(
-      leftCtx,
-      scaledLeftTrajectories,
-      { segmentIndex: leftCurrentSegmentIndex, logicalTime: leftTime },
-      userFlowMatchingTrajectories
-    );
+    draw(leftCtx, scaledLeftTrajectories, getCurrentState(), 'left', userFlowMatchingTrajectories);
   }
 
   function updateRightVisualization() {
     if (!isDataValid || !rightCtx) return;
-    draw(
-      rightCtx,
-      scaledRightTrajectories,
-      { segmentIndex: rightCurrentSegmentIndex, logicalTime: rightTime },
-      userRectifiedFlowTrajectories
-    );
+    draw(rightCtx, scaledRightTrajectories, getCurrentState(), 'right', userRectifiedFlowTrajectories);
   }
 
   // ----------------------------------------------------------------

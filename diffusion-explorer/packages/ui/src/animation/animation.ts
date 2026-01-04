@@ -1,150 +1,3 @@
-/**
- * Animation System
- * ================
- *
- * A composable animation system built around Timeline, Clip, and Layer abstractions.
- * Clips are reducer functions that return partial state updates, enabling conflict
- * resolution through a priority-based layer system.
- *
- *
- * ## Architecture Overview
- *
- * ```
- * ┌─────────────────────────────────────────────────────────────┐
- * │                        Timeline                             │
- * │              (single source of truth)                       │
- * │                                                             │
- * │   ┌─────────┐                                               │
- * │   │  Clock  │ (internal - owns RAF loop)                    │
- * │   └────┬────┘                                               │
- * │        │ dt                                                 │
- * │        ▼                                                    │
- * │   time: 0 ──────────────────────────────────────────► 1    │
- * │                                                             │
- * │   Layer 0 (BASE):        │ Clip A      │ Clip B      │     │
- * │   Layer 10 (INTERACTION):     │ Ephemeral │            │     │
- * │                                                             │
- * │   Higher layers override lower for conflicting state keys   │
- * │                                                             │
- * │   Methods: play() | pause() | seek(t) | reset()             │
- * └─────────────────────────────────────────────────────────────┘
- *         ▲                           │
- *         │ seek()                    │ onTick(time, state)
- *         │ play/pause                │
- *         │                           ▼
- * ┌───────────────┐           ┌───────────────┐
- * │  TimeSlider   │           │    Figure     │
- * │               │           │               │
- * │ timeline.seek()│          │ draw(state)   │
- * │ timeline.play()│          │               │
- * └───────────────┘           └───────────────┘
- * ```
- *
- *
- * ## Core Concepts
- *
- * ### Clip (Reducer Pattern)
- * Clips are functions that take time and current state, returning partial state updates.
- * They close over any external values they need (no params argument).
- *
- * ```typescript
- * const fadeClip: Clip<State> = {
- *   name: 'fade',
- *   duration: 0.5,  // 50% of timeline duration
- *   reduce(t, current) {
- *     return { opacity: t };  // Partial state update
- *   }
- * };
- * ```
- *
- * ### Layer Priority
- * Higher layer numbers take precedence for conflicting state keys.
- * Use built-in constants or any number:
- *
- * ```typescript
- * Layer.BASE = 0         // Default animations
- * Layer.INTERACTION = 10 // Hover effects, temporary states
- * Layer.OVERRIDE = 20    // User-triggered animations
- * ```
- *
- * ### Ephemeral Clips
- * One-shot clips that auto-remove after playing once. Perfect for click animations.
- *
- * ```typescript
- * timeline.playClip({
- *   name: 'flash',
- *   duration: 0.3,
- *   reduce(t) { return { flash: 1 - t }; }
- * });
- * ```
- *
- * ### Instant Clips (duration=0)
- * For immediate state changes that should appear on the timeline for debugging.
- *
- * ```typescript
- * timeline.setState('click', { clicked: true });
- * ```
- *
- *
- * ## TimeSlider Integration
- *
- * ```svelte
- * <script>
- *   let time = 0;
- *   let isPlaying = false;
- *
- *   timeline.onTick((t, state) => {
- *     time = t;
- *     draw(state);
- *   });
- * </script>
- *
- * <TimeSlider bind:value={time} bind:isPlaying timeline={timeline} />
- * ```
- *
- * For multiple independent sliders (like CrownJewel), make slider values
- * part of state and control them via clips.
- *
- *
- * ## Usage Examples
- *
- * ### Basic Animation
- * ```typescript
- * const numSegments = 10;
- *
- * const timeline = new Timeline<{ segmentIndex: number }>();
- * timeline.initialState = { segmentIndex: 0 };
- *
- * timeline.add({
- *   name: 'segments',
- *   duration: 0.8,
- *   reduce(t) {
- *     return { segmentIndex: Math.floor(t * numSegments) };
- *   }
- * }, 0);
- *
- * timeline.onTick((time, state) => draw(state));
- * timeline.play();
- * ```
- *
- * ### Hover Override
- * ```typescript
- * let hoverId: string | null = null;
- *
- * function onMouseEnter(id: string) {
- *   hoverId = timeline.add({
- *     name: 'hover',
- *     duration: 1,
- *     reduce() { return { hoveredId: id, hoverOpacity: 1 }; }
- *   }, 'now', { layer: Layer.INTERACTION });
- * }
- *
- * function onMouseLeave() {
- *   if (hoverId) timeline.remove(hoverId);
- * }
- * ```
- */
-
 // ===== Layer Constants =====
 export const Layer = {
   BASE: 0,
@@ -208,11 +61,16 @@ export class Timeline<TState> {
     return this._isPlaying;
   }
 
+  private _isSeeking = false;
+  get isSeeking(): boolean {
+    return this._isSeeking;
+  }
+
   // Computed state (cached, recomputed on tick/seek)
   private _cachedState: TState | null = null;
   get state(): Readonly<TState> {
     if (this._cachedState === null) {
-      this._cachedState = this.computeState();
+      this._cachedState = this.resolveState();
     }
     return this._cachedState;
   }
@@ -223,7 +81,7 @@ export class Timeline<TState> {
 
   // Internal
   private clock = new Clock();
-  private tickCallback: ((time: number, state: Readonly<TState>) => void) | null = null;
+  private tickCallbacks: Set<(time: number, state: Readonly<TState>) => void> = new Set();
   private endPauseRemaining = 0;
 
   // ===== Clip Management =====
@@ -276,14 +134,6 @@ export class Timeline<TState> {
     this._cachedState = null;
   }
 
-  /**
-   * Remove all ephemeral clips.
-   */
-  clearEphemeral(): void {
-    this.clips = this.clips.filter(s => !s.options.ephemeral);
-    this._cachedState = null;
-  }
-
   // ===== Convenience Methods =====
 
   /**
@@ -324,6 +174,22 @@ export class Timeline<TState> {
   }
 
   /**
+   * Start seeking (temporarily pauses time progression).
+   * Called when user starts dragging the time slider.
+   */
+  startSeeking(): void {
+    this._isSeeking = true;
+  }
+
+  /**
+   * End seeking (resumes time progression if playing).
+   * Called when user stops dragging the time slider.
+   */
+  endSeeking(): void {
+    this._isSeeking = false;
+  }
+
+  /**
    * Seek to a specific time.
    * @param normalizedT - Time in range [0, 1]
    */
@@ -331,7 +197,7 @@ export class Timeline<TState> {
     this._time = Math.max(0, Math.min(normalizedT * this.duration, this.duration));
     this.endPauseRemaining = 0;
     this._cachedState = null;
-    this.tickCallback?.(this._time, this.state);
+    this.tickCallbacks.forEach(cb => cb(this._time, this.state));
   }
 
   reset(): void {
@@ -344,12 +210,13 @@ export class Timeline<TState> {
 
   /**
    * Register tick callback (for figure to redraw).
+   * Multiple callbacks can be registered; each receives (time, state).
    * @returns Unsubscribe function
    */
   onTick(callback: (time: number, state: Readonly<TState>) => void): () => void {
-    this.tickCallback = callback;
+    this.tickCallbacks.add(callback);
     return () => {
-      this.tickCallback = null;
+      this.tickCallbacks.delete(callback);
     };
   }
 
@@ -360,6 +227,12 @@ export class Timeline<TState> {
   // ===== Internal =====
 
   private tick(dt: number): void {
+    // Skip time progression if seeking (but still fire callbacks for redraws)
+    if (this._isSeeking) {
+      this.tickCallbacks.forEach(cb => cb(this._time, this.state));
+      return;
+    }
+
     // If in end pause state, count down
     if (this.endPauseRemaining > 0) {
       this.endPauseRemaining -= dt;
@@ -367,7 +240,7 @@ export class Timeline<TState> {
         this._time = 0;
         this._cachedState = null;
       }
-      this.tickCallback?.(this._time, this.state);
+      this.tickCallbacks.forEach(cb => cb(this._time, this.state));
       return;
     }
 
@@ -386,10 +259,10 @@ export class Timeline<TState> {
       }
     }
 
-    this.tickCallback?.(this._time, this.state);
+    this.tickCallbacks.forEach(cb => cb(this._time, this.state));
   }
 
-  private computeState(): TState {
+  private resolveState(): TState {
     const initial = this.initialState;
     let result = { ...initial };
 

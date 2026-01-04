@@ -70,7 +70,7 @@
   $: ctx = canvas && canvas2d.ctx;
 
   // Animation state type
-  type AnimState = {
+  type AnimationState = {
     time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
   };
 
@@ -82,10 +82,8 @@
   let targetPointPixel = [0, 0];
 
   // Animation state - Timeline system
-  let isPlaying = playingByDefault;
-  let time = 0;
   let isInitialized = false;
-  let timeline: Timeline<AnimState> | null = null;
+  let timeline: Timeline<AnimationState> | null = null;
 
   // Visibility-based animation control
   let figureIsActive;
@@ -193,7 +191,7 @@
   };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimState>();
+    timeline = new Timeline<AnimationState>();
     timeline.initialState = { time: 0 };
 
     // Total cycle: forward + pause + backward + pause
@@ -213,7 +211,6 @@
 
     // Register tick callback
     timeline.onTick((_t, state) => {
-      time = state.time;  // For slider binding
       draw(state);
     });
   }
@@ -231,12 +228,11 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  async function draw(state: AnimState) {
+  async function draw(state: AnimationState) {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
 
-    const t = state.time;
-
+    // --- Static Background ---
     // Draw text labels
     const textY = marginHeight / 2;
     drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
@@ -272,6 +268,9 @@
     // Draw line endpoints
     drawCircle(sourcePointPixel[0], sourcePointPixel[1], pointRadius, animatedDotColor);
     drawCircle(targetPointPixel[0], targetPointPixel[1], pointRadius, animatedDotColor);
+
+    // --- Dynamic Foreground ---
+    const t = state.time;
 
     // Draw animated dot at current time position (trivial lerps use t directly)
     const currentX = sourcePointPixel[0] + t * (targetPointPixel[0] - sourcePointPixel[0]);
@@ -313,30 +312,13 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
+    if (!timeline) return;
+    if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
-      isPlaying = false;
       stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
-      isPlaying = true;
       startAnimation();
-    }
-  }
-
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-  }
-
-  function handleSliderInput() {
-    // Sync timeline with slider using seek
-    if (timeline) {
-      timeline.seek(time);
     }
   }
 
@@ -363,17 +345,12 @@
     setupTimeline();
     isInitialized = true;
     draw(timeline!.initialState);
-    if (isPlaying) startAnimation();
+    if (playingByDefault) startAnimation();
   }
 
   // Handle visibility changes (pause when off-screen, resume when back)
   $: if (figureIsActive !== undefined && isInitialized) {
     handleVisibilityChange($figureIsActive);
-  }
-
-  // Update drawing when time changes (e.g., from slider drag)
-  $: if (isInitialized && time !== undefined && timeline) {
-    draw(timeline.state);
   }
 </script>
 
@@ -387,15 +364,7 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider
-        bind:value={time}
-        bind:isPlaying
-        min={0}
-        max={1}
-        onTogglePlay={toggleAnimation}
-        onInput={handleSliderInput}
-        color="#f17720"
-      />
+      <TimeSlider {timeline} color="#f17720" />
     </div>
   {/snippet}
 </Figure>

@@ -274,6 +274,12 @@ async function handleRectifiedTrainRequest(requestId: string, data: any) {
     sourceDistribution = sourceTensor as tf.Tensor2D;
   }
 
+  // Create test source distribution tensor if test points are provided
+  let testSourceDistribution: tf.Tensor2D | null = null;
+  if (rectifiedConfig.testSourceDistributionPoints) {
+    testSourceDistribution = tf.tensor2d(rectifiedConfig.testSourceDistributionPoints);
+  }
+
   const allRectifiedTrajectories: number[][][][] = [];
 
   await ourModel.train_rectified(
@@ -304,8 +310,15 @@ async function handleRectifiedTrainRequest(requestId: string, data: any) {
         rectifiedStep,
         trajectories,
       });
-    }
+    },
+    testSourceDistribution,  // Pass the test source distribution
+    rectifiedConfig.reverseSampling ?? false  // Reverse sampling mode
   );
+
+  // Cleanup test source distribution tensor
+  if (testSourceDistribution) {
+    testSourceDistribution.dispose();
+  }
 
   const modelSaveName = await saveModel(ourModel.model, trainingObjective);
   console.log('[FlowModel Worker] Rectified training complete:', { requestId, timestamp: Date.now() });

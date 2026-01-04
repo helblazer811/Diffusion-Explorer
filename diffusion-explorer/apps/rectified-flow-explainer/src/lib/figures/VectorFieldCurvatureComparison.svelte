@@ -65,7 +65,7 @@
   $: rightCtx = rightCanvas && rightCanvas2d.ctx;
 
   // Animation state type
-  type AnimState = {
+  type AnimationState = {
     time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
   };
 
@@ -78,9 +78,7 @@
   let rightGridPositions = [];
 
   // Animation - Timeline system
-  let time = 0;
-  let isPlaying = playingByDefault;
-  let timeline: Timeline<AnimState> | null = null;
+  let timeline: Timeline<AnimationState> | null = null;
 
   // Initialization
   let isInitialized = false;
@@ -150,7 +148,7 @@
   };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimState>();
+    timeline = new Timeline<AnimationState>();
     timeline.initialState = { time: 0 };
 
     // Calculate normalized durations for timeline
@@ -169,7 +167,6 @@
 
     // Register tick callback
     timeline.onTick((_t, state) => {
-      time = state.time;  // For slider binding
       draw(state);
     });
   }
@@ -187,7 +184,7 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  function draw(state: AnimState) {
+  function draw(state: AnimationState) {
     if (!leftCtx || !rightCtx || !isDataValid) return;
 
     const t = state.time;
@@ -195,6 +192,9 @@
     // Clear canvases
     leftCtx.clearRect(0, 0, canvasWidth, canvasHeight);
     rightCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // --- Dynamic Foreground ---
+    // (No static background - vector fields are time-dependent)
 
     // Map time (0-1) to time indices for each vector field
     // timeIndex computed here because numSteps is external reactive data
@@ -235,30 +235,13 @@
   // Event Handlers
   // ----------------------------------------------------------------
 
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-  }
-
-  function handleSliderInput() {
-    // Sync timeline with slider using seek
-    if (timeline) {
-      timeline.seek(time);
-    }
-  }
-
   function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
+    if (!timeline) return;
+    if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
-      isPlaying = false;
       stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
-      isPlaying = true;
       startAnimation();
     }
   }
@@ -279,17 +262,12 @@
     runInitialComputation();
     setupTimeline();
     draw(timeline!.initialState);
-    if (isPlaying) startAnimation();
+    if (playingByDefault) startAnimation();
   }
 
   // Handle visibility changes (pause when off-screen, resume when back)
   $: if (figureIsActive !== undefined && isInitialized) {
     handleVisibilityChange($figureIsActive);
-  }
-
-  // Redraw when time changes (e.g., slider drag)
-  $: if (isInitialized && time !== undefined && timeline) {
-    draw(timeline.state);
   }
 </script>
 
@@ -322,15 +300,7 @@
     {/snippet}
 
     {#snippet footer()}
-      <TimeSlider
-        bind:value={time}
-        bind:isPlaying={isPlaying}
-        min={0}
-        max={1}
-        onTogglePlay={toggleAnimation}
-        onInput={handleSliderInput}
-        color="#f17720"
-      />
+      <TimeSlider {timeline} color="#f17720" />
     {/snippet}
   </DoubleFigure>
 {:else}

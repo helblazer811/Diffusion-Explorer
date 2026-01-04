@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectories, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -87,16 +87,14 @@
   let yScale;
 
   // Animation state type
-  type AnimState = {
+  type AnimationState = {
     time: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     segmentIndex: number;
   };
 
   // Animation - Timeline system
-  let time = 0;
   let currentSegmentIndex = 0;
-  let isPlaying = playingByDefault;
-  let timeline: Timeline<AnimState> | null = null;
+  let timeline: Timeline<AnimationState> | null = null;
 
   // Initialization
   let isInitialized = false;
@@ -196,7 +194,7 @@
   };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimState>();
+    timeline = new Timeline<AnimationState>();
     timeline.initialState = { time: 0, segmentIndex: 0 };
 
     // Calculate normalized durations for timeline
@@ -215,7 +213,6 @@
 
     // Register tick callback
     timeline.onTick((_t, state) => {
-      time = state.time;  // For slider binding
       currentSegmentIndex = state.segmentIndex;
       updateVisualization(state);
     });
@@ -241,9 +238,10 @@
     // Clear previous frame
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw target distribution scatter (behind trajectories)
+    // --- Static Background ---
     drawScatterPlot(ctx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
 
+    // --- Dynamic Foreground ---
     // Draw default trajectories (dimmed if user has clicked)
     const defaultOpacity = hasUserTrajectory ? 0.15 : trajectoryProgressOpacity;
     ctx.strokeStyle = trajectoryColor;
@@ -284,12 +282,11 @@
         const userNumSegments = userTrajectory.length - 1;
         const userSegmentIndex = Math.min(segmentIndex, userNumSegments - 1);
 
-        drawTrajectoriesWithPreview(ctx, [userTrajectory], userSegmentIndex, {
+        drawTrajectories(ctx, [userTrajectory], userSegmentIndex, {
           strokeWidth: trajectoryStrokeWidth,
           color: trajectoryColor,
           progressOpacity: 1.0,
           pointRadius: endpointRadius,
-          showPreview: false
         });
       } else if (userTrajectory && userTrajectory.length === 1) {
         // Draw just the starting point for immediate feedback
@@ -304,7 +301,7 @@
   }
 
   // Pure renderer: receives state explicitly
-  function updateVisualization(state: AnimState) {
+  function updateVisualization(state: AnimationState) {
     if (!isDataValid || !leftCtx || !rightCtx) return;
 
     draw(leftCtx, scaledLeftTrajectories, state.segmentIndex, userFlowMatchingTrajectories);
@@ -368,9 +365,7 @@
 
     // Reset animation state and start
     currentSegmentIndex = 0;
-    time = 0;
     if (timeline) timeline.reset();
-    isPlaying = true;
     startAnimation();
 
     // Helper to check if both samples are complete
@@ -416,30 +411,13 @@
     rfResult.promise.then(checkComplete);
   }
 
-  function togglePlayPause() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      startAnimation();
-    } else {
-      stopAnimation();
-    }
-  }
-
-  function handleSliderInput() {
-    // Sync timeline with slider using seek
-    if (timeline) {
-      timeline.seek(time);
-    }
-  }
-
   function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
+    if (!timeline) return;
+    if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
-      isPlaying = false;
       stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
-      isPlaying = true;
       startAnimation();
     }
   }
@@ -471,7 +449,7 @@
   $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
     runInitialComputation();
     setupTimeline();
-    if (isPlaying) startAnimation();
+    if (playingByDefault) startAnimation();
   }
 
   // Handle visibility changes (pause when off-screen, resume when back)
@@ -514,12 +492,7 @@
 
     {#snippet footer()}
       <TimeSlider
-        bind:value={time}
-        {isPlaying}
-        min={0}
-        max={1}
-        onTogglePlay={togglePlayPause}
-        onInput={handleSliderInput}
+        {timeline}
         color="#f17720"
       />
     {/snippet}

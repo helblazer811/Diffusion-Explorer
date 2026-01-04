@@ -1,6 +1,6 @@
 <script>
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales } from "@diffusion-explorer/ui";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
   import { base } from "$app/paths";
@@ -278,13 +278,11 @@
     const normalOpacity = settings.stylingSettings.trajectory.progressOpacity;
 
     if (transformedTrajectories.length > 0) {
-      drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
+      drawTrajectories(ctx, transformedTrajectories, segmentIndex, {
         strokeWidth: trajectoryStrokeWidth,
         color: trajectoryColor,
         progressOpacity: normalOpacity,
         pointRadius: trajectoryEndpointRadius,
-        showPreview: false,
-        previewOpacity: 0,
       });
     }
   }
