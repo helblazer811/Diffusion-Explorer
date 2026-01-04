@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectories, computeContours, plotContours, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectories, computeContours, plotContours, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -120,9 +120,9 @@
   let rightCurrentSegmentIndex = 0;
 
   // Pause at end before looping (as fraction of total duration)
-  const endPauseFraction = 0.15;
-  const animationFraction = 1 - endPauseFraction;
-  const rightAnimationDuration = animationFraction / 2;
+  // Timing constants
+  const endPauseDurationMs = 1500;  // End pause in ms
+  const rightSpeedMultiplier = 0.5; // Right animation runs at 2x speed (half duration)
 
   // Timeline for animation
   let timeline: Timeline<AnimationState> | null = null;
@@ -248,10 +248,10 @@
   // Animations
   // ----------------------------------------------------------------
 
-  // Left segment clip - runs at full speed during animation phase
+  // Left segment clip - runs full timeline duration
   const leftSegmentClip = {
     name: "LeftSegments",
-    duration: animationFraction,
+    duration: 1,
     reduce(t: number) {
       return {
         leftTime: t,
@@ -263,7 +263,7 @@
   // Right segment clip - runs at 2x speed (completes in half the time)
   const rightSegmentClip = {
     name: "RightSegments",
-    duration: rightAnimationDuration,
+    duration: rightSpeedMultiplier,
     reduce(t: number) {
       return {
         rightTime: t,
@@ -273,7 +273,7 @@
   };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimState>();
+    timeline = new Timeline<AnimationState>();
     timeline.initialState = {
       leftTime: 0,
       leftSegmentIndex: 0,
@@ -281,16 +281,14 @@
       rightSegmentIndex: 0
     };
 
-    // Add clips - both start at 0, right is faster
+    // Add clips - both start at 0, right finishes at 0.5
+    // Note: No explicit pause clip needed - Timeline holds final state for ended clips
     timeline.add(leftSegmentClip, 0);
     timeline.add(rightSegmentClip, 0);
 
-    // Add pause clips
-    timeline.add(createPauseClip(endPauseFraction), animationFraction);
-    timeline.add(createPauseClip(1 - rightAnimationDuration), rightAnimationDuration);
-
-    // Set timeline duration in seconds and enable looping
-    timeline.duration = animationDuration / 1000;
+    // Set timeline duration (animation only) and end pause
+    timeline.duration = (animationDuration - endPauseDurationMs) / 1000;
+    timeline.setEndPause(endPauseDurationMs / 1000);
     timeline.looping = true;
 
     // Register tick callback
@@ -447,9 +445,9 @@
     rightCurrentSegmentIndex = Math.min(leftCurrentSegmentIndex * 2, numSegments - 1);
     rightTime = rightCurrentSegmentIndex / numSegments;
 
-    // Seek timeline to corresponding position (left time maps to animation fraction)
+    // Seek timeline to corresponding position (leftTime is already normalized 0-1)
     if (timeline) {
-      timeline.seek(leftTime * animationFraction);
+      timeline.seek(leftTime);
     }
 
     // Update visualizations
@@ -465,13 +463,16 @@
     rightCurrentSegmentIndex = Math.min(Math.floor(newTime * numSegments), numSegments - 1);
     rightTime = rightCurrentSegmentIndex / numSegments;
 
-    // Sync left side (left is 2x slower, so it's at half the right position)
-    leftCurrentSegmentIndex = Math.floor(rightCurrentSegmentIndex / 2);
-    leftTime = leftCurrentSegmentIndex / numSegments;
+    // Calculate timeline position (right covers 0 to rightSpeedMultiplier of timeline)
+    const timelinePosition = rightTime * rightSpeedMultiplier;
 
-    // Seek timeline to corresponding position (right time * 2 gives normalized timeline position)
+    // Sync left side (left covers full timeline, so leftTime = timelinePosition)
+    leftTime = timelinePosition;
+    leftCurrentSegmentIndex = Math.min(Math.floor(leftTime * numSegments), numSegments - 1);
+
+    // Seek timeline to corresponding position
     if (timeline) {
-      timeline.seek(rightTime * rightAnimationDuration * 2);
+      timeline.seek(timelinePosition);
     }
 
     // Update visualizations
