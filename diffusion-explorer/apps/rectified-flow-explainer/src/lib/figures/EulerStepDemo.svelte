@@ -10,7 +10,6 @@
     drawVectorField,
     drawTrajectories,
     Timeline,
-    createPauseClip,
     FigureLegend,
     useCanvas2D,
   } from "@diffusion-explorer/ui";
@@ -270,13 +269,10 @@
 
   function setupTimeline() {
     const EULER_REAL_DURATION = NUM_STEPS * STEP_DURATION;
-    const TOTAL_REAL_DURATION = EULER_REAL_DURATION + PAUSE_BEFORE_RESTART;
-    const eulerNormalizedDuration = EULER_REAL_DURATION / TOTAL_REAL_DURATION;
-    const pauseNormalizedDuration = PAUSE_BEFORE_RESTART / TOTAL_REAL_DURATION;
 
     const eulerStepClip = {
       name: "EulerSteps",
-      duration: eulerNormalizedDuration,
+      duration: 1,
       reduce(t: number) {
         const rawStep = t * NUM_STEPS;
         const currentStep = Math.floor(rawStep);
@@ -297,15 +293,8 @@
       segmentProgress: 0,
     };
     timeline.add(eulerStepClip, 0);
-    // Add pause clip with hold state to preserve final animation state
-    const finalState = {
-      time: 1,
-      currentStep: NUM_STEPS,
-      segmentIndex: NUM_STEPS,
-      segmentProgress: 0,
-    };
-    timeline.add(createPauseClip(pauseNormalizedDuration, finalState), eulerNormalizedDuration);
-    timeline.duration = TOTAL_REAL_DURATION / 1000;
+    timeline.duration = EULER_REAL_DURATION / 1000;
+    timeline.setEndPause(PAUSE_BEFORE_RESTART / 1000);
     timeline.looping = true;
 
     timeline.onTick((t, state) => {

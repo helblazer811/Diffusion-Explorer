@@ -159,6 +159,15 @@ export class Timeline<TState> {
     return this.add(clip, 'now', { ...options, ephemeral: true });
   }
 
+  /**
+   * Set a pause duration at the end of the timeline before looping.
+   * During the pause, the timeline stays at t=1.0 and state is preserved.
+   * @param durationSeconds - How long to pause at the end (in seconds)
+   */
+  setEndPause(durationSeconds: number): void {
+    this.endPauseDuration = durationSeconds;
+  }
+
   // ===== Playback Control =====
 
   play(): void {
@@ -273,19 +282,21 @@ export class Timeline<TState> {
       const { clip, start, options } = scheduled;
       const end = start + clip.duration;
 
-      // Check if clip is active at current time
+      // Check if clip has started (clips contribute from start onwards, holding final state after end)
       // For duration=0 (instant) clips, they're active only at their start time
       const normalizedTime = this._time / this.duration;
-      const isActive = clip.duration === 0
+      const hasStarted = clip.duration === 0
         ? Math.abs(normalizedTime - start) < 0.0001 // Instant clip at start time
-        : normalizedTime >= start && normalizedTime <= end;
+        : normalizedTime >= start;
 
-      if (!isActive) continue;
+      if (!hasStarted) continue;
 
       // Compute local time within clip (0 to 1)
+      // If clip has ended, use t=1 (final state) to persist its contribution
+      const hasEnded = normalizedTime > end;
       const localT = clip.duration === 0
         ? 1 // Instant clips get t=1
-        : Math.min(1, Math.max(0, (normalizedTime - start) / clip.duration));
+        : hasEnded ? 1 : Math.min(1, Math.max(0, (normalizedTime - start) / clip.duration));
 
       // Track ephemeral completion
       if (localT >= 1 && options.ephemeral) {
@@ -309,10 +320,12 @@ export class Timeline<TState> {
       // Compute updates from all clips in this layer (last-wins for same keys)
       for (const scheduled of layerClips) {
         const { clip, start } = scheduled;
+        const end = start + clip.duration;
         const normalizedTime = this._time / this.duration;
+        const hasEnded = normalizedTime > end;
         const localT = clip.duration === 0
           ? 1
-          : Math.min(1, Math.max(0, (normalizedTime - start) / clip.duration));
+          : hasEnded ? 1 : Math.min(1, Math.max(0, (normalizedTime - start) / clip.duration));
 
         const update = clip.reduce(localT, result);
         if (update !== null) {
@@ -364,11 +377,15 @@ export class Clock {
 }
 
 // ===== Pause Clip =====
-// A clip that does nothing - just lets time pass
+/**
+ * Creates a pause clip that preserves the current state.
+ * During its active window [start, end], it returns the current accumulated state unchanged.
+ * @param duration - How long to pause (normalized 0-1)
+ */
 export function createPauseClip<TState>(duration: number): Clip<TState> {
   return {
     name: "Pause",
     duration,
-    reduce: () => null, // No state changes
+    reduce: (_t, current) => ({ ...current }),
   };
 }

@@ -8,7 +8,6 @@
     drawTrajectories,
     createSourceTargetScales,
     Timeline,
-    createPauseClip,
     useCanvas2D,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
@@ -223,15 +222,10 @@
       clickedSegmentIndex: 0,
     };
 
-    // Calculate normalized durations for timeline
-    const totalDuration = animationDuration + pauseBeforeRestart;
-    const mainDuration = animationDuration / totalDuration;
-    const pauseNormalized = pauseBeforeRestart / totalDuration;
-
     // Main animation clip - computes both segment indices
     const mainClip = {
       name: "Animation",
-      duration: mainDuration,
+      duration: 1,
       reduce(t: number) {
         return {
           time: t,
@@ -241,13 +235,12 @@
       },
     };
 
-    // Add main animation clip (0 to mainDuration of timeline)
+    // Add main animation clip
     timeline.add(mainClip, 0);
-    // Add pause clip (mainDuration to 1)
-    timeline.add(createPauseClip(pauseNormalized), mainDuration);
 
-    // Set timeline duration in seconds and enable looping
-    timeline.duration = totalDuration / 1000;
+    // Set timeline duration and end pause
+    timeline.duration = animationDuration / 1000;
+    timeline.setEndPause(pauseBeforeRestart / 1000);
     timeline.looping = true;
 
     // Register tick callback

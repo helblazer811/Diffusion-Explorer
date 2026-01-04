@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -182,15 +182,10 @@
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { time: 0, currentStep: 0, centerX: scales.sourceCenterPixelX };
 
-    // Calculate normalized durations for timeline
-    const totalDuration = animationDuration + animationPauseTime;
-    const mainDuration = animationDuration / totalDuration;
-    const pauseClipDuration = animationPauseTime / totalDuration;
-
     // Main animation clip - computes derived state from t
     const mainClip = {
       name: "Animation",
-      duration: mainDuration,
+      duration: 1,
       reduce(t: number) {
         return {
           time: t,
@@ -200,13 +195,12 @@
       }
     };
 
-    // Add main animation clip (0 to mainDuration of timeline)
+    // Add main animation clip
     timeline.add(mainClip, 0);
-    // Add pause clip (mainDuration to 1)
-    timeline.add(createPauseClip(pauseClipDuration), mainDuration);
 
-    // Set timeline duration in seconds and enable looping
-    timeline.duration = totalDuration / 1000;
+    // Set timeline duration and end pause
+    timeline.duration = animationDuration / 1000;
+    timeline.setEndPause(animationPauseTime / 1000);
     timeline.looping = true;
 
     // Register tick callback
