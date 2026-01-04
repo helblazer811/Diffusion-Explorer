@@ -139,18 +139,6 @@
     rightInEndPause: boolean;
   };
 
-  // Derived state for compatibility with draw functions
-  $: leftState = {
-    segmentIndex: timeline?.state?.leftSegmentIndex ?? 0,
-    segmentProgress: timeline?.state?.leftSegmentProgress ?? 0,
-    inEndPause: timeline?.state?.leftInEndPause ?? false
-  };
-  $: rightState = {
-    segmentIndex: timeline?.state?.rightSegmentIndex ?? 0,
-    segmentProgress: timeline?.state?.rightSegmentProgress ?? 0,
-    inEndPause: timeline?.state?.rightInEndPause ?? false
-  };
-
   // Timeline for animation
   let timeline: Timeline<AnimationState> | null = null;
 
@@ -209,13 +197,14 @@
   }
 
   // Create end pause clip for left side
-  function createLeftEndPauseClip(duration: number) {
+  function createLeftEndPauseClip(duration: number, numSegments: number) {
     return {
       name: "LeftEndPause",
       duration,
       reduce() {
         return {
           leftInEndPause: true,
+          leftSegmentIndex: numSegments,
           leftSegmentProgress: 1
         };
       }
@@ -223,13 +212,14 @@
   }
 
   // Create end pause clip for right side
-  function createRightEndPauseClip(duration: number) {
+  function createRightEndPauseClip(duration: number, numSegments: number) {
     return {
       name: "RightEndPause",
       duration,
       reduce() {
         return {
           rightInEndPause: true,
+          rightSegmentIndex: numSegments,
           rightSegmentProgress: 1
         };
       }
@@ -648,8 +638,8 @@
     // Add clips for both sides
     timeline.add(createLeftSegmentClip(currentSteps, segmentPhaseMs, segmentPhaseNormalized), 0);
     timeline.add(createRightSegmentClip(currentSteps, segmentPhaseMs, segmentPhaseNormalized), 0);
-    timeline.add(createLeftEndPauseClip(endPauseNormalized), segmentPhaseNormalized);
-    timeline.add(createRightEndPauseClip(endPauseNormalized), segmentPhaseNormalized);
+    timeline.add(createLeftEndPauseClip(endPauseNormalized, currentSteps), segmentPhaseNormalized);
+    timeline.add(createRightEndPauseClip(endPauseNormalized, currentSteps), segmentPhaseNormalized);
 
     // Set timeline duration in seconds
     timeline.duration = totalMs / 1000;
@@ -687,28 +677,38 @@
         return;
       }
 
-      drawLeftFrame();
-      drawRightFrame();
+      drawLeftFrame(state);
+      drawRightFrame(state);
     });
   }
 
   // Draw a full frame (background + approximation)
-  function drawLeftFrame() {
+  function drawLeftFrame(state: AnimationState) {
     drawLeftBackground();
     const currentSteps = stepValues[currentStepIndex];
     const leftApprox = flowMatchingTrajectories[currentSteps] || [];
+    const leftState = {
+      segmentIndex: state.leftSegmentIndex,
+      segmentProgress: state.leftSegmentProgress,
+      inEndPause: state.leftInEndPause
+    };
     drawApproximation(leftCtx, leftApprox, leftState);
-    if (leftState.inEndPause) {
+    if (state.leftInEndPause) {
       drawLeftErrorLines();
     }
   }
 
-  function drawRightFrame() {
+  function drawRightFrame(state: AnimationState) {
     drawRightBackground();
     const currentSteps = stepValues[currentStepIndex];
     const rightApprox = rectifiedFlowTrajectories[currentSteps] || [];
+    const rightState = {
+      segmentIndex: state.rightSegmentIndex,
+      segmentProgress: state.rightSegmentProgress,
+      inEndPause: state.rightInEndPause
+    };
     drawApproximation(rightCtx, rightApprox, rightState);
-    if (rightState.inEndPause) {
+    if (state.rightInEndPause) {
       drawRightErrorLines();
     }
   }
