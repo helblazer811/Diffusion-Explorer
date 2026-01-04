@@ -1,6 +1,6 @@
 <!-- Demonstrates Euler sampler trajectory with ground truth, approximation, error, and time-dependent vector field -->
 
-<script>
+<script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
   import {
@@ -9,8 +9,7 @@
     drawScatterPlot,
     drawVectorField,
     drawTrajectoriesWithPreview,
-    Clock,
-    Track,
+    Timeline,
     createPauseClip,
     FigureLegend,
     useCanvas2D,
@@ -127,53 +126,62 @@
   // Initialization
   let isInitialized = false;
 
-  // Animation state (owned by component, mutated by animation system)
-  let animationState = {
-    time: 0,
-    currentStep: 0,
-    segmentIndex: 0,
-    segmentProgress: 0,
-  };
-
-  // Euler step clip - maps normalized time to step + segment progress
-  const eulerStepClip = {
-    name: "EulerSteps",
-    duration: 1,
-    apply(t, { numSteps }, state) {
-      state.time = t;
-      const rawStep = t * numSteps;
-      state.currentStep = Math.floor(rawStep);
-      state.segmentIndex = state.currentStep;
-      state.segmentProgress = rawStep - state.currentStep;
-    }
-  };
-
   // Animation system setup
   // Calculate normalized durations for euler steps + pause
-  // Total animation = euler steps duration + pause duration
   const EULER_REAL_DURATION = NUM_STEPS * STEP_DURATION; // 6400ms
   const TOTAL_REAL_DURATION = EULER_REAL_DURATION + PAUSE_BEFORE_RESTART; // 7900ms
   const eulerNormalizedDuration = EULER_REAL_DURATION / TOTAL_REAL_DURATION; // ~0.81
   const pauseNormalizedDuration = PAUSE_BEFORE_RESTART / TOTAL_REAL_DURATION; // ~0.19
 
-  // Create track with euler + pause sequence
-  const track = new Track();
-  track.add({ ...eulerStepClip, duration: eulerNormalizedDuration }, 0);
-  track.add(createPauseClip(pauseNormalizedDuration), eulerNormalizedDuration);
-  track.duration = 1;
-  track.looping = true;
+  // Animation state type
+  type AnimationState = {
+    time: number;
+    currentStep: number;
+    segmentIndex: number;
+    segmentProgress: number;
+  };
 
-  const clock = new Clock();
+  // Euler step clip - maps normalized time to step + segment progress (reducer pattern)
+  const eulerStepClip = {
+    name: "EulerSteps",
+    duration: eulerNormalizedDuration,
+    reduce(t: number) {
+      const rawStep = t * NUM_STEPS;
+      const currentStep = Math.floor(rawStep);
+      return {
+        time: t,
+        currentStep,
+        segmentIndex: currentStep,
+        segmentProgress: rawStep - currentStep,
+      };
+    }
+  };
 
-  // Playback state
+  // Create timeline with euler + pause sequence
+  const timeline = new Timeline<AnimationState>();
+  timeline.initialState = {
+    time: 0,
+    currentStep: 0,
+    segmentIndex: 0,
+    segmentProgress: 0,
+  };
+  timeline.add(eulerStepClip, 0);
+  timeline.add(createPauseClip(pauseNormalizedDuration), eulerNormalizedDuration);
+  timeline.duration = TOTAL_REAL_DURATION / 1000; // Duration in seconds
+  timeline.looping = true;
+
+  // Playback state (bound to TimeSlider)
   let isPlaying = true;
 
   // Time value (bound to slider, updated by animation)
   let time = 0;
 
+  // Animation state (updated from timeline on each tick)
+  let animState: AnimationState = timeline.initialState;
+
   // Derived values from animation state
-  $: currentStep = animationState.currentStep;
-  $: segmentIndex = animationState.segmentIndex;
+  $: currentStep = animState.currentStep;
+  $: segmentIndex = animState.segmentIndex;
   $: showErrorLines = currentStep >= NUM_STEPS;
 
   // Legend items
@@ -246,7 +254,7 @@
     isLoading = false;
     resetAnimation();
     isPlaying = true;
-    draw();
+    draw(timeline.initialState);
     startAnimation();
 
     let completedCount = 0;
@@ -356,8 +364,11 @@
     }
   }
 
-  function draw() {
+  // Pure renderer: receives AnimationState, only derives timeIndex from external data
+  function draw(state: AnimationState) {
     if (!ctx) return;
+
+    const { segmentIndex } = state;
 
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
@@ -372,7 +383,7 @@
 
     // Draw vector field if available (clipped to domain range)
     if (hasVectorField) {
-      // Calculate time from animation progress (0 to 1)
+      // timeIndex derived here because numTimeSteps is external reactive data
       const maxSegments = NUM_STEPS;
       const animationTime = segmentIndex / maxSegments;
       const numTimeSteps = flowMatchingVectorField.timeSteps.length;
@@ -443,42 +454,30 @@
     }
   }
 
-  // Animation control functions using new animation system
+  // Animation control using Timeline
+  // Register tick callback for animation updates
+  timeline.onTick((t, state) => {
+    if (!isInitialized || isLoading) return;
+
+    const animationState = state as AnimationState;
+    // Update local state from timeline (t is in seconds, normalize for slider)
+    time = t / timeline.duration;
+    animState = animationState;
+    draw(animationState);
+  });
+
   function startAnimation() {
-    if (clock.isRunning) return;
-
-    clock.start((dt) => {
-      if (!isInitialized || isLoading) return;
-
-      // Convert real time (seconds) to normalized animation time
-      // Total duration includes euler steps + pause
-      const totalDurationSeconds = TOTAL_REAL_DURATION / 1000;
-      const normalizedDt = dt / totalDurationSeconds;
-
-      track.update(normalizedDt, { numSteps: NUM_STEPS }, animationState);
-
-      // Sync time for slider binding (scaled to euler portion only)
-      time = animationState.time;
-
-      // Trigger Svelte reactivity by reassigning
-      animationState = animationState;
-
-      draw();
-    });
+    if (timeline.isPlaying) return;
+    timeline.play();
   }
 
   function stopAnimation() {
-    clock.stop();
+    timeline.pause();
   }
 
   function resetAnimation() {
-    track.reset();
-    animationState = {
-      time: 0,
-      currentStep: 0,
-      segmentIndex: 0,
-      segmentProgress: 0,
-    };
+    timeline.reset();
+    animState = timeline.initialState;
     time = 0;
   }
 
@@ -492,14 +491,10 @@
   }
 
   // Handle slider scrubbing (when user manually changes time)
-  function handleSliderChange(newTime) {
-    // Update track time directly
-    track.time = newTime;
-    // Apply the clip to update animationState
-    track.update(0, { numSteps: NUM_STEPS }, animationState);
-    // Trigger reactivity
-    animationState = animationState;
-    draw();
+  function handleSliderChange(newTime: number) {
+    // Seek uses normalized time [0, 1]
+    timeline.seek(newTime);
+    // State is updated via onTick callback
   }
 
   // Handle canvas click
@@ -548,12 +543,12 @@
 
   // Handle slider scrubbing - when time changes from slider (not from animation)
   // This syncs the slider value back to the animation state
-  $: if (isInitialized && !clock.isRunning && time !== animationState.time) {
+  $: if (isInitialized && !timeline.isPlaying && time !== animState.time) {
     handleSliderChange(time);
   }
 
   // Start/stop animation when isPlaying changes
-  $: if (isInitialized && isPlaying && !clock.isRunning) {
+  $: if (isInitialized && isPlaying && !timeline.isPlaying) {
     startAnimation();
   }
 
@@ -594,6 +589,7 @@
         step={1 / NUM_STEPS}
         discreteFill={true}
         onTogglePlay={toggleAnimation}
+        onInput={handleSliderChange}
         color={approximationColor}
       />
     </div>

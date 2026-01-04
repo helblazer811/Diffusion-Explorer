@@ -1,7 +1,7 @@
-<script>
+<script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ===== PROPS =====
@@ -71,23 +71,21 @@
   let xScale;
   let yScale;
 
-  // Animation - Clock/Track system
+  // Animation - Timeline system
   let time = 0;
   let currentSegmentIndex = 0;
   let isPlaying = playingByDefault;
-  let clock = null;
-  let track = null;
+  let timeline: Timeline<{ time: number; segmentIndex: number }> | null = null;
 
-  // State object mutated by clips
-  let animState = { time: 0, segmentIndex: 0 };
-
-  // Main animation clip (maps normalized time to state)
+  // Main animation clip (reducer pattern, closes over numSegments)
   const mainClip = {
     name: "Animation",
     duration: 1,
-    apply(t, params, state) {
-      state.time = t;
-      state.segmentIndex = Math.floor(t * params.numSegments);
+    reduce(t: number) {
+      return {
+        time: t,
+        segmentIndex: Math.floor(t * numSegments)
+      };
     }
   };
 
@@ -189,9 +187,7 @@
     // Reset animation state and start
     currentSegmentIndex = 0;
     time = 0;
-    animState.time = 0;
-    animState.segmentIndex = 0;
-    if (track) track.reset();
+    if (timeline) timeline.reset();
     isPlaying = true;
     startAnimation();
 
@@ -215,7 +211,8 @@
     });
   }
 
-  function draw() {
+  // Pure renderer: receives segmentIndex, computes userSegmentIndex from external data
+  function draw(segmentIndex: number) {
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -232,7 +229,7 @@
     ctx.globalAlpha = defaultOpacity;
 
     for (const trajectory of scaledTrajectories) {
-      const endIdx = Math.min(currentSegmentIndex + 1, trajectory.length);
+      const endIdx = Math.min(segmentIndex + 1, trajectory.length);
       if (endIdx < 2) continue;
 
       ctx.beginPath();
@@ -246,7 +243,7 @@
     // Draw endpoint circles at the current position of each trajectory
     ctx.fillStyle = trajectoryColor;
     for (const trajectory of scaledTrajectories) {
-      const endIdx = Math.min(currentSegmentIndex + 1, trajectory.length) - 1;
+      const endIdx = Math.min(segmentIndex + 1, trajectory.length) - 1;
       if (endIdx < 0) continue;
 
       const [ex, ey] = trajectory[endIdx];
@@ -258,10 +255,11 @@
     ctx.globalAlpha = 1.0;
 
     // Draw all user-defined trajectories (highlighted) on top
+    // userSegmentIndex computed here because userTrajectory.length is external reactive state
     for (const userTrajectory of userTrajectories) {
       if (userTrajectory && userTrajectory.length > 1) {
         const userNumSegments = userTrajectory.length - 1;
-        const userSegmentIndex = Math.min(currentSegmentIndex, userNumSegments - 1);
+        const userSegmentIndex = Math.min(segmentIndex, userNumSegments - 1);
 
         drawTrajectoriesWithPreview(ctx, [userTrajectory], userSegmentIndex, {
           strokeWidth: trajectoryStrokeWidth,
@@ -288,53 +286,43 @@
     initializeScales();
     precomputeCoordinates();
     isInitialized = true;
-    draw();
+    draw(0);
   }
 
-  // Initialize animation track with main clip and pause
+  // Initialize animation timeline with main clip and pause
   function initializeAnimation() {
-    track = new Track();
+    timeline = new Timeline<{ time: number; segmentIndex: number }>();
+    timeline.initialState = { time: 0, segmentIndex: 0 };
 
-    // Calculate normalized durations for track
+    // Calculate normalized durations for timeline
     const totalDuration = animationDuration + pauseDuration;
     const mainDuration = animationDuration / totalDuration;
     const pauseClipDuration = pauseDuration / totalDuration;
 
-    // Add main animation clip (0 to mainDuration of track time)
-    track.add({ ...mainClip, duration: mainDuration }, 0);
+    // Add main animation clip (0 to mainDuration of timeline)
+    timeline.add({ ...mainClip, duration: mainDuration }, 0);
     // Add pause clip (mainDuration to 1)
-    track.add(createPauseClip(pauseClipDuration), mainDuration);
+    timeline.add(createPauseClip(pauseClipDuration), mainDuration);
 
-    clock = new Clock();
-  }
+    // Set timeline duration in seconds and enable looping
+    timeline.duration = totalDuration / 1000;
+    timeline.looping = true;
 
-  function startAnimation() {
-    if (!clock || !track) return;
-
-    clock.start((dt) => {
-      // Convert real time delta to normalized track time
-      const totalDuration = (animationDuration + pauseDuration) / 1000;
-      const normalizedDt = dt / totalDuration;
-
-      track.update(normalizedDt, { numSegments }, animState);
-      time = animState.time;
-      currentSegmentIndex = animState.segmentIndex;
-
-      // Loop when track completes
-      if (track.time >= 1) {
-        track.reset();
-        animState.time = 0;
-        animState.segmentIndex = 0;
-        time = 0;
-        currentSegmentIndex = 0;
-      }
-
-      draw();
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      time = state.time;  // For slider binding
+      currentSegmentIndex = state.segmentIndex;
+      draw(state.segmentIndex);
     });
   }
 
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
+  }
+
   function stopAnimation() {
-    if (clock) clock.stop();
+    if (timeline) timeline.pause();
   }
 
   function togglePlayPause() {
@@ -347,14 +335,10 @@
   }
 
   function handleSliderInput() {
-    if (isPlaying) {
-      isPlaying = false;
-      stopAnimation();
+    // Sync timeline with slider using seek
+    if (timeline) {
+      timeline.seek(time);
     }
-    currentSegmentIndex = Math.round(time * numSegments);
-    animState.time = time;
-    animState.segmentIndex = currentSegmentIndex;
-    draw();
   }
 
   function handleVisibilityChange(isActive) {
@@ -391,8 +375,8 @@
   // This ensures it's created with the correct base path prefix
 
   onDestroy(() => {
-    // Stop clock animation
-    if (clock) clock.stop();
+    // Stop timeline animation
+    if (timeline) timeline.pause();
 
     // Cancel any pending worker requests to prevent orphaned promises
     if (activeRequestId && flowMatchingClient) {

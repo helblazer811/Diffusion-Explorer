@@ -1,7 +1,7 @@
-<script>
+<script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectoriesWithPreview, computeContours, plotContours, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ===== PROPS =====
@@ -103,45 +103,57 @@
   let xScale;
   let yScale;
 
-  // Animation state
+  // Animation state (combined for single Timeline)
+  type AnimState = {
+    leftTime: number;
+    leftSegmentIndex: number;
+    rightTime: number;
+    rightSegmentIndex: number;
+  };
+
+  // Draw receives state for each canvas (logicalTime for user trajectory segment computation)
+  type DrawState = {
+    segmentIndex: number;
+    logicalTime: number;  // leftTime or rightTime
+  };
+
   let isPlaying = playingByDefault;
   let leftTime = 0;
   let rightTime = 0;
   let leftCurrentSegmentIndex = 0;
   let rightCurrentSegmentIndex = 0;
 
-  // Segment clip - maps normalized time to segment index
-  const createSegmentClip = (duration) => ({
-    name: "Segments",
-    duration,
-    apply(t, params, state) {
-      state.time = t;
-      state.segmentIndex = Math.floor(t * params.numSegments);
-    }
-  });
-
   // Pause at end before looping (as fraction of total duration)
   const endPauseFraction = 0.15;
   const animationFraction = 1 - endPauseFraction;
-
-  // Left track: full animation, then pause at end
-  const leftTrack = new Track();
-  leftTrack.add(createSegmentClip(animationFraction), 0);
-  leftTrack.add(createPauseClip(endPauseFraction), animationFraction);
-
-  // Right track: animation in first half of animation time, pause while left catches up, then end pause
-  // Right animation takes half the time of left, so it's animationFraction/2
-  const rightTrack = new Track();
   const rightAnimationDuration = animationFraction / 2;
-  rightTrack.add(createSegmentClip(rightAnimationDuration), 0);
-  rightTrack.add(createPauseClip(1 - rightAnimationDuration), rightAnimationDuration);
 
-  // Animation state objects (mutated by clips)
-  let leftState = { time: 0, segmentIndex: 0 };
-  let rightState = { time: 0, segmentIndex: 0 };
+  // Left segment clip - runs at full speed during animation phase
+  const leftSegmentClip = {
+    name: "LeftSegments",
+    duration: animationFraction,
+    reduce(t: number) {
+      return {
+        leftTime: t,
+        leftSegmentIndex: Math.floor(t * numSegments)
+      };
+    }
+  };
 
-  // Single clock drives both tracks
-  const clock = new Clock();
+  // Right segment clip - runs at 2x speed (completes in half the time)
+  const rightSegmentClip = {
+    name: "RightSegments",
+    duration: rightAnimationDuration,
+    reduce(t: number) {
+      return {
+        rightTime: t,
+        rightSegmentIndex: Math.floor(t * numSegments)
+      };
+    }
+  };
+
+  // Timeline for animation
+  let timeline: Timeline<AnimState> | null = null;
 
   // Initialization
   let isInitialized = false;
@@ -242,14 +254,16 @@
   }
 
   // Draw trajectories (clears and redraws each frame)
+  // Pure renderer: receives pre-computed state, only derives userSegmentIndex from logicalTime + trajectory length
   function draw(
-    ctx,
-    scaledTrajectories,
-    segmentIndex,
-    userTrajectories,
-    time
+    ctx: CanvasRenderingContext2D,
+    scaledTrajectories: number[][][],
+    state: DrawState,
+    userTrajectories: number[][][]
   ) {
     if (!ctx) return;
+
+    const { segmentIndex, logicalTime } = state;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -290,10 +304,11 @@
     );
 
     // Draw all user-defined trajectories (highlighted) on top
+    // Note: userSegmentIndex derived here because trajectory.length is external reactive state
     for (const userTrajectory of userTrajectories) {
       if (userTrajectory && userTrajectory.length > 1) {
         const userNumSegments = userTrajectory.length - 1;
-        const userSegmentIndex = Math.floor(time * userNumSegments);
+        const userSegmentIndex = Math.floor(logicalTime * userNumSegments);
         drawTrajectoriesWithPreview(
           ctx,
           [userTrajectory],
@@ -331,9 +346,8 @@
     draw(
       leftCtx,
       scaledLeftTrajectories,
-      leftCurrentSegmentIndex,
-      userFlowMatchingTrajectories,
-      leftTime
+      { segmentIndex: leftCurrentSegmentIndex, logicalTime: leftTime },
+      userFlowMatchingTrajectories
     );
   }
 
@@ -342,54 +356,56 @@
     draw(
       rightCtx,
       scaledRightTrajectories,
-      rightCurrentSegmentIndex,
-      userRectifiedFlowTrajectories,
-      rightTime
+      { segmentIndex: rightCurrentSegmentIndex, logicalTime: rightTime },
+      userRectifiedFlowTrajectories
     );
   }
 
-  // Animation control using Clock/Track system
-  function startAnimation() {
-    if (clock.isRunning) return;
+  // Initialize timeline with clips
+  function initializeTimeline() {
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = {
+      leftTime: 0,
+      leftSegmentIndex: 0,
+      rightTime: 0,
+      rightSegmentIndex: 0
+    };
 
-    clock.start((dt) => {
-      if (!pathsInitialized) return;
+    // Add clips - both start at 0, right is faster
+    timeline.add(leftSegmentClip, 0);
+    timeline.add(rightSegmentClip, 0);
 
-      // Convert real time (seconds) to normalized time
-      const normalizedDt = dt / (animationDuration / 1000);
+    // Add pause clips
+    timeline.add(createPauseClip(endPauseFraction), animationFraction);
+    timeline.add(createPauseClip(1 - rightAnimationDuration), rightAnimationDuration);
 
-      // Update both tracks
-      leftTrack.update(normalizedDt, { numSegments }, leftState);
-      rightTrack.update(normalizedDt, { numSegments }, rightState);
+    // Set timeline duration in seconds and enable looping
+    timeline.duration = animationDuration / 1000;
+    timeline.looping = true;
 
-      // Sync state for visualization and slider binding
-      leftTime = leftState.time;
-      rightTime = rightState.time;
-      leftCurrentSegmentIndex = leftState.segmentIndex;
-      rightCurrentSegmentIndex = rightState.segmentIndex;
-
-      // Handle looping - reset when left track completes
-      if (leftTrack.time >= 1) {
-        leftTrack.reset();
-        rightTrack.reset();
-        leftState = { time: 0, segmentIndex: 0 };
-        rightState = { time: 0, segmentIndex: 0 };
-      }
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      leftTime = state.leftTime;
+      rightTime = state.rightTime;
+      leftCurrentSegmentIndex = state.leftSegmentIndex;
+      rightCurrentSegmentIndex = state.rightSegmentIndex;
 
       updateLeftVisualization();
       updateRightVisualization();
     });
   }
 
+  function startAnimation() {
+    if (!timeline || timeline.isPlaying) return;
+    timeline.play();
+  }
+
   function stopAnimation() {
-    clock.stop();
+    if (timeline) timeline.pause();
   }
 
   function resetAnimation() {
-    leftTrack.reset();
-    rightTrack.reset();
-    leftState = { time: 0, segmentIndex: 0 };
-    rightState = { time: 0, segmentIndex: 0 };
+    if (timeline) timeline.reset();
     leftTime = 0;
     rightTime = 0;
     leftCurrentSegmentIndex = 0;
@@ -401,6 +417,50 @@
     if (!isPlaying) {
       stopAnimation();
     }
+  }
+
+  // Handler for when user drags the left (slow) slider
+  function handleLeftTimeInput(newTime) {
+    if (!pathsInitialized || numSegments === 0) return;
+
+    // Snap to discrete segment and update left side
+    leftCurrentSegmentIndex = Math.min(Math.floor(newTime * numSegments), numSegments - 1);
+    leftTime = leftCurrentSegmentIndex / numSegments;
+
+    // Sync right side (right is 2x faster, so it's at 2x the left position, capped at 1)
+    rightCurrentSegmentIndex = Math.min(leftCurrentSegmentIndex * 2, numSegments - 1);
+    rightTime = rightCurrentSegmentIndex / numSegments;
+
+    // Seek timeline to corresponding position (left time maps to animation fraction)
+    if (timeline) {
+      timeline.seek(leftTime * animationFraction);
+    }
+
+    // Update visualizations
+    updateLeftVisualization();
+    updateRightVisualization();
+  }
+
+  // Handler for when user drags the right (fast) slider
+  function handleRightTimeInput(newTime) {
+    if (!pathsInitialized || numSegments === 0) return;
+
+    // Snap to discrete segment and update right side
+    rightCurrentSegmentIndex = Math.min(Math.floor(newTime * numSegments), numSegments - 1);
+    rightTime = rightCurrentSegmentIndex / numSegments;
+
+    // Sync left side (left is 2x slower, so it's at half the right position)
+    leftCurrentSegmentIndex = Math.floor(rightCurrentSegmentIndex / 2);
+    leftTime = leftCurrentSegmentIndex / numSegments;
+
+    // Seek timeline to corresponding position (right time * 2 gives normalized timeline position)
+    if (timeline) {
+      timeline.seek(rightTime * rightAnimationDuration * 2);
+    }
+
+    // Update visualizations
+    updateLeftVisualization();
+    updateRightVisualization();
   }
 
   function handleVisibilityChange(isActive) {
@@ -515,11 +575,12 @@
 
   $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
     initializeVisualization();
+    initializeTimeline();
   }
 
-  $: if (isPlaying && pathsInitialized && !clock.isRunning)
+  $: if (isPlaying && pathsInitialized && timeline && !timeline.isPlaying)
     startAnimation();
-  $: if (!isPlaying && clock.isRunning) stopAnimation();
+  $: if (!isPlaying && timeline?.isPlaying) stopAnimation();
 
   // Handle visibility changes (pause when off-screen, resume when back)
   $: if (figureIsActive !== undefined && isInitialized) {
@@ -583,7 +644,8 @@
             color="#f17720"
             showTicks={false}
             showTimeLabel={false}
-            dragEnabled={false}
+            dragEnabled={true}
+            onInput={handleLeftTimeInput}
             hideSpacerOnMobile={true}
           />
         </div>
@@ -622,7 +684,8 @@
             color="#f17720"
             showTicks={false}
             showTimeLabel={false}
-            dragEnabled={false}
+            dragEnabled={true}
+            onInput={handleRightTimeInput}
             hideSpacerOnMobile={true}
           />
         </div>

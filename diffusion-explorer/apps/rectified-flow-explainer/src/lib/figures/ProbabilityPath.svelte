@@ -1,9 +1,9 @@
 <!-- This figure shows a source distribution mapped to a target distribution with animated intermediate samples. -->
 
-<script>
+<script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours, createSourceTargetScales, Clock, Track, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // Caption slot (passed as default children)
@@ -78,23 +78,19 @@
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
 
-  // Animation state - Clock/Track system
+  // Animation state type - derived values computed by clips (NOT time)
+  type AnimState = {
+    currentStep: number;
+    centerX: number;
+  };
+
+  // Animation state - Timeline system
   let time = 0;
   let isPlaying = playingByDefault;
-  let clock = null;
-  let track = null;
+  let timeline: Timeline<AnimState> | null = null;
 
-  // State object mutated by clips
-  let animState = { time: 0 };
-
-  // Main animation clip (maps normalized time to state.time)
-  const mainClip = {
-    name: "Animation",
-    duration: 1,
-    apply(t, params, state) {
-      state.time = t;
-    }
-  };
+  // Cached numSteps for clip closure
+  let cachedNumSteps = 1;
 
   // Visibility-based animation control
   let figureIsActive;
@@ -126,12 +122,10 @@
   }
 
   function handleSliderInput() {
-    if (isPlaying) {
-      isPlaying = false;
-      stopAnimation();
+    // Sync timeline with slider using seek
+    if (timeline) {
+      timeline.seek(time);
     }
-    animState.time = time;
-    draw();
   }
 
   /**
@@ -162,7 +156,8 @@
     ]);
   }
 
-  async function draw() {
+  // Pure renderer - accepts time from Timeline + pre-computed state
+  async function draw(t: number, state: AnimState) {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -208,15 +203,14 @@
     // Draw intermediate distribution (contours and/or scatter)
     const allSamples = $allTimeSamples;
     if (allSamples && allSamples.length > 0) {
-      const currentStep = Math.round(time * (allSamples.length - 1));
-      const samples = allSamples[currentStep];
+      const samples = allSamples[state.currentStep];
       if (samples && samples.length > 0) {
         const meanX = samples.reduce((s, p) => s + p[0], 0) / samples.length;
 
         // Draw contours for P_t (behind scatter points)
         if (showContours) {
           // Create scale functions for contour plotting
-          const xScaleForContour = (dataX) => getPixelX(dataX, meanX, time);
+          const xScaleForContour = (dataX) => getPixelX(dataX, meanX, t);
           const yScaleForContour = (dataY) => scales.yScale(dataY);
 
           // Compute and plot contours
@@ -239,7 +233,7 @@
         // Draw intermediate scatter
         if (showIntermediateScatter) {
           const coords = samples.map((p) => [
-            getPixelX(p[0], meanX, time),
+            getPixelX(p[0], meanX, t),
             scales.yScale(p[1]),
           ]);
           drawScatterPlot(
@@ -275,12 +269,9 @@
     );
 
     // p_t label (visible when not at endpoints)
-    if (time >= 0.1 && time <= 0.9) {
-      const centerX =
-        scales.sourceCenterPixelX +
-        time * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    if (t >= 0.1 && t <= 0.9) {
       await drawMathjaxOnCanvas(
-        ctx, "p_t", centerX, mathLabelY,
+        ctx, "p_t", state.centerX, mathLabelY,
         latexFontSize, 0, latexLabelOffsetY, { color: intermediatePointColor }
       );
     }
@@ -314,52 +305,59 @@
     precomputeScatterCoords();
   }
 
-  // Initialize animation track with main clip and pause
+  // Initialize animation timeline with main clip and pause
   function initializeAnimation() {
-    track = new Track();
+    // Cache numSteps for clip closure
+    cachedNumSteps = $allTimeSamples?.length || 1;
 
-    // Calculate normalized durations for track
+    timeline = new Timeline<AnimState>();
+    timeline.initialState = { currentStep: 0, centerX: scales.sourceCenterPixelX };
+
+    // Calculate normalized durations for timeline
     const totalDuration = animationDuration + animationPauseTime;
     const mainDuration = animationDuration / totalDuration;
     const pauseClipDuration = animationPauseTime / totalDuration;
 
-    // Add main animation clip (0 to mainDuration of track time)
-    track.add({ ...mainClip, duration: mainDuration }, 0);
-    // Add pause clip (mainDuration to 1)
-    track.add(createPauseClip(pauseClipDuration), mainDuration);
-
-    clock = new Clock();
-  }
-
-  function startAnimation() {
-    if (!clock || !track) return;
-
-    clock.start((dt) => {
-      // Convert real time delta to normalized track time
-      const totalDuration = (animationDuration + animationPauseTime) / 1000;
-      const normalizedDt = dt / totalDuration;
-
-      track.update(normalizedDt, {}, animState);
-      time = animState.time;
-
-      // Loop when track completes
-      if (track.time >= 1) {
-        track.reset();
-        animState.time = 0;
-        time = 0;
+    // Main animation clip - computes derived state from t
+    const mainClip = {
+      name: "Animation",
+      duration: mainDuration,
+      reduce(t: number) {
+        return {
+          currentStep: Math.round(t * (cachedNumSteps - 1)),
+          centerX: scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX)
+        };
       }
+    };
 
-      draw();
+    // Add main animation clip (0 to mainDuration of timeline)
+    timeline.add(mainClip, 0);
+    // Add pause clip (mainDuration to 1)
+    timeline.add(createPauseClip(pauseClipDuration), mainDuration);
+
+    // Set timeline duration in seconds and enable looping
+    timeline.duration = totalDuration / 1000;
+    timeline.looping = true;
+
+    // Register tick callback - t from Timeline, state from clips
+    timeline.onTick((t, state) => {
+      time = t;  // For slider binding
+      draw(t, state);
     });
   }
 
+  function startAnimation() {
+    if (!timeline) return;
+    timeline.play();
+  }
+
   function stopAnimation() {
-    if (clock) clock.stop();
+    if (timeline) timeline.pause();
   }
 
   // Update visualization when time changes (e.g., from slider drag)
-  $: if (isInitialized && time !== undefined) {
-    draw();
+  $: if (isInitialized && time !== undefined && timeline) {
+    draw(time, timeline.state);
   }
 
   // React to data changes and initialize visualization once
@@ -373,7 +371,7 @@
     initializeVisualization();
     initializeAnimation();
     isInitialized = true;
-    draw();
+    draw(0, timeline!.initialState);
     if (isPlaying) startAnimation();
   }
 
@@ -383,7 +381,7 @@
   }
 
   onDestroy(() => {
-    if (clock) clock.stop();
+    if (timeline) timeline.pause();
   });
 </script>
 

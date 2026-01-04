@@ -60,7 +60,9 @@ export * from './plotting/utils';
 // Animation utilities
 export {
   Clock,
-  Track,
+  Timeline,
+  Layer,
   createPauseClip,
   type Clip,
+  type ClipOptions,
 } from './animation/animation';
