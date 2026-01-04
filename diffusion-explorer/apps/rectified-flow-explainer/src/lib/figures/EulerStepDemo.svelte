@@ -216,7 +216,6 @@
 
     isLoading = false;
     resetAnimation();
-    isPlaying = true;
     draw(timeline!.initialState);
     startAnimation();
 
@@ -298,7 +297,14 @@
       segmentProgress: 0,
     };
     timeline.add(eulerStepClip, 0);
-    timeline.add(createPauseClip(pauseNormalizedDuration), eulerNormalizedDuration);
+    // Add pause clip with hold state to preserve final animation state
+    const finalState = {
+      time: 1,
+      currentStep: NUM_STEPS,
+      segmentIndex: NUM_STEPS,
+      segmentProgress: 0,
+    };
+    timeline.add(createPauseClip(pauseNormalizedDuration, finalState), eulerNormalizedDuration);
     timeline.duration = TOTAL_REAL_DURATION / 1000;
     timeline.looping = true;
 
