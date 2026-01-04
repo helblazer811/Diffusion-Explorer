@@ -176,6 +176,9 @@ export function drawTrajectoriesWithOpacityGradient(
   for (let i = 0; i < numTrajectories; i++) {
     const points = trajectories[i]; // [timestep][x,y] in pixel coords
 
+    // Skip empty or undefined trajectories
+    if (!points || points.length === 0) continue;
+
     // Draw full trajectory preview (lighter) - only if enabled
     if (style.showPreview && style.previewOpacity !== undefined) {
       ctx.globalAlpha = style.previewOpacity;
@@ -236,19 +239,23 @@ export function drawTrajectoriesWithOpacityGradient(
 }
 
 /**
- * Draws trajectories with a low-opacity preview of the full path and animated progress.
+ * Draws trajectories with animated progress and optional low-opacity preview of full path.
  * Takes pre-transformed pixel coordinates.
  * @param ctx - Canvas 2D rendering context
  * @param trajectories - Array of trajectories in pixel coords: [trajectory][timestep][x,y]
  * @param segmentIndex - Current segment index for animation progress
- * @param style - Trajectory styling options
+ * @param style - Trajectory styling options (showPreview defaults to false)
  */
-export function drawTrajectoriesWithPreview(
+export function drawTrajectories(
   ctx: CanvasRenderingContext2D,
   trajectories: number[][][],
   segmentIndex: number,
   style: TrajectoryStyleOptions
 ): void {
+  if (segmentIndex === undefined || segmentIndex === null || isNaN(segmentIndex)) {
+    throw new Error(`drawTrajectories: segmentIndex is invalid (${segmentIndex})`);
+  }
+
   const numTrajectories = trajectories.length;
   if (numTrajectories === 0) return;
 
@@ -263,8 +270,11 @@ export function drawTrajectoriesWithPreview(
   for (let i = 0; i < numTrajectories; i++) {
     const points = trajectories[i]; // [timestep][x,y] in pixel coords
 
-    // 1. Draw full trajectory preview (low opacity)
-    if (style.showPreview !== false) {
+    // Skip empty or undefined trajectories
+    if (!points || points.length === 0) continue;
+
+    // 1. Draw full trajectory preview (low opacity) - only if explicitly enabled
+    if (style.showPreview) {
       // Draw outline for preview if specified
       if (outline) {
         ctx.lineWidth = outlineWidth;

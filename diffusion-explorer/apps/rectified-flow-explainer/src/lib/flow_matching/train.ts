@@ -1,6 +1,7 @@
 import {
   FlowModelClient,
-  downloadModelFromIndexedDB
+  downloadModelFromIndexedDB,
+  generateUniformGridSamples
 } from '@diffusion-explorer/diffusion';
 import {
   settings as globalSettings,
@@ -110,4 +111,69 @@ export async function trainRectifiedFlow(
   };
 
   return { data, requestId };
+}
+
+export async function trainRecursiveRectifiedFlow(
+  settings: TrainingSettings,
+  workerUrl: string,
+  gridConfig: {
+    gridResolution: number;
+    gridDomainRange: { xMin: number; xMax: number; yMin: number; yMax: number };
+  },
+  onEpochCallback?: (epoch: number, rectifiedStep: number) => void,
+  onRectifiedStepCallback?: (rectifiedStep: number, trajectories: number[][][] | null) => void
+): Promise<{ allRectifiedTrajectories: number[][][][]; requestId: string }> {
+  console.log('Starting recursive rectified flow training for visualization...');
+  const modelConfig = settings.modelConfig;
+  const rectifiedFlowConfig = settings.rectifiedFlowTrainingConfig;
+
+  // Build absolute URL for worker to fetch (workers don't have same base URL context)
+  const datasetPath = new URL('/' + globalSettings.targetDistributionPointsPath, window.location.origin).href;
+
+  // Generate uniform grid points as test source distribution
+  const gridPoints: number[][] = generateUniformGridSamples(
+    gridConfig.gridResolution,
+    gridConfig.gridDomainRange
+  );
+  console.log(`Using ${gridPoints.length} grid points for visualization trajectories`);
+
+  // Create client for training (no model path needed)
+  const client = new FlowModelClient(
+    workerUrl,
+    '',  // No model path for training
+    'Flow Matching',
+    modelConfig
+  );
+
+  // Collect trajectories from each reflow step
+  const allRectifiedTrajectories: number[][][][] = [];
+
+  console.log("Starting recursive rectified flow training with grid visualization...");
+  const { requestId, promise } = client.trainRectified(
+    datasetPath,
+    {
+      ...rectifiedFlowConfig,
+      testSourceDistributionPoints: gridPoints  // Use grid as test source for visualization
+    },
+    // Epoch callback
+    (epoch: number, rectifiedStep: number, _intermediateSamples: number[][] | null, loss?: number) => {
+      console.log(`Rectified step ${rectifiedStep}, epoch ${epoch}: loss = ${loss?.toFixed(6) ?? 'N/A'}`);
+      onEpochCallback?.(epoch, rectifiedStep);
+    },
+    // Rectified step callback - collect trajectories
+    (rectifiedStep: number, trajectories: number[][][] | null) => {
+      console.log(`Completed rectified step ${rectifiedStep}`);
+      if (trajectories) {
+        console.log('  Trajectories shape:', trajectories.length, 'timesteps,', trajectories[0]?.length ?? 0, 'samples');
+        allRectifiedTrajectories.push(trajectories);
+      }
+      onRectifiedStepCallback?.(rectifiedStep, trajectories);
+    }
+  );
+
+  await promise;
+  console.log('Recursive rectified flow training finished!');
+  console.log('Collected', allRectifiedTrajectories.length, 'rectified steps');
+
+  return { allRectifiedTrajectories, requestId };
 }

@@ -6,7 +6,7 @@
   import {
     DoubleFigure,
     drawScatterPlot,
-    drawTrajectoriesWithPreview,
+    drawTrajectories,
     Slider,
     FigureLegend,
     Timeline,
@@ -130,7 +130,7 @@
   const endPauseDuration = 2500;
 
   // Animation state (combined for single Timeline)
-  type AnimState = {
+  type AnimationState = {
     leftSegmentIndex: number;
     leftSegmentProgress: number;
     leftInEndPause: boolean;
@@ -152,7 +152,7 @@
   };
 
   // Timeline for animation
-  let timeline: Timeline<AnimState> | null = null;
+  let timeline: Timeline<AnimationState> | null = null;
 
   // Track previous end pause state for detecting transitions
   let prevLeftInEndPause = false;
@@ -514,7 +514,7 @@
     ctx.setLineDash([]); // Reset to solid line
   }
 
-  // Background drawing functions for animation controllers
+  // --- Static Background ---
   function drawLeftBackground() {
     if (!leftCtx) return;
     leftCtx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -569,6 +569,7 @@
     rightCtx.globalAlpha = 1.0;
   }
 
+  // --- Dynamic Foreground ---
   // Draw error lines for left panel (called during end pause)
   function drawLeftErrorLines() {
     if (!leftCtx) return;
@@ -610,12 +611,11 @@
       traj.map(point => [xScale(point[0]), yScale(point[1])])
     );
 
-    drawTrajectoriesWithPreview(ctx, scaledTrajectories, state.segmentIndex, {
+    drawTrajectories(ctx, scaledTrajectories, state.segmentIndex, {
       color: approximationColor,
       strokeWidth: trajectoryStrokeWidth + 0.5,
       pointRadius: endpointRadius,
       progressOpacity: approximationOpacity,
-      showPreview: false,
       headStyle: { type: 'arrow', radius: endpointRadius * 2.5 }
     });
   }
@@ -635,7 +635,7 @@
     const endPauseNormalized = endPauseDuration / totalMs;
 
     // Create new timeline
-    timeline = new Timeline<AnimState>();
+    timeline = new Timeline<AnimationState>();
     timeline.initialState = {
       leftSegmentIndex: 0,
       leftSegmentProgress: 0,

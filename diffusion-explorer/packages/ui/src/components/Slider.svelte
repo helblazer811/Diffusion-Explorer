@@ -1,4 +1,6 @@
 <script>
+  import { onDestroy } from 'svelte';
+
   // Props
   export let value = 0;
   export let min = 0;
@@ -13,6 +15,8 @@
   export let maxLabel = 't=1';
   export let dragEnabled = true;
   export let onInput = () => {};  // Called when user drags slider
+  export let onDragStart = () => {};  // Called when user starts dragging
+  export let onDragEnd = () => {};    // Called when user stops dragging
   export let showValue = false;
   export let valueFormatter = (v) => v.toFixed(2);  // Function to format displayed value
 
@@ -29,6 +33,32 @@
 
   // Snap fill to step boundaries (for discrete animations)
   export let discreteFill = false;
+
+  // Track dragging state
+  let isDragging = false;
+
+  function handleDragStart() {
+    if (isDragging) return;
+    isDragging = true;
+    onDragStart();
+    // Listen for drag end on document (user may release outside slider)
+    document.addEventListener('mouseup', handleDragEnd);
+    document.addEventListener('touchend', handleDragEnd);
+  }
+
+  function handleDragEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    onDragEnd();
+    document.removeEventListener('mouseup', handleDragEnd);
+    document.removeEventListener('touchend', handleDragEnd);
+  }
+
+  // Cleanup on component destroy
+  onDestroy(() => {
+    document.removeEventListener('mouseup', handleDragEnd);
+    document.removeEventListener('touchend', handleDragEnd);
+  });
 
   // Dynamic background gradient based on current value
   let sliderStyle;
@@ -56,6 +86,8 @@
         bind:value
         {disabled}
         oninput={onInput}
+        onmousedown={handleDragStart}
+        ontouchstart={handleDragStart}
       />
 
       {#if showTicks}

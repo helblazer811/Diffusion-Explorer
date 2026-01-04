@@ -55,6 +55,7 @@ export interface RectifiedConfig {
     num_simulation_steps: number;
     sourceDistributionPath?: string;
     testSourceDistributionPoints?: number[][];  // Optional test points for sampling visualization trajectories
+    reverseSampling?: boolean;  // If true, sample backward from target to source for induced coupling
 }
 
 // Callback types

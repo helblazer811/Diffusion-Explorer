@@ -371,6 +371,7 @@ export function plotLabel(
   options: {
     fontSize?: number;
     color?: string;
+    opacity?: number;
     textAnchor?: string;
     withOutline?: boolean;
     outlineColor?: string;
@@ -381,6 +382,7 @@ export function plotLabel(
   const {
     fontSize = 22,
     color = '#666',
+    opacity = 1,
     textAnchor = 'middle',
     withOutline = true,
     outlineColor = '#ffffff',
@@ -393,7 +395,8 @@ export function plotLabel(
     .attr('y', y)
     .attr('text-anchor', textAnchor)
     .attr('font-size', `${fontSize}px`)
-    .attr('fill', color);
+    .attr('fill', color)
+    .attr('opacity', opacity);
 
   if (withOutline) {
     textElement
@@ -428,6 +431,7 @@ export function plotSourceTargetLabels(
     targetLabelText?: string;
     labelFontSize?: number;
     labelColor?: string;
+    labelOpacity?: number;
     yShiftFactor?: number;
     groupId?: string;
     outlineColor?: string;
@@ -439,6 +443,7 @@ export function plotSourceTargetLabels(
     targetLabelText = 'Target Distribution',
     labelFontSize = 22,
     labelColor = '#666',
+    labelOpacity = 1,
     yShiftFactor = 0.5,
     groupId = 'labels',
     outlineColor = '#f9f9f9',
@@ -458,6 +463,7 @@ export function plotSourceTargetLabels(
   plotLabel(group, sourceLabelText, sourceCenterPixelX, labelY, {
     fontSize: labelFontSize,
     color: labelColor,
+    opacity: labelOpacity,
     outlineColor,
     outlineOpacity
   });
@@ -465,6 +471,7 @@ export function plotSourceTargetLabels(
   plotLabel(group, targetLabelText, targetCenterPixelX, labelY, {
     fontSize: labelFontSize,
     color: labelColor,
+    opacity: labelOpacity,
     outlineColor,
     outlineOpacity
   });

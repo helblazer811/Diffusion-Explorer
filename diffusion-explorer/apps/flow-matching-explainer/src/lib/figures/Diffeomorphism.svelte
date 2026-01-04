@@ -1,4 +1,9 @@
-<!-- Diffeomorphism figure - visualizes how a flow matching model transforms space via an animated mesh grid -->
+<!-- Diffeomorphism figure - visualizes how a flow matching model transforms space via an animated mesh grid
+
+TODO:
+1. Scale up the smiley face in the flow matching training so it is more symmetrical as a figure.
+2. Cache the uniform grid trajectories/pull from the cache rather than running every time.
+-->
 
 <script>
   import { onMount, onDestroy } from "svelte";
@@ -87,6 +92,7 @@
 
   // FlowModelClient instance
   let client = null;
+  let activeRequestId = null;
 
   // Pause animation when figure goes off-screen
   $: if (figureIsActive !== undefined && isInitialized) {
@@ -204,11 +210,14 @@
         numSteps
       );
 
+      activeRequestId = result.requestId;
       const trajectories = await result.promise;
+      activeRequestId = null;
       // trajectories shape: [timesteps, gridResolution², 2]
       allGridStates = reshapeToGrid(trajectories, gridResolution);
       isLoading = false;
     } catch (error) {
+      activeRequestId = null;
       console.error("Error sampling grid trajectories:", error);
       isLoading = false;
     }
@@ -392,6 +401,11 @@
 
   onDestroy(() => {
     stopAnimation();
+
+    // Cancel any pending worker request to prevent orphaned promises
+    if (activeRequestId && client) {
+      client.stopRequest(activeRequestId);
+    }
   });
 </script>
 

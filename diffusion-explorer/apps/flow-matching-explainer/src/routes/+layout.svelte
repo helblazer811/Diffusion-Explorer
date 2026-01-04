@@ -7,6 +7,7 @@
 </script>
 
 <svelte:head>
+	<title>Visualizing Flow Matching</title>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 

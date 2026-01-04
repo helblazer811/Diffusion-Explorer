@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectoriesWithPreview, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -57,22 +57,14 @@
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
-  // Animation phase state machine
-  type PhaseState = {
-    phase: string;
-    phaseProgress: number;
-    linesDrawnCount: number;
-    trajectoryTime: number;
-    fadeOpacity: number;
-    inducedCouplingProgress: number;
+  // Animation state - computed by Timeline clips
+  type AnimationState = {
+    stateIndex: number;              // 0, 1, or 2 for toggle button
+    linesDrawnCount: number;         // For naive coupling (0 to numLinesToDraw)
+    naiveCouplingOpacity: number;    // 1 → 0 during fade
+    segmentIndex: number;            // For trajectory animation
+    inducedCouplingProgress: number; // 0 → 1 for induced coupling lines
   };
-
-  let currentPhase = 'distributions';
-  let phaseProgress = 0;
-  let linesDrawnCount = 0;
-  let trajectoryTime = 0;
-  let fadeOpacity = 1;
-  let inducedCouplingProgress = 0;
 
   // Pre-computed data
   let scales = null;
@@ -89,33 +81,22 @@
   let isGeneratingTrajectories = false;
 
   // Playback control
-  let isPlaying = true;
-  let timeline: Timeline<PhaseState> | null = null;
-  let lastTickTime = 0;
+  let timeline: Timeline<AnimationState> | null = null;
+  let currentState: AnimationState = {
+    stateIndex: 0,
+    linesDrawnCount: 0,
+    naiveCouplingOpacity: 1,
+    segmentIndex: 0,
+    inducedCouplingProgress: 0
+  };
 
   // Visibility tracking
   let figureIsActive;
   let wasPlayingBeforeHidden = false;
   let initialized = false;
 
-  // State index for toggle button
-  $: stateIndex = (() => {
-    switch (currentPhase) {
-      case 'distributions':
-      case 'naive_coupling':
-      case 'pause_after_naive':
-      case 'fade_out':
-        return 0;
-      case 'trajectories':
-      case 'pause_after_trajectories':
-        return 1;
-      case 'induced_coupling':
-      case 'pause_at_end':
-        return 2;
-      default:
-        return 0;
-    }
-  })();
+  // State index for toggle button (derived from animation state)
+  $: stateIndex = currentState.stateIndex;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -155,7 +136,7 @@
       // Re-initialize data with new trajectories and redraw
       if (canvas && ctx) {
         runInitialComputation();
-        draw(getCurrentState());
+        draw(currentState);
       }
     } catch (error) {
       console.error('[InducedCouplingAnimated] Error generating trajectories:', error);
@@ -164,16 +145,6 @@
     }
   }
 
-  function getCurrentState(): PhaseState {
-    return {
-      phase: currentPhase,
-      phaseProgress,
-      linesDrawnCount,
-      trajectoryTime,
-      fadeOpacity,
-      inducedCouplingProgress
-    };
-  }
 
   // ----------------------------------------------------------------
   // Setup
@@ -264,113 +235,130 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function advancePhase() {
-    switch (currentPhase) {
-      case 'distributions':
-        currentPhase = 'naive_coupling';
-        linesDrawnCount = 0;
-        break;
-      case 'naive_coupling':
-        currentPhase = 'pause_after_naive';
-        break;
-      case 'pause_after_naive':
-        currentPhase = 'fade_out';
-        fadeOpacity = 1;
-        break;
-      case 'fade_out':
-        currentPhase = 'trajectories';
-        trajectoryTime = 0;
-        break;
-      case 'trajectories':
-        currentPhase = 'pause_after_trajectories';
-        break;
-      case 'pause_after_trajectories':
-        currentPhase = 'induced_coupling';
-        inducedCouplingProgress = 0;
-        break;
-      case 'induced_coupling':
-        currentPhase = 'pause_at_end';
-        break;
-      case 'pause_at_end':
-        currentPhase = 'distributions';
-        shuffleArray(shuffledTargetIndices);
-        break;
-    }
-    phaseProgress = 0;
-  }
+  // Durations for each clip (in ms)
+  const inducedCouplingDuration = 1500;
 
-  function updateAnimation(elapsed: number) {
-    switch (currentPhase) {
-      case 'distributions':
-        phaseProgress += elapsed / pauseBetweenPhases;
-        if (phaseProgress >= 1) advancePhase();
-        break;
-      case 'naive_coupling': {
-        const totalLineDuration = numLinesToDraw * lineDrawDuration;
-        phaseProgress += elapsed / totalLineDuration;
-        linesDrawnCount = Math.min(Math.floor(phaseProgress * numLinesToDraw) + 1, numLinesToDraw);
-        if (phaseProgress >= 1) advancePhase();
-        break;
-      }
-      case 'induced_coupling': {
-        const inducedCouplingDuration = 1500;
-        phaseProgress += elapsed / inducedCouplingDuration;
-        inducedCouplingProgress = Math.min(phaseProgress, 1);
-        if (phaseProgress >= 1) advancePhase();
-        break;
-      }
-      case 'pause_after_naive':
-        phaseProgress += elapsed / pauseAfterNaiveCoupling;
-        if (phaseProgress >= 1) advancePhase();
-        break;
-      case 'fade_out':
-        phaseProgress += elapsed / fadeOutDuration;
-        fadeOpacity = Math.max(0, 1 - phaseProgress);
-        if (phaseProgress >= 1) advancePhase();
-        break;
-      case 'trajectories':
-        phaseProgress += elapsed / trajectoryAnimationDuration;
-        trajectoryTime = Math.min(phaseProgress, 1);
-        if (phaseProgress >= 1) advancePhase();
-        break;
-      case 'pause_after_trajectories':
-        phaseProgress += elapsed / pauseAfterTrajectories;
-        if (phaseProgress >= 1) advancePhase();
-        break;
-      case 'pause_at_end':
-        phaseProgress += elapsed / pauseAfterInducedCoupling;
-        if (phaseProgress >= 1) advancePhase();
-        break;
-    }
+  // Cached values for clip closures
+  let cachedNumSegments = 0;
+  let cachedNumLinesToDraw = 0;
 
-    draw(getCurrentState());
-  }
+  // Clip start times (normalized 0-1, computed in setupTimeline)
+  let clip1Start = 0;
+  let clip2Start = 0;
+  let clip3Start = 0;
 
   function setupTimeline() {
-    timeline = new Timeline<PhaseState>();
-    timeline.initialState = getCurrentState();
+    // Cache values for closures
+    cachedNumSegments = numTimeSteps - 1;
+    cachedNumLinesToDraw = numLinesToDraw;
 
-    // Use a simple clip that tracks time for delta calculation
+    // Calculate durations for each clip
+    const clip1Duration = pauseBetweenPhases + (lineDrawDuration * numLinesToDraw) + pauseAfterNaiveCoupling + fadeOutDuration;
+    const clip2Duration = trajectoryAnimationDuration + pauseAfterTrajectories;
+    const clip3Duration = inducedCouplingDuration + pauseAfterInducedCoupling;
+    const totalDuration = clip1Duration + clip2Duration + clip3Duration;
+
+    // Compute normalized clip durations and start times
+    const clip1Norm = clip1Duration / totalDuration;
+    const clip2Norm = clip2Duration / totalDuration;
+    const clip3Norm = clip3Duration / totalDuration;
+
+    clip1Start = 0;
+    clip2Start = clip1Norm;
+    clip3Start = clip1Norm + clip2Norm;
+
+    // Sub-phase boundaries within Clip 1 (normalized within clip)
+    const c1_distributions = pauseBetweenPhases / clip1Duration;
+    const c1_linesDraw = (lineDrawDuration * numLinesToDraw) / clip1Duration;
+    const c1_pauseAfterNaive = pauseAfterNaiveCoupling / clip1Duration;
+    // fadeOut is the remainder
+
+    // Sub-phase boundary within Clip 2
+    const c2_trajectories = trajectoryAnimationDuration / clip2Duration;
+
+    // Sub-phase boundary within Clip 3
+    const c3_inducedCoupling = inducedCouplingDuration / clip3Duration;
+
+    timeline = new Timeline<AnimationState>();
+    timeline.initialState = {
+      stateIndex: 0,
+      linesDrawnCount: 0,
+      naiveCouplingOpacity: 1,
+      segmentIndex: 0,
+      inducedCouplingProgress: 0
+    };
+
+    // Clip 1: Independent Coupling (stateIndex = 0)
     timeline.add({
-      name: "PhaseAnimation",
-      duration: 1,
+      name: "IndependentCoupling",
+      duration: clip1Norm,
       reduce(t: number) {
-        return getCurrentState();
-      }
-    }, 0);
+        const distribEnd = c1_distributions;
+        const linesEnd = distribEnd + c1_linesDraw;
+        const pauseEnd = linesEnd + c1_pauseAfterNaive;
+        // fadeEnd = 1.0
 
-    // Set a long duration for continuous animation
-    timeline.duration = 1000; // seconds
+        if (t < distribEnd) {
+          // Just distributions
+          return { stateIndex: 0, linesDrawnCount: 0, naiveCouplingOpacity: 1, segmentIndex: 0, inducedCouplingProgress: 0 };
+        } else if (t < linesEnd) {
+          // Drawing lines progressively
+          const lineProgress = (t - distribEnd) / c1_linesDraw;
+          const count = Math.min(Math.floor(lineProgress * cachedNumLinesToDraw) + 1, cachedNumLinesToDraw);
+          return { stateIndex: 0, linesDrawnCount: count, naiveCouplingOpacity: 1, segmentIndex: 0, inducedCouplingProgress: 0 };
+        } else if (t < pauseEnd) {
+          // Pause with all lines
+          return { stateIndex: 0, linesDrawnCount: cachedNumLinesToDraw, naiveCouplingOpacity: 1, segmentIndex: 0, inducedCouplingProgress: 0 };
+        } else {
+          // Fade out
+          const fadeProgress = (t - pauseEnd) / (1 - pauseEnd);
+          const opacity = Math.max(0, 1 - fadeProgress);
+          return { stateIndex: 0, linesDrawnCount: cachedNumLinesToDraw, naiveCouplingOpacity: opacity, segmentIndex: 0, inducedCouplingProgress: 0 };
+        }
+      }
+    }, clip1Start);
+
+    // Clip 2: Simulate Flow (stateIndex = 1)
+    timeline.add({
+      name: "SimulateFlow",
+      duration: clip2Norm,
+      reduce(t: number) {
+        if (t < c2_trajectories) {
+          // Animating trajectories
+          const trajProgress = t / c2_trajectories;
+          const segIdx = Math.floor(trajProgress * cachedNumSegments);
+          return { stateIndex: 1, linesDrawnCount: 0, naiveCouplingOpacity: 0, segmentIndex: segIdx, inducedCouplingProgress: 0 };
+        } else {
+          // Pause at end
+          return { stateIndex: 1, linesDrawnCount: 0, naiveCouplingOpacity: 0, segmentIndex: cachedNumSegments, inducedCouplingProgress: 0 };
+        }
+      }
+    }, clip2Start);
+
+    // Clip 3: Induced Coupling (stateIndex = 2)
+    timeline.add({
+      name: "InducedCoupling",
+      duration: clip3Norm,
+      reduce(t: number) {
+        if (t < c3_inducedCoupling) {
+          // Drawing induced coupling lines
+          const progress = t / c3_inducedCoupling;
+          return { stateIndex: 2, linesDrawnCount: 0, naiveCouplingOpacity: 0, segmentIndex: cachedNumSegments, inducedCouplingProgress: progress };
+        } else {
+          // Pause at end
+          return { stateIndex: 2, linesDrawnCount: 0, naiveCouplingOpacity: 0, segmentIndex: cachedNumSegments, inducedCouplingProgress: 1 };
+        }
+      }
+    }, clip3Start);
+
+    // Set timeline duration and looping
+    timeline.duration = totalDuration / 1000; // Convert to seconds
     timeline.looping = true;
 
-    lastTickTime = 0;
-
     // Register tick callback
-    timeline.onTick((t, _state) => {
-      const currentTime = t * timeline.duration * 1000; // Convert to ms
-      const elapsed = lastTickTime === 0 ? 16.67 : currentTime - lastTickTime;
-      lastTickTime = currentTime;
-      updateAnimation(elapsed);
+    timeline.onTick((_, state) => {
+      currentState = state;
+      draw(state);
     });
   }
 
@@ -440,16 +428,12 @@
     ctx.globalAlpha = 1;
   }
 
-  function drawAnimatedTrajectories(time: number) {
-    const segmentIndex = Math.floor(time * (numTimeSteps - 1));
-
-    drawTrajectoriesWithPreview(ctx, transformedTrajectories, segmentIndex, {
+  function drawAnimatedTrajectories(segmentIndex: number) {
+    drawTrajectories(ctx, transformedTrajectories, segmentIndex, {
       strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
       color: settings.stylingSettings.trajectory.color,
       progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
       pointRadius: settings.stylingSettings.trajectory.endpointRadius,
-      showPreview: false,
-      previewOpacity: 0
     });
   }
 
@@ -477,39 +461,28 @@
     ctx.globalAlpha = 1;
   }
 
-  function draw(state: PhaseState) {
+  function draw(state: AnimationState) {
     if (!ctx || !initialized) return;
 
     ctx.clearRect(0, 0, width, height);
 
+    // --- Static Background ---
     drawSourceDistribution();
     drawTargetDistribution();
     drawLabels();
 
-    switch (state.phase) {
-      case 'distributions':
-        break;
-      case 'naive_coupling':
-        drawNaiveCouplingLines(state.linesDrawnCount);
-        break;
-      case 'pause_after_naive':
-        drawNaiveCouplingLines(numLinesToDraw);
-        break;
-      case 'fade_out':
-        drawNaiveCouplingLines(numLinesToDraw, state.fadeOpacity * couplingLineOpacity);
-        break;
-      case 'trajectories':
-        drawAnimatedTrajectories(state.trajectoryTime);
-        break;
-      case 'pause_after_trajectories':
-        drawAnimatedTrajectories(1);
-        break;
-      case 'induced_coupling':
-        drawInducedCouplingLines(state.inducedCouplingProgress);
-        break;
-      case 'pause_at_end':
-        drawInducedCouplingLines(1);
-        break;
+    // --- Dynamic Foreground ---
+    const { stateIndex, linesDrawnCount, naiveCouplingOpacity, segmentIndex, inducedCouplingProgress } = state;
+
+    if (stateIndex === 0 && linesDrawnCount > 0) {
+      // State 0: Draw naive coupling lines (with fade)
+      drawNaiveCouplingLines(linesDrawnCount, naiveCouplingOpacity * couplingLineOpacity);
+    } else if (stateIndex === 1) {
+      // State 1: Draw animated trajectories
+      drawAnimatedTrajectories(segmentIndex);
+    } else if (stateIndex === 2 && inducedCouplingProgress > 0) {
+      // State 2: Draw induced coupling lines
+      drawInducedCouplingLines(inducedCouplingProgress);
     }
   }
 
@@ -518,40 +491,39 @@
   // ----------------------------------------------------------------
 
   function jumpToState(newStateIndex: number) {
-    phaseProgress = 0;
+    if (!timeline) return;
 
+    // Seek to the start of the appropriate clip
+    let seekTime = 0;
     switch (newStateIndex) {
       case 0:
-        currentPhase = 'pause_after_naive';
-        linesDrawnCount = numLinesToDraw;
-        fadeOpacity = 1;
+        seekTime = clip1Start;
         break;
       case 1:
-        currentPhase = 'trajectories';
-        trajectoryTime = 0;
-        fadeOpacity = 0;
+        seekTime = clip2Start;
         break;
       case 2:
-        currentPhase = 'pause_at_end';
-        inducedCouplingProgress = 1;
+        seekTime = clip3Start;
         break;
     }
 
-    draw(getCurrentState());
+    const wasPlaying = timeline.isPlaying;
+    // seek() triggers onTick callbacks which updates currentState and calls draw()
+    timeline.seek(seekTime);
 
-    if (isPlaying && timeline && !timeline.isPlaying) {
+    // Resume playing if it was playing before
+    if (wasPlaying) {
       startAnimation();
     }
   }
 
   function handleVisibilityChange(isActive: boolean) {
-    if (!isActive && isPlaying) {
+    if (!timeline) return;
+    if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
-      isPlaying = false;
       stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
-      isPlaying = true;
       startAnimation();
     }
   }
@@ -586,13 +558,9 @@
     runInitialComputation();
     initialized = true;
     setupTimeline();
-    draw(getCurrentState());
-    if (isPlaying) startAnimation();
+    draw(timeline!.initialState);
+    startAnimation();
   }
-
-  // Animation control
-  $: if (isPlaying && initialized && timeline && !timeline.isPlaying) startAnimation();
-  $: if (!isPlaying && timeline && timeline.isPlaying) stopAnimation();
 
   // Handle visibility changes
   $: if (figureIsActive !== undefined && initialized) {

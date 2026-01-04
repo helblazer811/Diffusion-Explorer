@@ -1,6 +1,7 @@
 export interface TextStyleOptions {
   font?: string;           // Default: '22px Helvetica, Arial, sans-serif'
   color?: string;          // Default: '#666'
+  opacity?: number;        // Default: 1
   align?: 'left' | 'center' | 'right';  // Default: 'center'
   baseline?: 'top' | 'middle' | 'bottom';  // Default: 'top'
   offsetX?: number;        // Default: 0
@@ -25,6 +26,7 @@ export function drawText(
   const {
     font = '22px Helvetica, Arial, sans-serif',
     color = '#666',
+    opacity = 1,
     align = 'center',
     baseline = 'top',
     offsetX = 0,
@@ -34,6 +36,7 @@ export function drawText(
   ctx.save();
   ctx.font = font;
   ctx.fillStyle = color;
+  ctx.globalAlpha = opacity;
   ctx.textAlign = align;
   ctx.textBaseline = baseline;
   ctx.fillText(text, x + offsetX, y + offsetY);

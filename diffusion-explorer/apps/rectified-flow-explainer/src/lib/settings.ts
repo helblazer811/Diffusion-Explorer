@@ -44,6 +44,7 @@ export const settings = {
   cachedRectifiedFlowTrajectoriesPath: "cached_samples/rectified_flow_trajectories.json" as string | null,
   cachedRectifiedFlowGridTrajectoriesPath: "cached_samples/rectified_flow_grid_trajectories.json" as string | null,
   cachedRectifiedFlowVectorFieldPath: "cached_samples/rectified_flow_vector_field.json" as string | null,
+  cachedRecursiveRectifiedFlowTrajectoriesPath: null, //"cached_samples/recursive_rectified_flow_grid_trajectories.json" as string | null,
 
   // Worker URL (bundled to static/workers/ for production)
   // Note: These are relative paths. The page component prefixes with base when creating clients.
@@ -89,6 +90,13 @@ export const settings = {
       gridResolution: 8,
       numTimeSteps: 300,
       domainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 }
+    },
+    // Recursive rectified flow grid sampling (for multi-step visualization)
+    recursiveRectifiedFlowGrid: {
+      gridResolution: 6,
+      gridDomainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 },
+      numSteps: 300,
+      maxReflowSteps: 5
     }
   },
 

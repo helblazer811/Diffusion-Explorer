@@ -1,9 +1,9 @@
 <script>
-  import * as tf from '@tensorflow/tfjs';
-  import { onMount, onDestroy } from 'svelte';
-  import * as d3 from 'd3';
-  import { DoubleFigure, PlayButton } from '@diffusion-explorer/ui';
-  import { settings } from '$lib/settings';
+  import * as tf from "@tensorflow/tfjs";
+  import { onMount, onDestroy } from "svelte";
+  import * as d3 from "d3";
+  import { DoubleFigure, PlayButton } from "@diffusion-explorer/ui";
+  import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
   // Props
@@ -18,8 +18,8 @@
   export let backgroundVisible = true;
 
   // Styling props
-  export let groundTruthColor = '#888888';
-  export let eulerColor = '#f17720';
+  export let groundTruthColor = "#888888";
+  export let eulerColor = "#f17720";
   export let lineWidth = 6;
   export let eulerLineWidth = 6;
 
@@ -40,8 +40,8 @@
   export let labelColor = settings.stylingSettings.label.color;
   export let labelOpacity = settings.stylingSettings.label.opacity;
   export let labelYShiftFactor = 0;
-  export let highCurvatureLabel = 'Curved Function';
-  export let lowCurvatureLabel = 'Almost Straight Function';
+  export let highCurvatureLabel = "Curved Function";
+  export let lowCurvatureLabel = "Almost Straight Function";
 
   // Caption
   export let children = undefined;
@@ -56,7 +56,10 @@
   $: domain = [0, numSteps * deltaT];
 
   // Calculate total cycle duration
-  $: totalCycleDuration = fullAnimationDelay + numSteps * perStepDuration + (numSteps - 1) * perStepDelay;
+  $: totalCycleDuration =
+    fullAnimationDelay +
+    numSteps * perStepDuration +
+    (numSteps - 1) * perStepDelay;
 
   // Y-scale factors for each panel
   const highCurvatureYScaleFactor = 1;
@@ -137,11 +140,18 @@
   }
 
   // Create Scales
-  function createScales(data, groundTruth, svgWidth, svgHeight, yScaleFactor = 1) {
-    const allT = [...data.t, ...groundTruth.map(d => d.t)];
-    const allY = [...data.y, ...groundTruth.map(d => d.y)];
+  function createScales(
+    data,
+    groundTruth,
+    svgWidth,
+    svgHeight,
+    yScaleFactor = 1
+  ) {
+    const allT = [...data.t, ...groundTruth.map((d) => d.t)];
+    const allY = [...data.y, ...groundTruth.map((d) => d.y)];
 
-    const xScale = d3.scaleLinear()
+    const xScale = d3
+      .scaleLinear()
       .domain([Math.min(...allT), Math.max(...allT)])
       .range([marginWidth, svgWidth - marginWidth]);
 
@@ -153,8 +163,12 @@
     // Shift the y-center down to give more space for the label at the top
     const yCenterOffset = -yRange * 0.15;
 
-    const yScale = d3.scaleLinear()
-      .domain([yCenter - yRange / 2 - yCenterOffset, yCenter + yRange / 2 - yCenterOffset])
+    const yScale = d3
+      .scaleLinear()
+      .domain([
+        yCenter - yRange / 2 - yCenterOffset,
+        yCenter + yRange / 2 - yCenterOffset,
+      ])
       .range([svgHeight - marginHeight, marginHeight]);
 
     return { xScale, yScale };
@@ -174,7 +188,7 @@
   function scheduleTimeout(fn, delay) {
     const id = setTimeout(() => {
       // Remove from active list when executed
-      activeTimeoutIds = activeTimeoutIds.filter(tid => tid !== id);
+      activeTimeoutIds = activeTimeoutIds.filter((tid) => tid !== id);
       fn();
     }, delay);
     activeTimeoutIds.push(id);
@@ -191,19 +205,60 @@
     const y0 = 0;
 
     // High-curvature data
-    const highCurvatureEuler = eulerMethod(highCurvatureODE, t0, y0, tEnd, deltaT);
-    const highCurvatureGT = generateGroundTruthPoints(highCurvatureGroundTruth, t0, tEnd, groundTruthDeltaT);
+    const highCurvatureEuler = eulerMethod(
+      highCurvatureODE,
+      t0,
+      y0,
+      tEnd,
+      deltaT
+    );
+    const highCurvatureGT = generateGroundTruthPoints(
+      highCurvatureGroundTruth,
+      t0,
+      tEnd,
+      groundTruthDeltaT
+    );
 
     // Low-curvature data
-    const lowCurvatureEuler = eulerMethod(lowCurvatureODE, t0, y0, tEnd, deltaT);
-    const lowCurvatureGT = generateGroundTruthPoints(lowCurvatureGroundTruth, t0, tEnd, groundTruthDeltaT);
+    const lowCurvatureEuler = eulerMethod(
+      lowCurvatureODE,
+      t0,
+      y0,
+      tEnd,
+      deltaT
+    );
+    const lowCurvatureGT = generateGroundTruthPoints(
+      lowCurvatureGroundTruth,
+      t0,
+      tEnd,
+      groundTruthDeltaT
+    );
 
     // Store animation data for restart
-    animationData = { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler };
+    animationData = {
+      highCurvatureGT,
+      highCurvatureEuler,
+      lowCurvatureGT,
+      lowCurvatureEuler,
+    };
 
     // Plot both with same animation delay so they start in sync
-    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, highCurvatureYScaleFactor, highCurvatureLabel, fullAnimationDelay);
-    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, lowCurvatureYScaleFactor, lowCurvatureLabel, fullAnimationDelay);
+    plotCurves(
+      leftSvg,
+      highCurvatureGT,
+      highCurvatureEuler,
+      highCurvatureYScaleFactor,
+      highCurvatureLabel,
+      fullAnimationDelay
+    );
+    plotCurves(
+      rightSvg,
+      lowCurvatureGT,
+      lowCurvatureEuler,
+      lowCurvatureYScaleFactor,
+      lowCurvatureLabel,
+      fullAnimationDelay
+    );
 
     isInitialized = true;
 
@@ -232,7 +287,11 @@
 
     // During animation (not in repeat delay)
     if (timeInCycle < totalCycleDuration) {
-      normalizedTime = Math.min(1, (timeInCycle - fullAnimationDelay) / (totalCycleDuration - fullAnimationDelay));
+      normalizedTime = Math.min(
+        1,
+        (timeInCycle - fullAnimationDelay) /
+          (totalCycleDuration - fullAnimationDelay)
+      );
       if (normalizedTime < 0) normalizedTime = 0;
     } else {
       // During repeat delay, show full circle
@@ -244,11 +303,11 @@
 
   function stopAllAnimations() {
     // Cancel all pending timeouts
-    activeTimeoutIds.forEach(id => clearTimeout(id));
+    activeTimeoutIds.forEach((id) => clearTimeout(id));
     activeTimeoutIds = [];
     // Interrupt all D3 transitions
-    if (leftSvg) d3.select(leftSvg).selectAll('*').interrupt();
-    if (rightSvg) d3.select(rightSvg).selectAll('*').interrupt();
+    if (leftSvg) d3.select(leftSvg).selectAll("*").interrupt();
+    if (rightSvg) d3.select(rightSvg).selectAll("*").interrupt();
     // Stop time tracking
     if (timeTrackingFrameId) {
       cancelAnimationFrame(timeTrackingFrameId);
@@ -260,9 +319,28 @@
     if (!animationData) return;
     // Stop any existing animations first
     stopAllAnimations();
-    const { highCurvatureGT, highCurvatureEuler, lowCurvatureGT, lowCurvatureEuler } = animationData;
-    plotCurves(leftSvg, highCurvatureGT, highCurvatureEuler, highCurvatureYScaleFactor, highCurvatureLabel, 0);
-    plotCurves(rightSvg, lowCurvatureGT, lowCurvatureEuler, lowCurvatureYScaleFactor, lowCurvatureLabel, 0);
+    const {
+      highCurvatureGT,
+      highCurvatureEuler,
+      lowCurvatureGT,
+      lowCurvatureEuler,
+    } = animationData;
+    plotCurves(
+      leftSvg,
+      highCurvatureGT,
+      highCurvatureEuler,
+      highCurvatureYScaleFactor,
+      highCurvatureLabel,
+      0
+    );
+    plotCurves(
+      rightSvg,
+      lowCurvatureGT,
+      lowCurvatureEuler,
+      lowCurvatureYScaleFactor,
+      lowCurvatureLabel,
+      0
+    );
     // Restart time tracking
     if (isPlaying) {
       startTimeTracking();
@@ -270,26 +348,35 @@
   }
 
   // Animate individual Euler line segments
-  function animateEulerSegments(svg, eulerPoints, xScale, yScale, delay = fullAnimationDelay) {
+  function animateEulerSegments(
+    svg,
+    eulerPoints,
+    xScale,
+    yScale,
+    delay = fullAnimationDelay
+  ) {
     // Clear existing segments and arrows
-    svg.selectAll('.euler-segment').remove();
-    svg.selectAll('.euler-arrow').remove();
+    svg.selectAll(".euler-segment").remove();
+    svg.selectAll(".euler-arrow").remove();
 
     // Define arrow marker
-    const defs = svg.select('defs').empty() ? svg.append('defs') : svg.select('defs');
-    defs.selectAll('#euler-sampler-arrow-marker').remove();
+    const defs = svg.select("defs").empty()
+      ? svg.append("defs")
+      : svg.select("defs");
+    defs.selectAll("#euler-sampler-arrow-marker").remove();
 
-    defs.append('marker')
-      .attr('id', 'euler-sampler-arrow-marker')
-      .attr('viewBox', '0 0 10 10')
-      .attr('refX', 8)
-      .attr('refY', 5)
-      .attr('markerWidth', 4)
-      .attr('markerHeight', 4)
-      .attr('orient', 'auto-start-reverse')
-      .append('path')
-      .attr('d', 'M 0 0 L 10 5 L 0 10 z')
-      .attr('fill', eulerColor);
+    defs
+      .append("marker")
+      .attr("id", "euler-sampler-arrow-marker")
+      .attr("viewBox", "0 0 10 10")
+      .attr("refX", 8)
+      .attr("refY", 5)
+      .attr("markerWidth", 4)
+      .attr("markerHeight", 4)
+      .attr("orient", "auto-start-reverse")
+      .append("path")
+      .attr("d", "M 0 0 L 10 5 L 0 10 z")
+      .attr("fill", eulerColor);
 
     for (let i = 0; i < eulerPoints.length - 1; i++) {
       const p1 = eulerPoints[i];
@@ -303,49 +390,51 @@
       const segmentDelay = delay + i * (perStepDuration + perStepDelay);
       const isLastSegment = i === eulerPoints.length - 2;
 
-      const line = svg.append('line')
-        .attr('x1', x1)
-        .attr('y1', y1)
-        .attr('x2', x1)
-        .attr('y2', y1)
-        .attr('stroke', eulerColor)
-        .attr('stroke-width', eulerLineWidth)
-        .attr('class', 'euler-segment');
+      const line = svg
+        .append("line")
+        .attr("x1", x1)
+        .attr("y1", y1)
+        .attr("x2", x1)
+        .attr("y2", y1)
+        .attr("stroke", eulerColor)
+        .attr("stroke-width", eulerLineWidth)
+        .attr("class", "euler-segment");
 
       const transition = line
         .transition()
         .delay(segmentDelay)
         .duration(perStepDuration)
         .ease(d3.easeLinear)
-        .attr('x2', x2)
-        .attr('y2', y2)
-        .on('start', function() {
+        .attr("x2", x2)
+        .attr("y2", y2)
+        .on("start", function () {
           // Remove previous arrow
-          svg.selectAll('.euler-arrow').remove();
+          svg.selectAll(".euler-arrow").remove();
 
           // Add arrow to current segment
-          const arrow = svg.append('line')
-            .attr('x1', x1)
-            .attr('y1', y1)
-            .attr('x2', x1)
-            .attr('y2', y1)
-            .attr('stroke', eulerColor)
-            .attr('stroke-width', eulerLineWidth)
-            .attr('marker-end', 'url(#euler-sampler-arrow-marker)')
-            .attr('class', 'euler-arrow');
+          const arrow = svg
+            .append("line")
+            .attr("x1", x1)
+            .attr("y1", y1)
+            .attr("x2", x1)
+            .attr("y2", y1)
+            .attr("stroke", eulerColor)
+            .attr("stroke-width", eulerLineWidth)
+            .attr("marker-end", "url(#euler-sampler-arrow-marker)")
+            .attr("class", "euler-arrow");
 
           // Animate arrow along with the segment
           arrow
             .transition()
             .duration(perStepDuration)
             .ease(d3.easeLinear)
-            .attr('x2', x2)
-            .attr('y2', y2);
+            .attr("x2", x2)
+            .attr("y2", y2);
         });
 
       // On the last segment, trigger repeat if needed
       if (isLastSegment && repeatAnimation) {
-        transition.on('end', function() {
+        transition.on("end", function () {
           if (shouldAnimate) {
             scheduleTimeout(() => {
               // Reset timer to sync with animation restart
@@ -369,7 +458,7 @@
     const d3Svg = d3.select(svg);
 
     // Remove existing label if it exists
-    d3Svg.select('.curve-label').remove();
+    d3Svg.select(".curve-label").remove();
 
     // Calculate center x position
     const xDomain = xScale.domain();
@@ -382,42 +471,58 @@
     const yShift = yRange * labelYShiftFactor;
 
     // Add label at the top center, shifted down by labelYShiftFactor
-    d3Svg.append('text')
-      .attr('class', 'curve-label')
-      .attr('x', xScale(xCenter))
-      .attr('y', yScale(yTop - yShift) - 5)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', `${labelFontSize}px`)
-      .attr('fill', labelColor)
-      .attr('opacity', labelOpacity)
+    d3Svg
+      .append("text")
+      .attr("class", "curve-label")
+      .attr("x", xScale(xCenter))
+      .attr("y", yScale(yTop - yShift) - 5)
+      .attr("text-anchor", "middle")
+      .attr("font-size", `${labelFontSize}px`)
+      .attr("fill", labelColor)
+      .attr("opacity", labelOpacity)
       .text(label);
   }
 
   // Plot Curves
-  function plotCurves(svg, groundTruth, eulerData, yScaleFactor = 1, label = '', animDelay = fullAnimationDelay) {
+  function plotCurves(
+    svg,
+    groundTruth,
+    eulerData,
+    yScaleFactor = 1,
+    label = "",
+    animDelay = fullAnimationDelay
+  ) {
     if (!svg) return;
 
     const d3Svg = d3.select(svg);
     const eulerPoints = eulerData.t.map((t, i) => ({ t, y: eulerData.y[i] }));
 
     // Create scales
-    const { xScale, yScale } = createScales(eulerData, groundTruth, width, height, yScaleFactor);
+    const { xScale, yScale } = createScales(
+      eulerData,
+      groundTruth,
+      width,
+      height,
+      yScaleFactor
+    );
 
     // Clear existing content
-    d3Svg.selectAll('*').remove();
+    d3Svg.selectAll("*").remove();
 
     // Create line generator
-    const line = d3.line()
-      .x(d => xScale(d.t))
-      .y(d => yScale(d.y));
+    const line = d3
+      .line()
+      .x((d) => xScale(d.t))
+      .y((d) => yScale(d.y));
 
     // Plot ground truth (black)
-    d3Svg.append('path')
+    d3Svg
+      .append("path")
       .datum(groundTruth)
-      .attr('fill', 'none')
-      .attr('stroke', groundTruthColor)
-      .attr('stroke-width', lineWidth)
-      .attr('d', line);
+      .attr("fill", "none")
+      .attr("stroke", groundTruthColor)
+      .attr("stroke-width", lineWidth)
+      .attr("d", line);
 
     // Animate individual Euler segments
     animateEulerSegments(d3Svg, eulerPoints, xScale, yScale, animDelay);
@@ -464,7 +569,7 @@
   });
 
   onDestroy(() => {
-    activeTimeoutIds.forEach(id => clearTimeout(id));
+    activeTimeoutIds.forEach((id) => clearTimeout(id));
     activeTimeoutIds = [];
     if (timeTrackingFrameId) {
       cancelAnimationFrame(timeTrackingFrameId);
@@ -481,15 +586,30 @@
   }
 </script>
 
-<DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+<DoubleFigure
+  {gap}
+  {caption}
+  {backgroundVisible}
+  bind:isActive={figureIsActive}
+>
   {#snippet left()}
     <PlayButton {isPlaying} onclick={togglePlayPause} time={normalizedTime} />
-    <svg bind:this={leftSvg} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
+    <svg
+      bind:this={leftSvg}
+      viewBox="0 0 {width} {height}"
+      preserveAspectRatio="xMidYMid meet"
+      style="width: 100%; height: auto; max-width: {width}px;"
+    >
     </svg>
   {/snippet}
 
   {#snippet right()}
-    <svg bind:this={rightSvg} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; max-width: {width}px;">
+    <svg
+      bind:this={rightSvg}
+      viewBox="0 0 {width} {height}"
+      preserveAspectRatio="xMidYMid meet"
+      style="width: 100%; height: auto; max-width: {width}px;"
+    >
     </svg>
   {/snippet}
 </DoubleFigure>
