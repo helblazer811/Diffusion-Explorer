@@ -22,12 +22,13 @@ interface CacheConfig {
   outputPath: string; // Relative path for output JSON
   numSamples: number;
   numSteps: number;
-  type: 'random' | 'grid';
+  type: 'random' | 'grid' | 'vector_field';
   isRectifiedFlow?: boolean; // If true, saves in RectifiedFlowData format
   gridResolution?: number;
   domainRange?: DomainRange;
   dim?: number;
   hidden?: number;
+  numTimeSteps?: number; // For vector field: number of time steps to evaluate
 }
 
 // Cache configurations
@@ -35,7 +36,7 @@ const CACHES: CacheConfig[] = [
   {
     modelPath: 'static/models/flow_matching_model.json',
     outputPath: 'static/cached_samples/flow_matching_trajectories.json',
-    numSamples: 300,
+    numSamples: 150, 
     numSteps: 200,
     type: 'random',
     dim: 2,
@@ -71,6 +72,31 @@ const CACHES: CacheConfig[] = [
     isRectifiedFlow: true,
     gridResolution: 6,
     domainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 },
+    dim: 2,
+    hidden: 64,
+  },
+  // Vector field caches
+  {
+    modelPath: 'static/models/flow_matching_model.json',
+    outputPath: 'static/cached_samples/flow_matching_vector_field.json',
+    numSamples: 0,
+    numSteps: 0,
+    type: 'vector_field',
+    gridResolution: 9,
+    domainRange: { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 },
+    numTimeSteps: 20,
+    dim: 2,
+    hidden: 64,
+  },
+  {
+    modelPath: 'static/models/rectified_flow_model.json',
+    outputPath: 'static/cached_samples/rectified_flow_vector_field.json',
+    numSamples: 0,
+    numSteps: 0,
+    type: 'vector_field',
+    gridResolution: 9,
+    domainRange: { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 },
+    numTimeSteps: 20,
     dim: 2,
     hidden: 64,
   },
@@ -184,7 +210,71 @@ async function generateCache(config: CacheConfig): Promise<void> {
   // Set the loaded model's internal layers model
   (model as any).model = tfModel;
 
-  // Generate samples
+  const outputFile = path.join(ROOT, config.outputPath);
+
+  // Ensure output directory exists
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+
+  // Handle vector field generation separately
+  if (config.type === 'vector_field') {
+    const gridResolution = config.gridResolution!;
+    const domainRange = config.domainRange!;
+    const numTimeSteps = config.numTimeSteps ?? 20;
+
+    console.log(`  Grid: ${gridResolution}x${gridResolution}`);
+    console.log(`  Time steps: ${numTimeSteps}`);
+
+    // Generate grid points
+    const gridPoints: number[][] = [];
+    for (let i = 0; i < gridResolution; i++) {
+      for (let j = 0; j < gridResolution; j++) {
+        const x = domainRange.xMin + (domainRange.xMax - domainRange.xMin) * (i / (gridResolution - 1));
+        const y = domainRange.yMin + (domainRange.yMax - domainRange.yMin) * (j / (gridResolution - 1));
+        gridPoints.push([x, y]);
+      }
+    }
+
+    // Generate time steps (0 to 1)
+    const timeSteps: number[] = [];
+    for (let t = 0; t < numTimeSteps; t++) {
+      timeSteps.push(t / (numTimeSteps - 1));
+    }
+
+    // Compute velocities at each time step
+    const velocities: number[][][] = [];
+    const gridPointsTensor = tf.tensor2d(gridPoints);
+
+    for (const t of timeSteps) {
+      const tTensor = tf.fill([gridPoints.length, 1], t);
+      const velocityTensor = model.forward(gridPointsTensor, tTensor) as tf.Tensor2D;
+      velocities.push(velocityTensor.arraySync() as number[][]);
+      tTensor.dispose();
+      velocityTensor.dispose();
+    }
+
+    gridPointsTensor.dispose();
+
+    // Save in VectorFieldData format
+    const outputData = {
+      gridResolution,
+      timeSteps,
+      domainRange,
+      velocities,
+      gridPoints,
+    };
+
+    fs.writeFileSync(outputFile, JSON.stringify(outputData));
+
+    console.log(`  Velocities shape: [${numTimeSteps}, ${gridPoints.length}, 2]`);
+    console.log(`  Format: VectorFieldData`);
+    console.log(`  Saved to: ${config.outputPath}`);
+    console.log(`  Time: ${formatDuration(Date.now() - startTime)}`);
+
+    tfModel.dispose();
+    return;
+  }
+
+  // Generate trajectory samples
   let trajectories: tf.Tensor3D | null = null;
 
   if (config.type === 'grid') {
@@ -201,10 +291,6 @@ async function generateCache(config: CacheConfig): Promise<void> {
 
   if (trajectories) {
     const rawData = trajectories.arraySync();
-    const outputFile = path.join(ROOT, config.outputPath);
-
-    // Ensure output directory exists
-    fs.mkdirSync(path.dirname(outputFile), { recursive: true });
 
     // For rectified flow, wrap data in expected format: { allRectifiedTrajectories: [...], modelPath: "..." }
     // The allRectifiedTrajectories is a 4D array where each element represents a rectification step
