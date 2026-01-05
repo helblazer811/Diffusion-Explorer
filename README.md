@@ -17,7 +17,7 @@ Diffusion Explorer is mainly an educational tool with the following key function
 
 ## Rectified Flow Explainer
 
-https://github.com/helblazer811/Diffusion-Explorer/blob/306f8375979abba0516495a28ccdd2968185cd27/media/RectifiedFlowIntro.mp4
+https://github.com/user-attachments/assets/650625d5-17f7-43ad-8a12-4248b57a6588
 
 An interactive blog post explaining Rectified Flow, a technique for straightening the trajectories learned by flow matching models. The explainer features animated visualizations that demonstrate:
 
@@ -27,6 +27,7 @@ An interactive blog post explaining Rectified Flow, a technique for straightenin
 - The connection between straight paths and optimal transport
 
 **Live demo:** [alechelbling.com/blog/rectified-flow](https://alechelbling.com/blog/rectified-flow)
+
 
 ### Running Locally
 
