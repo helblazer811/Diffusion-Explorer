@@ -13,23 +13,6 @@ export interface RectifiedFlowData {
   modelPath: string;
 }
 
-export interface TrainingSettings {
-  modelConfig: { dim: number; hidden: number };
-  domainRange: { xMin: number; xMax: number; yMin: number; yMax: number } | null;
-  flowMatchingTrainingConfig: {
-    epochs: number;
-    batchSize: number;
-    verbose: boolean;
-    displayInterval: number;
-  };
-  rectifiedFlowTrainingConfig: {
-    num_rectified_steps: number;
-    epochs_per_rectified_step: number;
-    batchSize: number;
-    num_simulation_steps: number;
-  };
-}
-
 // ========== SETTINGS OBJECT ==========
 
 export const settings = {
@@ -56,48 +39,10 @@ export const settings = {
   rectifiedFlowModelPath: "/models/rectified_flow_model.json" as string | null,
 
   // ========== SAMPLING SETTINGS ==========
+  // Used for target distribution loading and interactive sampling
   samplingSettings: {
-    // Flow matching trajectory sampling
-    flowMatching: {
-      numSamples: 100,
-      numSteps: 300
-    },
-    // Flow matching grid sampling
-    flowMatchingGrid: {
-      gridResolution: 6,
-      gridDomainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 },
-      numSteps: 300
-    },
-    // Flow matching vector field sampling
-    flowMatchingVectorField: {
-      gridResolution: 8,
-      numTimeSteps: 200,
-      domainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 }
-    },
-    // Rectified flow trajectory sampling
-    rectifiedFlow: {
-      numSamples: 100,
-      numSteps: 300
-    },
-    // Rectified flow grid sampling
-    rectifiedFlowGrid: {
-      gridResolution: 6,
-      gridDomainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 },
-      numSteps: 300
-    },
-    // Rectified flow vector field sampling
-    rectifiedFlowVectorField: {
-      gridResolution: 8,
-      numTimeSteps: 300,
-      domainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 }
-    },
-    // Recursive rectified flow grid sampling (for multi-step visualization)
-    recursiveRectifiedFlowGrid: {
-      gridResolution: 6,
-      gridDomainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 },
-      numSteps: 300,
-      maxReflowSteps: 5
-    }
+    numSamples: 150,  // Number of samples to load from target distribution
+    numSteps: 300     // Integration steps for interactive sampling
   },
 
   // ========== INTERACTIVE SETTINGS ==========
@@ -105,12 +50,19 @@ export const settings = {
     maxUserTrajectories: 5,  // Maximum concurrent user-drawn trajectories
   },
 
-  // ========== TRAINING SETTINGS ==========
+  // ========== MODEL SETTINGS ==========
+  // Model architecture settings for FlowModelClient initialization
+  modelSettings: {
+    dim: 2,
+    hidden: 64,
+    domainRange: null as { xMin: number; xMax: number; yMin: number; yMax: number } | null
+  },
+
+  // ========== TRAINING SETTINGS (for test_pathlines) ==========
   trainingSettings: {
     modelConfig: { dim: 2, hidden: 64 },
-    domainRange: null,
+    domainRange: null as { xMin: number; xMax: number; yMin: number; yMax: number } | null,
     flowMatchingTrainingConfig: {
-      // Important: use > 1000 epochs for good sampling quality
       epochs: 2000,
       batchSize: 1024,
       verbose: true,
@@ -122,7 +74,7 @@ export const settings = {
       batchSize: 1024,
       num_simulation_steps: 200
     }
-  } as TrainingSettings,
+  },
 
   // ========== STYLING SETTINGS ==========
   stylingSettings: {

@@ -153,13 +153,16 @@
     // Create a group for coupling edges
     const edgesGroup = svg.append('g').attr('id', 'couplingEdges');
 
-    // Shuffle the target points array for one-to-one pairing
-    const shuffledTargets = [...targetPoints].sort(() => Math.random() - 0.5);
+    // Use the minimum length to ensure valid pairings
+    const numPairs = Math.min(sourcePoints.length, targetPoints.length);
+
+    // Shuffle both arrays and take numPairs from each
+    const shuffledSources = [...sourcePoints].sort(() => Math.random() - 0.5).slice(0, numPairs);
+    const shuffledTargets = [...targetPoints].sort(() => Math.random() - 0.5).slice(0, numPairs);
 
     // Create random pairings without replacement
-    const couplingData = sourcePoints.map((sourcePoint, i) => {
-      const targetPoint = shuffledTargets[i];
-      return { source: sourcePoint, target: targetPoint, isSourcePoint: true };
+    const couplingData = shuffledSources.map((sourcePoint, i) => {
+      return { source: sourcePoint, target: shuffledTargets[i], isSourcePoint: true };
     });
 
     // Draw visible dashed edges

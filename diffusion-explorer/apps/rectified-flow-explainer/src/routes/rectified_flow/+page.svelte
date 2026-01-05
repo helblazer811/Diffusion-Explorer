@@ -20,7 +20,7 @@
       // Load target distribution
       const targetSamples = await sample.loadTargetDistribution(
         `${base}/${settings.targetDistributionPointsPath}`,
-        settings.samplingSettings.flowMatching.numSamples
+        settings.samplingSettings.numSamples
       );
       if (targetSamples) {
         targetDistributionSamples.set(targetSamples);
