@@ -24,7 +24,7 @@ export const CONFIG = {
   modelName: 'rectified_flow_model',
   dim: 2,
   hidden: 64,
-  numRectifiedSteps: 4,
+  numRectifiedSteps: 2,
   epochsPerStep: 2000,
   batchSize: 1024,
   numSimulationSteps: 200,
@@ -49,8 +49,13 @@ async function saveModel(model: tf.LayersModel, dir: string, name: string): Prom
 
   // Get model topology and weights
   const topoJSON = model.toJSON();
-  const modelJSON: tf.io.ModelJSON = typeof topoJSON === 'string' ? JSON.parse(topoJSON) : topoJSON;
+  const modelTopology = typeof topoJSON === 'string' ? JSON.parse(topoJSON) : topoJSON;
   const weights = model.getWeights();
+
+  // Create model JSON with modelTopology wrapper (required by tf.loadLayersModel)
+  const modelJSON: tf.io.ModelJSON = {
+    modelTopology,
+  } as tf.io.ModelJSON;
 
   // Serialize weights to binary
   const weightSpecs: tf.io.WeightsManifestEntry[] = [];
