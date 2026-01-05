@@ -27,16 +27,13 @@
     export let allTimeGridSamples; // All time grid samples for path plotting
 
     // If the currentTime changes then update the current distribution samples in the UI state
-    $: if ($currentTime && $allTimeSamples) {
-        // Convert current time to index
-        let currentTimeIndex = Math.floor($currentTime * $numberOfSteps);
+    $: if ($currentTime !== undefined && $allTimeSamples && $allTimeSamples.length > 0) {
+        // Convert current time to index using actual data length (not numberOfSteps store)
+        let currentTimeIndex = Math.floor($currentTime * ($allTimeSamples.length - 1));
         // Avoid going out of bounds
-        if (currentTimeIndex >= $numberOfSteps) {
-            currentTimeIndex = $numberOfSteps - 1;
-        }
+        currentTimeIndex = Math.min(currentTimeIndex, $allTimeSamples.length - 1);
         // Pull out the current time samples from the all time samples
         const currentSamples = $allTimeSamples[currentTimeIndex];
-        // const currentSamples = tf.tidy(() => $allTimeSamples.gather(currentTimeIndex));
         // Update the current distribution samples in the UI state
         currentDistributionSamples.set(currentSamples);
     }
