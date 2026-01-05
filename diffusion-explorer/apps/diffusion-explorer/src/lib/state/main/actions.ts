@@ -138,10 +138,47 @@ export function createMainStateHandlers(MainState: any) {
         const cachedGridSamplesPath = settings.cachedGridSamplesPaths?.[trainingObjectiveVal]?.[datasetNameVal];
 
         if (cachedSamplesPath && cachedGridSamplesPath) {
+            // Load and convert cached samples from domain coords to display coords
             const allSamples = await fetch(base + cachedSamplesPath).then(r => r.json());
-            allTimeSamples.set(allSamples);
-            const gridSamples = await fetch(base + cachedGridSamplesPath).then(r => r.json());
-            allTimeGridSamples.set(gridSamples);
+            const convertedSamples = allSamples.map((samples: number[][], timeIdx: number) => {
+                const t = timeIdx / (allSamples.length - 1); // Normalize time to [0, 1]
+                return convertDataToDisplayCoordinateFrame(
+                    samples,
+                    t,
+                    settings.interfaceSettings.distributionWidth,
+                    settings.interfaceSettings.displayAreaWidth,
+                    settings.domainRange
+                );
+            });
+            allTimeSamples.set(convertedSamples);
+
+            // Load grid samples, convert to display coords, and reshape from [time, N, 2] to [time, x, y, 2]
+            const gridSamplesFlat = await fetch(base + cachedGridSamplesPath).then(r => r.json());
+            const gridRes = settings.meshPlotSettings.gridResolution; // e.g., 15
+
+            // Convert and reshape grid samples
+            const reshapedGrid = gridSamplesFlat.map((timestep: number[][], timeIdx: number) => {
+                const t = timeIdx / (gridSamplesFlat.length - 1);
+                // Convert flat points to display coordinates
+                const convertedPoints = convertDataToDisplayCoordinateFrame(
+                    timestep,
+                    t,
+                    settings.interfaceSettings.distributionWidth,
+                    settings.interfaceSettings.displayAreaWidth,
+                    settings.domainRange
+                );
+                // Reshape [N, 2] to [gridRes, gridRes, 2]
+                const result: number[][][] = [];
+                for (let i = 0; i < gridRes; i++) {
+                    const row: number[][] = [];
+                    for (let j = 0; j < gridRes; j++) {
+                        row.push(convertedPoints[i * gridRes + j]);
+                    }
+                    result.push(row);
+                }
+                return result;
+            });
+            allTimeGridSamples.set(reshapedGrid);
             if (!get(isTraining)) isPlaying.set(true);
         } else {
             console.log("No cached samples found.");

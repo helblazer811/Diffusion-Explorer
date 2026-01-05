@@ -1,6 +1,6 @@
 import { base } from '$app/paths';
 
-import { FlowModel, DiffusionModel, ConditionalDiffusionModel } from '$lib/diffusion';
+import { FlowModel, DiffusionModel, ConditionalDiffusionModel, type NetworkType } from '$lib/diffusion';
 
 export const backend: "webgl" | "wasm" = "webgl";
 
@@ -69,17 +69,23 @@ export const pretrainedModelPaths: Record<string, Record<string, string>> = {
 };
 
 export const cachedSamplesPaths: Record<string, Record<string, string>> = {
-    // "Flow Matching": {
-    //     "Three Modes": "/cached_samples/flow_matching_euler_three_modes.json",
-    //     "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face.json",
-    // },
+    "Flow Matching": {
+        "Three Modes": "/cached_samples/flow_matching_three_modes_samples.json",
+        "Smiley Face": "/cached_samples/flow_matching_smiley_face_samples.json",
+    },
+    "Diffusion": {
+        "Smiley Face": "/cached_samples/diffusion_smiley_face_samples.json",
+    },
 }
 
 export const cachedGridSamplesPaths: Record<string, Record<string, string>> = {
-    // "Flow Matching": {
-        // "Three Modes": "/cached_samples/flow_matching_euler_three_modes_grid.json",
-        // "Smiley Face": "/cached_samples/flow_matching_euler_smiley_face_grid.json",
-    // },
+    "Flow Matching": {
+        "Three Modes": "/cached_samples/flow_matching_three_modes_grid.json",
+        "Smiley Face": "/cached_samples/flow_matching_smiley_face_grid.json",
+    },
+    "Diffusion": {
+        "Smiley Face": "/cached_samples/diffusion_smiley_face_grid.json",
+    },
 }
 
 export const trainingObjectiveToModelClass: Record<string, any> = {
@@ -92,6 +98,7 @@ export interface ModelConfig {
     dim: number;
     hidden: number;
     condDim?: number;
+    networkType?: NetworkType;  // 'simple' or 'improved' (for diffusion models)
 }
 
 export const trainingObjectiveToModelConfig: Record<string, ModelConfig> = {
@@ -101,7 +108,8 @@ export const trainingObjectiveToModelConfig: Record<string, ModelConfig> = {
     },
     "Diffusion": {
         dim: 2,
-        hidden: 64,
+        hidden: 128,
+        networkType: 'improved',  // Use improved network with positional embeddings
     },
     "Conditional Diffusion": {
         dim: 2,
