@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 // ESM __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-export const ROOT = path.resolve(__dirname, '../..');
+export const ROOT = path.resolve(__dirname, '..');
 
 /**
  * Initialize TensorFlow.js with WASM backend
