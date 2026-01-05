@@ -189,12 +189,14 @@ async function generateDiffusionTrajectories(): Promise<void> {
 
   console.log(`  Grid: ${CONFIG.gridResolution}x${CONFIG.gridResolution}`);
   console.log(`  Steps: ${CONFIG.numSteps}`);
+  console.log(`  Scheduler: DDIM`);
 
-  // Generate grid trajectories
+  // Generate grid trajectories using DDIM scheduler
   const trajectories = await model.sample_grid(
     CONFIG.gridResolution,
     CONFIG.domainRange,
-    CONFIG.numSteps
+    CONFIG.numSteps,
+    { scheduler: 'ddim' }
   );
 
   if (trajectories) {

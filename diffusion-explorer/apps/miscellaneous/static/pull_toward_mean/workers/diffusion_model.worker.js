@@ -61771,7 +61771,7 @@ async function handleSamplingRequest(requestId, type, data) {
   const modelJSONPath = data.modelJSONPath;
   const modelConfig = data.modelConfig;
   const numberOfSteps = data.numberOfSteps;
-  const options = data.options || {};
+  const options = { scheduler: "ddim", ...data.options };
   const streaming = data.streaming || false;
   const perStepCallback = streaming ? (step5, x_t) => {
     if (!shouldStop()) {
