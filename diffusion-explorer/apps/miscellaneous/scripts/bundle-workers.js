@@ -11,10 +11,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 
 async function bundleWorkers() {
+  // Use shared worker from packages/diffusion
   const workers = [
     {
-      entry: 'src/lib/workers/diffusion_model.worker.ts',
+      entry: '../../packages/diffusion/src/workers/diffusion_model.worker.ts',
       output: 'static/pull_toward_mean/workers/diffusion_model.worker.js'
+    },
+    {
+      entry: '../../packages/diffusion/src/workers/diffusion_model.worker.ts',
+      output: 'static/diffusion_vs_ddim/workers/diffusion_model.worker.js'
+    },
+    {
+      entry: '../../packages/diffusion/src/workers/diffusion_model.worker.ts',
+      output: 'static/diffusion_horizontal/workers/diffusion_model.worker.js'
     }
   ];
 

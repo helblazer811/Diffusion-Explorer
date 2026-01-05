@@ -11,14 +11,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 
 async function bundleWorkers() {
+  // Use shared worker from packages/diffusion (handles both sampling and training)
   const workers = [
     {
-      entry: 'src/lib/flow_matching/workers/sampling.worker.ts',
+      entry: '../../packages/diffusion/src/workers/flow_model.worker.ts',
       output: 'static/workers/sampling.worker.js'
-    },
-    {
-      entry: 'src/lib/flow_matching/workers/train.worker.ts',
-      output: 'static/workers/train.worker.js'
     }
   ];
 

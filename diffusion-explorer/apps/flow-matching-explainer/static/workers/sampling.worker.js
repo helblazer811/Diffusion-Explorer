@@ -8,9 +8,9 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __commonJS = (cb, mod4) => function __require() {
   return mod4 || (0, cb[__getOwnPropNames(cb)[0]])((mod4 = { exports: {} }).exports, mod4), mod4.exports;
 };
-var __export = (target, all4) => {
-  for (var name in all4)
-    __defProp(target, name, { get: all4[name], enumerable: true });
+var __export = (target, all5) => {
+  for (var name in all5)
+    __defProp(target, name, { get: all5[name], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -1173,7 +1173,7 @@ var require_xorshift7 = __commonJS({
           me.i = i + 1 & 7;
           return v;
         };
-        function init(me2, seed2) {
+        function init2(me2, seed2) {
           var j, w, X = [];
           if (seed2 === (seed2 | 0)) {
             w = X[0] = seed2;
@@ -1193,7 +1193,7 @@ var require_xorshift7 = __commonJS({
             me2.next();
           }
         }
-        init(me, seed);
+        init2(me, seed);
       }
       function copy(f, t) {
         t.x = f.x.slice();
@@ -1259,7 +1259,7 @@ var require_xor4096 = __commonJS({
           me.i = i;
           return v + (w ^ w >>> 16) | 0;
         };
-        function init(me2, seed2) {
+        function init2(me2, seed2) {
           var t, v, i, j, w, X = [], limit = 128;
           if (seed2 === (seed2 | 0)) {
             v = seed2;
@@ -1299,7 +1299,7 @@ var require_xor4096 = __commonJS({
           me2.X = X;
           me2.i = i;
         }
-        init(me, seed);
+        init2(me, seed);
       }
       function copy(f, t) {
         t.i = f.i;
@@ -1608,6 +1608,2788 @@ var require_string_decoder = __commonJS({
   }
 });
 
+// (disabled):fs
+var require_fs = __commonJS({
+  "(disabled):fs"() {
+  }
+});
+
+// (disabled):path
+var require_path = __commonJS({
+  "(disabled):path"() {
+  }
+});
+
+// (disabled):worker_threads
+var require_worker_threads = __commonJS({
+  "(disabled):worker_threads"() {
+  }
+});
+
+// (disabled):perf_hooks
+var require_perf_hooks = __commonJS({
+  "(disabled):perf_hooks"() {
+  }
+});
+
+// (disabled):os
+var require_os = __commonJS({
+  "(disabled):os"() {
+  }
+});
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/wasm-out/tfjs-backend-wasm-threaded-simd.js
+var require_tfjs_backend_wasm_threaded_simd = __commonJS({
+  "../../node_modules/@tensorflow/tfjs-backend-wasm/wasm-out/tfjs-backend-wasm-threaded-simd.js"(exports, module) {
+    var WasmBackendModuleThreadedSimd2 = (() => {
+      var _scriptDir = typeof document !== "undefined" && document.currentScript ? document.currentScript.src : void 0;
+      if (typeof __filename !== "undefined") _scriptDir = _scriptDir || __filename;
+      return (function(WasmBackendModuleThreadedSimd3) {
+        WasmBackendModuleThreadedSimd3 = WasmBackendModuleThreadedSimd3 || {};
+        function GROWABLE_HEAP_I8() {
+          if (wasmMemory.buffer != buffer2) {
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+          }
+          return HEAP8;
+        }
+        function GROWABLE_HEAP_U8() {
+          if (wasmMemory.buffer != buffer2) {
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+          }
+          return HEAPU8;
+        }
+        function GROWABLE_HEAP_I16() {
+          if (wasmMemory.buffer != buffer2) {
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+          }
+          return HEAP16;
+        }
+        function GROWABLE_HEAP_I32() {
+          if (wasmMemory.buffer != buffer2) {
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+          }
+          return HEAP32;
+        }
+        function GROWABLE_HEAP_U32() {
+          if (wasmMemory.buffer != buffer2) {
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+          }
+          return HEAPU32;
+        }
+        function GROWABLE_HEAP_F32() {
+          if (wasmMemory.buffer != buffer2) {
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+          }
+          return HEAPF32;
+        }
+        function GROWABLE_HEAP_F64() {
+          if (wasmMemory.buffer != buffer2) {
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+          }
+          return HEAPF64;
+        }
+        var Module = typeof WasmBackendModuleThreadedSimd3 != "undefined" ? WasmBackendModuleThreadedSimd3 : {};
+        var readyPromiseResolve, readyPromiseReject;
+        Module["ready"] = new Promise(function(resolve, reject) {
+          readyPromiseResolve = resolve;
+          readyPromiseReject = reject;
+        });
+        var beforeListeners;
+        if (typeof process !== "undefined" && process.listeners) {
+          beforeListeners = { uncaughtException: process.listeners("uncaughtException"), unhandledRejection: process.listeners("unhandledRejection") };
+        }
+        var moduleOverrides = Object.assign({}, Module);
+        var arguments_ = [];
+        var thisProgram = "./this.program";
+        var quit_ = (status, toThrow) => {
+          throw toThrow;
+        };
+        var ENVIRONMENT_IS_WEB = typeof window == "object";
+        var ENVIRONMENT_IS_WORKER = typeof importScripts == "function";
+        var ENVIRONMENT_IS_NODE = typeof process == "object" && typeof process.versions == "object" && typeof process.versions.node == "string";
+        var ENVIRONMENT_IS_PTHREAD = Module["ENVIRONMENT_IS_PTHREAD"] || false;
+        var scriptDirectory = "";
+        function locateFile(path) {
+          if (Module["locateFile"]) {
+            return Module["locateFile"](path, scriptDirectory);
+          }
+          return scriptDirectory + path;
+        }
+        var read_, readAsync, readBinary, setWindowTitle;
+        function logExceptionOnExit(e) {
+          if (e instanceof ExitStatus) return;
+          let toLog = e;
+          err("exiting due to exception: " + toLog);
+        }
+        if (ENVIRONMENT_IS_NODE) {
+          var fs = require_fs();
+          var nodePath = require_path();
+          if (ENVIRONMENT_IS_WORKER) {
+            scriptDirectory = nodePath.dirname(scriptDirectory) + "/";
+          } else {
+            scriptDirectory = __dirname + "/";
+          }
+          read_ = (filename, binary) => {
+            filename = isFileURI(filename) ? new URL(filename) : nodePath.normalize(filename);
+            return fs.readFileSync(filename, binary ? void 0 : "utf8");
+          };
+          readBinary = (filename) => {
+            var ret = read_(filename, true);
+            if (!ret.buffer) {
+              ret = new Uint8Array(ret);
+            }
+            return ret;
+          };
+          readAsync = (filename, onload, onerror) => {
+            filename = isFileURI(filename) ? new URL(filename) : nodePath.normalize(filename);
+            fs.readFile(filename, function(err2, data) {
+              if (err2) onerror(err2);
+              else onload(data.buffer);
+            });
+          };
+          if (process["argv"].length > 1) {
+            thisProgram = process["argv"][1].replace(/\\/g, "/");
+          }
+          arguments_ = process["argv"].slice(2);
+          process["on"]("uncaughtException", function(ex) {
+            if (!(ex instanceof ExitStatus)) {
+              throw ex;
+            }
+          });
+          process["on"]("unhandledRejection", function(reason) {
+            throw reason;
+          });
+          quit_ = (status, toThrow) => {
+            if (keepRuntimeAlive()) {
+              process["exitCode"] = status;
+              throw toThrow;
+            }
+            logExceptionOnExit(toThrow);
+            process["exit"](status);
+          };
+          Module["inspect"] = function() {
+            return "[Emscripten Module object]";
+          };
+          let nodeWorkerThreads;
+          try {
+            nodeWorkerThreads = require_worker_threads();
+          } catch (e) {
+            console.error('The "worker_threads" module is not supported in this node.js build - perhaps a newer version is needed?');
+            throw e;
+          }
+          global.Worker = nodeWorkerThreads.Worker;
+        } else if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
+          if (ENVIRONMENT_IS_WORKER) {
+            scriptDirectory = self.location.href;
+          } else if (typeof document != "undefined" && document.currentScript) {
+            scriptDirectory = document.currentScript.src;
+          }
+          if (typeof _scriptDir !== "undefined" && _scriptDir) {
+            scriptDirectory = _scriptDir;
+          }
+          if (scriptDirectory.indexOf("blob:") !== 0) {
+            scriptDirectory = scriptDirectory.substr(0, scriptDirectory.replace(/[?#].*/, "").lastIndexOf("/") + 1);
+          } else {
+            scriptDirectory = "";
+          }
+          if (!ENVIRONMENT_IS_NODE) {
+            read_ = (url) => {
+              var xhr = new XMLHttpRequest();
+              xhr.open("GET", url, false);
+              xhr.send(null);
+              return xhr.responseText;
+            };
+            if (ENVIRONMENT_IS_WORKER) {
+              readBinary = (url) => {
+                var xhr = new XMLHttpRequest();
+                xhr.open("GET", url, false);
+                xhr.responseType = "arraybuffer";
+                xhr.send(null);
+                return new Uint8Array(xhr.response);
+              };
+            }
+            readAsync = (url, onload, onerror) => {
+              var xhr = new XMLHttpRequest();
+              xhr.open("GET", url, true);
+              xhr.responseType = "arraybuffer";
+              xhr.onload = () => {
+                if (xhr.status == 200 || xhr.status == 0 && xhr.response) {
+                  onload(xhr.response);
+                  return;
+                }
+                onerror();
+              };
+              xhr.onerror = onerror;
+              xhr.send(null);
+            };
+          }
+          setWindowTitle = (title) => document.title = title;
+        } else {
+        }
+        if (ENVIRONMENT_IS_NODE) {
+          if (typeof performance == "undefined") {
+            global.performance = require_perf_hooks().performance;
+          }
+        }
+        var defaultPrint = console.log.bind(console);
+        var defaultPrintErr = console.warn.bind(console);
+        if (ENVIRONMENT_IS_NODE) {
+          defaultPrint = (str) => fs.writeSync(1, str + "\n");
+          defaultPrintErr = (str) => fs.writeSync(2, str + "\n");
+        }
+        var out = Module["print"] || defaultPrint;
+        var err = Module["printErr"] || defaultPrintErr;
+        Object.assign(Module, moduleOverrides);
+        moduleOverrides = null;
+        if (Module["arguments"]) arguments_ = Module["arguments"];
+        if (Module["thisProgram"]) thisProgram = Module["thisProgram"];
+        if (Module["quit"]) quit_ = Module["quit"];
+        var POINTER_SIZE = 4;
+        var Atomics_load = Atomics.load;
+        var Atomics_store = Atomics.store;
+        var Atomics_compareExchange = Atomics.compareExchange;
+        var wasmBinary;
+        if (Module["wasmBinary"]) wasmBinary = Module["wasmBinary"];
+        var noExitRuntime = Module["noExitRuntime"] || true;
+        if (typeof WebAssembly != "object") {
+          abort("no native wasm support detected");
+        }
+        var wasmMemory;
+        var wasmModule;
+        var ABORT = false;
+        var EXITSTATUS;
+        function assert3(condition, text) {
+          if (!condition) {
+            abort(text);
+          }
+        }
+        var UTF8Decoder = typeof TextDecoder != "undefined" ? new TextDecoder("utf8") : void 0;
+        function UTF8ArrayToString(heapOrArray, idx, maxBytesToRead) {
+          idx >>>= 0;
+          var endIdx = idx + maxBytesToRead;
+          var endPtr = idx;
+          while (heapOrArray[endPtr] && !(endPtr >= endIdx)) ++endPtr;
+          if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) {
+            return UTF8Decoder.decode(heapOrArray.buffer instanceof SharedArrayBuffer ? heapOrArray.slice(idx, endPtr) : heapOrArray.subarray(idx, endPtr));
+          }
+          var str = "";
+          while (idx < endPtr) {
+            var u0 = heapOrArray[idx++];
+            if (!(u0 & 128)) {
+              str += String.fromCharCode(u0);
+              continue;
+            }
+            var u1 = heapOrArray[idx++] & 63;
+            if ((u0 & 224) == 192) {
+              str += String.fromCharCode((u0 & 31) << 6 | u1);
+              continue;
+            }
+            var u2 = heapOrArray[idx++] & 63;
+            if ((u0 & 240) == 224) {
+              u0 = (u0 & 15) << 12 | u1 << 6 | u2;
+            } else {
+              u0 = (u0 & 7) << 18 | u1 << 12 | u2 << 6 | heapOrArray[idx++] & 63;
+            }
+            if (u0 < 65536) {
+              str += String.fromCharCode(u0);
+            } else {
+              var ch = u0 - 65536;
+              str += String.fromCharCode(55296 | ch >> 10, 56320 | ch & 1023);
+            }
+          }
+          return str;
+        }
+        function UTF8ToString(ptr, maxBytesToRead) {
+          ptr >>>= 0;
+          return ptr ? UTF8ArrayToString(GROWABLE_HEAP_U8(), ptr, maxBytesToRead) : "";
+        }
+        function stringToUTF8Array(str, heap, outIdx, maxBytesToWrite) {
+          outIdx >>>= 0;
+          if (!(maxBytesToWrite > 0)) return 0;
+          var startIdx = outIdx;
+          var endIdx = outIdx + maxBytesToWrite - 1;
+          for (var i = 0; i < str.length; ++i) {
+            var u = str.charCodeAt(i);
+            if (u >= 55296 && u <= 57343) {
+              var u1 = str.charCodeAt(++i);
+              u = 65536 + ((u & 1023) << 10) | u1 & 1023;
+            }
+            if (u <= 127) {
+              if (outIdx >= endIdx) break;
+              heap[outIdx++ >>> 0] = u;
+            } else if (u <= 2047) {
+              if (outIdx + 1 >= endIdx) break;
+              heap[outIdx++ >>> 0] = 192 | u >> 6;
+              heap[outIdx++ >>> 0] = 128 | u & 63;
+            } else if (u <= 65535) {
+              if (outIdx + 2 >= endIdx) break;
+              heap[outIdx++ >>> 0] = 224 | u >> 12;
+              heap[outIdx++ >>> 0] = 128 | u >> 6 & 63;
+              heap[outIdx++ >>> 0] = 128 | u & 63;
+            } else {
+              if (outIdx + 3 >= endIdx) break;
+              heap[outIdx++ >>> 0] = 240 | u >> 18;
+              heap[outIdx++ >>> 0] = 128 | u >> 12 & 63;
+              heap[outIdx++ >>> 0] = 128 | u >> 6 & 63;
+              heap[outIdx++ >>> 0] = 128 | u & 63;
+            }
+          }
+          heap[outIdx >>> 0] = 0;
+          return outIdx - startIdx;
+        }
+        function stringToUTF8(str, outPtr, maxBytesToWrite) {
+          return stringToUTF8Array(str, GROWABLE_HEAP_U8(), outPtr, maxBytesToWrite);
+        }
+        var buffer2, HEAP8, HEAPU8, HEAP16, HEAPU16, HEAP32, HEAPU32, HEAPF32, HEAPF64;
+        if (ENVIRONMENT_IS_PTHREAD) {
+          buffer2 = Module["buffer"];
+        }
+        function updateGlobalBufferAndViews(buf) {
+          buffer2 = buf;
+          Module["HEAP8"] = HEAP8 = new Int8Array(buf);
+          Module["HEAP16"] = HEAP16 = new Int16Array(buf);
+          Module["HEAP32"] = HEAP32 = new Int32Array(buf);
+          Module["HEAPU8"] = HEAPU8 = new Uint8Array(buf);
+          Module["HEAPU16"] = HEAPU16 = new Uint16Array(buf);
+          Module["HEAPU32"] = HEAPU32 = new Uint32Array(buf);
+          Module["HEAPF32"] = HEAPF32 = new Float32Array(buf);
+          Module["HEAPF64"] = HEAPF64 = new Float64Array(buf);
+        }
+        var INITIAL_MEMORY = Module["INITIAL_MEMORY"] || 16777216;
+        if (ENVIRONMENT_IS_PTHREAD) {
+          wasmMemory = Module["wasmMemory"];
+          buffer2 = Module["buffer"];
+        } else {
+          if (Module["wasmMemory"]) {
+            wasmMemory = Module["wasmMemory"];
+          } else {
+            wasmMemory = new WebAssembly.Memory({ "initial": INITIAL_MEMORY / 65536, "maximum": 4294967296 / 65536, "shared": true });
+            if (!(wasmMemory.buffer instanceof SharedArrayBuffer)) {
+              err("requested a shared WebAssembly.Memory but the returned buffer is not a SharedArrayBuffer, indicating that while the browser has SharedArrayBuffer it does not have WebAssembly threads support - you may need to set a flag");
+              if (ENVIRONMENT_IS_NODE) {
+                err("(on node you may need: --experimental-wasm-threads --experimental-wasm-bulk-memory and/or recent version)");
+              }
+              throw Error("bad memory");
+            }
+          }
+        }
+        if (wasmMemory) {
+          buffer2 = wasmMemory.buffer;
+        }
+        INITIAL_MEMORY = buffer2.byteLength;
+        updateGlobalBufferAndViews(buffer2);
+        var wasmTable;
+        var __ATPRERUN__ = [];
+        var __ATINIT__ = [];
+        var __ATPOSTRUN__ = [];
+        var runtimeInitialized = false;
+        function keepRuntimeAlive() {
+          return noExitRuntime;
+        }
+        function preRun() {
+          if (Module["preRun"]) {
+            if (typeof Module["preRun"] == "function") Module["preRun"] = [Module["preRun"]];
+            while (Module["preRun"].length) {
+              addOnPreRun(Module["preRun"].shift());
+            }
+          }
+          callRuntimeCallbacks(__ATPRERUN__);
+        }
+        function initRuntime() {
+          runtimeInitialized = true;
+          if (ENVIRONMENT_IS_PTHREAD) return;
+          callRuntimeCallbacks(__ATINIT__);
+        }
+        function postRun() {
+          if (ENVIRONMENT_IS_PTHREAD) return;
+          if (Module["postRun"]) {
+            if (typeof Module["postRun"] == "function") Module["postRun"] = [Module["postRun"]];
+            while (Module["postRun"].length) {
+              addOnPostRun(Module["postRun"].shift());
+            }
+          }
+          callRuntimeCallbacks(__ATPOSTRUN__);
+        }
+        function addOnPreRun(cb) {
+          __ATPRERUN__.unshift(cb);
+        }
+        function addOnInit(cb) {
+          __ATINIT__.unshift(cb);
+        }
+        function addOnPostRun(cb) {
+          __ATPOSTRUN__.unshift(cb);
+        }
+        var runDependencies = 0;
+        var runDependencyWatcher = null;
+        var dependenciesFulfilled = null;
+        function addRunDependency(id) {
+          runDependencies++;
+          if (Module["monitorRunDependencies"]) {
+            Module["monitorRunDependencies"](runDependencies);
+          }
+        }
+        function removeRunDependency(id) {
+          runDependencies--;
+          if (Module["monitorRunDependencies"]) {
+            Module["monitorRunDependencies"](runDependencies);
+          }
+          if (runDependencies == 0) {
+            if (runDependencyWatcher !== null) {
+              clearInterval(runDependencyWatcher);
+              runDependencyWatcher = null;
+            }
+            if (dependenciesFulfilled) {
+              var callback = dependenciesFulfilled;
+              dependenciesFulfilled = null;
+              callback();
+            }
+          }
+        }
+        function abort(what) {
+          if (Module["onAbort"]) {
+            Module["onAbort"](what);
+          }
+          what = "Aborted(" + what + ")";
+          err(what);
+          ABORT = true;
+          EXITSTATUS = 1;
+          what += ". Build with -sASSERTIONS for more info.";
+          var e = new WebAssembly.RuntimeError(what);
+          readyPromiseReject(e);
+          throw e;
+        }
+        var dataURIPrefix = "data:application/octet-stream;base64,";
+        function isDataURI(filename) {
+          return filename.startsWith(dataURIPrefix);
+        }
+        function isFileURI(filename) {
+          return filename.startsWith("file://");
+        }
+        var wasmBinaryFile;
+        wasmBinaryFile = "tfjs-backend-wasm-threaded-simd.wasm";
+        if (!isDataURI(wasmBinaryFile)) {
+          wasmBinaryFile = locateFile(wasmBinaryFile);
+        }
+        function getBinary(file) {
+          try {
+            if (file == wasmBinaryFile && wasmBinary) {
+              return new Uint8Array(wasmBinary);
+            }
+            if (readBinary) {
+              return readBinary(file);
+            }
+            throw "both async and sync fetching of the wasm failed";
+          } catch (err2) {
+            abort(err2);
+          }
+        }
+        function getBinaryPromise() {
+          if (!wasmBinary && (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER)) {
+            if (typeof fetch == "function" && !isFileURI(wasmBinaryFile)) {
+              return fetch(wasmBinaryFile, { credentials: "same-origin" }).then(function(response) {
+                if (!response["ok"]) {
+                  throw "failed to load wasm binary file at '" + wasmBinaryFile + "'";
+                }
+                return response["arrayBuffer"]();
+              }).catch(function() {
+                return getBinary(wasmBinaryFile);
+              });
+            } else {
+              if (readAsync) {
+                return new Promise(function(resolve, reject) {
+                  readAsync(wasmBinaryFile, function(response) {
+                    resolve(new Uint8Array(response));
+                  }, reject);
+                });
+              }
+            }
+          }
+          return Promise.resolve().then(function() {
+            return getBinary(wasmBinaryFile);
+          });
+        }
+        function createWasm() {
+          var info = { "env": asmLibraryArg, "wasi_snapshot_preview1": asmLibraryArg };
+          function receiveInstance(instance, module2) {
+            var exports3 = instance.exports;
+            Module["asm"] = exports3;
+            registerTLSInit(Module["asm"]["_emscripten_tls_init"]);
+            wasmTable = Module["asm"]["__indirect_function_table"];
+            addOnInit(Module["asm"]["__wasm_call_ctors"]);
+            wasmModule = module2;
+            if (!ENVIRONMENT_IS_PTHREAD) {
+              var numWorkersToLoad = PThread.unusedWorkers.length;
+              PThread.unusedWorkers.forEach(function(w) {
+                PThread.loadWasmModuleToWorker(w, function() {
+                  if (!--numWorkersToLoad) removeRunDependency("wasm-instantiate");
+                });
+              });
+            }
+          }
+          if (!ENVIRONMENT_IS_PTHREAD) {
+            addRunDependency("wasm-instantiate");
+          }
+          function receiveInstantiationResult(result) {
+            receiveInstance(result["instance"], result["module"]);
+          }
+          function instantiateArrayBuffer(receiver) {
+            return getBinaryPromise().then(function(binary) {
+              return WebAssembly.instantiate(binary, info);
+            }).then(function(instance) {
+              return instance;
+            }).then(receiver, function(reason) {
+              err("failed to asynchronously prepare wasm: " + reason);
+              abort(reason);
+            });
+          }
+          function instantiateAsync() {
+            if (!wasmBinary && typeof WebAssembly.instantiateStreaming == "function" && !isDataURI(wasmBinaryFile) && !isFileURI(wasmBinaryFile) && !ENVIRONMENT_IS_NODE && typeof fetch == "function") {
+              return fetch(wasmBinaryFile, { credentials: "same-origin" }).then(function(response) {
+                var result = WebAssembly.instantiateStreaming(response, info);
+                return result.then(receiveInstantiationResult, function(reason) {
+                  err("wasm streaming compile failed: " + reason);
+                  err("falling back to ArrayBuffer instantiation");
+                  return instantiateArrayBuffer(receiveInstantiationResult);
+                });
+              });
+            } else {
+              return instantiateArrayBuffer(receiveInstantiationResult);
+            }
+          }
+          if (Module["instantiateWasm"]) {
+            try {
+              var exports2 = Module["instantiateWasm"](info, receiveInstance);
+              return exports2;
+            } catch (e) {
+              err("Module.instantiateWasm callback failed with error: " + e);
+              readyPromiseReject(e);
+            }
+          }
+          instantiateAsync().catch(readyPromiseReject);
+          return {};
+        }
+        var tempDouble;
+        var tempI64;
+        var ASM_CONSTS = {};
+        function ExitStatus(status) {
+          this.name = "ExitStatus";
+          this.message = "Program terminated with exit(" + status + ")";
+          this.status = status;
+        }
+        function killThread(pthread_ptr) {
+          var worker = PThread.pthreads[pthread_ptr];
+          delete PThread.pthreads[pthread_ptr];
+          worker.terminate();
+          __emscripten_thread_free_data(pthread_ptr);
+          PThread.runningWorkers.splice(PThread.runningWorkers.indexOf(worker), 1);
+          worker.pthread_ptr = 0;
+        }
+        function cancelThread(pthread_ptr) {
+          var worker = PThread.pthreads[pthread_ptr];
+          worker.postMessage({ "cmd": "cancel" });
+        }
+        function cleanupThread(pthread_ptr) {
+          var worker = PThread.pthreads[pthread_ptr];
+          assert3(worker);
+          PThread.returnWorkerToPool(worker);
+        }
+        function spawnThread(threadParams) {
+          var worker = PThread.getNewWorker();
+          if (!worker) {
+            return 6;
+          }
+          PThread.runningWorkers.push(worker);
+          PThread.pthreads[threadParams.pthread_ptr] = worker;
+          worker.pthread_ptr = threadParams.pthread_ptr;
+          var msg = { "cmd": "run", "start_routine": threadParams.startRoutine, "arg": threadParams.arg, "pthread_ptr": threadParams.pthread_ptr };
+          worker.runPthread = () => {
+            if (ENVIRONMENT_IS_NODE) {
+              worker.ref();
+            }
+            worker.postMessage(msg, threadParams.transferList);
+            delete worker.runPthread;
+          };
+          if (worker.loaded) {
+            worker.runPthread();
+          }
+          return 0;
+        }
+        var SYSCALLS = { varargs: void 0, get: function() {
+          SYSCALLS.varargs += 4;
+          var ret = GROWABLE_HEAP_I32()[SYSCALLS.varargs - 4 >>> 2];
+          return ret;
+        }, getStr: function(ptr) {
+          var ret = UTF8ToString(ptr);
+          return ret;
+        } };
+        function _proc_exit(code) {
+          if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(1, 1, code);
+          EXITSTATUS = code;
+          if (!keepRuntimeAlive()) {
+            PThread.terminateAllThreads();
+            if (Module["onExit"]) Module["onExit"](code);
+            ABORT = true;
+          }
+          quit_(code, new ExitStatus(code));
+        }
+        function exitJS(status, implicit) {
+          EXITSTATUS = status;
+          if (!implicit) {
+            if (ENVIRONMENT_IS_PTHREAD) {
+              exitOnMainThread(status);
+              throw "unwind";
+            } else {
+            }
+          }
+          _proc_exit(status);
+        }
+        var _exit = exitJS;
+        function handleException(e) {
+          if (e instanceof ExitStatus || e == "unwind") {
+            return EXITSTATUS;
+          }
+          quit_(1, e);
+        }
+        var PThread = { unusedWorkers: [], runningWorkers: [], tlsInitFunctions: [], pthreads: {}, init: function() {
+          if (ENVIRONMENT_IS_PTHREAD) {
+            PThread.initWorker();
+          } else {
+            PThread.initMainThread();
+          }
+        }, initMainThread: function() {
+          var pthreadPoolSize = 8;
+          while (pthreadPoolSize--) {
+            PThread.allocateUnusedWorker();
+          }
+        }, initWorker: function() {
+          noExitRuntime = false;
+        }, setExitStatus: function(status) {
+          EXITSTATUS = status;
+        }, terminateAllThreads: function() {
+          for (var worker of Object.values(PThread.pthreads)) {
+            PThread.returnWorkerToPool(worker);
+          }
+          for (var worker of PThread.unusedWorkers) {
+            worker.terminate();
+          }
+          PThread.unusedWorkers = [];
+        }, returnWorkerToPool: function(worker) {
+          var pthread_ptr = worker.pthread_ptr;
+          delete PThread.pthreads[pthread_ptr];
+          PThread.unusedWorkers.push(worker);
+          PThread.runningWorkers.splice(PThread.runningWorkers.indexOf(worker), 1);
+          worker.pthread_ptr = 0;
+          if (ENVIRONMENT_IS_NODE) {
+            worker.unref();
+          }
+          __emscripten_thread_free_data(pthread_ptr);
+        }, receiveObjectTransfer: function(data) {
+        }, threadInitTLS: function() {
+          PThread.tlsInitFunctions.forEach((f) => f());
+        }, loadWasmModuleToWorker: function(worker, onFinishedLoading) {
+          worker.onmessage = (e) => {
+            var d = e["data"];
+            var cmd = d["cmd"];
+            if (worker.pthread_ptr) PThread.currentProxiedOperationCallerThread = worker.pthread_ptr;
+            if (d["targetThread"] && d["targetThread"] != _pthread_self()) {
+              var targetWorker = PThread.pthreads[d.targetThread];
+              if (targetWorker) {
+                targetWorker.postMessage(d, d["transferList"]);
+              } else {
+                err('Internal error! Worker sent a message "' + cmd + '" to target pthread ' + d["targetThread"] + ", but that thread no longer exists!");
+              }
+              PThread.currentProxiedOperationCallerThread = void 0;
+              return;
+            }
+            if (cmd === "processProxyingQueue") {
+              executeNotifiedProxyingQueue(d["queue"]);
+            } else if (cmd === "spawnThread") {
+              spawnThread(d);
+            } else if (cmd === "cleanupThread") {
+              cleanupThread(d["thread"]);
+            } else if (cmd === "killThread") {
+              killThread(d["thread"]);
+            } else if (cmd === "cancelThread") {
+              cancelThread(d["thread"]);
+            } else if (cmd === "loaded") {
+              worker.loaded = true;
+              if (ENVIRONMENT_IS_NODE) {
+                worker.unref();
+              }
+              if (onFinishedLoading) onFinishedLoading(worker);
+              if (worker.runPthread) {
+                worker.runPthread();
+              }
+            } else if (cmd === "print") {
+              out("Thread " + d["threadId"] + ": " + d["text"]);
+            } else if (cmd === "printErr") {
+              err("Thread " + d["threadId"] + ": " + d["text"]);
+            } else if (cmd === "alert") {
+              alert("Thread " + d["threadId"] + ": " + d["text"]);
+            } else if (d.target === "setimmediate") {
+              worker.postMessage(d);
+            } else if (cmd === "callHandler") {
+              Module[d["handler"]](...d["args"]);
+            } else if (cmd) {
+              err("worker sent an unknown command " + cmd);
+            }
+            PThread.currentProxiedOperationCallerThread = void 0;
+          };
+          worker.onerror = (e) => {
+            var message = "worker sent an error!";
+            err(message + " " + e.filename + ":" + e.lineno + ": " + e.message);
+            throw e;
+          };
+          if (ENVIRONMENT_IS_NODE) {
+            worker.on("message", function(data) {
+              worker.onmessage({ data });
+            });
+            worker.on("error", function(e) {
+              worker.onerror(e);
+            });
+            worker.on("detachedExit", function() {
+            });
+          }
+          var handlers = [];
+          var knownHandlers = ["onExit", "onAbort", "print", "printErr"];
+          for (var handler of knownHandlers) {
+            if (Module.hasOwnProperty(handler)) {
+              handlers.push(handler);
+            }
+          }
+          worker.postMessage({ "cmd": "load", "handlers": handlers, "urlOrBlob": Module["mainScriptUrlOrBlob"] || _scriptDir, "wasmMemory": wasmMemory, "wasmModule": wasmModule });
+        }, allocateUnusedWorker: function() {
+          var worker;
+          var pthreadMainJs = locateFile("tfjs-backend-wasm-threaded-simd.worker.js");
+          worker = new Worker(pthreadMainJs);
+          PThread.unusedWorkers.push(worker);
+        }, getNewWorker: function() {
+          if (PThread.unusedWorkers.length == 0) {
+            PThread.allocateUnusedWorker();
+            PThread.loadWasmModuleToWorker(PThread.unusedWorkers[0]);
+          }
+          return PThread.unusedWorkers.pop();
+        } };
+        Module["PThread"] = PThread;
+        function callRuntimeCallbacks(callbacks2) {
+          while (callbacks2.length > 0) {
+            callbacks2.shift()(Module);
+          }
+        }
+        function establishStackSpace() {
+          var pthread_ptr = _pthread_self();
+          var stackTop = GROWABLE_HEAP_I32()[pthread_ptr + 52 >>> 2];
+          var stackSize = GROWABLE_HEAP_I32()[pthread_ptr + 56 >>> 2];
+          var stackMax = stackTop - stackSize;
+          _emscripten_stack_set_limits(stackTop, stackMax);
+          stackRestore(stackTop);
+        }
+        Module["establishStackSpace"] = establishStackSpace;
+        function exitOnMainThread(returnCode) {
+          if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(2, 0, returnCode);
+          try {
+            _exit(returnCode);
+          } catch (e) {
+            handleException(e);
+          }
+        }
+        var wasmTableMirror = [];
+        function getWasmTableEntry(funcPtr) {
+          var func2 = wasmTableMirror[funcPtr];
+          if (!func2) {
+            if (funcPtr >= wasmTableMirror.length) wasmTableMirror.length = funcPtr + 1;
+            wasmTableMirror[funcPtr] = func2 = wasmTable.get(funcPtr);
+          }
+          return func2;
+        }
+        function invokeEntryPoint(ptr, arg) {
+          var result = getWasmTableEntry(ptr)(arg);
+          if (keepRuntimeAlive()) {
+            PThread.setExitStatus(result);
+          } else {
+            __emscripten_thread_exit(result);
+          }
+        }
+        Module["invokeEntryPoint"] = invokeEntryPoint;
+        function registerTLSInit(tlsInitFunc) {
+          PThread.tlsInitFunctions.push(tlsInitFunc);
+        }
+        function ___emscripten_init_main_thread_js(tb) {
+          __emscripten_thread_init(tb, !ENVIRONMENT_IS_WORKER, 1, !ENVIRONMENT_IS_WEB);
+          PThread.threadInitTLS();
+        }
+        function ___emscripten_thread_cleanup(thread) {
+          if (!ENVIRONMENT_IS_PTHREAD) cleanupThread(thread);
+          else postMessage({ "cmd": "cleanupThread", "thread": thread });
+        }
+        function pthreadCreateProxied(pthread_ptr, attr, startRoutine, arg) {
+          if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(3, 1, pthread_ptr, attr, startRoutine, arg);
+          return ___pthread_create_js(pthread_ptr, attr, startRoutine, arg);
+        }
+        function ___pthread_create_js(pthread_ptr, attr, startRoutine, arg) {
+          if (typeof SharedArrayBuffer == "undefined") {
+            err("Current environment does not support SharedArrayBuffer, pthreads are not available!");
+            return 6;
+          }
+          var transferList = [];
+          var error = 0;
+          if (ENVIRONMENT_IS_PTHREAD && (transferList.length === 0 || error)) {
+            return pthreadCreateProxied(pthread_ptr, attr, startRoutine, arg);
+          }
+          if (error) return error;
+          var threadParams = { startRoutine, pthread_ptr, arg, transferList };
+          if (ENVIRONMENT_IS_PTHREAD) {
+            threadParams.cmd = "spawnThread";
+            postMessage(threadParams, transferList);
+            return 0;
+          }
+          return spawnThread(threadParams);
+        }
+        function __emscripten_default_pthread_stack_size() {
+          return 65536;
+        }
+        var nowIsMonotonic = true;
+        function __emscripten_get_now_is_monotonic() {
+          return nowIsMonotonic;
+        }
+        function executeNotifiedProxyingQueue(queue) {
+          Atomics.store(GROWABLE_HEAP_I32(), queue >> 2, 1);
+          if (_pthread_self()) {
+            __emscripten_proxy_execute_task_queue(queue);
+          }
+          Atomics.compareExchange(GROWABLE_HEAP_I32(), queue >> 2, 1, 0);
+        }
+        Module["executeNotifiedProxyingQueue"] = executeNotifiedProxyingQueue;
+        function __emscripten_notify_task_queue(targetThreadId, currThreadId, mainThreadId, queue) {
+          if (targetThreadId == currThreadId) {
+            setTimeout(() => executeNotifiedProxyingQueue(queue));
+          } else if (ENVIRONMENT_IS_PTHREAD) {
+            postMessage({ "targetThread": targetThreadId, "cmd": "processProxyingQueue", "queue": queue });
+          } else {
+            var worker = PThread.pthreads[targetThreadId];
+            if (!worker) {
+              return;
+            }
+            worker.postMessage({ "cmd": "processProxyingQueue", "queue": queue });
+          }
+          return 1;
+        }
+        function __emscripten_set_offscreencanvas_size(target, width, height) {
+          return -1;
+        }
+        function _abort() {
+          abort("");
+        }
+        function warnOnce(text) {
+          if (!warnOnce.shown) warnOnce.shown = {};
+          if (!warnOnce.shown[text]) {
+            warnOnce.shown[text] = 1;
+            if (ENVIRONMENT_IS_NODE) text = "warning: " + text;
+            err(text);
+          }
+        }
+        function _emscripten_check_blocking_allowed() {
+          if (ENVIRONMENT_IS_NODE) return;
+          if (ENVIRONMENT_IS_WORKER) return;
+          warnOnce("Blocking on the main thread is very dangerous, see https://emscripten.org/docs/porting/pthreads.html#blocking-on-the-main-browser-thread");
+        }
+        function _emscripten_date_now() {
+          return Date.now();
+        }
+        function getHeapMax() {
+          return 4294901760;
+        }
+        function _emscripten_get_heap_max() {
+          return getHeapMax();
+        }
+        var _emscripten_get_now;
+        if (ENVIRONMENT_IS_NODE) {
+          _emscripten_get_now = () => {
+            var t = process["hrtime"]();
+            return t[0] * 1e3 + t[1] / 1e6;
+          };
+        } else _emscripten_get_now = () => performance.timeOrigin + performance.now();
+        function _emscripten_memcpy_big(dest, src, num) {
+          GROWABLE_HEAP_U8().copyWithin(dest >>> 0, src >>> 0, src + num >>> 0);
+        }
+        function _emscripten_num_logical_cores() {
+          if (ENVIRONMENT_IS_NODE) return require_os().cpus().length;
+          return navigator["hardwareConcurrency"];
+        }
+        function withStackSave(f) {
+          var stack2 = stackSave();
+          var ret = f();
+          stackRestore(stack2);
+          return ret;
+        }
+        function _emscripten_proxy_to_main_thread_js(index, sync) {
+          var numCallArgs = arguments.length - 2;
+          var outerArgs = arguments;
+          return withStackSave(() => {
+            var serializedNumCallArgs = numCallArgs;
+            var args = stackAlloc(serializedNumCallArgs * 8);
+            var b = args >> 3;
+            for (var i = 0; i < numCallArgs; i++) {
+              var arg = outerArgs[2 + i];
+              GROWABLE_HEAP_F64()[b + i >>> 0] = arg;
+            }
+            return _emscripten_run_in_main_runtime_thread_js(index, serializedNumCallArgs, args, sync);
+          });
+        }
+        var _emscripten_receive_on_main_thread_js_callArgs = [];
+        function _emscripten_receive_on_main_thread_js(index, numCallArgs, args) {
+          _emscripten_receive_on_main_thread_js_callArgs.length = numCallArgs;
+          var b = args >> 3;
+          for (var i = 0; i < numCallArgs; i++) {
+            _emscripten_receive_on_main_thread_js_callArgs[i] = GROWABLE_HEAP_F64()[b + i >>> 0];
+          }
+          var isEmAsmConst = index < 0;
+          var func2 = !isEmAsmConst ? proxiedFunctionTable[index] : ASM_CONSTS[-index - 1];
+          return func2.apply(null, _emscripten_receive_on_main_thread_js_callArgs);
+        }
+        function emscripten_realloc_buffer(size) {
+          try {
+            wasmMemory.grow(size - buffer2.byteLength + 65535 >>> 16);
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+            return 1;
+          } catch (e) {
+          }
+        }
+        function _emscripten_resize_heap(requestedSize) {
+          var oldSize = GROWABLE_HEAP_U8().length;
+          requestedSize = requestedSize >>> 0;
+          if (requestedSize <= oldSize) {
+            return false;
+          }
+          var maxHeapSize = getHeapMax();
+          if (requestedSize > maxHeapSize) {
+            return false;
+          }
+          let alignUp = (x, multiple) => x + (multiple - x % multiple) % multiple;
+          for (var cutDown = 1; cutDown <= 4; cutDown *= 2) {
+            var overGrownHeapSize = oldSize * (1 + 0.2 / cutDown);
+            overGrownHeapSize = Math.min(overGrownHeapSize, requestedSize + 100663296);
+            var newSize = Math.min(maxHeapSize, alignUp(Math.max(requestedSize, overGrownHeapSize), 65536));
+            var replacement = emscripten_realloc_buffer(newSize);
+            if (replacement) {
+              return true;
+            }
+          }
+          return false;
+        }
+        function _emscripten_unwind_to_js_event_loop() {
+          throw "unwind";
+        }
+        function _fd_close(fd) {
+          if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(4, 1, fd);
+          return 52;
+        }
+        function _fd_seek(fd, offset_low, offset_high, whence, newOffset) {
+          if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(5, 1, fd, offset_low, offset_high, whence, newOffset);
+          return 70;
+        }
+        var printCharBuffers = [null, [], []];
+        function printChar(stream, curr) {
+          var buffer3 = printCharBuffers[stream];
+          if (curr === 0 || curr === 10) {
+            (stream === 1 ? out : err)(UTF8ArrayToString(buffer3, 0));
+            buffer3.length = 0;
+          } else {
+            buffer3.push(curr);
+          }
+        }
+        function _fd_write(fd, iov, iovcnt, pnum) {
+          if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(6, 1, fd, iov, iovcnt, pnum);
+          var num = 0;
+          for (var i = 0; i < iovcnt; i++) {
+            var ptr = GROWABLE_HEAP_U32()[iov >>> 2];
+            var len = GROWABLE_HEAP_U32()[iov + 4 >>> 2];
+            iov += 8;
+            for (var j = 0; j < len; j++) {
+              printChar(fd, GROWABLE_HEAP_U8()[ptr + j >>> 0]);
+            }
+            num += len;
+          }
+          GROWABLE_HEAP_U32()[pnum >>> 2] = num;
+          return 0;
+        }
+        function getCFunc(ident) {
+          var func2 = Module["_" + ident];
+          return func2;
+        }
+        function writeArrayToMemory(array2, buffer3) {
+          GROWABLE_HEAP_I8().set(array2, buffer3 >>> 0);
+        }
+        function ccall(ident, returnType, argTypes, args, opts) {
+          var toC = { "string": (str) => {
+            var ret2 = 0;
+            if (str !== null && str !== void 0 && str !== 0) {
+              var len = (str.length << 2) + 1;
+              ret2 = stackAlloc(len);
+              stringToUTF8(str, ret2, len);
+            }
+            return ret2;
+          }, "array": (arr) => {
+            var ret2 = stackAlloc(arr.length);
+            writeArrayToMemory(arr, ret2);
+            return ret2;
+          } };
+          function convertReturnValue(ret2) {
+            if (returnType === "string") {
+              return UTF8ToString(ret2);
+            }
+            if (returnType === "boolean") return Boolean(ret2);
+            return ret2;
+          }
+          var func2 = getCFunc(ident);
+          var cArgs = [];
+          var stack2 = 0;
+          if (args) {
+            for (var i = 0; i < args.length; i++) {
+              var converter = toC[argTypes[i]];
+              if (converter) {
+                if (stack2 === 0) stack2 = stackSave();
+                cArgs[i] = converter(args[i]);
+              } else {
+                cArgs[i] = args[i];
+              }
+            }
+          }
+          var ret = func2.apply(null, cArgs);
+          function onDone(ret2) {
+            if (stack2 !== 0) stackRestore(stack2);
+            return convertReturnValue(ret2);
+          }
+          ret = onDone(ret);
+          return ret;
+        }
+        function cwrap(ident, returnType, argTypes, opts) {
+          argTypes = argTypes || [];
+          var numericArgs = argTypes.every((type) => type === "number" || type === "boolean");
+          var numericRet = returnType !== "string";
+          if (numericRet && numericArgs && !opts) {
+            return getCFunc(ident);
+          }
+          return function() {
+            return ccall(ident, returnType, argTypes, arguments, opts);
+          };
+        }
+        PThread.init();
+        var proxiedFunctionTable = [null, _proc_exit, exitOnMainThread, pthreadCreateProxied, _fd_close, _fd_seek, _fd_write];
+        var asmLibraryArg = { "__emscripten_init_main_thread_js": ___emscripten_init_main_thread_js, "__emscripten_thread_cleanup": ___emscripten_thread_cleanup, "__pthread_create_js": ___pthread_create_js, "_emscripten_default_pthread_stack_size": __emscripten_default_pthread_stack_size, "_emscripten_get_now_is_monotonic": __emscripten_get_now_is_monotonic, "_emscripten_notify_task_queue": __emscripten_notify_task_queue, "_emscripten_set_offscreencanvas_size": __emscripten_set_offscreencanvas_size, "abort": _abort, "emscripten_check_blocking_allowed": _emscripten_check_blocking_allowed, "emscripten_date_now": _emscripten_date_now, "emscripten_get_heap_max": _emscripten_get_heap_max, "emscripten_get_now": _emscripten_get_now, "emscripten_memcpy_big": _emscripten_memcpy_big, "emscripten_num_logical_cores": _emscripten_num_logical_cores, "emscripten_receive_on_main_thread_js": _emscripten_receive_on_main_thread_js, "emscripten_resize_heap": _emscripten_resize_heap, "emscripten_unwind_to_js_event_loop": _emscripten_unwind_to_js_event_loop, "exit": _exit, "fd_close": _fd_close, "fd_seek": _fd_seek, "fd_write": _fd_write, "memory": wasmMemory || Module["wasmMemory"] };
+        var asm = createWasm();
+        var ___wasm_call_ctors = Module["___wasm_call_ctors"] = function() {
+          return (___wasm_call_ctors = Module["___wasm_call_ctors"] = Module["asm"]["__wasm_call_ctors"]).apply(null, arguments);
+        };
+        var _init = Module["_init"] = function() {
+          return (_init = Module["_init"] = Module["asm"]["init"]).apply(null, arguments);
+        };
+        var _init_with_threads_count = Module["_init_with_threads_count"] = function() {
+          return (_init_with_threads_count = Module["_init_with_threads_count"] = Module["asm"]["init_with_threads_count"]).apply(null, arguments);
+        };
+        var _get_threads_count = Module["_get_threads_count"] = function() {
+          return (_get_threads_count = Module["_get_threads_count"] = Module["asm"]["get_threads_count"]).apply(null, arguments);
+        };
+        var _register_tensor = Module["_register_tensor"] = function() {
+          return (_register_tensor = Module["_register_tensor"] = Module["asm"]["register_tensor"]).apply(null, arguments);
+        };
+        var _dispose_data = Module["_dispose_data"] = function() {
+          return (_dispose_data = Module["_dispose_data"] = Module["asm"]["dispose_data"]).apply(null, arguments);
+        };
+        var _dispose = Module["_dispose"] = function() {
+          return (_dispose = Module["_dispose"] = Module["asm"]["dispose"]).apply(null, arguments);
+        };
+        var _Abs = Module["_Abs"] = function() {
+          return (_Abs = Module["_Abs"] = Module["asm"]["Abs"]).apply(null, arguments);
+        };
+        var _Acos = Module["_Acos"] = function() {
+          return (_Acos = Module["_Acos"] = Module["asm"]["Acos"]).apply(null, arguments);
+        };
+        var _Acosh = Module["_Acosh"] = function() {
+          return (_Acosh = Module["_Acosh"] = Module["asm"]["Acosh"]).apply(null, arguments);
+        };
+        var _Add = Module["_Add"] = function() {
+          return (_Add = Module["_Add"] = Module["asm"]["Add"]).apply(null, arguments);
+        };
+        var _AddN = Module["_AddN"] = function() {
+          return (_AddN = Module["_AddN"] = Module["asm"]["AddN"]).apply(null, arguments);
+        };
+        var _All = Module["_All"] = function() {
+          return (_All = Module["_All"] = Module["asm"]["All"]).apply(null, arguments);
+        };
+        var _Any = Module["_Any"] = function() {
+          return (_Any = Module["_Any"] = Module["asm"]["Any"]).apply(null, arguments);
+        };
+        var _ArgMax = Module["_ArgMax"] = function() {
+          return (_ArgMax = Module["_ArgMax"] = Module["asm"]["ArgMax"]).apply(null, arguments);
+        };
+        var _ArgMin = Module["_ArgMin"] = function() {
+          return (_ArgMin = Module["_ArgMin"] = Module["asm"]["ArgMin"]).apply(null, arguments);
+        };
+        var _Asin = Module["_Asin"] = function() {
+          return (_Asin = Module["_Asin"] = Module["asm"]["Asin"]).apply(null, arguments);
+        };
+        var _Asinh = Module["_Asinh"] = function() {
+          return (_Asinh = Module["_Asinh"] = Module["asm"]["Asinh"]).apply(null, arguments);
+        };
+        var _Atan = Module["_Atan"] = function() {
+          return (_Atan = Module["_Atan"] = Module["asm"]["Atan"]).apply(null, arguments);
+        };
+        var _Atan2 = Module["_Atan2"] = function() {
+          return (_Atan2 = Module["_Atan2"] = Module["asm"]["Atan2"]).apply(null, arguments);
+        };
+        var _Atanh = Module["_Atanh"] = function() {
+          return (_Atanh = Module["_Atanh"] = Module["asm"]["Atanh"]).apply(null, arguments);
+        };
+        var _AvgPool = Module["_AvgPool"] = function() {
+          return (_AvgPool = Module["_AvgPool"] = Module["asm"]["AvgPool"]).apply(null, arguments);
+        };
+        var _AvgPool3D = Module["_AvgPool3D"] = function() {
+          return (_AvgPool3D = Module["_AvgPool3D"] = Module["asm"]["AvgPool3D"]).apply(null, arguments);
+        };
+        var _AvgPool3DGrad = Module["_AvgPool3DGrad"] = function() {
+          return (_AvgPool3DGrad = Module["_AvgPool3DGrad"] = Module["asm"]["AvgPool3DGrad"]).apply(null, arguments);
+        };
+        var _AvgPoolGrad = Module["_AvgPoolGrad"] = function() {
+          return (_AvgPoolGrad = Module["_AvgPoolGrad"] = Module["asm"]["AvgPoolGrad"]).apply(null, arguments);
+        };
+        var _BatchMatMul = Module["_BatchMatMul"] = function() {
+          return (_BatchMatMul = Module["_BatchMatMul"] = Module["asm"]["BatchMatMul"]).apply(null, arguments);
+        };
+        var _Bincount = Module["_Bincount"] = function() {
+          return (_Bincount = Module["_Bincount"] = Module["asm"]["Bincount"]).apply(null, arguments);
+        };
+        var _BitwiseAnd = Module["_BitwiseAnd"] = function() {
+          return (_BitwiseAnd = Module["_BitwiseAnd"] = Module["asm"]["BitwiseAnd"]).apply(null, arguments);
+        };
+        var _Ceil = Module["_Ceil"] = function() {
+          return (_Ceil = Module["_Ceil"] = Module["asm"]["Ceil"]).apply(null, arguments);
+        };
+        var _ClipByValue = Module["_ClipByValue"] = function() {
+          return (_ClipByValue = Module["_ClipByValue"] = Module["asm"]["ClipByValue"]).apply(null, arguments);
+        };
+        var _Conv2D = Module["_Conv2D"] = function() {
+          return (_Conv2D = Module["_Conv2D"] = Module["asm"]["Conv2D"]).apply(null, arguments);
+        };
+        var _Conv2DBackpropInput = Module["_Conv2DBackpropInput"] = function() {
+          return (_Conv2DBackpropInput = Module["_Conv2DBackpropInput"] = Module["asm"]["Conv2DBackpropInput"]).apply(null, arguments);
+        };
+        var _Conv3D = Module["_Conv3D"] = function() {
+          return (_Conv3D = Module["_Conv3D"] = Module["asm"]["Conv3D"]).apply(null, arguments);
+        };
+        var _Conv3DBackpropFilterV2 = Module["_Conv3DBackpropFilterV2"] = function() {
+          return (_Conv3DBackpropFilterV2 = Module["_Conv3DBackpropFilterV2"] = Module["asm"]["Conv3DBackpropFilterV2"]).apply(null, arguments);
+        };
+        var _Conv3DBackpropInputV2 = Module["_Conv3DBackpropInputV2"] = function() {
+          return (_Conv3DBackpropInputV2 = Module["_Conv3DBackpropInputV2"] = Module["asm"]["Conv3DBackpropInputV2"]).apply(null, arguments);
+        };
+        var _Cos = Module["_Cos"] = function() {
+          return (_Cos = Module["_Cos"] = Module["asm"]["Cos"]).apply(null, arguments);
+        };
+        var _Cosh = Module["_Cosh"] = function() {
+          return (_Cosh = Module["_Cosh"] = Module["asm"]["Cosh"]).apply(null, arguments);
+        };
+        var _CropAndResize = Module["_CropAndResize"] = function() {
+          return (_CropAndResize = Module["_CropAndResize"] = Module["asm"]["CropAndResize"]).apply(null, arguments);
+        };
+        var _Cumprod = Module["_Cumprod"] = function() {
+          return (_Cumprod = Module["_Cumprod"] = Module["asm"]["Cumprod"]).apply(null, arguments);
+        };
+        var _Cumsum = Module["_Cumsum"] = function() {
+          return (_Cumsum = Module["_Cumsum"] = Module["asm"]["Cumsum"]).apply(null, arguments);
+        };
+        var _DenseBincount = Module["_DenseBincount"] = function() {
+          return (_DenseBincount = Module["_DenseBincount"] = Module["asm"]["DenseBincount"]).apply(null, arguments);
+        };
+        var _DepthToSpace = Module["_DepthToSpace"] = function() {
+          return (_DepthToSpace = Module["_DepthToSpace"] = Module["asm"]["DepthToSpace"]).apply(null, arguments);
+        };
+        var _DepthwiseConv2dNative = Module["_DepthwiseConv2dNative"] = function() {
+          return (_DepthwiseConv2dNative = Module["_DepthwiseConv2dNative"] = Module["asm"]["DepthwiseConv2dNative"]).apply(null, arguments);
+        };
+        var _Diag = Module["_Diag"] = function() {
+          return (_Diag = Module["_Diag"] = Module["asm"]["Diag"]).apply(null, arguments);
+        };
+        var _Dilation2D = Module["_Dilation2D"] = function() {
+          return (_Dilation2D = Module["_Dilation2D"] = Module["asm"]["Dilation2D"]).apply(null, arguments);
+        };
+        var _Dilation2DBackpropFilter = Module["_Dilation2DBackpropFilter"] = function() {
+          return (_Dilation2DBackpropFilter = Module["_Dilation2DBackpropFilter"] = Module["asm"]["Dilation2DBackpropFilter"]).apply(null, arguments);
+        };
+        var _Dilation2DBackpropInput = Module["_Dilation2DBackpropInput"] = function() {
+          return (_Dilation2DBackpropInput = Module["_Dilation2DBackpropInput"] = Module["asm"]["Dilation2DBackpropInput"]).apply(null, arguments);
+        };
+        var _Elu = Module["_Elu"] = function() {
+          return (_Elu = Module["_Elu"] = Module["asm"]["Elu"]).apply(null, arguments);
+        };
+        var _EluGrad = Module["_EluGrad"] = function() {
+          return (_EluGrad = Module["_EluGrad"] = Module["asm"]["EluGrad"]).apply(null, arguments);
+        };
+        var _Equal = Module["_Equal"] = function() {
+          return (_Equal = Module["_Equal"] = Module["asm"]["Equal"]).apply(null, arguments);
+        };
+        var _Erf = Module["_Erf"] = function() {
+          return (_Erf = Module["_Erf"] = Module["asm"]["Erf"]).apply(null, arguments);
+        };
+        var _Exp = Module["_Exp"] = function() {
+          return (_Exp = Module["_Exp"] = Module["asm"]["Exp"]).apply(null, arguments);
+        };
+        var _Expm1 = Module["_Expm1"] = function() {
+          return (_Expm1 = Module["_Expm1"] = Module["asm"]["Expm1"]).apply(null, arguments);
+        };
+        var _FlipLeftRight = Module["_FlipLeftRight"] = function() {
+          return (_FlipLeftRight = Module["_FlipLeftRight"] = Module["asm"]["FlipLeftRight"]).apply(null, arguments);
+        };
+        var _Floor = Module["_Floor"] = function() {
+          return (_Floor = Module["_Floor"] = Module["asm"]["Floor"]).apply(null, arguments);
+        };
+        var _FloorDiv = Module["_FloorDiv"] = function() {
+          return (_FloorDiv = Module["_FloorDiv"] = Module["asm"]["FloorDiv"]).apply(null, arguments);
+        };
+        var _FusedBatchNorm = Module["_FusedBatchNorm"] = function() {
+          return (_FusedBatchNorm = Module["_FusedBatchNorm"] = Module["asm"]["FusedBatchNorm"]).apply(null, arguments);
+        };
+        var _FusedConv2D = Module["_FusedConv2D"] = function() {
+          return (_FusedConv2D = Module["_FusedConv2D"] = Module["asm"]["FusedConv2D"]).apply(null, arguments);
+        };
+        var _FusedDepthwiseConv2D = Module["_FusedDepthwiseConv2D"] = function() {
+          return (_FusedDepthwiseConv2D = Module["_FusedDepthwiseConv2D"] = Module["asm"]["FusedDepthwiseConv2D"]).apply(null, arguments);
+        };
+        var _Gather = Module["_Gather"] = function() {
+          return (_Gather = Module["_Gather"] = Module["asm"]["Gather"]).apply(null, arguments);
+        };
+        var _GatherNd = Module["_GatherNd"] = function() {
+          return (_GatherNd = Module["_GatherNd"] = Module["asm"]["GatherNd"]).apply(null, arguments);
+        };
+        var _Greater = Module["_Greater"] = function() {
+          return (_Greater = Module["_Greater"] = Module["asm"]["Greater"]).apply(null, arguments);
+        };
+        var _GreaterEqual = Module["_GreaterEqual"] = function() {
+          return (_GreaterEqual = Module["_GreaterEqual"] = Module["asm"]["GreaterEqual"]).apply(null, arguments);
+        };
+        var _IsFinite = Module["_IsFinite"] = function() {
+          return (_IsFinite = Module["_IsFinite"] = Module["asm"]["IsFinite"]).apply(null, arguments);
+        };
+        var _IsInf = Module["_IsInf"] = function() {
+          return (_IsInf = Module["_IsInf"] = Module["asm"]["IsInf"]).apply(null, arguments);
+        };
+        var _IsNan = Module["_IsNan"] = function() {
+          return (_IsNan = Module["_IsNan"] = Module["asm"]["IsNan"]).apply(null, arguments);
+        };
+        var _LRN = Module["_LRN"] = function() {
+          return (_LRN = Module["_LRN"] = Module["asm"]["LRN"]).apply(null, arguments);
+        };
+        var _LRNGrad = Module["_LRNGrad"] = function() {
+          return (_LRNGrad = Module["_LRNGrad"] = Module["asm"]["LRNGrad"]).apply(null, arguments);
+        };
+        var _LeakyRelu = Module["_LeakyRelu"] = function() {
+          return (_LeakyRelu = Module["_LeakyRelu"] = Module["asm"]["LeakyRelu"]).apply(null, arguments);
+        };
+        var _Less = Module["_Less"] = function() {
+          return (_Less = Module["_Less"] = Module["asm"]["Less"]).apply(null, arguments);
+        };
+        var _LessEqual = Module["_LessEqual"] = function() {
+          return (_LessEqual = Module["_LessEqual"] = Module["asm"]["LessEqual"]).apply(null, arguments);
+        };
+        var _LinSpace = Module["_LinSpace"] = function() {
+          return (_LinSpace = Module["_LinSpace"] = Module["asm"]["LinSpace"]).apply(null, arguments);
+        };
+        var _Log = Module["_Log"] = function() {
+          return (_Log = Module["_Log"] = Module["asm"]["Log"]).apply(null, arguments);
+        };
+        var _Log1p = Module["_Log1p"] = function() {
+          return (_Log1p = Module["_Log1p"] = Module["asm"]["Log1p"]).apply(null, arguments);
+        };
+        var _LogicalAnd = Module["_LogicalAnd"] = function() {
+          return (_LogicalAnd = Module["_LogicalAnd"] = Module["asm"]["LogicalAnd"]).apply(null, arguments);
+        };
+        var _LogicalNot = Module["_LogicalNot"] = function() {
+          return (_LogicalNot = Module["_LogicalNot"] = Module["asm"]["LogicalNot"]).apply(null, arguments);
+        };
+        var _LogicalOr = Module["_LogicalOr"] = function() {
+          return (_LogicalOr = Module["_LogicalOr"] = Module["asm"]["LogicalOr"]).apply(null, arguments);
+        };
+        var _LogicalXor = Module["_LogicalXor"] = function() {
+          return (_LogicalXor = Module["_LogicalXor"] = Module["asm"]["LogicalXor"]).apply(null, arguments);
+        };
+        var _Max = Module["_Max"] = function() {
+          return (_Max = Module["_Max"] = Module["asm"]["Max"]).apply(null, arguments);
+        };
+        var _MaxPool = Module["_MaxPool"] = function() {
+          return (_MaxPool = Module["_MaxPool"] = Module["asm"]["MaxPool"]).apply(null, arguments);
+        };
+        var _MaxPool3D = Module["_MaxPool3D"] = function() {
+          return (_MaxPool3D = Module["_MaxPool3D"] = Module["asm"]["MaxPool3D"]).apply(null, arguments);
+        };
+        var _MaxPool3DGrad = Module["_MaxPool3DGrad"] = function() {
+          return (_MaxPool3DGrad = Module["_MaxPool3DGrad"] = Module["asm"]["MaxPool3DGrad"]).apply(null, arguments);
+        };
+        var _MaxPoolGrad = Module["_MaxPoolGrad"] = function() {
+          return (_MaxPoolGrad = Module["_MaxPoolGrad"] = Module["asm"]["MaxPoolGrad"]).apply(null, arguments);
+        };
+        var _MaxPoolWithArgmax = Module["_MaxPoolWithArgmax"] = function() {
+          return (_MaxPoolWithArgmax = Module["_MaxPoolWithArgmax"] = Module["asm"]["MaxPoolWithArgmax"]).apply(null, arguments);
+        };
+        var _Maximum = Module["_Maximum"] = function() {
+          return (_Maximum = Module["_Maximum"] = Module["asm"]["Maximum"]).apply(null, arguments);
+        };
+        var _Mean = Module["_Mean"] = function() {
+          return (_Mean = Module["_Mean"] = Module["asm"]["Mean"]).apply(null, arguments);
+        };
+        var _Min = Module["_Min"] = function() {
+          return (_Min = Module["_Min"] = Module["asm"]["Min"]).apply(null, arguments);
+        };
+        var _Minimum = Module["_Minimum"] = function() {
+          return (_Minimum = Module["_Minimum"] = Module["asm"]["Minimum"]).apply(null, arguments);
+        };
+        var _MirrorPad = Module["_MirrorPad"] = function() {
+          return (_MirrorPad = Module["_MirrorPad"] = Module["asm"]["MirrorPad"]).apply(null, arguments);
+        };
+        var _Mod = Module["_Mod"] = function() {
+          return (_Mod = Module["_Mod"] = Module["asm"]["Mod"]).apply(null, arguments);
+        };
+        var _Multinomial = Module["_Multinomial"] = function() {
+          return (_Multinomial = Module["_Multinomial"] = Module["asm"]["Multinomial"]).apply(null, arguments);
+        };
+        var _Multiply = Module["_Multiply"] = function() {
+          return (_Multiply = Module["_Multiply"] = Module["asm"]["Multiply"]).apply(null, arguments);
+        };
+        var _Neg = Module["_Neg"] = function() {
+          return (_Neg = Module["_Neg"] = Module["asm"]["Neg"]).apply(null, arguments);
+        };
+        var _NonMaxSuppressionV3 = Module["_NonMaxSuppressionV3"] = function() {
+          return (_NonMaxSuppressionV3 = Module["_NonMaxSuppressionV3"] = Module["asm"]["NonMaxSuppressionV3"]).apply(null, arguments);
+        };
+        var _NonMaxSuppressionV4 = Module["_NonMaxSuppressionV4"] = function() {
+          return (_NonMaxSuppressionV4 = Module["_NonMaxSuppressionV4"] = Module["asm"]["NonMaxSuppressionV4"]).apply(null, arguments);
+        };
+        var _NonMaxSuppressionV5 = Module["_NonMaxSuppressionV5"] = function() {
+          return (_NonMaxSuppressionV5 = Module["_NonMaxSuppressionV5"] = Module["asm"]["NonMaxSuppressionV5"]).apply(null, arguments);
+        };
+        var _NotEqual = Module["_NotEqual"] = function() {
+          return (_NotEqual = Module["_NotEqual"] = Module["asm"]["NotEqual"]).apply(null, arguments);
+        };
+        var _OneHot = Module["_OneHot"] = function() {
+          return (_OneHot = Module["_OneHot"] = Module["asm"]["OneHot"]).apply(null, arguments);
+        };
+        var _PadV2 = Module["_PadV2"] = function() {
+          return (_PadV2 = Module["_PadV2"] = Module["asm"]["PadV2"]).apply(null, arguments);
+        };
+        var _Pow = Module["_Pow"] = function() {
+          return (_Pow = Module["_Pow"] = Module["asm"]["Pow"]).apply(null, arguments);
+        };
+        var _Prelu = Module["_Prelu"] = function() {
+          return (_Prelu = Module["_Prelu"] = Module["asm"]["Prelu"]).apply(null, arguments);
+        };
+        var _Prod = Module["_Prod"] = function() {
+          return (_Prod = Module["_Prod"] = Module["asm"]["Prod"]).apply(null, arguments);
+        };
+        var _RealDiv = Module["_RealDiv"] = function() {
+          return (_RealDiv = Module["_RealDiv"] = Module["asm"]["RealDiv"]).apply(null, arguments);
+        };
+        var _Reciprocal = Module["_Reciprocal"] = function() {
+          return (_Reciprocal = Module["_Reciprocal"] = Module["asm"]["Reciprocal"]).apply(null, arguments);
+        };
+        var _Relu = Module["_Relu"] = function() {
+          return (_Relu = Module["_Relu"] = Module["asm"]["Relu"]).apply(null, arguments);
+        };
+        var _Relu6 = Module["_Relu6"] = function() {
+          return (_Relu6 = Module["_Relu6"] = Module["asm"]["Relu6"]).apply(null, arguments);
+        };
+        var _ResizeBilinear = Module["_ResizeBilinear"] = function() {
+          return (_ResizeBilinear = Module["_ResizeBilinear"] = Module["asm"]["ResizeBilinear"]).apply(null, arguments);
+        };
+        var _ResizeBilinearGrad = Module["_ResizeBilinearGrad"] = function() {
+          return (_ResizeBilinearGrad = Module["_ResizeBilinearGrad"] = Module["asm"]["ResizeBilinearGrad"]).apply(null, arguments);
+        };
+        var _ResizeNearestNeighbor = Module["_ResizeNearestNeighbor"] = function() {
+          return (_ResizeNearestNeighbor = Module["_ResizeNearestNeighbor"] = Module["asm"]["ResizeNearestNeighbor"]).apply(null, arguments);
+        };
+        var _ResizeNearestNeighborGrad = Module["_ResizeNearestNeighborGrad"] = function() {
+          return (_ResizeNearestNeighborGrad = Module["_ResizeNearestNeighborGrad"] = Module["asm"]["ResizeNearestNeighborGrad"]).apply(null, arguments);
+        };
+        var _Reverse = Module["_Reverse"] = function() {
+          return (_Reverse = Module["_Reverse"] = Module["asm"]["Reverse"]).apply(null, arguments);
+        };
+        var _RotateWithOffset = Module["_RotateWithOffset"] = function() {
+          return (_RotateWithOffset = Module["_RotateWithOffset"] = Module["asm"]["RotateWithOffset"]).apply(null, arguments);
+        };
+        var _Round = Module["_Round"] = function() {
+          return (_Round = Module["_Round"] = Module["asm"]["Round"]).apply(null, arguments);
+        };
+        var _Rsqrt = Module["_Rsqrt"] = function() {
+          return (_Rsqrt = Module["_Rsqrt"] = Module["asm"]["Rsqrt"]).apply(null, arguments);
+        };
+        var _ScatterNd = Module["_ScatterNd"] = function() {
+          return (_ScatterNd = Module["_ScatterNd"] = Module["asm"]["ScatterNd"]).apply(null, arguments);
+        };
+        var _SearchSorted = Module["_SearchSorted"] = function() {
+          return (_SearchSorted = Module["_SearchSorted"] = Module["asm"]["SearchSorted"]).apply(null, arguments);
+        };
+        var _SelectV2 = Module["_SelectV2"] = function() {
+          return (_SelectV2 = Module["_SelectV2"] = Module["asm"]["SelectV2"]).apply(null, arguments);
+        };
+        var _Selu = Module["_Selu"] = function() {
+          return (_Selu = Module["_Selu"] = Module["asm"]["Selu"]).apply(null, arguments);
+        };
+        var _Sigmoid = Module["_Sigmoid"] = function() {
+          return (_Sigmoid = Module["_Sigmoid"] = Module["asm"]["Sigmoid"]).apply(null, arguments);
+        };
+        var _Sign = Module["_Sign"] = function() {
+          return (_Sign = Module["_Sign"] = Module["asm"]["Sign"]).apply(null, arguments);
+        };
+        var _Sin = Module["_Sin"] = function() {
+          return (_Sin = Module["_Sin"] = Module["asm"]["Sin"]).apply(null, arguments);
+        };
+        var _Sinh = Module["_Sinh"] = function() {
+          return (_Sinh = Module["_Sinh"] = Module["asm"]["Sinh"]).apply(null, arguments);
+        };
+        var _Softmax = Module["_Softmax"] = function() {
+          return (_Softmax = Module["_Softmax"] = Module["asm"]["Softmax"]).apply(null, arguments);
+        };
+        var _Softplus = Module["_Softplus"] = function() {
+          return (_Softplus = Module["_Softplus"] = Module["asm"]["Softplus"]).apply(null, arguments);
+        };
+        var _SparseFillEmptyRows = Module["_SparseFillEmptyRows"] = function() {
+          return (_SparseFillEmptyRows = Module["_SparseFillEmptyRows"] = Module["asm"]["SparseFillEmptyRows"]).apply(null, arguments);
+        };
+        var _SparseReshape = Module["_SparseReshape"] = function() {
+          return (_SparseReshape = Module["_SparseReshape"] = Module["asm"]["SparseReshape"]).apply(null, arguments);
+        };
+        var _SparseSegmentReduction = Module["_SparseSegmentReduction"] = function() {
+          return (_SparseSegmentReduction = Module["_SparseSegmentReduction"] = Module["asm"]["SparseSegmentReduction"]).apply(null, arguments);
+        };
+        var _SparseToDense = Module["_SparseToDense"] = function() {
+          return (_SparseToDense = Module["_SparseToDense"] = Module["asm"]["SparseToDense"]).apply(null, arguments);
+        };
+        var _Sqrt = Module["_Sqrt"] = function() {
+          return (_Sqrt = Module["_Sqrt"] = Module["asm"]["Sqrt"]).apply(null, arguments);
+        };
+        var _Square = Module["_Square"] = function() {
+          return (_Square = Module["_Square"] = Module["asm"]["Square"]).apply(null, arguments);
+        };
+        var _SquaredDifference = Module["_SquaredDifference"] = function() {
+          return (_SquaredDifference = Module["_SquaredDifference"] = Module["asm"]["SquaredDifference"]).apply(null, arguments);
+        };
+        var _Step = Module["_Step"] = function() {
+          return (_Step = Module["_Step"] = Module["asm"]["Step"]).apply(null, arguments);
+        };
+        var _StridedSlice = Module["_StridedSlice"] = function() {
+          return (_StridedSlice = Module["_StridedSlice"] = Module["asm"]["StridedSlice"]).apply(null, arguments);
+        };
+        var _Sub = Module["_Sub"] = function() {
+          return (_Sub = Module["_Sub"] = Module["asm"]["Sub"]).apply(null, arguments);
+        };
+        var _Sum = Module["_Sum"] = function() {
+          return (_Sum = Module["_Sum"] = Module["asm"]["Sum"]).apply(null, arguments);
+        };
+        var _Tan = Module["_Tan"] = function() {
+          return (_Tan = Module["_Tan"] = Module["asm"]["Tan"]).apply(null, arguments);
+        };
+        var _Tanh = Module["_Tanh"] = function() {
+          return (_Tanh = Module["_Tanh"] = Module["asm"]["Tanh"]).apply(null, arguments);
+        };
+        var _TensorScatterUpdate = Module["_TensorScatterUpdate"] = function() {
+          return (_TensorScatterUpdate = Module["_TensorScatterUpdate"] = Module["asm"]["TensorScatterUpdate"]).apply(null, arguments);
+        };
+        var _Tile = Module["_Tile"] = function() {
+          return (_Tile = Module["_Tile"] = Module["asm"]["Tile"]).apply(null, arguments);
+        };
+        var _TopK = Module["_TopK"] = function() {
+          return (_TopK = Module["_TopK"] = Module["asm"]["TopK"]).apply(null, arguments);
+        };
+        var _Transform = Module["_Transform"] = function() {
+          return (_Transform = Module["_Transform"] = Module["asm"]["Transform"]).apply(null, arguments);
+        };
+        var _Transpose = Module["_Transpose"] = function() {
+          return (_Transpose = Module["_Transpose"] = Module["asm"]["Transpose"]).apply(null, arguments);
+        };
+        var __FusedMatMul = Module["__FusedMatMul"] = function() {
+          return (__FusedMatMul = Module["__FusedMatMul"] = Module["asm"]["_FusedMatMul"]).apply(null, arguments);
+        };
+        var _malloc = Module["_malloc"] = function() {
+          return (_malloc = Module["_malloc"] = Module["asm"]["malloc"]).apply(null, arguments);
+        };
+        var _free = Module["_free"] = function() {
+          return (_free = Module["_free"] = Module["asm"]["free"]).apply(null, arguments);
+        };
+        var __emscripten_tls_init = Module["__emscripten_tls_init"] = function() {
+          return (__emscripten_tls_init = Module["__emscripten_tls_init"] = Module["asm"]["_emscripten_tls_init"]).apply(null, arguments);
+        };
+        var _pthread_self = Module["_pthread_self"] = function() {
+          return (_pthread_self = Module["_pthread_self"] = Module["asm"]["pthread_self"]).apply(null, arguments);
+        };
+        var ___errno_location = Module["___errno_location"] = function() {
+          return (___errno_location = Module["___errno_location"] = Module["asm"]["__errno_location"]).apply(null, arguments);
+        };
+        var __emscripten_thread_init = Module["__emscripten_thread_init"] = function() {
+          return (__emscripten_thread_init = Module["__emscripten_thread_init"] = Module["asm"]["_emscripten_thread_init"]).apply(null, arguments);
+        };
+        var __emscripten_thread_crashed = Module["__emscripten_thread_crashed"] = function() {
+          return (__emscripten_thread_crashed = Module["__emscripten_thread_crashed"] = Module["asm"]["_emscripten_thread_crashed"]).apply(null, arguments);
+        };
+        var _emscripten_main_thread_process_queued_calls = Module["_emscripten_main_thread_process_queued_calls"] = function() {
+          return (_emscripten_main_thread_process_queued_calls = Module["_emscripten_main_thread_process_queued_calls"] = Module["asm"]["emscripten_main_thread_process_queued_calls"]).apply(null, arguments);
+        };
+        var _emscripten_main_browser_thread_id = Module["_emscripten_main_browser_thread_id"] = function() {
+          return (_emscripten_main_browser_thread_id = Module["_emscripten_main_browser_thread_id"] = Module["asm"]["emscripten_main_browser_thread_id"]).apply(null, arguments);
+        };
+        var _emscripten_run_in_main_runtime_thread_js = Module["_emscripten_run_in_main_runtime_thread_js"] = function() {
+          return (_emscripten_run_in_main_runtime_thread_js = Module["_emscripten_run_in_main_runtime_thread_js"] = Module["asm"]["emscripten_run_in_main_runtime_thread_js"]).apply(null, arguments);
+        };
+        var _emscripten_dispatch_to_thread_ = Module["_emscripten_dispatch_to_thread_"] = function() {
+          return (_emscripten_dispatch_to_thread_ = Module["_emscripten_dispatch_to_thread_"] = Module["asm"]["emscripten_dispatch_to_thread_"]).apply(null, arguments);
+        };
+        var __emscripten_proxy_execute_task_queue = Module["__emscripten_proxy_execute_task_queue"] = function() {
+          return (__emscripten_proxy_execute_task_queue = Module["__emscripten_proxy_execute_task_queue"] = Module["asm"]["_emscripten_proxy_execute_task_queue"]).apply(null, arguments);
+        };
+        var __emscripten_thread_free_data = Module["__emscripten_thread_free_data"] = function() {
+          return (__emscripten_thread_free_data = Module["__emscripten_thread_free_data"] = Module["asm"]["_emscripten_thread_free_data"]).apply(null, arguments);
+        };
+        var __emscripten_thread_exit = Module["__emscripten_thread_exit"] = function() {
+          return (__emscripten_thread_exit = Module["__emscripten_thread_exit"] = Module["asm"]["_emscripten_thread_exit"]).apply(null, arguments);
+        };
+        var _emscripten_stack_set_limits = Module["_emscripten_stack_set_limits"] = function() {
+          return (_emscripten_stack_set_limits = Module["_emscripten_stack_set_limits"] = Module["asm"]["emscripten_stack_set_limits"]).apply(null, arguments);
+        };
+        var stackSave = Module["stackSave"] = function() {
+          return (stackSave = Module["stackSave"] = Module["asm"]["stackSave"]).apply(null, arguments);
+        };
+        var stackRestore = Module["stackRestore"] = function() {
+          return (stackRestore = Module["stackRestore"] = Module["asm"]["stackRestore"]).apply(null, arguments);
+        };
+        var stackAlloc = Module["stackAlloc"] = function() {
+          return (stackAlloc = Module["stackAlloc"] = Module["asm"]["stackAlloc"]).apply(null, arguments);
+        };
+        var dynCall_iijjiiii = Module["dynCall_iijjiiii"] = function() {
+          return (dynCall_iijjiiii = Module["dynCall_iijjiiii"] = Module["asm"]["dynCall_iijjiiii"]).apply(null, arguments);
+        };
+        var dynCall_jiji = Module["dynCall_jiji"] = function() {
+          return (dynCall_jiji = Module["dynCall_jiji"] = Module["asm"]["dynCall_jiji"]).apply(null, arguments);
+        };
+        Module["keepRuntimeAlive"] = keepRuntimeAlive;
+        Module["wasmMemory"] = wasmMemory;
+        Module["cwrap"] = cwrap;
+        Module["ExitStatus"] = ExitStatus;
+        Module["PThread"] = PThread;
+        var calledRun;
+        dependenciesFulfilled = function runCaller() {
+          if (!calledRun) run();
+          if (!calledRun) dependenciesFulfilled = runCaller;
+        };
+        function run(args) {
+          args = args || arguments_;
+          if (runDependencies > 0) {
+            return;
+          }
+          if (ENVIRONMENT_IS_PTHREAD) {
+            readyPromiseResolve(Module);
+            initRuntime();
+            startWorker(Module);
+            return;
+          }
+          preRun();
+          if (runDependencies > 0) {
+            return;
+          }
+          function doRun() {
+            if (calledRun) return;
+            calledRun = true;
+            Module["calledRun"] = true;
+            if (ABORT) return;
+            initRuntime();
+            readyPromiseResolve(Module);
+            if (Module["onRuntimeInitialized"]) Module["onRuntimeInitialized"]();
+            postRun();
+          }
+          if (Module["setStatus"]) {
+            Module["setStatus"]("Running...");
+            setTimeout(function() {
+              setTimeout(function() {
+                Module["setStatus"]("");
+              }, 1);
+              doRun();
+            }, 1);
+          } else {
+            doRun();
+          }
+        }
+        if (Module["preInit"]) {
+          if (typeof Module["preInit"] == "function") Module["preInit"] = [Module["preInit"]];
+          while (Module["preInit"].length > 0) {
+            Module["preInit"].pop()();
+          }
+        }
+        run();
+        var listenersAdded;
+        if (beforeListeners) {
+          listenersAdded = { uncaughtException: process.listeners("uncaughtException").filter(function(listener) {
+            return !beforeListeners.uncaughtException.indexOf(listener) > -1;
+          }), unhandledRejection: process.listeners("unhandledRejection").filter(function(listener) {
+            return !beforeListeners.unhandledRejection.indexOf(listener) > -1;
+          }) };
+        }
+        var actualModule;
+        if (typeof WasmBackendModule !== "undefined") {
+          actualModule = WasmBackendModule;
+        } else if (typeof WasmBackendModuleThreadedSimd3 !== "undefined") {
+          actualModule = WasmBackendModuleThreadedSimd3;
+        } else {
+          throw new Error("Could not find wasm module in post.js");
+        }
+        if (listenersAdded) {
+          var tmpDispose = actualModule["_dispose"];
+          actualModule["_dispose"] = function() {
+            tmpDispose();
+            listenersAdded.uncaughtException.forEach(function(listener) {
+              process.removeListener("uncaughtException", listener);
+            });
+            listenersAdded.unhandledRejection.forEach(function(listener) {
+              process.removeListener("unhandledRejection", listener);
+            });
+          };
+        }
+        return WasmBackendModuleThreadedSimd3.ready;
+      });
+    })();
+    if (typeof exports === "object" && typeof module === "object")
+      module.exports = WasmBackendModuleThreadedSimd2;
+    else if (typeof define === "function" && define["amd"])
+      define([], function() {
+        return WasmBackendModuleThreadedSimd2;
+      });
+    else if (typeof exports === "object")
+      exports["WasmBackendModuleThreadedSimd"] = WasmBackendModuleThreadedSimd2;
+  }
+});
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/wasm-out/tfjs-backend-wasm-threaded-simd.worker.js
+var require_tfjs_backend_wasm_threaded_simd_worker = __commonJS({
+  "../../node_modules/@tensorflow/tfjs-backend-wasm/wasm-out/tfjs-backend-wasm-threaded-simd.worker.js"(exports, module) {
+    module.exports.wasmWorkerContents = `"use strict";var Module={};var ENVIRONMENT_IS_NODE=typeof process=="object"&&typeof process.versions=="object"&&typeof process.versions.node=="string";if(ENVIRONMENT_IS_NODE){var nodeWorkerThreads=require("worker_threads");var parentPort=nodeWorkerThreads.parentPort;parentPort.on("message",data=>onmessage({data:data}));var fs=require("fs");Object.assign(global,{self:global,require:require,Module:Module,location:{href:__filename},Worker:nodeWorkerThreads.Worker,importScripts:function(f){(0,eval)(fs.readFileSync(f,"utf8")+"//# sourceURL="+f)},postMessage:function(msg){parentPort.postMessage(msg)},performance:global.performance||{now:function(){return Date.now()}}})}var initializedJS=false;var pendingNotifiedProxyingQueues=[];function threadPrintErr(){var text=Array.prototype.slice.call(arguments).join(" ");if(ENVIRONMENT_IS_NODE){fs.writeSync(2,text+"
+");return}console.error(text)}function threadAlert(){var text=Array.prototype.slice.call(arguments).join(" ");postMessage({cmd:"alert",text:text,threadId:Module["_pthread_self"]()})}var err=threadPrintErr;self.alert=threadAlert;Module["instantiateWasm"]=(info,receiveInstance)=>{var instance=new WebAssembly.Instance(Module["wasmModule"],info);receiveInstance(instance);Module["wasmModule"]=null;return instance.exports};self.onunhandledrejection=e=>{throw e.reason??e};self.startWorker=instance=>{Module=instance;postMessage({"cmd":"loaded"})};self.onmessage=e=>{try{if(e.data.cmd==="load"){Module["wasmModule"]=e.data.wasmModule;for(const handler of e.data.handlers){Module[handler]=function(){postMessage({cmd:"callHandler",handler:handler,args:[...arguments]})}}Module["wasmMemory"]=e.data.wasmMemory;Module["buffer"]=Module["wasmMemory"].buffer;Module["ENVIRONMENT_IS_PTHREAD"]=true;if(typeof e.data.urlOrBlob=="string"){importScripts(e.data.urlOrBlob)}else{var objectUrl=URL.createObjectURL(e.data.urlOrBlob);importScripts(objectUrl);URL.revokeObjectURL(objectUrl)}WasmBackendModuleThreadedSimd(Module)}else if(e.data.cmd==="run"){Module["__emscripten_thread_init"](e.data.pthread_ptr,0,0,1);Module["establishStackSpace"]();Module["PThread"].receiveObjectTransfer(e.data);Module["PThread"].threadInitTLS();if(!initializedJS){pendingNotifiedProxyingQueues.forEach(queue=>{Module["executeNotifiedProxyingQueue"](queue)});pendingNotifiedProxyingQueues=[];initializedJS=true}try{Module["invokeEntryPoint"](e.data.start_routine,e.data.arg)}catch(ex){if(ex!="unwind"){if(ex instanceof Module["ExitStatus"]){if(Module["keepRuntimeAlive"]()){}else{Module["__emscripten_thread_exit"](ex.status)}}else{throw ex}}}}else if(e.data.cmd==="cancel"){if(Module["_pthread_self"]()){Module["__emscripten_thread_exit"](-1)}}else if(e.data.target==="setimmediate"){}else if(e.data.cmd==="processProxyingQueue"){if(initializedJS){Module["executeNotifiedProxyingQueue"](e.data.queue)}else{pendingNotifiedProxyingQueues.push(e.data.queue)}}else if(e.data.cmd){err("worker.js received unknown command "+e.data.cmd);err(e.data)}}catch(ex){if(Module["__emscripten_thread_crashed"]){Module["__emscripten_thread_crashed"]()}throw ex}};`;
+  }
+});
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/wasm-out/tfjs-backend-wasm.js
+var require_tfjs_backend_wasm = __commonJS({
+  "../../node_modules/@tensorflow/tfjs-backend-wasm/wasm-out/tfjs-backend-wasm.js"(exports, module) {
+    var WasmBackendModule2 = (() => {
+      var _scriptDir = typeof document !== "undefined" && document.currentScript ? document.currentScript.src : void 0;
+      if (typeof __filename !== "undefined") _scriptDir = _scriptDir || __filename;
+      return (function(WasmBackendModule3) {
+        WasmBackendModule3 = WasmBackendModule3 || {};
+        var Module = typeof WasmBackendModule3 != "undefined" ? WasmBackendModule3 : {};
+        var readyPromiseResolve, readyPromiseReject;
+        Module["ready"] = new Promise(function(resolve, reject) {
+          readyPromiseResolve = resolve;
+          readyPromiseReject = reject;
+        });
+        var beforeListeners;
+        if (typeof process !== "undefined" && process.listeners) {
+          beforeListeners = { uncaughtException: process.listeners("uncaughtException"), unhandledRejection: process.listeners("unhandledRejection") };
+        }
+        var moduleOverrides = Object.assign({}, Module);
+        var arguments_ = [];
+        var thisProgram = "./this.program";
+        var quit_ = (status, toThrow) => {
+          throw toThrow;
+        };
+        var ENVIRONMENT_IS_WEB = typeof window == "object";
+        var ENVIRONMENT_IS_WORKER = typeof importScripts == "function";
+        var ENVIRONMENT_IS_NODE = typeof process == "object" && typeof process.versions == "object" && typeof process.versions.node == "string";
+        var scriptDirectory = "";
+        function locateFile(path) {
+          if (Module["locateFile"]) {
+            return Module["locateFile"](path, scriptDirectory);
+          }
+          return scriptDirectory + path;
+        }
+        var read_, readAsync, readBinary, setWindowTitle;
+        function logExceptionOnExit(e) {
+          if (e instanceof ExitStatus) return;
+          let toLog = e;
+          err("exiting due to exception: " + toLog);
+        }
+        if (ENVIRONMENT_IS_NODE) {
+          var fs = require_fs();
+          var nodePath = require_path();
+          if (ENVIRONMENT_IS_WORKER) {
+            scriptDirectory = nodePath.dirname(scriptDirectory) + "/";
+          } else {
+            scriptDirectory = __dirname + "/";
+          }
+          read_ = (filename, binary) => {
+            filename = isFileURI(filename) ? new URL(filename) : nodePath.normalize(filename);
+            return fs.readFileSync(filename, binary ? void 0 : "utf8");
+          };
+          readBinary = (filename) => {
+            var ret = read_(filename, true);
+            if (!ret.buffer) {
+              ret = new Uint8Array(ret);
+            }
+            return ret;
+          };
+          readAsync = (filename, onload, onerror) => {
+            filename = isFileURI(filename) ? new URL(filename) : nodePath.normalize(filename);
+            fs.readFile(filename, function(err2, data) {
+              if (err2) onerror(err2);
+              else onload(data.buffer);
+            });
+          };
+          if (process["argv"].length > 1) {
+            thisProgram = process["argv"][1].replace(/\\/g, "/");
+          }
+          arguments_ = process["argv"].slice(2);
+          process["on"]("uncaughtException", function(ex) {
+            if (!(ex instanceof ExitStatus)) {
+              throw ex;
+            }
+          });
+          process["on"]("unhandledRejection", function(reason) {
+            throw reason;
+          });
+          quit_ = (status, toThrow) => {
+            if (keepRuntimeAlive()) {
+              process["exitCode"] = status;
+              throw toThrow;
+            }
+            logExceptionOnExit(toThrow);
+            process["exit"](status);
+          };
+          Module["inspect"] = function() {
+            return "[Emscripten Module object]";
+          };
+        } else if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
+          if (ENVIRONMENT_IS_WORKER) {
+            scriptDirectory = self.location.href;
+          } else if (typeof document != "undefined" && document.currentScript) {
+            scriptDirectory = document.currentScript.src;
+          }
+          if (_scriptDir) {
+            scriptDirectory = _scriptDir;
+          }
+          if (scriptDirectory.indexOf("blob:") !== 0) {
+            scriptDirectory = scriptDirectory.substr(0, scriptDirectory.replace(/[?#].*/, "").lastIndexOf("/") + 1);
+          } else {
+            scriptDirectory = "";
+          }
+          {
+            read_ = (url) => {
+              var xhr = new XMLHttpRequest();
+              xhr.open("GET", url, false);
+              xhr.send(null);
+              return xhr.responseText;
+            };
+            if (ENVIRONMENT_IS_WORKER) {
+              readBinary = (url) => {
+                var xhr = new XMLHttpRequest();
+                xhr.open("GET", url, false);
+                xhr.responseType = "arraybuffer";
+                xhr.send(null);
+                return new Uint8Array(xhr.response);
+              };
+            }
+            readAsync = (url, onload, onerror) => {
+              var xhr = new XMLHttpRequest();
+              xhr.open("GET", url, true);
+              xhr.responseType = "arraybuffer";
+              xhr.onload = () => {
+                if (xhr.status == 200 || xhr.status == 0 && xhr.response) {
+                  onload(xhr.response);
+                  return;
+                }
+                onerror();
+              };
+              xhr.onerror = onerror;
+              xhr.send(null);
+            };
+          }
+          setWindowTitle = (title) => document.title = title;
+        } else {
+        }
+        var out = Module["print"] || console.log.bind(console);
+        var err = Module["printErr"] || console.warn.bind(console);
+        Object.assign(Module, moduleOverrides);
+        moduleOverrides = null;
+        if (Module["arguments"]) arguments_ = Module["arguments"];
+        if (Module["thisProgram"]) thisProgram = Module["thisProgram"];
+        if (Module["quit"]) quit_ = Module["quit"];
+        var POINTER_SIZE = 4;
+        var wasmBinary;
+        if (Module["wasmBinary"]) wasmBinary = Module["wasmBinary"];
+        var noExitRuntime = Module["noExitRuntime"] || true;
+        if (typeof WebAssembly != "object") {
+          abort("no native wasm support detected");
+        }
+        var wasmMemory;
+        var ABORT = false;
+        var EXITSTATUS;
+        function assert3(condition, text) {
+          if (!condition) {
+            abort(text);
+          }
+        }
+        var UTF8Decoder = typeof TextDecoder != "undefined" ? new TextDecoder("utf8") : void 0;
+        function UTF8ArrayToString(heapOrArray, idx, maxBytesToRead) {
+          idx >>>= 0;
+          var endIdx = idx + maxBytesToRead;
+          var endPtr = idx;
+          while (heapOrArray[endPtr] && !(endPtr >= endIdx)) ++endPtr;
+          if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) {
+            return UTF8Decoder.decode(heapOrArray.subarray(idx, endPtr));
+          }
+          var str = "";
+          while (idx < endPtr) {
+            var u0 = heapOrArray[idx++];
+            if (!(u0 & 128)) {
+              str += String.fromCharCode(u0);
+              continue;
+            }
+            var u1 = heapOrArray[idx++] & 63;
+            if ((u0 & 224) == 192) {
+              str += String.fromCharCode((u0 & 31) << 6 | u1);
+              continue;
+            }
+            var u2 = heapOrArray[idx++] & 63;
+            if ((u0 & 240) == 224) {
+              u0 = (u0 & 15) << 12 | u1 << 6 | u2;
+            } else {
+              u0 = (u0 & 7) << 18 | u1 << 12 | u2 << 6 | heapOrArray[idx++] & 63;
+            }
+            if (u0 < 65536) {
+              str += String.fromCharCode(u0);
+            } else {
+              var ch = u0 - 65536;
+              str += String.fromCharCode(55296 | ch >> 10, 56320 | ch & 1023);
+            }
+          }
+          return str;
+        }
+        function UTF8ToString(ptr, maxBytesToRead) {
+          ptr >>>= 0;
+          return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead) : "";
+        }
+        function stringToUTF8Array(str, heap, outIdx, maxBytesToWrite) {
+          outIdx >>>= 0;
+          if (!(maxBytesToWrite > 0)) return 0;
+          var startIdx = outIdx;
+          var endIdx = outIdx + maxBytesToWrite - 1;
+          for (var i = 0; i < str.length; ++i) {
+            var u = str.charCodeAt(i);
+            if (u >= 55296 && u <= 57343) {
+              var u1 = str.charCodeAt(++i);
+              u = 65536 + ((u & 1023) << 10) | u1 & 1023;
+            }
+            if (u <= 127) {
+              if (outIdx >= endIdx) break;
+              heap[outIdx++ >>> 0] = u;
+            } else if (u <= 2047) {
+              if (outIdx + 1 >= endIdx) break;
+              heap[outIdx++ >>> 0] = 192 | u >> 6;
+              heap[outIdx++ >>> 0] = 128 | u & 63;
+            } else if (u <= 65535) {
+              if (outIdx + 2 >= endIdx) break;
+              heap[outIdx++ >>> 0] = 224 | u >> 12;
+              heap[outIdx++ >>> 0] = 128 | u >> 6 & 63;
+              heap[outIdx++ >>> 0] = 128 | u & 63;
+            } else {
+              if (outIdx + 3 >= endIdx) break;
+              heap[outIdx++ >>> 0] = 240 | u >> 18;
+              heap[outIdx++ >>> 0] = 128 | u >> 12 & 63;
+              heap[outIdx++ >>> 0] = 128 | u >> 6 & 63;
+              heap[outIdx++ >>> 0] = 128 | u & 63;
+            }
+          }
+          heap[outIdx >>> 0] = 0;
+          return outIdx - startIdx;
+        }
+        function stringToUTF8(str, outPtr, maxBytesToWrite) {
+          return stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
+        }
+        var buffer2, HEAP8, HEAPU8, HEAP16, HEAPU16, HEAP32, HEAPU32, HEAPF32, HEAPF64;
+        function updateGlobalBufferAndViews(buf) {
+          buffer2 = buf;
+          Module["HEAP8"] = HEAP8 = new Int8Array(buf);
+          Module["HEAP16"] = HEAP16 = new Int16Array(buf);
+          Module["HEAP32"] = HEAP32 = new Int32Array(buf);
+          Module["HEAPU8"] = HEAPU8 = new Uint8Array(buf);
+          Module["HEAPU16"] = HEAPU16 = new Uint16Array(buf);
+          Module["HEAPU32"] = HEAPU32 = new Uint32Array(buf);
+          Module["HEAPF32"] = HEAPF32 = new Float32Array(buf);
+          Module["HEAPF64"] = HEAPF64 = new Float64Array(buf);
+        }
+        var INITIAL_MEMORY = Module["INITIAL_MEMORY"] || 16777216;
+        var wasmTable;
+        var __ATPRERUN__ = [];
+        var __ATINIT__ = [];
+        var __ATPOSTRUN__ = [];
+        var runtimeInitialized = false;
+        function keepRuntimeAlive() {
+          return noExitRuntime;
+        }
+        function preRun() {
+          if (Module["preRun"]) {
+            if (typeof Module["preRun"] == "function") Module["preRun"] = [Module["preRun"]];
+            while (Module["preRun"].length) {
+              addOnPreRun(Module["preRun"].shift());
+            }
+          }
+          callRuntimeCallbacks(__ATPRERUN__);
+        }
+        function initRuntime() {
+          runtimeInitialized = true;
+          callRuntimeCallbacks(__ATINIT__);
+        }
+        function postRun() {
+          if (Module["postRun"]) {
+            if (typeof Module["postRun"] == "function") Module["postRun"] = [Module["postRun"]];
+            while (Module["postRun"].length) {
+              addOnPostRun(Module["postRun"].shift());
+            }
+          }
+          callRuntimeCallbacks(__ATPOSTRUN__);
+        }
+        function addOnPreRun(cb) {
+          __ATPRERUN__.unshift(cb);
+        }
+        function addOnInit(cb) {
+          __ATINIT__.unshift(cb);
+        }
+        function addOnPostRun(cb) {
+          __ATPOSTRUN__.unshift(cb);
+        }
+        var runDependencies = 0;
+        var runDependencyWatcher = null;
+        var dependenciesFulfilled = null;
+        function addRunDependency(id) {
+          runDependencies++;
+          if (Module["monitorRunDependencies"]) {
+            Module["monitorRunDependencies"](runDependencies);
+          }
+        }
+        function removeRunDependency(id) {
+          runDependencies--;
+          if (Module["monitorRunDependencies"]) {
+            Module["monitorRunDependencies"](runDependencies);
+          }
+          if (runDependencies == 0) {
+            if (runDependencyWatcher !== null) {
+              clearInterval(runDependencyWatcher);
+              runDependencyWatcher = null;
+            }
+            if (dependenciesFulfilled) {
+              var callback = dependenciesFulfilled;
+              dependenciesFulfilled = null;
+              callback();
+            }
+          }
+        }
+        function abort(what) {
+          if (Module["onAbort"]) {
+            Module["onAbort"](what);
+          }
+          what = "Aborted(" + what + ")";
+          err(what);
+          ABORT = true;
+          EXITSTATUS = 1;
+          what += ". Build with -sASSERTIONS for more info.";
+          var e = new WebAssembly.RuntimeError(what);
+          readyPromiseReject(e);
+          throw e;
+        }
+        var dataURIPrefix = "data:application/octet-stream;base64,";
+        function isDataURI(filename) {
+          return filename.startsWith(dataURIPrefix);
+        }
+        function isFileURI(filename) {
+          return filename.startsWith("file://");
+        }
+        var wasmBinaryFile;
+        wasmBinaryFile = "tfjs-backend-wasm.wasm";
+        if (!isDataURI(wasmBinaryFile)) {
+          wasmBinaryFile = locateFile(wasmBinaryFile);
+        }
+        function getBinary(file) {
+          try {
+            if (file == wasmBinaryFile && wasmBinary) {
+              return new Uint8Array(wasmBinary);
+            }
+            if (readBinary) {
+              return readBinary(file);
+            }
+            throw "both async and sync fetching of the wasm failed";
+          } catch (err2) {
+            abort(err2);
+          }
+        }
+        function getBinaryPromise() {
+          if (!wasmBinary && (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER)) {
+            if (typeof fetch == "function" && !isFileURI(wasmBinaryFile)) {
+              return fetch(wasmBinaryFile, { credentials: "same-origin" }).then(function(response) {
+                if (!response["ok"]) {
+                  throw "failed to load wasm binary file at '" + wasmBinaryFile + "'";
+                }
+                return response["arrayBuffer"]();
+              }).catch(function() {
+                return getBinary(wasmBinaryFile);
+              });
+            } else {
+              if (readAsync) {
+                return new Promise(function(resolve, reject) {
+                  readAsync(wasmBinaryFile, function(response) {
+                    resolve(new Uint8Array(response));
+                  }, reject);
+                });
+              }
+            }
+          }
+          return Promise.resolve().then(function() {
+            return getBinary(wasmBinaryFile);
+          });
+        }
+        function createWasm() {
+          var info = { "env": asmLibraryArg, "wasi_snapshot_preview1": asmLibraryArg };
+          function receiveInstance(instance, module2) {
+            var exports3 = instance.exports;
+            Module["asm"] = exports3;
+            wasmMemory = Module["asm"]["memory"];
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+            wasmTable = Module["asm"]["__indirect_function_table"];
+            addOnInit(Module["asm"]["__wasm_call_ctors"]);
+            removeRunDependency("wasm-instantiate");
+          }
+          addRunDependency("wasm-instantiate");
+          function receiveInstantiationResult(result) {
+            receiveInstance(result["instance"]);
+          }
+          function instantiateArrayBuffer(receiver) {
+            return getBinaryPromise().then(function(binary) {
+              return WebAssembly.instantiate(binary, info);
+            }).then(function(instance) {
+              return instance;
+            }).then(receiver, function(reason) {
+              err("failed to asynchronously prepare wasm: " + reason);
+              abort(reason);
+            });
+          }
+          function instantiateAsync() {
+            if (!wasmBinary && typeof WebAssembly.instantiateStreaming == "function" && !isDataURI(wasmBinaryFile) && !isFileURI(wasmBinaryFile) && !ENVIRONMENT_IS_NODE && typeof fetch == "function") {
+              return fetch(wasmBinaryFile, { credentials: "same-origin" }).then(function(response) {
+                var result = WebAssembly.instantiateStreaming(response, info);
+                return result.then(receiveInstantiationResult, function(reason) {
+                  err("wasm streaming compile failed: " + reason);
+                  err("falling back to ArrayBuffer instantiation");
+                  return instantiateArrayBuffer(receiveInstantiationResult);
+                });
+              });
+            } else {
+              return instantiateArrayBuffer(receiveInstantiationResult);
+            }
+          }
+          if (Module["instantiateWasm"]) {
+            try {
+              var exports2 = Module["instantiateWasm"](info, receiveInstance);
+              return exports2;
+            } catch (e) {
+              err("Module.instantiateWasm callback failed with error: " + e);
+              readyPromiseReject(e);
+            }
+          }
+          instantiateAsync().catch(readyPromiseReject);
+          return {};
+        }
+        var tempDouble;
+        var tempI64;
+        function ExitStatus(status) {
+          this.name = "ExitStatus";
+          this.message = "Program terminated with exit(" + status + ")";
+          this.status = status;
+        }
+        function callRuntimeCallbacks(callbacks2) {
+          while (callbacks2.length > 0) {
+            callbacks2.shift()(Module);
+          }
+        }
+        function _abort() {
+          abort("");
+        }
+        function getHeapMax() {
+          return 4294901760;
+        }
+        function _emscripten_get_heap_max() {
+          return getHeapMax();
+        }
+        function _emscripten_memcpy_big(dest, src, num) {
+          HEAPU8.copyWithin(dest >>> 0, src >>> 0, src + num >>> 0);
+        }
+        function emscripten_realloc_buffer(size) {
+          try {
+            wasmMemory.grow(size - buffer2.byteLength + 65535 >>> 16);
+            updateGlobalBufferAndViews(wasmMemory.buffer);
+            return 1;
+          } catch (e) {
+          }
+        }
+        function _emscripten_resize_heap(requestedSize) {
+          var oldSize = HEAPU8.length;
+          requestedSize = requestedSize >>> 0;
+          var maxHeapSize = getHeapMax();
+          if (requestedSize > maxHeapSize) {
+            return false;
+          }
+          let alignUp = (x, multiple) => x + (multiple - x % multiple) % multiple;
+          for (var cutDown = 1; cutDown <= 4; cutDown *= 2) {
+            var overGrownHeapSize = oldSize * (1 + 0.2 / cutDown);
+            overGrownHeapSize = Math.min(overGrownHeapSize, requestedSize + 100663296);
+            var newSize = Math.min(maxHeapSize, alignUp(Math.max(requestedSize, overGrownHeapSize), 65536));
+            var replacement = emscripten_realloc_buffer(newSize);
+            if (replacement) {
+              return true;
+            }
+          }
+          return false;
+        }
+        var SYSCALLS = { varargs: void 0, get: function() {
+          SYSCALLS.varargs += 4;
+          var ret = HEAP32[SYSCALLS.varargs - 4 >>> 2];
+          return ret;
+        }, getStr: function(ptr) {
+          var ret = UTF8ToString(ptr);
+          return ret;
+        } };
+        function _fd_close(fd) {
+          return 52;
+        }
+        function _fd_seek(fd, offset_low, offset_high, whence, newOffset) {
+          return 70;
+        }
+        var printCharBuffers = [null, [], []];
+        function printChar(stream, curr) {
+          var buffer3 = printCharBuffers[stream];
+          if (curr === 0 || curr === 10) {
+            (stream === 1 ? out : err)(UTF8ArrayToString(buffer3, 0));
+            buffer3.length = 0;
+          } else {
+            buffer3.push(curr);
+          }
+        }
+        function _fd_write(fd, iov, iovcnt, pnum) {
+          var num = 0;
+          for (var i = 0; i < iovcnt; i++) {
+            var ptr = HEAPU32[iov >>> 2];
+            var len = HEAPU32[iov + 4 >>> 2];
+            iov += 8;
+            for (var j = 0; j < len; j++) {
+              printChar(fd, HEAPU8[ptr + j >>> 0]);
+            }
+            num += len;
+          }
+          HEAPU32[pnum >>> 2] = num;
+          return 0;
+        }
+        function getCFunc(ident) {
+          var func2 = Module["_" + ident];
+          return func2;
+        }
+        function writeArrayToMemory(array2, buffer3) {
+          HEAP8.set(array2, buffer3 >>> 0);
+        }
+        function ccall(ident, returnType, argTypes, args, opts) {
+          var toC = { "string": (str) => {
+            var ret2 = 0;
+            if (str !== null && str !== void 0 && str !== 0) {
+              var len = (str.length << 2) + 1;
+              ret2 = stackAlloc(len);
+              stringToUTF8(str, ret2, len);
+            }
+            return ret2;
+          }, "array": (arr) => {
+            var ret2 = stackAlloc(arr.length);
+            writeArrayToMemory(arr, ret2);
+            return ret2;
+          } };
+          function convertReturnValue(ret2) {
+            if (returnType === "string") {
+              return UTF8ToString(ret2);
+            }
+            if (returnType === "boolean") return Boolean(ret2);
+            return ret2;
+          }
+          var func2 = getCFunc(ident);
+          var cArgs = [];
+          var stack2 = 0;
+          if (args) {
+            for (var i = 0; i < args.length; i++) {
+              var converter = toC[argTypes[i]];
+              if (converter) {
+                if (stack2 === 0) stack2 = stackSave();
+                cArgs[i] = converter(args[i]);
+              } else {
+                cArgs[i] = args[i];
+              }
+            }
+          }
+          var ret = func2.apply(null, cArgs);
+          function onDone(ret2) {
+            if (stack2 !== 0) stackRestore(stack2);
+            return convertReturnValue(ret2);
+          }
+          ret = onDone(ret);
+          return ret;
+        }
+        function cwrap(ident, returnType, argTypes, opts) {
+          argTypes = argTypes || [];
+          var numericArgs = argTypes.every((type) => type === "number" || type === "boolean");
+          var numericRet = returnType !== "string";
+          if (numericRet && numericArgs && !opts) {
+            return getCFunc(ident);
+          }
+          return function() {
+            return ccall(ident, returnType, argTypes, arguments, opts);
+          };
+        }
+        var asmLibraryArg = { "abort": _abort, "emscripten_get_heap_max": _emscripten_get_heap_max, "emscripten_memcpy_big": _emscripten_memcpy_big, "emscripten_resize_heap": _emscripten_resize_heap, "fd_close": _fd_close, "fd_seek": _fd_seek, "fd_write": _fd_write };
+        var asm = createWasm();
+        var ___wasm_call_ctors = Module["___wasm_call_ctors"] = function() {
+          return (___wasm_call_ctors = Module["___wasm_call_ctors"] = Module["asm"]["__wasm_call_ctors"]).apply(null, arguments);
+        };
+        var _init = Module["_init"] = function() {
+          return (_init = Module["_init"] = Module["asm"]["init"]).apply(null, arguments);
+        };
+        var _init_with_threads_count = Module["_init_with_threads_count"] = function() {
+          return (_init_with_threads_count = Module["_init_with_threads_count"] = Module["asm"]["init_with_threads_count"]).apply(null, arguments);
+        };
+        var _get_threads_count = Module["_get_threads_count"] = function() {
+          return (_get_threads_count = Module["_get_threads_count"] = Module["asm"]["get_threads_count"]).apply(null, arguments);
+        };
+        var _register_tensor = Module["_register_tensor"] = function() {
+          return (_register_tensor = Module["_register_tensor"] = Module["asm"]["register_tensor"]).apply(null, arguments);
+        };
+        var _dispose_data = Module["_dispose_data"] = function() {
+          return (_dispose_data = Module["_dispose_data"] = Module["asm"]["dispose_data"]).apply(null, arguments);
+        };
+        var _dispose = Module["_dispose"] = function() {
+          return (_dispose = Module["_dispose"] = Module["asm"]["dispose"]).apply(null, arguments);
+        };
+        var _Abs = Module["_Abs"] = function() {
+          return (_Abs = Module["_Abs"] = Module["asm"]["Abs"]).apply(null, arguments);
+        };
+        var _Acos = Module["_Acos"] = function() {
+          return (_Acos = Module["_Acos"] = Module["asm"]["Acos"]).apply(null, arguments);
+        };
+        var _Acosh = Module["_Acosh"] = function() {
+          return (_Acosh = Module["_Acosh"] = Module["asm"]["Acosh"]).apply(null, arguments);
+        };
+        var _Add = Module["_Add"] = function() {
+          return (_Add = Module["_Add"] = Module["asm"]["Add"]).apply(null, arguments);
+        };
+        var _AddN = Module["_AddN"] = function() {
+          return (_AddN = Module["_AddN"] = Module["asm"]["AddN"]).apply(null, arguments);
+        };
+        var _All = Module["_All"] = function() {
+          return (_All = Module["_All"] = Module["asm"]["All"]).apply(null, arguments);
+        };
+        var _Any = Module["_Any"] = function() {
+          return (_Any = Module["_Any"] = Module["asm"]["Any"]).apply(null, arguments);
+        };
+        var _ArgMax = Module["_ArgMax"] = function() {
+          return (_ArgMax = Module["_ArgMax"] = Module["asm"]["ArgMax"]).apply(null, arguments);
+        };
+        var _ArgMin = Module["_ArgMin"] = function() {
+          return (_ArgMin = Module["_ArgMin"] = Module["asm"]["ArgMin"]).apply(null, arguments);
+        };
+        var _Asin = Module["_Asin"] = function() {
+          return (_Asin = Module["_Asin"] = Module["asm"]["Asin"]).apply(null, arguments);
+        };
+        var _Asinh = Module["_Asinh"] = function() {
+          return (_Asinh = Module["_Asinh"] = Module["asm"]["Asinh"]).apply(null, arguments);
+        };
+        var _Atan = Module["_Atan"] = function() {
+          return (_Atan = Module["_Atan"] = Module["asm"]["Atan"]).apply(null, arguments);
+        };
+        var _Atan2 = Module["_Atan2"] = function() {
+          return (_Atan2 = Module["_Atan2"] = Module["asm"]["Atan2"]).apply(null, arguments);
+        };
+        var _Atanh = Module["_Atanh"] = function() {
+          return (_Atanh = Module["_Atanh"] = Module["asm"]["Atanh"]).apply(null, arguments);
+        };
+        var _AvgPool = Module["_AvgPool"] = function() {
+          return (_AvgPool = Module["_AvgPool"] = Module["asm"]["AvgPool"]).apply(null, arguments);
+        };
+        var _AvgPool3D = Module["_AvgPool3D"] = function() {
+          return (_AvgPool3D = Module["_AvgPool3D"] = Module["asm"]["AvgPool3D"]).apply(null, arguments);
+        };
+        var _AvgPool3DGrad = Module["_AvgPool3DGrad"] = function() {
+          return (_AvgPool3DGrad = Module["_AvgPool3DGrad"] = Module["asm"]["AvgPool3DGrad"]).apply(null, arguments);
+        };
+        var _AvgPoolGrad = Module["_AvgPoolGrad"] = function() {
+          return (_AvgPoolGrad = Module["_AvgPoolGrad"] = Module["asm"]["AvgPoolGrad"]).apply(null, arguments);
+        };
+        var _BatchMatMul = Module["_BatchMatMul"] = function() {
+          return (_BatchMatMul = Module["_BatchMatMul"] = Module["asm"]["BatchMatMul"]).apply(null, arguments);
+        };
+        var _Bincount = Module["_Bincount"] = function() {
+          return (_Bincount = Module["_Bincount"] = Module["asm"]["Bincount"]).apply(null, arguments);
+        };
+        var _BitwiseAnd = Module["_BitwiseAnd"] = function() {
+          return (_BitwiseAnd = Module["_BitwiseAnd"] = Module["asm"]["BitwiseAnd"]).apply(null, arguments);
+        };
+        var _Ceil = Module["_Ceil"] = function() {
+          return (_Ceil = Module["_Ceil"] = Module["asm"]["Ceil"]).apply(null, arguments);
+        };
+        var _ClipByValue = Module["_ClipByValue"] = function() {
+          return (_ClipByValue = Module["_ClipByValue"] = Module["asm"]["ClipByValue"]).apply(null, arguments);
+        };
+        var _Conv2D = Module["_Conv2D"] = function() {
+          return (_Conv2D = Module["_Conv2D"] = Module["asm"]["Conv2D"]).apply(null, arguments);
+        };
+        var _Conv2DBackpropInput = Module["_Conv2DBackpropInput"] = function() {
+          return (_Conv2DBackpropInput = Module["_Conv2DBackpropInput"] = Module["asm"]["Conv2DBackpropInput"]).apply(null, arguments);
+        };
+        var _Conv3D = Module["_Conv3D"] = function() {
+          return (_Conv3D = Module["_Conv3D"] = Module["asm"]["Conv3D"]).apply(null, arguments);
+        };
+        var _Conv3DBackpropFilterV2 = Module["_Conv3DBackpropFilterV2"] = function() {
+          return (_Conv3DBackpropFilterV2 = Module["_Conv3DBackpropFilterV2"] = Module["asm"]["Conv3DBackpropFilterV2"]).apply(null, arguments);
+        };
+        var _Conv3DBackpropInputV2 = Module["_Conv3DBackpropInputV2"] = function() {
+          return (_Conv3DBackpropInputV2 = Module["_Conv3DBackpropInputV2"] = Module["asm"]["Conv3DBackpropInputV2"]).apply(null, arguments);
+        };
+        var _Cos = Module["_Cos"] = function() {
+          return (_Cos = Module["_Cos"] = Module["asm"]["Cos"]).apply(null, arguments);
+        };
+        var _Cosh = Module["_Cosh"] = function() {
+          return (_Cosh = Module["_Cosh"] = Module["asm"]["Cosh"]).apply(null, arguments);
+        };
+        var _CropAndResize = Module["_CropAndResize"] = function() {
+          return (_CropAndResize = Module["_CropAndResize"] = Module["asm"]["CropAndResize"]).apply(null, arguments);
+        };
+        var _Cumprod = Module["_Cumprod"] = function() {
+          return (_Cumprod = Module["_Cumprod"] = Module["asm"]["Cumprod"]).apply(null, arguments);
+        };
+        var _Cumsum = Module["_Cumsum"] = function() {
+          return (_Cumsum = Module["_Cumsum"] = Module["asm"]["Cumsum"]).apply(null, arguments);
+        };
+        var _DenseBincount = Module["_DenseBincount"] = function() {
+          return (_DenseBincount = Module["_DenseBincount"] = Module["asm"]["DenseBincount"]).apply(null, arguments);
+        };
+        var _DepthToSpace = Module["_DepthToSpace"] = function() {
+          return (_DepthToSpace = Module["_DepthToSpace"] = Module["asm"]["DepthToSpace"]).apply(null, arguments);
+        };
+        var _DepthwiseConv2dNative = Module["_DepthwiseConv2dNative"] = function() {
+          return (_DepthwiseConv2dNative = Module["_DepthwiseConv2dNative"] = Module["asm"]["DepthwiseConv2dNative"]).apply(null, arguments);
+        };
+        var _Diag = Module["_Diag"] = function() {
+          return (_Diag = Module["_Diag"] = Module["asm"]["Diag"]).apply(null, arguments);
+        };
+        var _Dilation2D = Module["_Dilation2D"] = function() {
+          return (_Dilation2D = Module["_Dilation2D"] = Module["asm"]["Dilation2D"]).apply(null, arguments);
+        };
+        var _Dilation2DBackpropFilter = Module["_Dilation2DBackpropFilter"] = function() {
+          return (_Dilation2DBackpropFilter = Module["_Dilation2DBackpropFilter"] = Module["asm"]["Dilation2DBackpropFilter"]).apply(null, arguments);
+        };
+        var _Dilation2DBackpropInput = Module["_Dilation2DBackpropInput"] = function() {
+          return (_Dilation2DBackpropInput = Module["_Dilation2DBackpropInput"] = Module["asm"]["Dilation2DBackpropInput"]).apply(null, arguments);
+        };
+        var _Elu = Module["_Elu"] = function() {
+          return (_Elu = Module["_Elu"] = Module["asm"]["Elu"]).apply(null, arguments);
+        };
+        var _EluGrad = Module["_EluGrad"] = function() {
+          return (_EluGrad = Module["_EluGrad"] = Module["asm"]["EluGrad"]).apply(null, arguments);
+        };
+        var _Equal = Module["_Equal"] = function() {
+          return (_Equal = Module["_Equal"] = Module["asm"]["Equal"]).apply(null, arguments);
+        };
+        var _Erf = Module["_Erf"] = function() {
+          return (_Erf = Module["_Erf"] = Module["asm"]["Erf"]).apply(null, arguments);
+        };
+        var _Exp = Module["_Exp"] = function() {
+          return (_Exp = Module["_Exp"] = Module["asm"]["Exp"]).apply(null, arguments);
+        };
+        var _Expm1 = Module["_Expm1"] = function() {
+          return (_Expm1 = Module["_Expm1"] = Module["asm"]["Expm1"]).apply(null, arguments);
+        };
+        var _FlipLeftRight = Module["_FlipLeftRight"] = function() {
+          return (_FlipLeftRight = Module["_FlipLeftRight"] = Module["asm"]["FlipLeftRight"]).apply(null, arguments);
+        };
+        var _Floor = Module["_Floor"] = function() {
+          return (_Floor = Module["_Floor"] = Module["asm"]["Floor"]).apply(null, arguments);
+        };
+        var _FloorDiv = Module["_FloorDiv"] = function() {
+          return (_FloorDiv = Module["_FloorDiv"] = Module["asm"]["FloorDiv"]).apply(null, arguments);
+        };
+        var _FusedBatchNorm = Module["_FusedBatchNorm"] = function() {
+          return (_FusedBatchNorm = Module["_FusedBatchNorm"] = Module["asm"]["FusedBatchNorm"]).apply(null, arguments);
+        };
+        var _FusedConv2D = Module["_FusedConv2D"] = function() {
+          return (_FusedConv2D = Module["_FusedConv2D"] = Module["asm"]["FusedConv2D"]).apply(null, arguments);
+        };
+        var _FusedDepthwiseConv2D = Module["_FusedDepthwiseConv2D"] = function() {
+          return (_FusedDepthwiseConv2D = Module["_FusedDepthwiseConv2D"] = Module["asm"]["FusedDepthwiseConv2D"]).apply(null, arguments);
+        };
+        var _Gather = Module["_Gather"] = function() {
+          return (_Gather = Module["_Gather"] = Module["asm"]["Gather"]).apply(null, arguments);
+        };
+        var _GatherNd = Module["_GatherNd"] = function() {
+          return (_GatherNd = Module["_GatherNd"] = Module["asm"]["GatherNd"]).apply(null, arguments);
+        };
+        var _Greater = Module["_Greater"] = function() {
+          return (_Greater = Module["_Greater"] = Module["asm"]["Greater"]).apply(null, arguments);
+        };
+        var _GreaterEqual = Module["_GreaterEqual"] = function() {
+          return (_GreaterEqual = Module["_GreaterEqual"] = Module["asm"]["GreaterEqual"]).apply(null, arguments);
+        };
+        var _IsFinite = Module["_IsFinite"] = function() {
+          return (_IsFinite = Module["_IsFinite"] = Module["asm"]["IsFinite"]).apply(null, arguments);
+        };
+        var _IsInf = Module["_IsInf"] = function() {
+          return (_IsInf = Module["_IsInf"] = Module["asm"]["IsInf"]).apply(null, arguments);
+        };
+        var _IsNan = Module["_IsNan"] = function() {
+          return (_IsNan = Module["_IsNan"] = Module["asm"]["IsNan"]).apply(null, arguments);
+        };
+        var _LRN = Module["_LRN"] = function() {
+          return (_LRN = Module["_LRN"] = Module["asm"]["LRN"]).apply(null, arguments);
+        };
+        var _LRNGrad = Module["_LRNGrad"] = function() {
+          return (_LRNGrad = Module["_LRNGrad"] = Module["asm"]["LRNGrad"]).apply(null, arguments);
+        };
+        var _LeakyRelu = Module["_LeakyRelu"] = function() {
+          return (_LeakyRelu = Module["_LeakyRelu"] = Module["asm"]["LeakyRelu"]).apply(null, arguments);
+        };
+        var _Less = Module["_Less"] = function() {
+          return (_Less = Module["_Less"] = Module["asm"]["Less"]).apply(null, arguments);
+        };
+        var _LessEqual = Module["_LessEqual"] = function() {
+          return (_LessEqual = Module["_LessEqual"] = Module["asm"]["LessEqual"]).apply(null, arguments);
+        };
+        var _LinSpace = Module["_LinSpace"] = function() {
+          return (_LinSpace = Module["_LinSpace"] = Module["asm"]["LinSpace"]).apply(null, arguments);
+        };
+        var _Log = Module["_Log"] = function() {
+          return (_Log = Module["_Log"] = Module["asm"]["Log"]).apply(null, arguments);
+        };
+        var _Log1p = Module["_Log1p"] = function() {
+          return (_Log1p = Module["_Log1p"] = Module["asm"]["Log1p"]).apply(null, arguments);
+        };
+        var _LogicalAnd = Module["_LogicalAnd"] = function() {
+          return (_LogicalAnd = Module["_LogicalAnd"] = Module["asm"]["LogicalAnd"]).apply(null, arguments);
+        };
+        var _LogicalNot = Module["_LogicalNot"] = function() {
+          return (_LogicalNot = Module["_LogicalNot"] = Module["asm"]["LogicalNot"]).apply(null, arguments);
+        };
+        var _LogicalOr = Module["_LogicalOr"] = function() {
+          return (_LogicalOr = Module["_LogicalOr"] = Module["asm"]["LogicalOr"]).apply(null, arguments);
+        };
+        var _LogicalXor = Module["_LogicalXor"] = function() {
+          return (_LogicalXor = Module["_LogicalXor"] = Module["asm"]["LogicalXor"]).apply(null, arguments);
+        };
+        var _Max = Module["_Max"] = function() {
+          return (_Max = Module["_Max"] = Module["asm"]["Max"]).apply(null, arguments);
+        };
+        var _MaxPool = Module["_MaxPool"] = function() {
+          return (_MaxPool = Module["_MaxPool"] = Module["asm"]["MaxPool"]).apply(null, arguments);
+        };
+        var _MaxPool3D = Module["_MaxPool3D"] = function() {
+          return (_MaxPool3D = Module["_MaxPool3D"] = Module["asm"]["MaxPool3D"]).apply(null, arguments);
+        };
+        var _MaxPool3DGrad = Module["_MaxPool3DGrad"] = function() {
+          return (_MaxPool3DGrad = Module["_MaxPool3DGrad"] = Module["asm"]["MaxPool3DGrad"]).apply(null, arguments);
+        };
+        var _MaxPoolGrad = Module["_MaxPoolGrad"] = function() {
+          return (_MaxPoolGrad = Module["_MaxPoolGrad"] = Module["asm"]["MaxPoolGrad"]).apply(null, arguments);
+        };
+        var _MaxPoolWithArgmax = Module["_MaxPoolWithArgmax"] = function() {
+          return (_MaxPoolWithArgmax = Module["_MaxPoolWithArgmax"] = Module["asm"]["MaxPoolWithArgmax"]).apply(null, arguments);
+        };
+        var _Maximum = Module["_Maximum"] = function() {
+          return (_Maximum = Module["_Maximum"] = Module["asm"]["Maximum"]).apply(null, arguments);
+        };
+        var _Mean = Module["_Mean"] = function() {
+          return (_Mean = Module["_Mean"] = Module["asm"]["Mean"]).apply(null, arguments);
+        };
+        var _Min = Module["_Min"] = function() {
+          return (_Min = Module["_Min"] = Module["asm"]["Min"]).apply(null, arguments);
+        };
+        var _Minimum = Module["_Minimum"] = function() {
+          return (_Minimum = Module["_Minimum"] = Module["asm"]["Minimum"]).apply(null, arguments);
+        };
+        var _MirrorPad = Module["_MirrorPad"] = function() {
+          return (_MirrorPad = Module["_MirrorPad"] = Module["asm"]["MirrorPad"]).apply(null, arguments);
+        };
+        var _Mod = Module["_Mod"] = function() {
+          return (_Mod = Module["_Mod"] = Module["asm"]["Mod"]).apply(null, arguments);
+        };
+        var _Multinomial = Module["_Multinomial"] = function() {
+          return (_Multinomial = Module["_Multinomial"] = Module["asm"]["Multinomial"]).apply(null, arguments);
+        };
+        var _Multiply = Module["_Multiply"] = function() {
+          return (_Multiply = Module["_Multiply"] = Module["asm"]["Multiply"]).apply(null, arguments);
+        };
+        var _Neg = Module["_Neg"] = function() {
+          return (_Neg = Module["_Neg"] = Module["asm"]["Neg"]).apply(null, arguments);
+        };
+        var _NonMaxSuppressionV3 = Module["_NonMaxSuppressionV3"] = function() {
+          return (_NonMaxSuppressionV3 = Module["_NonMaxSuppressionV3"] = Module["asm"]["NonMaxSuppressionV3"]).apply(null, arguments);
+        };
+        var _NonMaxSuppressionV4 = Module["_NonMaxSuppressionV4"] = function() {
+          return (_NonMaxSuppressionV4 = Module["_NonMaxSuppressionV4"] = Module["asm"]["NonMaxSuppressionV4"]).apply(null, arguments);
+        };
+        var _NonMaxSuppressionV5 = Module["_NonMaxSuppressionV5"] = function() {
+          return (_NonMaxSuppressionV5 = Module["_NonMaxSuppressionV5"] = Module["asm"]["NonMaxSuppressionV5"]).apply(null, arguments);
+        };
+        var _NotEqual = Module["_NotEqual"] = function() {
+          return (_NotEqual = Module["_NotEqual"] = Module["asm"]["NotEqual"]).apply(null, arguments);
+        };
+        var _OneHot = Module["_OneHot"] = function() {
+          return (_OneHot = Module["_OneHot"] = Module["asm"]["OneHot"]).apply(null, arguments);
+        };
+        var _PadV2 = Module["_PadV2"] = function() {
+          return (_PadV2 = Module["_PadV2"] = Module["asm"]["PadV2"]).apply(null, arguments);
+        };
+        var _Pow = Module["_Pow"] = function() {
+          return (_Pow = Module["_Pow"] = Module["asm"]["Pow"]).apply(null, arguments);
+        };
+        var _Prelu = Module["_Prelu"] = function() {
+          return (_Prelu = Module["_Prelu"] = Module["asm"]["Prelu"]).apply(null, arguments);
+        };
+        var _Prod = Module["_Prod"] = function() {
+          return (_Prod = Module["_Prod"] = Module["asm"]["Prod"]).apply(null, arguments);
+        };
+        var _RealDiv = Module["_RealDiv"] = function() {
+          return (_RealDiv = Module["_RealDiv"] = Module["asm"]["RealDiv"]).apply(null, arguments);
+        };
+        var _Reciprocal = Module["_Reciprocal"] = function() {
+          return (_Reciprocal = Module["_Reciprocal"] = Module["asm"]["Reciprocal"]).apply(null, arguments);
+        };
+        var _Relu = Module["_Relu"] = function() {
+          return (_Relu = Module["_Relu"] = Module["asm"]["Relu"]).apply(null, arguments);
+        };
+        var _Relu6 = Module["_Relu6"] = function() {
+          return (_Relu6 = Module["_Relu6"] = Module["asm"]["Relu6"]).apply(null, arguments);
+        };
+        var _ResizeBilinear = Module["_ResizeBilinear"] = function() {
+          return (_ResizeBilinear = Module["_ResizeBilinear"] = Module["asm"]["ResizeBilinear"]).apply(null, arguments);
+        };
+        var _ResizeBilinearGrad = Module["_ResizeBilinearGrad"] = function() {
+          return (_ResizeBilinearGrad = Module["_ResizeBilinearGrad"] = Module["asm"]["ResizeBilinearGrad"]).apply(null, arguments);
+        };
+        var _ResizeNearestNeighbor = Module["_ResizeNearestNeighbor"] = function() {
+          return (_ResizeNearestNeighbor = Module["_ResizeNearestNeighbor"] = Module["asm"]["ResizeNearestNeighbor"]).apply(null, arguments);
+        };
+        var _ResizeNearestNeighborGrad = Module["_ResizeNearestNeighborGrad"] = function() {
+          return (_ResizeNearestNeighborGrad = Module["_ResizeNearestNeighborGrad"] = Module["asm"]["ResizeNearestNeighborGrad"]).apply(null, arguments);
+        };
+        var _Reverse = Module["_Reverse"] = function() {
+          return (_Reverse = Module["_Reverse"] = Module["asm"]["Reverse"]).apply(null, arguments);
+        };
+        var _RotateWithOffset = Module["_RotateWithOffset"] = function() {
+          return (_RotateWithOffset = Module["_RotateWithOffset"] = Module["asm"]["RotateWithOffset"]).apply(null, arguments);
+        };
+        var _Round = Module["_Round"] = function() {
+          return (_Round = Module["_Round"] = Module["asm"]["Round"]).apply(null, arguments);
+        };
+        var _Rsqrt = Module["_Rsqrt"] = function() {
+          return (_Rsqrt = Module["_Rsqrt"] = Module["asm"]["Rsqrt"]).apply(null, arguments);
+        };
+        var _ScatterNd = Module["_ScatterNd"] = function() {
+          return (_ScatterNd = Module["_ScatterNd"] = Module["asm"]["ScatterNd"]).apply(null, arguments);
+        };
+        var _SearchSorted = Module["_SearchSorted"] = function() {
+          return (_SearchSorted = Module["_SearchSorted"] = Module["asm"]["SearchSorted"]).apply(null, arguments);
+        };
+        var _SelectV2 = Module["_SelectV2"] = function() {
+          return (_SelectV2 = Module["_SelectV2"] = Module["asm"]["SelectV2"]).apply(null, arguments);
+        };
+        var _Selu = Module["_Selu"] = function() {
+          return (_Selu = Module["_Selu"] = Module["asm"]["Selu"]).apply(null, arguments);
+        };
+        var _Sigmoid = Module["_Sigmoid"] = function() {
+          return (_Sigmoid = Module["_Sigmoid"] = Module["asm"]["Sigmoid"]).apply(null, arguments);
+        };
+        var _Sign = Module["_Sign"] = function() {
+          return (_Sign = Module["_Sign"] = Module["asm"]["Sign"]).apply(null, arguments);
+        };
+        var _Sin = Module["_Sin"] = function() {
+          return (_Sin = Module["_Sin"] = Module["asm"]["Sin"]).apply(null, arguments);
+        };
+        var _Sinh = Module["_Sinh"] = function() {
+          return (_Sinh = Module["_Sinh"] = Module["asm"]["Sinh"]).apply(null, arguments);
+        };
+        var _Softmax = Module["_Softmax"] = function() {
+          return (_Softmax = Module["_Softmax"] = Module["asm"]["Softmax"]).apply(null, arguments);
+        };
+        var _Softplus = Module["_Softplus"] = function() {
+          return (_Softplus = Module["_Softplus"] = Module["asm"]["Softplus"]).apply(null, arguments);
+        };
+        var _SparseFillEmptyRows = Module["_SparseFillEmptyRows"] = function() {
+          return (_SparseFillEmptyRows = Module["_SparseFillEmptyRows"] = Module["asm"]["SparseFillEmptyRows"]).apply(null, arguments);
+        };
+        var _SparseReshape = Module["_SparseReshape"] = function() {
+          return (_SparseReshape = Module["_SparseReshape"] = Module["asm"]["SparseReshape"]).apply(null, arguments);
+        };
+        var _SparseSegmentReduction = Module["_SparseSegmentReduction"] = function() {
+          return (_SparseSegmentReduction = Module["_SparseSegmentReduction"] = Module["asm"]["SparseSegmentReduction"]).apply(null, arguments);
+        };
+        var _SparseToDense = Module["_SparseToDense"] = function() {
+          return (_SparseToDense = Module["_SparseToDense"] = Module["asm"]["SparseToDense"]).apply(null, arguments);
+        };
+        var _Sqrt = Module["_Sqrt"] = function() {
+          return (_Sqrt = Module["_Sqrt"] = Module["asm"]["Sqrt"]).apply(null, arguments);
+        };
+        var _Square = Module["_Square"] = function() {
+          return (_Square = Module["_Square"] = Module["asm"]["Square"]).apply(null, arguments);
+        };
+        var _SquaredDifference = Module["_SquaredDifference"] = function() {
+          return (_SquaredDifference = Module["_SquaredDifference"] = Module["asm"]["SquaredDifference"]).apply(null, arguments);
+        };
+        var _Step = Module["_Step"] = function() {
+          return (_Step = Module["_Step"] = Module["asm"]["Step"]).apply(null, arguments);
+        };
+        var _StridedSlice = Module["_StridedSlice"] = function() {
+          return (_StridedSlice = Module["_StridedSlice"] = Module["asm"]["StridedSlice"]).apply(null, arguments);
+        };
+        var _Sub = Module["_Sub"] = function() {
+          return (_Sub = Module["_Sub"] = Module["asm"]["Sub"]).apply(null, arguments);
+        };
+        var _Sum = Module["_Sum"] = function() {
+          return (_Sum = Module["_Sum"] = Module["asm"]["Sum"]).apply(null, arguments);
+        };
+        var _Tan = Module["_Tan"] = function() {
+          return (_Tan = Module["_Tan"] = Module["asm"]["Tan"]).apply(null, arguments);
+        };
+        var _Tanh = Module["_Tanh"] = function() {
+          return (_Tanh = Module["_Tanh"] = Module["asm"]["Tanh"]).apply(null, arguments);
+        };
+        var _TensorScatterUpdate = Module["_TensorScatterUpdate"] = function() {
+          return (_TensorScatterUpdate = Module["_TensorScatterUpdate"] = Module["asm"]["TensorScatterUpdate"]).apply(null, arguments);
+        };
+        var _Tile = Module["_Tile"] = function() {
+          return (_Tile = Module["_Tile"] = Module["asm"]["Tile"]).apply(null, arguments);
+        };
+        var _TopK = Module["_TopK"] = function() {
+          return (_TopK = Module["_TopK"] = Module["asm"]["TopK"]).apply(null, arguments);
+        };
+        var _Transform = Module["_Transform"] = function() {
+          return (_Transform = Module["_Transform"] = Module["asm"]["Transform"]).apply(null, arguments);
+        };
+        var _Transpose = Module["_Transpose"] = function() {
+          return (_Transpose = Module["_Transpose"] = Module["asm"]["Transpose"]).apply(null, arguments);
+        };
+        var __FusedMatMul = Module["__FusedMatMul"] = function() {
+          return (__FusedMatMul = Module["__FusedMatMul"] = Module["asm"]["_FusedMatMul"]).apply(null, arguments);
+        };
+        var _malloc = Module["_malloc"] = function() {
+          return (_malloc = Module["_malloc"] = Module["asm"]["malloc"]).apply(null, arguments);
+        };
+        var _free = Module["_free"] = function() {
+          return (_free = Module["_free"] = Module["asm"]["free"]).apply(null, arguments);
+        };
+        var ___errno_location = Module["___errno_location"] = function() {
+          return (___errno_location = Module["___errno_location"] = Module["asm"]["__errno_location"]).apply(null, arguments);
+        };
+        var stackSave = Module["stackSave"] = function() {
+          return (stackSave = Module["stackSave"] = Module["asm"]["stackSave"]).apply(null, arguments);
+        };
+        var stackRestore = Module["stackRestore"] = function() {
+          return (stackRestore = Module["stackRestore"] = Module["asm"]["stackRestore"]).apply(null, arguments);
+        };
+        var stackAlloc = Module["stackAlloc"] = function() {
+          return (stackAlloc = Module["stackAlloc"] = Module["asm"]["stackAlloc"]).apply(null, arguments);
+        };
+        var dynCall_iijjiiii = Module["dynCall_iijjiiii"] = function() {
+          return (dynCall_iijjiiii = Module["dynCall_iijjiiii"] = Module["asm"]["dynCall_iijjiiii"]).apply(null, arguments);
+        };
+        var dynCall_jiji = Module["dynCall_jiji"] = function() {
+          return (dynCall_jiji = Module["dynCall_jiji"] = Module["asm"]["dynCall_jiji"]).apply(null, arguments);
+        };
+        Module["cwrap"] = cwrap;
+        var calledRun;
+        dependenciesFulfilled = function runCaller() {
+          if (!calledRun) run();
+          if (!calledRun) dependenciesFulfilled = runCaller;
+        };
+        function run(args) {
+          args = args || arguments_;
+          if (runDependencies > 0) {
+            return;
+          }
+          preRun();
+          if (runDependencies > 0) {
+            return;
+          }
+          function doRun() {
+            if (calledRun) return;
+            calledRun = true;
+            Module["calledRun"] = true;
+            if (ABORT) return;
+            initRuntime();
+            readyPromiseResolve(Module);
+            if (Module["onRuntimeInitialized"]) Module["onRuntimeInitialized"]();
+            postRun();
+          }
+          if (Module["setStatus"]) {
+            Module["setStatus"]("Running...");
+            setTimeout(function() {
+              setTimeout(function() {
+                Module["setStatus"]("");
+              }, 1);
+              doRun();
+            }, 1);
+          } else {
+            doRun();
+          }
+        }
+        if (Module["preInit"]) {
+          if (typeof Module["preInit"] == "function") Module["preInit"] = [Module["preInit"]];
+          while (Module["preInit"].length > 0) {
+            Module["preInit"].pop()();
+          }
+        }
+        run();
+        var listenersAdded;
+        if (beforeListeners) {
+          listenersAdded = { uncaughtException: process.listeners("uncaughtException").filter(function(listener) {
+            return !beforeListeners.uncaughtException.indexOf(listener) > -1;
+          }), unhandledRejection: process.listeners("unhandledRejection").filter(function(listener) {
+            return !beforeListeners.unhandledRejection.indexOf(listener) > -1;
+          }) };
+        }
+        var actualModule;
+        if (typeof WasmBackendModule3 !== "undefined") {
+          actualModule = WasmBackendModule3;
+        } else if (typeof WasmBackendModuleThreadedSimd !== "undefined") {
+          actualModule = WasmBackendModuleThreadedSimd;
+        } else {
+          throw new Error("Could not find wasm module in post.js");
+        }
+        if (listenersAdded) {
+          var tmpDispose = actualModule["_dispose"];
+          actualModule["_dispose"] = function() {
+            tmpDispose();
+            listenersAdded.uncaughtException.forEach(function(listener) {
+              process.removeListener("uncaughtException", listener);
+            });
+            listenersAdded.unhandledRejection.forEach(function(listener) {
+              process.removeListener("unhandledRejection", listener);
+            });
+          };
+        }
+        return WasmBackendModule3.ready;
+      });
+    })();
+    if (typeof exports === "object" && typeof module === "object")
+      module.exports = WasmBackendModule2;
+    else if (typeof define === "function" && define["amd"])
+      define([], function() {
+        return WasmBackendModule2;
+      });
+    else if (typeof exports === "object")
+      exports["WasmBackendModule"] = WasmBackendModule2;
+  }
+});
+
 // ../../node_modules/@tensorflow/tfjs-core/dist/backends/backend.js
 var EPSILON_FLOAT32 = 1e-7;
 var EPSILON_FLOAT16 = 1e-4;
@@ -1718,8 +4500,8 @@ function shuffleCombo(array2, array22) {
     swap(array22, counter, index);
   }
 }
-function clamp(min5, x, max5) {
-  return Math.max(min5, Math.min(x, max5));
+function clamp(min6, x, max6) {
+  return Math.max(min6, Math.min(x, max6));
 }
 function nearestLargerEven(val) {
   return val % 2 === 0 ? val : val + 1;
@@ -1730,11 +4512,11 @@ function swap(object, left, right) {
   object[right] = temp;
 }
 function sum(arr) {
-  let sum5 = 0;
+  let sum6 = 0;
   for (let i = 0; i < arr.length; i++) {
-    sum5 += arr[i];
+    sum6 += arr[i];
   }
-  return sum5;
+  return sum6;
 }
 function randUniform(a, b) {
   const r = Math.random();
@@ -2306,12 +5088,12 @@ function getGlobalMap() {
   }
   return ns._tfGlobals;
 }
-function getGlobal(key, init) {
+function getGlobal(key, init2) {
   const globalMap = getGlobalMap();
   if (globalMap.has(key)) {
     return globalMap.get(key);
   } else {
-    const singleton = init();
+    const singleton = init2();
     globalMap.set(key, singleton);
     return globalMap.get(key);
   }
@@ -2403,6 +5185,7 @@ var Log1p = "Log1p";
 var LogicalAnd = "LogicalAnd";
 var LogicalNot = "LogicalNot";
 var LogicalOr = "LogicalOr";
+var LogicalXor = "LogicalXor";
 var LogSoftmax = "LogSoftmax";
 var LRN = "LRN";
 var LRNGrad = "LRNGrad";
@@ -3064,7 +5847,7 @@ function computeMaxSizePerColumn(vals, shape, dtype, strides) {
   }
   return padPerCol;
 }
-function valToString(val, pad2, dtype) {
+function valToString(val, pad3, dtype) {
   let valStr;
   if (Array.isArray(val)) {
     valStr = `${parseFloat(val[0].toFixed(FORMAT_NUM_SIG_DIGITS))} + ${parseFloat(val[1].toFixed(FORMAT_NUM_SIG_DIGITS))}j`;
@@ -3075,7 +5858,7 @@ function valToString(val, pad2, dtype) {
   } else {
     valStr = parseFloat(val.toFixed(FORMAT_NUM_SIG_DIGITS)).toString();
   }
-  return rightPad(valStr, pad2);
+  return rightPad(valStr, pad3);
 }
 function boolNumToString(v) {
   return v === 0 ? "false" : "true";
@@ -3686,8 +6469,8 @@ var EngineState = class {
   }
 };
 var Engine = class _Engine {
-  constructor(ENV6) {
-    this.ENV = ENV6;
+  constructor(ENV7) {
+    this.ENV = ENV7;
     this.registry = {};
     this.registryFactory = {};
     this.pendingBackendInitId = 0;
@@ -4002,7 +6785,7 @@ var Engine = class _Engine {
     if (this.shouldCheckForMemLeaks()) {
       this.state.numDataMovesStack.push(0);
     }
-    let kernelFunc;
+    let kernelFunc3;
     if (this.backendName == null) {
       this.backend;
     }
@@ -4015,7 +6798,7 @@ var Engine = class _Engine {
       }
       const kernel = getKernel(kernelName, this.backendName);
       assert(kernel != null, () => `Cannot find registered kernel '${kernelName}' for backend '${this.backendName}'`);
-      kernelFunc = () => {
+      kernelFunc3 = () => {
         const numDataIdsBefore = this.backend.numDataIds();
         out = kernel.kernelFunc({ inputs: inputs2, attrs: attrs2, backend: this.backend });
         const outInfos = Array.isArray(out) ? out : [out];
@@ -4042,7 +6825,7 @@ var Engine = class _Engine {
         }
         saved = tensors.map((tensor2) => this.keep(this.clone(tensor2)));
       };
-      kernelFunc = () => {
+      kernelFunc3 = () => {
         const numDataIdsBefore = this.backend.numDataIds();
         out = this.tidy(() => forwardFunc(this.backend, saveFunc));
         const outs = Array.isArray(out) ? out : [out];
@@ -4061,9 +6844,9 @@ var Engine = class _Engine {
       () => this.state.kernelDepth--,
       () => {
         if (!this.ENV.getBool("DEBUG") && !this.state.profiling) {
-          outputs = kernelFunc();
+          outputs = kernelFunc3();
         } else {
-          kernelProfile = this.profiler.profileKernel(kernelOrScopeName, inputs, () => kernelFunc());
+          kernelProfile = this.profiler.profileKernel(kernelOrScopeName, inputs, () => kernelFunc3());
           if (this.ENV.getBool("DEBUG")) {
             this.profiler.logKernelProfile(kernelProfile);
           }
@@ -4849,17 +7632,17 @@ var CompositeArrayBuffer = class _CompositeArrayBuffer {
   }
 };
 function search(sortedArray, compare) {
-  let min5 = 0;
-  let max5 = sortedArray.length;
-  while (min5 <= max5) {
-    const middle = Math.floor((max5 - min5) / 2) + min5;
+  let min6 = 0;
+  let max6 = sortedArray.length;
+  while (min6 <= max6) {
+    const middle = Math.floor((max6 - min6) / 2) + min6;
     const side = compare(sortedArray[middle]);
     if (side === 0) {
       return middle;
     } else if (side < 0) {
-      max5 = middle;
+      max6 = middle;
     } else {
-      min5 = middle + 1;
+      min6 = middle + 1;
     }
   }
   return -1;
@@ -4958,7 +7741,7 @@ function decodeWeights(weightData, specs) {
   }
   return out;
 }
-function getWeightBytelength(spec, slice4) {
+function getWeightBytelength(spec, slice5) {
   const size = sizeFromShape(spec.shape);
   let bytesPerValue;
   if ("quantization" in spec) {
@@ -4967,7 +7750,7 @@ function getWeightBytelength(spec, slice4) {
   } else if (spec.dtype === "string") {
     let byteLength = 0;
     for (let i = 0; i < size; i++) {
-      byteLength += NUM_BYTES_STRING_LENGTH + new Uint32Array(slice4(byteLength, byteLength + NUM_BYTES_STRING_LENGTH))[0];
+      byteLength += NUM_BYTES_STRING_LENGTH + new Uint32Array(slice5(byteLength, byteLength + NUM_BYTES_STRING_LENGTH))[0];
     }
     return byteLength;
   } else {
@@ -4975,7 +7758,7 @@ function getWeightBytelength(spec, slice4) {
   }
   return size * bytesPerValue;
 }
-async function getWeightBytelengthAsync(spec, slice4) {
+async function getWeightBytelengthAsync(spec, slice5) {
   const size = sizeFromShape(spec.shape);
   let bytesPerValue;
   if ("quantization" in spec) {
@@ -4984,7 +7767,7 @@ async function getWeightBytelengthAsync(spec, slice4) {
   } else if (spec.dtype === "string") {
     let byteLength = 0;
     for (let i = 0; i < size; i++) {
-      byteLength += NUM_BYTES_STRING_LENGTH + new Uint32Array(await slice4(byteLength, byteLength + NUM_BYTES_STRING_LENGTH))[0];
+      byteLength += NUM_BYTES_STRING_LENGTH + new Uint32Array(await slice5(byteLength, byteLength + NUM_BYTES_STRING_LENGTH))[0];
     }
     return byteLength;
   } else {
@@ -5918,8 +8701,8 @@ var PlatformBrowser = class {
     this.handledMessageCount = 0;
     this.hasEventListener = false;
   }
-  fetch(path, init) {
-    return fetch(path, init);
+  fetch(path, init2) {
+    return fetch(path, init2);
   }
   now() {
     return performance.now();
@@ -6222,13 +9005,13 @@ function atanh_(x) {
 var atanh = /* @__PURE__ */ op({ atanh_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv_util.js
-function computeDilation2DInfo(inputShape, filterShape, strides, pad2, dataFormat = "NHWC", dilations) {
+function computeDilation2DInfo(inputShape, filterShape, strides, pad3, dataFormat = "NHWC", dilations) {
   const inputChannels = inputShape[3];
   const $filterShape = [...filterShape, inputChannels];
   const $dataFormat = convertConv2DDataFormat(dataFormat);
-  return computeConv2DInfo(inputShape, $filterShape, strides, dilations, pad2, null, null, $dataFormat);
+  return computeConv2DInfo(inputShape, $filterShape, strides, dilations, pad3, null, null, $dataFormat);
 }
-function computePool2DInfo(inShape, filterSize, strides, dilations, pad2, roundingMode, dataFormat = "channelsLast") {
+function computePool2DInfo(inShape, filterSize, strides, dilations, pad3, roundingMode, dataFormat = "channelsLast") {
   const [filterHeight, filterWidth] = parseTupleParam(filterSize);
   let filterShape;
   if (dataFormat === "channelsLast") {
@@ -6238,9 +9021,9 @@ function computePool2DInfo(inShape, filterSize, strides, dilations, pad2, roundi
   } else {
     throw new Error(`Unknown dataFormat ${dataFormat}`);
   }
-  return computeConv2DInfo(inShape, filterShape, strides, dilations, pad2, roundingMode, false, dataFormat);
+  return computeConv2DInfo(inShape, filterShape, strides, dilations, pad3, roundingMode, false, dataFormat);
 }
-function computePool3DInfo(inShape, filterSize, strides, dilations, pad2, roundingMode, dataFormat = "NDHWC") {
+function computePool3DInfo(inShape, filterSize, strides, dilations, pad3, roundingMode, dataFormat = "NDHWC") {
   const [filterDepth, filterHeight, filterWidth] = parse3TupleParam(filterSize);
   let filterShape;
   let $dataFormat;
@@ -6253,9 +9036,9 @@ function computePool3DInfo(inShape, filterSize, strides, dilations, pad2, roundi
   } else {
     throw new Error(`Unknown dataFormat ${dataFormat}`);
   }
-  return computeConv3DInfo(inShape, filterShape, strides, dilations, pad2, false, $dataFormat, roundingMode);
+  return computeConv3DInfo(inShape, filterShape, strides, dilations, pad3, false, $dataFormat, roundingMode);
 }
-function computeConv2DInfo(inShape, filterShape, strides, dilations, pad2, roundingMode, depthwise = false, dataFormat = "channelsLast") {
+function computeConv2DInfo(inShape, filterShape, strides, dilations, pad3, roundingMode, depthwise = false, dataFormat = "channelsLast") {
   let [batchSize, inHeight, inWidth, inChannels] = [-1, -1, -1, -1];
   if (dataFormat === "channelsLast") {
     [batchSize, inHeight, inWidth, inChannels] = inShape;
@@ -6269,7 +9052,7 @@ function computeConv2DInfo(inShape, filterShape, strides, dilations, pad2, round
   const [dilationHeight, dilationWidth] = parseTupleParam(dilations);
   const effectiveFilterHeight = getEffectiveFilterSize(filterHeight, dilationHeight);
   const effectiveFilterWidth = getEffectiveFilterSize(filterWidth, dilationWidth);
-  const { padInfo, outHeight, outWidth } = getPadAndOutInfo(pad2, inHeight, inWidth, strideHeight, strideWidth, effectiveFilterHeight, effectiveFilterWidth, roundingMode, dataFormat);
+  const { padInfo, outHeight, outWidth } = getPadAndOutInfo(pad3, inHeight, inWidth, strideHeight, strideWidth, effectiveFilterHeight, effectiveFilterWidth, roundingMode, dataFormat);
   const outChannels = depthwise ? filterChannels * inChannels : filterChannels;
   let outShape;
   if (dataFormat === "channelsFirst") {
@@ -6300,7 +9083,7 @@ function computeConv2DInfo(inShape, filterShape, strides, dilations, pad2, round
     filterShape
   };
 }
-function computeConv3DInfo(inShape, filterShape, strides, dilations, pad2, depthwise = false, dataFormat = "channelsLast", roundingMode) {
+function computeConv3DInfo(inShape, filterShape, strides, dilations, pad3, depthwise = false, dataFormat = "channelsLast", roundingMode) {
   let [batchSize, inDepth, inHeight, inWidth, inChannels] = [-1, -1, -1, -1, -1];
   if (dataFormat === "channelsLast") {
     [batchSize, inDepth, inHeight, inWidth, inChannels] = inShape;
@@ -6315,7 +9098,7 @@ function computeConv3DInfo(inShape, filterShape, strides, dilations, pad2, depth
   const effectiveFilterDepth = getEffectiveFilterSize(filterDepth, dilationDepth);
   const effectiveFilterHeight = getEffectiveFilterSize(filterHeight, dilationHeight);
   const effectiveFilterWidth = getEffectiveFilterSize(filterWidth, dilationWidth);
-  const { padInfo, outDepth, outHeight, outWidth } = get3DPadAndOutInfo(pad2, inDepth, inHeight, inWidth, strideDepth, strideHeight, strideWidth, effectiveFilterDepth, effectiveFilterHeight, effectiveFilterWidth, roundingMode);
+  const { padInfo, outDepth, outHeight, outWidth } = get3DPadAndOutInfo(pad3, inDepth, inHeight, inWidth, strideDepth, strideHeight, strideWidth, effectiveFilterDepth, effectiveFilterHeight, effectiveFilterWidth, roundingMode);
   const outChannels = depthwise ? filterChannels * inChannels : filterChannels;
   let outShape;
   if (dataFormat === "channelsFirst") {
@@ -6396,17 +9179,17 @@ function getEffectiveFilterSize(filterSize, dilation) {
   }
   return filterSize + (filterSize - 1) * (dilation - 1);
 }
-function getPadAndOutInfo(pad2, inHeight, inWidth, strideHeight, strideWidth, filterHeight, filterWidth, roundingMode, dataFormat) {
+function getPadAndOutInfo(pad3, inHeight, inWidth, strideHeight, strideWidth, filterHeight, filterWidth, roundingMode, dataFormat) {
   let padInfo;
   let outHeight;
   let outWidth;
-  if (typeof pad2 === "number") {
-    const padType = pad2 === 0 ? "VALID" : "NUMBER";
-    padInfo = { top: pad2, bottom: pad2, left: pad2, right: pad2, type: padType };
-    const outShape = computeOutputShape2D([inHeight, inWidth], filterHeight, strideHeight, pad2, roundingMode);
+  if (typeof pad3 === "number") {
+    const padType = pad3 === 0 ? "VALID" : "NUMBER";
+    padInfo = { top: pad3, bottom: pad3, left: pad3, right: pad3, type: padType };
+    const outShape = computeOutputShape2D([inHeight, inWidth], filterHeight, strideHeight, pad3, roundingMode);
     outHeight = outShape[0];
     outWidth = outShape[1];
-  } else if (pad2 === "same") {
+  } else if (pad3 === "same") {
     outHeight = Math.ceil(inHeight / strideHeight);
     outWidth = Math.ceil(inWidth / strideWidth);
     const padAlongHeight = Math.max(0, (outHeight - 1) * strideHeight + filterHeight - inHeight);
@@ -6416,48 +9199,48 @@ function getPadAndOutInfo(pad2, inHeight, inWidth, strideHeight, strideWidth, fi
     const left = Math.floor(padAlongWidth / 2);
     const right = padAlongWidth - left;
     padInfo = { top, bottom, left, right, type: "SAME" };
-  } else if (pad2 === "valid") {
+  } else if (pad3 === "valid") {
     padInfo = { top: 0, bottom: 0, left: 0, right: 0, type: "VALID" };
     outHeight = Math.ceil((inHeight - filterHeight + 1) / strideHeight);
     outWidth = Math.ceil((inWidth - filterWidth + 1) / strideWidth);
-  } else if (typeof pad2 === "object") {
-    const top = dataFormat === "channelsLast" ? pad2[1][0] : pad2[2][0];
-    const bottom = dataFormat === "channelsLast" ? pad2[1][1] : pad2[2][1];
-    const left = dataFormat === "channelsLast" ? pad2[2][0] : pad2[3][0];
-    const right = dataFormat === "channelsLast" ? pad2[2][1] : pad2[3][1];
+  } else if (typeof pad3 === "object") {
+    const top = dataFormat === "channelsLast" ? pad3[1][0] : pad3[2][0];
+    const bottom = dataFormat === "channelsLast" ? pad3[1][1] : pad3[2][1];
+    const left = dataFormat === "channelsLast" ? pad3[2][0] : pad3[3][0];
+    const right = dataFormat === "channelsLast" ? pad3[2][1] : pad3[3][1];
     const padType = top === 0 && bottom === 0 && left === 0 && right === 0 ? "VALID" : "EXPLICIT";
     padInfo = { top, bottom, left, right, type: padType };
     outHeight = round((inHeight - filterHeight + top + bottom) / strideHeight + 1, roundingMode);
     outWidth = round((inWidth - filterWidth + left + right) / strideWidth + 1, roundingMode);
   } else {
-    throw Error(`Unknown padding parameter: ${pad2}`);
+    throw Error(`Unknown padding parameter: ${pad3}`);
   }
   return { padInfo, outHeight, outWidth };
 }
-function get3DPadAndOutInfo(pad2, inDepth, inHeight, inWidth, strideDepth, strideHeight, strideWidth, filterDepth, filterHeight, filterWidth, roundingMode) {
+function get3DPadAndOutInfo(pad3, inDepth, inHeight, inWidth, strideDepth, strideHeight, strideWidth, filterDepth, filterHeight, filterWidth, roundingMode) {
   let padInfo;
   let outDepth;
   let outHeight;
   let outWidth;
-  if (pad2 === "valid") {
-    pad2 = 0;
+  if (pad3 === "valid") {
+    pad3 = 0;
   }
-  if (typeof pad2 === "number") {
-    const padType = pad2 === 0 ? "VALID" : "NUMBER";
+  if (typeof pad3 === "number") {
+    const padType = pad3 === 0 ? "VALID" : "NUMBER";
     padInfo = {
-      top: pad2,
-      bottom: pad2,
-      left: pad2,
-      right: pad2,
-      front: pad2,
-      back: pad2,
+      top: pad3,
+      bottom: pad3,
+      left: pad3,
+      right: pad3,
+      front: pad3,
+      back: pad3,
       type: padType
     };
-    const outShape = computeOutputShape4D([inDepth, inHeight, inWidth, 1], [filterDepth, filterHeight, filterWidth], 1, [strideDepth, strideHeight, strideWidth], pad2, roundingMode);
+    const outShape = computeOutputShape4D([inDepth, inHeight, inWidth, 1], [filterDepth, filterHeight, filterWidth], 1, [strideDepth, strideHeight, strideWidth], pad3, roundingMode);
     outDepth = outShape[0];
     outHeight = outShape[1];
     outWidth = outShape[2];
-  } else if (pad2 === "same") {
+  } else if (pad3 === "same") {
     outDepth = Math.ceil(inDepth / strideDepth);
     outHeight = Math.ceil(inHeight / strideHeight);
     outWidth = Math.ceil(inWidth / strideWidth);
@@ -6472,7 +9255,7 @@ function get3DPadAndOutInfo(pad2, inDepth, inHeight, inWidth, strideDepth, strid
     const right = padAlongWidth - left;
     padInfo = { top, bottom, left, right, front, back, type: "SAME" };
   } else {
-    throw Error(`Unknown padding parameter: ${pad2}`);
+    throw Error(`Unknown padding parameter: ${pad3}`);
   }
   return { padInfo, outDepth, outHeight, outWidth };
 }
@@ -6510,20 +9293,20 @@ function convertConv2DDataFormat(dataFormat) {
     throw new Error(`Unknown dataFormat ${dataFormat}`);
   }
 }
-function checkPadOnDimRoundingMode(opDesc, pad2, dimRoundingMode) {
+function checkPadOnDimRoundingMode(opDesc, pad3, dimRoundingMode) {
   if (dimRoundingMode != null) {
-    if (typeof pad2 === "string") {
-      throw Error(`Error in ${opDesc}: pad must be an integer when using dimRoundingMode ${dimRoundingMode} but got pad ${pad2}.`);
-    } else if (typeof pad2 === "number") {
-      assert(isInt(pad2), () => `Error in ${opDesc}: pad must be an integer when using dimRoundingMode ${dimRoundingMode} but got pad ${pad2}.`);
-    } else if (typeof pad2 === "object") {
-      pad2.forEach((p2) => {
+    if (typeof pad3 === "string") {
+      throw Error(`Error in ${opDesc}: pad must be an integer when using dimRoundingMode ${dimRoundingMode} but got pad ${pad3}.`);
+    } else if (typeof pad3 === "number") {
+      assert(isInt(pad3), () => `Error in ${opDesc}: pad must be an integer when using dimRoundingMode ${dimRoundingMode} but got pad ${pad3}.`);
+    } else if (typeof pad3 === "object") {
+      pad3.forEach((p2) => {
         p2.forEach((v) => {
           assert(isInt(v), () => `Error in ${opDesc}: pad must be an integer when using dimRoundingMode ${dimRoundingMode} but got pad ${v}.`);
         });
       });
     } else {
-      throw Error(`Error in ${opDesc}: Unknown padding parameter: ${pad2}`);
+      throw Error(`Error in ${opDesc}: Unknown padding parameter: ${pad3}`);
     }
   }
 }
@@ -6538,7 +9321,7 @@ function reshape_(x, shape) {
 var reshape = /* @__PURE__ */ op({ reshape_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/avg_pool.js
-function avgPool_(x, filterSize, strides, pad2, dimRoundingMode) {
+function avgPool_(x, filterSize, strides, pad3, dimRoundingMode) {
   const $x = convertToTensor(x, "x", "avgPool", "float32");
   const dilations = 1;
   assert(eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in avgPool: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
@@ -6549,9 +9332,9 @@ function avgPool_(x, filterSize, strides, pad2, dimRoundingMode) {
     x4D = reshape($x, [1, $x.shape[0], $x.shape[1], $x.shape[2]]);
   }
   assert(x4D.rank === 4, () => `Error in avgPool: x must be rank 4 but got rank ${x4D.rank}.`);
-  checkPadOnDimRoundingMode("avgPool", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("avgPool", pad3, dimRoundingMode);
   const inputs = { x: x4D };
-  const attrs = { filterSize, strides, pad: pad2, dimRoundingMode };
+  const attrs = { filterSize, strides, pad: pad3, dimRoundingMode };
   let res = ENGINE.runKernel(AvgPool, inputs, attrs);
   res = cast(res, $x.dtype);
   if (reshapedTo4D) {
@@ -6562,7 +9345,7 @@ function avgPool_(x, filterSize, strides, pad2, dimRoundingMode) {
 var avgPool = /* @__PURE__ */ op({ avgPool_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/avg_pool_3d.js
-function avgPool3d_(x, filterSize, strides, pad2, dimRoundingMode, dataFormat = "NDHWC") {
+function avgPool3d_(x, filterSize, strides, pad3, dimRoundingMode, dataFormat = "NDHWC") {
   const $x = convertToTensor(x, "x", "avgPool3d", "float32");
   let x5D = $x;
   let reshapedTo5D = false;
@@ -6573,9 +9356,9 @@ function avgPool3d_(x, filterSize, strides, pad2, dimRoundingMode, dataFormat = 
   assert(x5D.rank === 5, () => `Error in avgPool3d: x must be rank 5 but got rank ${x5D.rank}.`);
   assert(dataFormat === "NDHWC", () => `Error in avgPool3d: Only NDHWC is currently supported, but got dataFormat of ${dataFormat}`);
   assert(typeof strides === "number" && strides > 0 || Array.isArray(strides) && strides[0] > 0 && strides[1] > 0 && strides[2] > 0, () => `Error in avgPool3d: Stride must be > 0, but got '${strides}'`);
-  checkPadOnDimRoundingMode("avgPool3d", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("avgPool3d", pad3, dimRoundingMode);
   const inputs = { x: x5D };
-  const attrs = { filterSize, strides, pad: pad2, dimRoundingMode, dataFormat };
+  const attrs = { filterSize, strides, pad: pad3, dimRoundingMode, dataFormat };
   let res = ENGINE.runKernel(AvgPool3D, inputs, attrs);
   res = cast(res, x5D.dtype);
   if (reshapedTo5D) {
@@ -6648,10 +9431,10 @@ var tanh2 = /* @__PURE__ */ op({ tanh_ });
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/batch_to_space_nd.js
 function batchToSpaceND_(x, blockShape, crops) {
   const $x = convertToTensor(x, "x", "batchToSpaceND");
-  const prod4 = blockShape.reduce((a, b) => a * b);
+  const prod5 = blockShape.reduce((a, b) => a * b);
   assert($x.rank >= 1 + blockShape.length, () => `input rank is ${$x.rank} but should be > than blockShape.length ${blockShape.length}`);
   assert(crops.length === blockShape.length, () => `crops.length is ${crops.length} but should be equal to blockShape.length  ${blockShape.length}`);
-  assert($x.shape[0] % prod4 === 0, () => `input tensor batch is ${$x.shape[0]} but is not divisible by the product of the elements of blockShape ${blockShape.join(" * ")} === ${prod4}`);
+  assert($x.shape[0] % prod5 === 0, () => `input tensor batch is ${$x.shape[0]} but is not divisible by the product of the elements of blockShape ${blockShape.join(" * ")} === ${prod5}`);
   const inputs = { x: $x };
   const attrs = { blockShape, crops };
   return ENGINE.runKernel(BatchToSpaceND, inputs, attrs);
@@ -6674,12 +9457,12 @@ function xAs4D(x) {
 }
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/batchnorm.js
-function batchNorm_(x, mean3, variance, offset, scale2, varianceEpsilon) {
+function batchNorm_(x, mean4, variance, offset, scale2, varianceEpsilon) {
   if (varianceEpsilon == null) {
     varianceEpsilon = 1e-3;
   }
   const $x = convertToTensor(x, "x", "batchNorm");
-  const $mean = convertToTensor(mean3, "mean", "batchNorm");
+  const $mean = convertToTensor(mean4, "mean", "batchNorm");
   const $variance = convertToTensor(variance, "variance", "batchNorm");
   let $scale;
   if (scale2 != null) {
@@ -6707,9 +9490,9 @@ function batchNorm_(x, mean3, variance, offset, scale2, varianceEpsilon) {
 var batchNorm = /* @__PURE__ */ op({ batchNorm_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/batchnorm2d.js
-function batchNorm2d_(x, mean3, variance, offset, scale2, varianceEpsilon) {
+function batchNorm2d_(x, mean4, variance, offset, scale2, varianceEpsilon) {
   const $x = convertToTensor(x, "x", "batchNorm");
-  const $mean = convertToTensor(mean3, "mean", "batchNorm");
+  const $mean = convertToTensor(mean4, "mean", "batchNorm");
   const $variance = convertToTensor(variance, "variance", "batchNorm");
   let $scale;
   if (scale2 != null) {
@@ -6733,9 +9516,9 @@ function batchNorm2d_(x, mean3, variance, offset, scale2, varianceEpsilon) {
 var batchNorm2d = /* @__PURE__ */ op({ batchNorm2d_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/batchnorm3d.js
-function batchNorm3d_(x, mean3, variance, offset, scale2, varianceEpsilon) {
+function batchNorm3d_(x, mean4, variance, offset, scale2, varianceEpsilon) {
   const $x = convertToTensor(x, "x", "batchNorm");
-  const $mean = convertToTensor(mean3, "mean", "batchNorm");
+  const $mean = convertToTensor(mean4, "mean", "batchNorm");
   const $variance = convertToTensor(variance, "variance", "batchNorm");
   let $scale;
   if (scale2 != null) {
@@ -6759,9 +9542,9 @@ function batchNorm3d_(x, mean3, variance, offset, scale2, varianceEpsilon) {
 var batchNorm3d = /* @__PURE__ */ op({ batchNorm3d_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/batchnorm4d.js
-function batchNorm4d_(x, mean3, variance, offset, scale2, varianceEpsilon) {
+function batchNorm4d_(x, mean4, variance, offset, scale2, varianceEpsilon) {
   const $x = convertToTensor(x, "x", "batchNorm");
-  const $mean = convertToTensor(mean3, "mean", "batchNorm");
+  const $mean = convertToTensor(mean4, "mean", "batchNorm");
   const $variance = convertToTensor(variance, "variance", "batchNorm");
   let $scale;
   if (scale2 != null) {
@@ -6889,7 +9672,7 @@ function concat4d_(tensors, axis) {
 var concat4d = /* @__PURE__ */ op({ concat4d_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv2d.js
-function conv2d_(x, filter, strides, pad2, dataFormat = "NHWC", dilations = [1, 1], dimRoundingMode) {
+function conv2d_(x, filter, strides, pad3, dataFormat = "NHWC", dilations = [1, 1], dimRoundingMode) {
   const $x = convertToTensor(x, "x", "conv2d", "float32");
   const $filter = convertToTensor(filter, "filter", "conv2d", "float32");
   let x4D = $x;
@@ -6900,14 +9683,14 @@ function conv2d_(x, filter, strides, pad2, dataFormat = "NHWC", dilations = [1, 
   }
   assert(x4D.rank === 4, () => `Error in conv2d: input must be rank 4, but got rank ${x4D.rank}.`);
   assert($filter.rank === 4, () => `Error in conv2d: filter must be rank 4, but got rank ${$filter.rank}.`);
-  checkPadOnDimRoundingMode("conv2d", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("conv2d", pad3, dimRoundingMode);
   const inDepth = dataFormat === "NHWC" ? x4D.shape[3] : x4D.shape[1];
   assert(inDepth === $filter.shape[2], () => `Error in conv2d: depth of input (${inDepth}) must match input depth for filter ${$filter.shape[2]}.`);
   assert(eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in conv2D: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
   assert(stridesOrDilationsArePositive(dilations), () => "Error in conv2D: Dilated rates should be larger than 0.");
   assert(stridesOrDilationsArePositive(strides), () => "Error in conv2D: Strides should be larger than 0.");
   const inputs = { x: x4D, filter: $filter };
-  const attrs = { strides, pad: pad2, dataFormat, dilations, dimRoundingMode };
+  const attrs = { strides, pad: pad3, dataFormat, dilations, dimRoundingMode };
   const res = ENGINE.runKernel(Conv2D, inputs, attrs);
   if (reshapedTo4D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3]]);
@@ -6917,7 +9700,7 @@ function conv2d_(x, filter, strides, pad2, dataFormat = "NHWC", dilations = [1, 
 var conv2d = /* @__PURE__ */ op({ conv2d_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv1d.js
-function conv1d_(x, filter, stride, pad2, dataFormat = "NWC", dilation = 1, dimRoundingMode) {
+function conv1d_(x, filter, stride, pad3, dataFormat = "NWC", dilation = 1, dimRoundingMode) {
   const $x = convertToTensor(x, "x", "conv1d");
   const $filter = convertToTensor(filter, "filter", "conv1d");
   let x3D = $x;
@@ -6928,7 +9711,7 @@ function conv1d_(x, filter, stride, pad2, dataFormat = "NWC", dilation = 1, dimR
   }
   assert(x3D.rank === 3, () => `Error in conv1d: input must be rank 3, but got rank ${x3D.rank}.`);
   assert($filter.rank === 3, () => `Error in conv1d: filter must be rank 3, but got rank ${$filter.rank}.`);
-  checkPadOnDimRoundingMode("conv1d", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("conv1d", pad3, dimRoundingMode);
   assert(x3D.shape[2] === $filter.shape[1], () => `Error in conv1d: depth of input (${x3D.shape[2]}) must match input depth for filter ${$filter.shape[1]}.`);
   assert(eitherStridesOrDilationsAreOne(stride, dilation), () => `Error in conv1D: Either stride or dilation must be 1. Got stride ${stride} and dilation '${dilation}'`);
   assert(stridesOrDilationsArePositive(dilation), () => "Error in conv1D: Dilated rates should be larger than 0.");
@@ -6939,7 +9722,7 @@ function conv1d_(x, filter, stride, pad2, dataFormat = "NWC", dilation = 1, dimR
   const strides = [1, stride];
   const dilations = [1, dilation];
   const conv2dDataFormat = "NHWC";
-  const res = conv2d(input4D, filter4D, strides, pad2, conv2dDataFormat, dilations, dimRoundingMode);
+  const res = conv2d(input4D, filter4D, strides, pad3, conv2dDataFormat, dilations, dimRoundingMode);
   if (reshapedTo3D) {
     return reshape(res, [res.shape[2], res.shape[3]]);
   }
@@ -6948,7 +9731,7 @@ function conv1d_(x, filter, stride, pad2, dataFormat = "NWC", dilation = 1, dimR
 var conv1d = /* @__PURE__ */ op({ conv1d_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv2d_backprop_input.js
-function conv2DBackpropInput_(xShape, dy, filter, strides, pad2, dataFormat = "NHWC", dimRoundingMode) {
+function conv2DBackpropInput_(xShape, dy, filter, strides, pad3, dataFormat = "NHWC", dimRoundingMode) {
   assert(xShape.length === dy.rank, () => `Length of inShape (${xShape.length}) and rank of dy (${dy.rank}) must match`);
   let xShape4D = xShape;
   let dy4D = dy;
@@ -6965,9 +9748,9 @@ function conv2DBackpropInput_(xShape, dy, filter, strides, pad2, dataFormat = "N
   const outDepth = dataFormat === "NHWC" ? dy4D.shape[3] : dy4D.shape[1];
   assert(inDepth === filter.shape[2], () => `Error in conv2dDerInput: depth of input (${inDepth}) must match input depth for filter ${filter.shape[2]}.`);
   assert(outDepth === filter.shape[3], () => `Error in conv2dDerInput: depth of output (${outDepth}) must match output depth for filter ${filter.shape[3]}.`);
-  checkPadOnDimRoundingMode("conv2dDerInput", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("conv2dDerInput", pad3, dimRoundingMode);
   const inputs = { dy: dy4D, filter };
-  const attrs = { strides, pad: pad2, dataFormat, dimRoundingMode, inputShape: xShape4D };
+  const attrs = { strides, pad: pad3, dataFormat, dimRoundingMode, inputShape: xShape4D };
   const res = ENGINE.runKernel(Conv2DBackpropInput, inputs, attrs);
   if (reshapedTo4D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3]]);
@@ -6977,15 +9760,15 @@ function conv2DBackpropInput_(xShape, dy, filter, strides, pad2, dataFormat = "N
 var conv2DBackpropInput = /* @__PURE__ */ op({ conv2DBackpropInput_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv2d_transpose.js
-function conv2dTranspose_(x, filter, outputShape, strides, pad2, dimRoundingMode) {
+function conv2dTranspose_(x, filter, outputShape, strides, pad3, dimRoundingMode) {
   const $x = convertToTensor(x, "x", "conv2dTranspose");
   const $filter = convertToTensor(filter, "filter", "conv2dTranspose");
-  return conv2DBackpropInput(outputShape, $x, $filter, strides, pad2, "NHWC", dimRoundingMode);
+  return conv2DBackpropInput(outputShape, $x, $filter, strides, pad3, "NHWC", dimRoundingMode);
 }
 var conv2dTranspose = /* @__PURE__ */ op({ conv2dTranspose_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv3d.js
-function conv3d_(x, filter, strides, pad2, dataFormat = "NDHWC", dilations = [1, 1, 1]) {
+function conv3d_(x, filter, strides, pad3, dataFormat = "NDHWC", dilations = [1, 1, 1]) {
   const $x = convertToTensor(x, "x", "conv3d");
   const $filter = convertToTensor(filter, "filter", "conv3d");
   let x5D = $x;
@@ -7002,7 +9785,7 @@ function conv3d_(x, filter, strides, pad2, dataFormat = "NDHWC", dilations = [1,
   assert(stridesOrDilationsArePositive(dilations), () => "Error in conv3D: Dilated rates should be larger than 0.");
   assert(stridesOrDilationsArePositive(strides), () => "Error in conv3D: Strides should be larger than 0.");
   const inputs = { x: x5D, filter: $filter };
-  const attrs = { strides, pad: pad2, dataFormat, dilations };
+  const attrs = { strides, pad: pad3, dataFormat, dilations };
   const res = ENGINE.runKernel(Conv3D, inputs, attrs);
   if (reshapedTo5D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3], res.shape[4]]);
@@ -7012,7 +9795,7 @@ function conv3d_(x, filter, strides, pad2, dataFormat = "NDHWC", dilations = [1,
 var conv3d = /* @__PURE__ */ op({ conv3d_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv3d_backprop_input.js
-function conv3DBackpropInput_(xShape, dy, filter, strides, pad2) {
+function conv3DBackpropInput_(xShape, dy, filter, strides, pad3) {
   assert(xShape.length === dy.rank, () => `Length of inShape (${xShape.length}) and rank of dy (${dy.rank}) must match`);
   let xShape5D = xShape;
   let dy5D = dy;
@@ -7030,7 +9813,7 @@ function conv3DBackpropInput_(xShape, dy, filter, strides, pad2) {
   assert(inDepth === filter.shape[3], () => `Error in conv3dDerInput: depth of input (${inDepth}) must match input depth for filter ${filter.shape[3]}.`);
   assert(outDepth === filter.shape[4], () => `Error in conv3dDerInput: depth of output (${outDepth}) must match output depth for filter ${filter.shape[4]}.`);
   const inputs = { dy: dy5D, filter };
-  const attrs = { pad: pad2, strides, inputShape: xShape5D };
+  const attrs = { pad: pad3, strides, inputShape: xShape5D };
   const res = ENGINE.runKernel(Conv3DBackpropInputV2, inputs, attrs);
   if (reshapedTo5D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3], res.shape[4]]);
@@ -7040,10 +9823,10 @@ function conv3DBackpropInput_(xShape, dy, filter, strides, pad2) {
 var conv3DBackpropInput = /* @__PURE__ */ op({ conv3DBackpropInput_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv3d_transpose.js
-function conv3dTranspose_(x, filter, outputShape, strides, pad2) {
+function conv3dTranspose_(x, filter, outputShape, strides, pad3) {
   const $x = convertToTensor(x, "x", "conv3dTranspose");
   const $filter = convertToTensor(filter, "filter", "conv3dTranspose");
-  return conv3DBackpropInput(outputShape, $x, $filter, strides, pad2);
+  return conv3DBackpropInput(outputShape, $x, $filter, strides, pad3);
 }
 var conv3dTranspose = /* @__PURE__ */ op({ conv3dTranspose_ });
 
@@ -7064,19 +9847,19 @@ function cosh_(x) {
 var cosh = /* @__PURE__ */ op({ cosh_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/cumprod.js
-function cumprod_(x, axis = 0, exclusive = false, reverse4 = false) {
+function cumprod_(x, axis = 0, exclusive = false, reverse5 = false) {
   const $x = convertToTensor(x, "x", "cumprod");
   const inputs = { x: $x };
-  const attrs = { axis, exclusive, reverse: reverse4 };
+  const attrs = { axis, exclusive, reverse: reverse5 };
   return ENGINE.runKernel(Cumprod, inputs, attrs);
 }
 var cumprod = /* @__PURE__ */ op({ cumprod_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/cumsum.js
-function cumsum_(x, axis = 0, exclusive = false, reverse4 = false) {
+function cumsum_(x, axis = 0, exclusive = false, reverse5 = false) {
   const $x = convertToTensor(x, "x", "cumsum");
   const inputs = { x: $x };
-  const attrs = { axis, exclusive, reverse: reverse4 };
+  const attrs = { axis, exclusive, reverse: reverse5 };
   return ENGINE.runKernel(Cumsum, inputs, attrs);
 }
 var cumsum = /* @__PURE__ */ op({ cumsum_ });
@@ -7116,7 +9899,7 @@ function depthToSpace_(x, blockSize, dataFormat = "NHWC") {
 var depthToSpace = /* @__PURE__ */ op({ depthToSpace_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/depthwise_conv2d.js
-function depthwiseConv2d_(x, filter, strides, pad2, dataFormat = "NHWC", dilations = [1, 1], dimRoundingMode) {
+function depthwiseConv2d_(x, filter, strides, pad3, dataFormat = "NHWC", dilations = [1, 1], dimRoundingMode) {
   const $x = convertToTensor(x, "x", "depthwiseConv2d", "float32");
   const $filter = convertToTensor(filter, "filter", "depthwiseConv2d", "float32");
   let x4D = $x;
@@ -7129,9 +9912,9 @@ function depthwiseConv2d_(x, filter, strides, pad2, dataFormat = "NHWC", dilatio
   assert($filter.rank === 4, () => `Error in depthwiseConv2d: filter must be rank 4, but got rank ${$filter.rank}.`);
   const inChannels = dataFormat === "NHWC" ? x4D.shape[3] : x4D.shape[1];
   assert(inChannels === $filter.shape[2], () => `Error in depthwiseConv2d: number of input channels (${inChannels}) must match the inChannels dimension in filter ${$filter.shape[2]}.`);
-  checkPadOnDimRoundingMode("depthwiseConv2d", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("depthwiseConv2d", pad3, dimRoundingMode);
   const inputs = { x: x4D, filter: $filter };
-  const attrs = { strides, pad: pad2, dataFormat, dilations, dimRoundingMode };
+  const attrs = { strides, pad: pad3, dataFormat, dilations, dimRoundingMode };
   const res = ENGINE.runKernel(DepthwiseConv2dNative, inputs, attrs);
   if (reshapedTo4D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3]]);
@@ -7141,7 +9924,7 @@ function depthwiseConv2d_(x, filter, strides, pad2, dataFormat = "NHWC", dilatio
 var depthwiseConv2d = /* @__PURE__ */ op({ depthwiseConv2d_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/dilation2d.js
-function dilation2d_(x, filter, strides, pad2, dilations = [1, 1], dataFormat = "NHWC") {
+function dilation2d_(x, filter, strides, pad3, dilations = [1, 1], dataFormat = "NHWC") {
   const $x = convertToTensor(x, "x", "dilation2d");
   const $filter = convertToTensor(filter, "filter", "dilation2d");
   assert($x.rank === 3 || $x.rank === 4, () => `Error in dilation2d: input must be rank 3 or 4, but got rank ${$x.rank}.`);
@@ -7155,7 +9938,7 @@ function dilation2d_(x, filter, strides, pad2, dilations = [1, 1], dataFormat = 
   }
   assert(x4D.shape[3] === $filter.shape[2], () => `Error in dilation2d:  input and filter must have the same depth: ${x4D.shape[3]} vs ${$filter.shape[2]}`);
   const inputs = { x: x4D, filter: $filter };
-  const attrs = { strides, pad: pad2, dilations };
+  const attrs = { strides, pad: pad3, dilations };
   const res = ENGINE.runKernel(Dilation2D, inputs, attrs);
   if (reshapedTo4D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3]]);
@@ -7834,8 +10617,8 @@ function logSoftmax_(logits, axis = -1) {
     const gradFunc = (dy, saved) => {
       const [value2] = saved;
       const keepDims2 = true;
-      const softmax5 = exp(value2);
-      return sub(dy, mul(sum2(dy, axis, keepDims2), softmax5));
+      const softmax6 = exp(value2);
+      return sub(dy, mul(sum2(dy, axis, keepDims2), softmax6));
     };
     return { value, gradFunc };
   });
@@ -7904,7 +10687,7 @@ function logicalXor_(a, b) {
 var logicalXor = /* @__PURE__ */ op({ logicalXor_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/max_pool.js
-function maxPool_(x, filterSize, strides, pad2, dimRoundingMode) {
+function maxPool_(x, filterSize, strides, pad3, dimRoundingMode) {
   const $x = convertToTensor(x, "x", "maxPool");
   const dilations = 1;
   let x4D = $x;
@@ -7915,9 +10698,9 @@ function maxPool_(x, filterSize, strides, pad2, dimRoundingMode) {
   }
   assert(x4D.rank === 4, () => `Error in maxPool: input must be rank 4 but got rank ${x4D.rank}.`);
   assert(eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in maxPool: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
-  checkPadOnDimRoundingMode("maxPool", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("maxPool", pad3, dimRoundingMode);
   const inputs = { x: x4D };
-  const attrs = { filterSize, strides, pad: pad2, dimRoundingMode };
+  const attrs = { filterSize, strides, pad: pad3, dimRoundingMode };
   const res = ENGINE.runKernel(MaxPool, inputs, attrs);
   if (reshapedTo4D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3]]);
@@ -7927,7 +10710,7 @@ function maxPool_(x, filterSize, strides, pad2, dimRoundingMode) {
 var maxPool = /* @__PURE__ */ op({ maxPool_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/max_pool_3d.js
-function maxPool3d_(x, filterSize = [1, 1, 1], strides, pad2, dimRoundingMode, dataFormat = "NDHWC") {
+function maxPool3d_(x, filterSize = [1, 1, 1], strides, pad3, dimRoundingMode, dataFormat = "NDHWC") {
   const $x = convertToTensor(x, "x", "maxPool3d");
   let x5D = $x;
   let reshapedTo5D = false;
@@ -7937,9 +10720,9 @@ function maxPool3d_(x, filterSize = [1, 1, 1], strides, pad2, dimRoundingMode, d
   }
   assert(x5D.rank === 5, () => `Error in maxPool3d: x must be rank 5 but got rank ${x5D.rank}.`);
   assert(dataFormat === "NDHWC", () => `Error in maxPool3d: Only NDHWC is currently supported, but got dataFormat of ${dataFormat}`);
-  checkPadOnDimRoundingMode("maxPool3d", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("maxPool3d", pad3, dimRoundingMode);
   const inputs = { x: x5D };
-  const attrs = { filterSize, strides, pad: pad2, dimRoundingMode, dataFormat };
+  const attrs = { filterSize, strides, pad: pad3, dimRoundingMode, dataFormat };
   const res = ENGINE.runKernel(MaxPool3D, inputs, attrs);
   if (reshapedTo5D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3], res.shape[4]]);
@@ -8147,15 +10930,15 @@ function spaceToBatchND_(x, blockShape, paddings) {
 var spaceToBatchND = /* @__PURE__ */ op({ spaceToBatchND_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/pool.js
-function pool_(input2, windowShape, poolingType, pad2, dilations, strides, dimRoundingMode) {
+function pool_(input2, windowShape, poolingType, pad3, dilations, strides, dimRoundingMode) {
   if (dilations == null) {
     dilations = [1, 1];
   }
   if (strides == null) {
     strides = 1;
   }
-  if (pad2 === 0) {
-    pad2 = "valid";
+  if (pad3 === 0) {
+    pad3 = "valid";
   }
   const $x = convertToTensor(input2, "x", "maxPool");
   let x4D = $x;
@@ -8165,17 +10948,17 @@ function pool_(input2, windowShape, poolingType, pad2, dilations, strides, dimRo
     x4D = reshape($x, [1, $x.shape[0], $x.shape[1], $x.shape[2]]);
   }
   assert(eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in pool: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
-  const convInfo = computePool2DInfo(x4D.shape, windowShape, strides, dilations, pad2);
+  const convInfo = computePool2DInfo(x4D.shape, windowShape, strides, dilations, pad3);
   const dilation = [convInfo.dilationHeight, convInfo.dilationWidth];
   let basePadding;
-  if (pad2 === "same") {
+  if (pad3 === "same") {
     basePadding = withSpaceToBatchBasePaddings([convInfo.filterHeight, convInfo.filterWidth], dilation);
   } else {
     basePadding = [[0, 0], [0, 0]];
   }
   const isDilationOne = dilation[0] === 1 && dilation[1] === 1;
   const [adjustedPadding, adjustedCrops] = requiredSpaceToBatchPaddings([convInfo.inHeight, convInfo.inWidth], dilation, basePadding);
-  const convertedPad = isDilationOne ? pad2 : "valid";
+  const convertedPad = isDilationOne ? pad3 : "valid";
   const convertedX = isDilationOne ? x4D : spaceToBatchND(x4D, dilation, adjustedPadding);
   const forwardOp = poolingType === "avg" ? () => avgPool(convertedX, windowShape, strides, convertedPad, dimRoundingMode) : () => maxPool(convertedX, windowShape, strides, convertedPad, dimRoundingMode);
   const y = forwardOp();
@@ -8232,8 +11015,8 @@ var prod = /* @__PURE__ */ op({ prod_ });
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/rand_util.js
 var seedrandom = __toESM(require_seedrandom2());
 var MPRandGauss = class {
-  constructor(mean3, stdDeviation, dtype, truncated, seed) {
-    this.mean = mean3;
+  constructor(mean4, stdDeviation, dtype, truncated, seed) {
+    this.mean = mean4;
     this.stdDev = stdDeviation;
     this.dtype = dtype;
     this.nextVal = NaN;
@@ -8286,10 +11069,10 @@ var MPRandGauss = class {
   }
 };
 var UniformRandom = class {
-  constructor(min5 = 0, max5 = 1, dtype, seed) {
+  constructor(min6 = 0, max6 = 1, dtype, seed) {
     this.canReturnFloat = () => this.dtype == null || this.dtype === "float32";
-    this.min = min5;
-    this.range = max5 - min5;
+    this.min = min6;
+    this.range = max6 - min6;
     this.dtype = dtype;
     if (seed == null) {
       seed = Math.random();
@@ -8298,7 +11081,7 @@ var UniformRandom = class {
       seed = seed.toString();
     }
     if (!this.canReturnFloat() && this.range <= 1) {
-      throw new Error(`The difference between ${min5} - ${max5} <= 1 and dtype is not float`);
+      throw new Error(`The difference between ${min6} - ${max6} <= 1 and dtype is not float`);
     }
     this.random = seedrandom.alea(seed);
   }
@@ -8314,12 +11097,12 @@ var UniformRandom = class {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/random_normal.js
-function randomNormal_(shape, mean3 = 0, stdDev = 1, dtype, seed) {
+function randomNormal_(shape, mean4 = 0, stdDev = 1, dtype, seed) {
   assertNonNegativeIntegerDimensions(shape);
   if (dtype != null && dtype === "bool") {
     throw new Error(`Unsupported data type ${dtype}`);
   }
-  const randGauss = new MPRandGauss(mean3, stdDev, dtype, false, seed);
+  const randGauss = new MPRandGauss(mean4, stdDev, dtype, false, seed);
   const res = buffer(shape, dtype);
   for (let i = 0; i < res.values.length; i++) {
     res.values[i] = randGauss.nextValue();
@@ -8341,11 +11124,11 @@ function randomUniform_(shape, minval = 0, maxval = 1, dtype = "float32", seed) 
 var randomUniform = /* @__PURE__ */ op({ randomUniform_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/range.js
-function range(start, stop, step4 = 1, dtype = "float32") {
-  if (step4 === 0) {
+function range(start, stop, step5 = 1, dtype = "float32") {
+  if (step5 === 0) {
     throw new Error("Cannot have a step of zero");
   }
-  const attrs = { start, stop, step: step4, dtype };
+  const attrs = { start, stop, step: step5, dtype };
   return ENGINE.runKernel(Range, {}, attrs);
 }
 
@@ -8415,7 +11198,7 @@ function selu_(x) {
 var selu = /* @__PURE__ */ op({ selu_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/separable_conv2d.js
-function separableConv2d_(x, depthwiseFilter, pointwiseFilter, strides, pad2, dilation = [1, 1], dataFormat = "NHWC") {
+function separableConv2d_(x, depthwiseFilter, pointwiseFilter, strides, pad3, dilation = [1, 1], dataFormat = "NHWC") {
   const $x = convertToTensor(x, "x", "separableConv2d");
   const $depthwiseFilter = convertToTensor(depthwiseFilter, "depthwiseFilter", "separableConv2d");
   const $pointwiseFilter = convertToTensor(pointwiseFilter, "pointwiseFilter", "separableConv2d");
@@ -8436,7 +11219,7 @@ function separableConv2d_(x, depthwiseFilter, pointwiseFilter, strides, pad2, di
   const inChannels = $depthwiseFilter.shape[2];
   const channelMultiplier = $depthwiseFilter.shape[3];
   assert($pointwiseFilter.shape[2] === inChannels * channelMultiplier, () => `Error in separableConv2d: the third dimension of pointwise filter must be ${inChannels * channelMultiplier}, but got ${$pointwiseFilter.shape[2]}.`);
-  const depthwise = depthwiseConv2d(x4D, $depthwiseFilter, strides, pad2, dataFormat, dilation);
+  const depthwise = depthwiseConv2d(x4D, $depthwiseFilter, strides, pad3, dataFormat, dilation);
   const pointwiseStride = 1;
   const res = conv2d(depthwise, $pointwiseFilter, pointwiseStride, "valid", dataFormat);
   if (reshapedTo4D) {
@@ -8701,6 +11484,12 @@ function tensor2d(values, shape, dtype) {
 }
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/scatter_nd_util.js
+var scatter_nd_util_exports = {};
+__export(scatter_nd_util_exports, {
+  calculateShapes: () => calculateShapes,
+  validateInput: () => validateInput,
+  validateUpdateShape: () => validateUpdateShape
+});
 function validateUpdateShape(shape, indices, updates) {
   const sliceDim = indices.rank > 1 ? indices.shape[indices.rank - 1] : 1;
   const batchDim = indices.rank > 1 ? indices.rank - 1 : 1;
@@ -8784,12 +11573,12 @@ function topk_(x, k = 1, sorted = true) {
 var topk = /* @__PURE__ */ op({ topk_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/truncated_normal.js
-function truncatedNormal_(shape, mean3 = 0, stdDev = 1, dtype, seed) {
+function truncatedNormal_(shape, mean4 = 0, stdDev = 1, dtype, seed) {
   assertNonNegativeIntegerDimensions(shape);
   if (dtype != null && dtype === "bool") {
     throw new Error(`Unsupported data type $ { dtype }`);
   }
-  const randGauss = new MPRandGauss(mean3, stdDev, dtype, true, seed);
+  const randGauss = new MPRandGauss(mean4, stdDev, dtype, true, seed);
   const res = buffer(shape, dtype);
   for (let i = 0; i < res.values.length; i++) {
     res.values[i] = randGauss.nextValue();
@@ -8930,7 +11719,7 @@ __export(fused_ops_exports, {
 });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv2d_backprop_filter.js
-function conv2DBackpropFilter_(x, dy, filterShape, strides, pad2, dataFormat = "NHWC", dimRoundingMode) {
+function conv2DBackpropFilter_(x, dy, filterShape, strides, pad3, dataFormat = "NHWC", dimRoundingMode) {
   let x4D = x;
   if (x.rank === 3) {
     x4D = reshape(x, [1, x.shape[0], x.shape[1], x.shape[2]]);
@@ -8946,9 +11735,9 @@ function conv2DBackpropFilter_(x, dy, filterShape, strides, pad2, dataFormat = "
   const outDepth = dataFormat === "NHWC" ? dy4D.shape[3] : dy4D.shape[1];
   assert(inDepth === filterShape[2], () => `Error in conv2dDerFilter: depth of input ${inDepth}) must match input depth in filter (${filterShape[2]}.`);
   assert(outDepth === filterShape[3], () => `Error in conv2dDerFilter: depth of dy (${outDepth}) must match output depth for filter (${filterShape[3]}).`);
-  checkPadOnDimRoundingMode("conv2dDerFilter", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("conv2dDerFilter", pad3, dimRoundingMode);
   const inputs = { x: x4D, dy: dy4D };
-  const attrs = { strides, pad: pad2, dataFormat, dimRoundingMode, filterShape };
+  const attrs = { strides, pad: pad3, dataFormat, dimRoundingMode, filterShape };
   return ENGINE.runKernel(Conv2DBackpropFilter, inputs, attrs);
 }
 var conv2DBackpropFilter = /* @__PURE__ */ op({ conv2DBackpropFilter_ });
@@ -8995,11 +11784,11 @@ var shouldFuse = (gradientDepth, activation2) => {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/fused/conv2d.js
-function fusedConv2d_({ x, filter, strides, pad: pad2, dataFormat = "NHWC", dilations = [1, 1], dimRoundingMode, bias, activation: activation2 = "linear", preluActivationWeights, leakyreluAlpha }) {
+function fusedConv2d_({ x, filter, strides, pad: pad3, dataFormat = "NHWC", dilations = [1, 1], dimRoundingMode, bias, activation: activation2 = "linear", preluActivationWeights, leakyreluAlpha }) {
   activation2 = activation2 || "linear";
   if (shouldFuse(ENGINE.state.gradientDepth, activation2) === false) {
     assert(dataFormat === "NHWC", () => `Error in fused conv2d: got dataFormat of ${dataFormat} but only NHWC is currently supported for the case of gradient depth is 0 and the activation is not linear.`);
-    let result = conv2d(x, filter, strides, pad2, dataFormat, dilations, dimRoundingMode);
+    let result = conv2d(x, filter, strides, pad3, dataFormat, dilations, dimRoundingMode);
     if (bias != null) {
       result = add2(result, bias);
     }
@@ -9015,11 +11804,11 @@ function fusedConv2d_({ x, filter, strides, pad: pad2, dataFormat = "NHWC", dila
   }
   assert(x4D.rank === 4, () => `Error in fused conv2d: input must be rank 4, but got rank ${x4D.rank}.`);
   assert($filter.rank === 4, () => `Error in fused conv2d: filter must be rank 4, but got rank ${$filter.rank}.`);
-  checkPadOnDimRoundingMode("fused conv2d", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("fused conv2d", pad3, dimRoundingMode);
   const inputChannels = dataFormat === "NHWC" ? x4D.shape[3] : x4D.shape[1];
   assert($filter.shape[2] === inputChannels, () => `Error in conv2d: depth of input (${inputChannels}) must match input depth for filter ${$filter.shape[2]}.`);
   assert(eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in conv2D: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
-  const convInfo = computeConv2DInfo(x4D.shape, $filter.shape, strides, dilations, pad2, dimRoundingMode);
+  const convInfo = computeConv2DInfo(x4D.shape, $filter.shape, strides, dilations, pad3, dimRoundingMode);
   let $bias;
   if (bias != null) {
     $bias = convertToTensor(bias, "bias", "fused conv2d");
@@ -9052,8 +11841,8 @@ function fusedConv2d_({ x, filter, strides, pad: pad2, dataFormat = "NHWC", dila
     const [$filter2, x4D2, y, $bias2] = saved;
     const dyActivation = getFusedDyActivation(dy, y, activation2);
     assert(tupleValuesAreOne(dilations), () => `Error in gradient of fused conv2D: dilation rates greater than 1 are not yet supported in gradients. Got dilations '${dilations}'`);
-    const xDer = conv2DBackpropInput(x4D2.shape, dyActivation, $filter2, strides, pad2);
-    const filterDer = conv2DBackpropFilter(x4D2, dyActivation, $filter2.shape, strides, pad2);
+    const xDer = conv2DBackpropInput(x4D2.shape, dyActivation, $filter2, strides, pad3);
+    const filterDer = conv2DBackpropFilter(x4D2, dyActivation, $filter2.shape, strides, pad3);
     const der = [xDer, filterDer];
     if ($bias2 != null) {
       const biasDer = getFusedBiasGradient($bias2, dyActivation);
@@ -9069,7 +11858,7 @@ function fusedConv2d_({ x, filter, strides, pad: pad2, dataFormat = "NHWC", dila
   };
   const attrs = {
     strides,
-    pad: pad2,
+    pad: pad3,
     dataFormat,
     dilations,
     dimRoundingMode,
@@ -9104,7 +11893,7 @@ function fusedConv2d_({ x, filter, strides, pad: pad2, dataFormat = "NHWC", dila
 var conv2d2 = /* @__PURE__ */ op({ fusedConv2d_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/depthwise_conv2d_native_backprop_filter.js
-function depthwiseConv2dNativeBackpropFilter_(x, dy, filterShape, strides, pad2, dilations = [1, 1], dimRoundingMode) {
+function depthwiseConv2dNativeBackpropFilter_(x, dy, filterShape, strides, pad3, dilations = [1, 1], dimRoundingMode) {
   let x4D = x;
   if (x.rank === 3) {
     x4D = reshape(x, [1, x.shape[0], x.shape[1], x.shape[2]]);
@@ -9114,13 +11903,13 @@ function depthwiseConv2dNativeBackpropFilter_(x, dy, filterShape, strides, pad2,
     dy4D = reshape(dy, [1, dy.shape[0], dy.shape[1], dy.shape[2]]);
   }
   const inputs = { x: x4D, dy: dy4D };
-  const attrs = { strides, pad: pad2, dimRoundingMode, dilations, filterShape };
+  const attrs = { strides, pad: pad3, dimRoundingMode, dilations, filterShape };
   return ENGINE.runKernel(DepthwiseConv2dNativeBackpropFilter, inputs, attrs);
 }
 var depthwiseConv2dNativeBackpropFilter = op({ depthwiseConv2dNativeBackpropFilter_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/depthwise_conv2d_native_backprop_input.js
-function depthwiseConv2dNativeBackpropInput_(xShape, dy, filter, strides, pad2, dilations = [1, 1], dimRoundingMode) {
+function depthwiseConv2dNativeBackpropInput_(xShape, dy, filter, strides, pad3, dilations = [1, 1], dimRoundingMode) {
   let dy4D = dy;
   let reshapedTo4D = false;
   if (dy.rank === 3) {
@@ -9128,7 +11917,7 @@ function depthwiseConv2dNativeBackpropInput_(xShape, dy, filter, strides, pad2, 
     dy4D = reshape(dy, [1, dy.shape[0], dy.shape[1], dy.shape[2]]);
   }
   const inputs = { dy: dy4D, filter };
-  const attrs = { strides, pad: pad2, dimRoundingMode, dilations, inputShape: xShape };
+  const attrs = { strides, pad: pad3, dimRoundingMode, dilations, inputShape: xShape };
   const res = (
     // tslint:disable-next-line: no-unnecessary-type-assertion
     ENGINE.runKernel(DepthwiseConv2dNativeBackpropInput, inputs, attrs)
@@ -9141,9 +11930,9 @@ function depthwiseConv2dNativeBackpropInput_(xShape, dy, filter, strides, pad2, 
 var depthwiseConv2dNativeBackpropInput = op({ depthwiseConv2dNativeBackpropInput_ });
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/fused/depthwise_conv2d.js
-function fusedDepthwiseConv2d_({ x, filter, strides, pad: pad2, dataFormat = "NHWC", dilations = [1, 1], dimRoundingMode, bias, activation: activation2 = "linear", preluActivationWeights, leakyreluAlpha }) {
+function fusedDepthwiseConv2d_({ x, filter, strides, pad: pad3, dataFormat = "NHWC", dilations = [1, 1], dimRoundingMode, bias, activation: activation2 = "linear", preluActivationWeights, leakyreluAlpha }) {
   if (shouldFuse(ENGINE.state.gradientDepth, activation2) === false) {
-    let result = depthwiseConv2d(x, filter, strides, pad2, dataFormat, dilations, dimRoundingMode);
+    let result = depthwiseConv2d(x, filter, strides, pad3, dataFormat, dilations, dimRoundingMode);
     if (bias != null) {
       result = add2(result, bias);
     }
@@ -9164,13 +11953,13 @@ function fusedDepthwiseConv2d_({ x, filter, strides, pad: pad2, dataFormat = "NH
     dilations = [1, 1];
   }
   assert(eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in fused depthwiseConv2d: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
-  checkPadOnDimRoundingMode("fused depthwiseConv2d", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("fused depthwiseConv2d", pad3, dimRoundingMode);
   const convInfo = computeConv2DInfo(
     x4D.shape,
     $filter.shape,
     strides,
     dilations,
-    pad2,
+    pad3,
     dimRoundingMode,
     true
     /* depthwise */
@@ -9189,8 +11978,8 @@ function fusedDepthwiseConv2d_({ x, filter, strides, pad: pad2, dataFormat = "NH
     assert(tupleValuesAreOne(dilations), () => `Error in gradient of fused depthwiseConv2d: dilation rates greater than 1 are not yet supported. Got dilations '${dilations}'`);
     const [$filter2, x4D2, y, bias2] = saved;
     const dyActivation = getFusedDyActivation(dy, y, activation2);
-    const xDer = depthwiseConv2dNativeBackpropInput(x4D2.shape, dyActivation, $filter2, strides, pad2, dilations, dimRoundingMode);
-    const filterDer = depthwiseConv2dNativeBackpropFilter(x4D2, dyActivation, $filter2.shape, strides, pad2, dilations, dimRoundingMode);
+    const xDer = depthwiseConv2dNativeBackpropInput(x4D2.shape, dyActivation, $filter2, strides, pad3, dilations, dimRoundingMode);
+    const filterDer = depthwiseConv2dNativeBackpropFilter(x4D2, dyActivation, $filter2.shape, strides, pad3, dilations, dimRoundingMode);
     if (bias2 != null) {
       const biasDer = getFusedBiasGradient($bias, dyActivation);
       return [xDer, filterDer, biasDer];
@@ -9205,7 +11994,7 @@ function fusedDepthwiseConv2d_({ x, filter, strides, pad: pad2, dataFormat = "NH
   };
   const attrs = {
     strides,
-    pad: pad2,
+    pad: pad3,
     dataFormat,
     dilations,
     dimRoundingMode,
@@ -11432,19 +14221,19 @@ var HTTPRequest = class {
     if (modelArtifacts.modelTopology instanceof ArrayBuffer) {
       throw new Error("BrowserHTTPRequest.save() does not support saving model topology in binary formats yet.");
     }
-    const init = Object.assign({ method: this.DEFAULT_METHOD }, this.requestInit);
-    init.body = new FormData();
+    const init2 = Object.assign({ method: this.DEFAULT_METHOD }, this.requestInit);
+    init2.body = new FormData();
     const weightsManifest = [{
       paths: ["./model.weights.bin"],
       weights: modelArtifacts.weightSpecs
     }];
     const modelTopologyAndWeightManifest = getModelJSONForModelArtifacts(modelArtifacts, weightsManifest);
-    init.body.append("model.json", new Blob([JSON.stringify(modelTopologyAndWeightManifest)], { type: JSON_TYPE }), "model.json");
+    init2.body.append("model.json", new Blob([JSON.stringify(modelTopologyAndWeightManifest)], { type: JSON_TYPE }), "model.json");
     if (modelArtifacts.weightData != null) {
       const weightBuffer = CompositeArrayBuffer.join(modelArtifacts.weightData);
-      init.body.append("model.weights.bin", new Blob([weightBuffer], { type: OCTET_STREAM_MIME_TYPE }), "model.weights.bin");
+      init2.body.append("model.weights.bin", new Blob([weightBuffer], { type: OCTET_STREAM_MIME_TYPE }), "model.weights.bin");
     }
-    const response = await this.fetch(this.path, init);
+    const response = await this.fetch(this.path, init2);
     if (response.ok) {
       return {
         modelArtifactsInfo: getModelArtifactsInfoForJSON(modelArtifacts),
@@ -11621,6 +14410,10 @@ function withSaveHandlerSync(saveHandler) {
 }
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/gather_nd_util.js
+var gather_nd_util_exports = {};
+__export(gather_nd_util_exports, {
+  prepareAndValidate: () => prepareAndValidate
+});
 function prepareAndValidate(tensor2, indices) {
   const tensorRank = tensor2.shape.length;
   const indicesRank = indices.shape.length;
@@ -12495,11 +15288,11 @@ function getImageCenter(center, imageHeight, imageWidth) {
 }
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/array_ops_util.js
-function getReshaped(inputShape, blockShape, prod4, batchToSpace = true) {
+function getReshaped(inputShape, blockShape, prod5, batchToSpace = true) {
   let reshaped = [];
   if (batchToSpace) {
     reshaped = reshaped.concat(blockShape.slice(0));
-    reshaped.push(inputShape[0] / prod4);
+    reshaped.push(inputShape[0] / prod5);
     reshaped = reshaped.concat(inputShape.slice(1));
   } else {
     reshaped = reshaped.concat(inputShape[0]);
@@ -12539,12 +15332,12 @@ function getPermuted(reshapedRank, blockShapeRank, batchToSpace = true) {
   }
   return permuted;
 }
-function getReshapedPermuted(inputShape, blockShape, prod4, batchToSpace = true) {
+function getReshapedPermuted(inputShape, blockShape, prod5, batchToSpace = true) {
   const reshapedPermuted = [];
   if (batchToSpace) {
-    reshapedPermuted.push(inputShape[0] / prod4);
+    reshapedPermuted.push(inputShape[0] / prod5);
   } else {
-    reshapedPermuted.push(inputShape[0] * prod4);
+    reshapedPermuted.push(inputShape[0] * prod5);
   }
   for (let i = 1; i < inputShape.length; ++i) {
     if (i <= blockShape.length) {
@@ -12716,14 +15509,14 @@ function getEinsumPermutation(nDims, idDims) {
   for (let i = 0; i < idDims.length; ++i) {
     permutationIndices[idDims[i]] = i;
   }
-  const expandDims5 = [];
+  const expandDims6 = [];
   for (let i = 0; i < nDims; ++i) {
     if (permutationIndices[i] === -1) {
-      expandDims5.push(i);
+      expandDims6.push(i);
     }
   }
   permutationIndices = permutationIndices.filter((d) => d !== -1);
-  return { permutationIndices, expandDims: expandDims5 };
+  return { permutationIndices, expandDims: expandDims6 };
 }
 function checkEinsumDimSizes(nDims, idDims, tensors) {
   const dimSizes = new Array(nDims);
@@ -13131,7 +15924,7 @@ var atanhGradConfig = {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/avg_pool_3d_grad.js
-function avgPool3dGrad_(dy, input2, filterSize, strides, pad2, dimRoundingMode) {
+function avgPool3dGrad_(dy, input2, filterSize, strides, pad3, dimRoundingMode) {
   const $dy = convertToTensor(dy, "dy", "avgPool3dGrad");
   const $input = convertToTensor(input2, "input", "avgPool3dGrad");
   let dy5D = $dy;
@@ -13150,9 +15943,9 @@ function avgPool3dGrad_(dy, input2, filterSize, strides, pad2, dimRoundingMode) 
   }
   assert(dy5D.rank === 5, () => `Error in avgPool3dGrad: dy must be rank 5 but got rank ${dy5D.rank}.`);
   assert(input5D.rank === 5, () => `Error in avgPool3dGrad: input must be rank 5 but got rank ${input5D.rank}.`);
-  checkPadOnDimRoundingMode("avgPool3dGrad", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("avgPool3dGrad", pad3, dimRoundingMode);
   const inputs = { dy: dy5D, input: input5D };
-  const attrs = { filterSize, strides, pad: pad2, dimRoundingMode };
+  const attrs = { filterSize, strides, pad: pad3, dimRoundingMode };
   const res = ENGINE.runKernel(AvgPool3DGrad, inputs, attrs);
   if (reshapedTo5D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3], res.shape[4]]);
@@ -13167,15 +15960,15 @@ var avgPool3DGradConfig = {
   inputsToSave: ["x"],
   gradFunc: (dy, saved, attrs) => {
     const [x] = saved;
-    const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+    const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
     return {
-      x: () => avgPool3dGrad(dy, x, filterSize, strides, pad2, dimRoundingMode)
+      x: () => avgPool3dGrad(dy, x, filterSize, strides, pad3, dimRoundingMode)
     };
   }
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/avg_pool_grad.js
-function avgPoolGrad_(dy, input2, filterSize, strides, pad2) {
+function avgPoolGrad_(dy, input2, filterSize, strides, pad3) {
   const $dy = convertToTensor(dy, "dy", "avgPoolGrad");
   const $input = convertToTensor(input2, "input", "avgPoolGrad");
   assert($input.rank === $dy.rank, () => `Rank of input (${$input.rank}) does not match rank of dy (${$dy.rank})`);
@@ -13190,7 +15983,7 @@ function avgPoolGrad_(dy, input2, filterSize, strides, pad2) {
   assert(dy4D.rank === 4, () => `Error in avgPoolGrad: dy must be rank 4 but got rank ${dy4D.rank}.`);
   assert(input4D.rank === 4, () => `Error in avgPoolGrad: input must be rank 4 but got rank ${input4D.rank}.`);
   const inputs = { dy: dy4D, input: input4D };
-  const attrs = { filterSize, strides, pad: pad2 };
+  const attrs = { filterSize, strides, pad: pad3 };
   const res = ENGINE.runKernel(AvgPoolGrad, inputs, attrs);
   if (reshapedTo4D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3]]);
@@ -13205,8 +15998,8 @@ var avgPoolGradConfig = {
   inputsToSave: ["x"],
   gradFunc: (dy, saved, attrs) => {
     const [x] = saved;
-    const { filterSize, strides, pad: pad2 } = attrs;
-    return { x: () => avgPoolGrad(dy, x, filterSize, strides, pad2) };
+    const { filterSize, strides, pad: pad3 } = attrs;
+    return { x: () => avgPoolGrad(dy, x, filterSize, strides, pad3) };
   }
 };
 
@@ -13336,11 +16129,11 @@ var conv2DGradConfig = {
   inputsToSave: ["x", "filter"],
   gradFunc: (dy, saved, attrs) => {
     const [x4D, $filter] = saved;
-    const { dilations, strides, pad: pad2, dataFormat } = attrs;
+    const { dilations, strides, pad: pad3, dataFormat } = attrs;
     assert(tupleValuesAreOne(dilations), () => `Error in gradient of conv2D: dilation rates greater than 1 are not yet supported in gradients. Got dilations '${dilations}'`);
     return {
-      x: () => conv2DBackpropInput(x4D.shape, dy, $filter, strides, pad2, dataFormat),
-      filter: () => conv2DBackpropFilter(x4D, dy, $filter.shape, strides, pad2, dataFormat)
+      x: () => conv2DBackpropInput(x4D.shape, dy, $filter, strides, pad3, dataFormat),
+      filter: () => conv2DBackpropFilter(x4D, dy, $filter.shape, strides, pad3, dataFormat)
     };
   }
 };
@@ -13351,16 +16144,16 @@ var conv2DBackpropInputGradConfig = {
   inputsToSave: ["dy", "filter"],
   gradFunc: (ddx, saved, attrs) => {
     const [dy, filter] = saved;
-    const { strides, pad: pad2, dataFormat, dimRoundingMode } = attrs;
+    const { strides, pad: pad3, dataFormat, dimRoundingMode } = attrs;
     return {
-      dy: () => conv2d(ddx, filter, strides, pad2, dataFormat, 1, dimRoundingMode),
-      filter: () => conv2DBackpropFilter(ddx, dy, filter.shape, strides, pad2, dataFormat, dimRoundingMode)
+      dy: () => conv2d(ddx, filter, strides, pad3, dataFormat, 1, dimRoundingMode),
+      filter: () => conv2DBackpropFilter(ddx, dy, filter.shape, strides, pad3, dataFormat, dimRoundingMode)
     };
   }
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/conv3d_backprop_filter.js
-function conv3DBackpropFilter_(x, dy, filterShape, strides, pad2) {
+function conv3DBackpropFilter_(x, dy, filterShape, strides, pad3) {
   let x5D = x;
   if (x.rank === 4) {
     x5D = reshape(x, [1, x.shape[0], x.shape[1], x.shape[2], x.shape[3]]);
@@ -13375,7 +16168,7 @@ function conv3DBackpropFilter_(x, dy, filterShape, strides, pad2) {
   assert(x5D.shape[4] === filterShape[3], () => `Error in conv3dDerFilter: depth of input ${x5D.shape[4]}) must match input depth in filter (${filterShape[3]}.`);
   assert(dy5D.shape[4] === filterShape[4], () => `Error in conv3dDerFilter: depth of dy (${dy5D.shape[4]}) must match output depth for filter (${filterShape[4]}).`);
   const inputs = { x: x5D, dy: dy5D };
-  const attrs = { strides, pad: pad2, filterShape };
+  const attrs = { strides, pad: pad3, filterShape };
   return ENGINE.runKernel(Conv3DBackpropFilterV2, inputs, attrs);
 }
 var conv3DBackpropFilter = /* @__PURE__ */ op({ conv3DBackpropFilter_ });
@@ -13385,12 +16178,12 @@ var conv3DGradConfig = {
   kernelName: Conv3D,
   inputsToSave: ["x", "filter"],
   gradFunc: (dy, saved, attrs) => {
-    const { dilations, strides, pad: pad2 } = attrs;
+    const { dilations, strides, pad: pad3 } = attrs;
     assert(tupleValuesAreOne(dilations), () => `Error in gradient of conv3D: dilation rates greater than 1 are not yet supported in gradients. Got dilations '${dilations}'`);
     const [x5D, $filter] = saved;
     return {
-      x: () => conv3DBackpropInput(x5D.shape, dy, $filter, strides, pad2),
-      filter: () => conv3DBackpropFilter(x5D, dy, $filter.shape, strides, pad2)
+      x: () => conv3DBackpropInput(x5D.shape, dy, $filter, strides, pad3),
+      filter: () => conv3DBackpropFilter(x5D, dy, $filter.shape, strides, pad3)
     };
   }
 };
@@ -13421,11 +16214,11 @@ var cumsumGradConfig = {
   inputsToSave: ["x"],
   gradFunc: (dy, saved, attrs) => {
     const [x] = saved;
-    const { axis, exclusive, reverse: reverse4 } = attrs;
+    const { axis, exclusive, reverse: reverse5 } = attrs;
     return {
       x: () => {
         const permutation = getAxesPermutation([axis], x.rank);
-        let out = cumsum(dy, axis, exclusive, !reverse4);
+        let out = cumsum(dy, axis, exclusive, !reverse5);
         if (permutation != null) {
           out = transpose(out, permutation);
         }
@@ -13440,7 +16233,7 @@ var depthwiseConv2dNativeGradConfig = {
   kernelName: DepthwiseConv2dNative,
   inputsToSave: ["x", "filter"],
   gradFunc: (dy, saved, attrs) => {
-    const { dilations, strides, pad: pad2, dimRoundingMode } = attrs;
+    const { dilations, strides, pad: pad3, dimRoundingMode } = attrs;
     const $dilations = dilations == null ? [1, 1] : dilations;
     assert(tupleValuesAreOne($dilations), () => `Error in gradient of depthwiseConv2dNative: dilation rates greater than 1 are not yet supported. Got dilations '${$dilations}'`);
     const [x, filter] = saved;
@@ -13448,10 +16241,10 @@ var depthwiseConv2dNativeGradConfig = {
     assert(filter.rank === 4, () => `Error in gradient of depthwiseConv2dNative: filter must be rank 4, but got rank ${filter.rank}.`);
     assert(x.shape[3] === filter.shape[2], () => `Error in gradient of depthwiseConv2d: number of input channels (${x.shape[3]}) must match the inChannels dimension in filter ${filter.shape[2]}.`);
     assert(eitherStridesOrDilationsAreOne(strides, $dilations), () => `Error in gradient of depthwiseConv2d: Either strides or dilations must be  1. Got strides ${strides} and dilations '${$dilations}'.`);
-    checkPadOnDimRoundingMode("depthwiseConv2d", pad2, dimRoundingMode);
+    checkPadOnDimRoundingMode("depthwiseConv2d", pad3, dimRoundingMode);
     return {
-      x: () => depthwiseConv2dNativeBackpropInput(x.shape, dy, filter, strides, pad2, $dilations, dimRoundingMode),
-      filter: () => depthwiseConv2dNativeBackpropFilter(x, dy, filter.shape, strides, pad2, $dilations, dimRoundingMode)
+      x: () => depthwiseConv2dNativeBackpropInput(x.shape, dy, filter, strides, pad3, $dilations, dimRoundingMode),
+      filter: () => depthwiseConv2dNativeBackpropFilter(x, dy, filter.shape, strides, pad3, $dilations, dimRoundingMode)
     };
   }
 };
@@ -13565,55 +16358,55 @@ var fusedBatchNormGradConfig = {
   inputsToSave: ["x", "mean", "variance", "scale"],
   gradFunc: (dy, saved, attrs) => {
     const { varianceEpsilon } = attrs;
-    const [x, mean3, variance, scale2] = saved;
+    const [x, mean4, variance, scale2] = saved;
     const scaleValue = scale2 == null ? scalar(1) : scale2;
-    const reductionAxes = getReductionAxes(mean3.shape, x.shape);
+    const reductionAxes = getReductionAxes(mean4.shape, x.shape);
     const tileShape = [];
-    if (mean3.rank === 1) {
+    if (mean4.rank === 1) {
       for (let i = 0; i < x.shape.length - 1; ++i) {
         tileShape.push(x.shape[i]);
       }
       tileShape.push(1);
     }
-    const xMinusMean = sub(x, mean3);
+    const xMinusMean = sub(x, mean4);
     const dyTimesScaleValue = mul(dy, scaleValue);
     const oneOverSqrtVariance = rsqrt(add2(variance, scalar(varianceEpsilon)));
     const minusHalfRCube = mul(mul(mul(oneOverSqrtVariance, oneOverSqrtVariance), oneOverSqrtVariance), scalar(-0.5));
     const derX = () => {
-      if (mean3.rank === 1) {
-        return reshape(mul(mul(dy, tile(reshape(oneOverSqrtVariance, [1, 1, 1, mean3.shape[0]]), tileShape)), scaleValue), x.shape);
+      if (mean4.rank === 1) {
+        return reshape(mul(mul(dy, tile(reshape(oneOverSqrtVariance, [1, 1, 1, mean4.shape[0]]), tileShape)), scaleValue), x.shape);
       } else {
         return reshape(mul(mul(dy, oneOverSqrtVariance), scaleValue), x.shape);
       }
     };
     const derMean = () => {
       let meanDer = mul(mul(oneOverSqrtVariance, scalar(-1)), dyTimesScaleValue);
-      if (mean3.rank === 1) {
+      if (mean4.rank === 1) {
         meanDer = sum2(meanDer, reductionAxes);
       }
-      return reshape(meanDer, mean3.shape);
+      return reshape(meanDer, mean4.shape);
     };
     const derVariance = () => {
       let varianceDer = mul(mul(minusHalfRCube, xMinusMean), dyTimesScaleValue);
-      if (mean3.rank === 1) {
+      if (mean4.rank === 1) {
         varianceDer = sum2(varianceDer, reductionAxes);
       }
-      return reshape(varianceDer, mean3.shape);
+      return reshape(varianceDer, mean4.shape);
     };
     const derScale = () => {
       const xMinusMean2TimesRsqrt = mul(xMinusMean, oneOverSqrtVariance);
       let scaleDer = mul(dy, xMinusMean2TimesRsqrt);
-      if (mean3.rank === 1) {
+      if (mean4.rank === 1) {
         scaleDer = sum2(scaleDer, reductionAxes);
       }
-      return reshape(scaleDer, mean3.shape);
+      return reshape(scaleDer, mean4.shape);
     };
     const derOffset = () => {
       let offsetDer = dy;
-      if (mean3.rank === 1) {
+      if (mean4.rank === 1) {
         offsetDer = sum2(offsetDer, reductionAxes);
       }
-      return reshape(offsetDer, mean3.shape);
+      return reshape(offsetDer, mean4.shape);
     };
     return {
       x: derX,
@@ -13775,8 +16568,8 @@ var logSoftmaxGradConfig = {
     return {
       logits: () => {
         const keepDims = true;
-        const softmax5 = exp(value);
-        return sub(dy, mul(sum2(dy, axis, keepDims), softmax5));
+        const softmax6 = exp(value);
+        return sub(dy, mul(sum2(dy, axis, keepDims), softmax6));
       }
     };
   }
@@ -13853,7 +16646,7 @@ var maximumGradConfig = {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/max_pool_3d_grad.js
-function maxPool3dGrad_(dy, input2, output, filterSize, strides, pad2, dimRoundingMode) {
+function maxPool3dGrad_(dy, input2, output, filterSize, strides, pad3, dimRoundingMode) {
   const $dy = convertToTensor(dy, "dy", "maxPool3dGrad");
   const $input = convertToTensor(input2, "input", "maxPool3dGrad");
   const $output = convertToTensor(output, "output", "maxPool3dGrad");
@@ -13882,9 +16675,9 @@ function maxPool3dGrad_(dy, input2, output, filterSize, strides, pad2, dimRoundi
   assert(dy5D.rank === 5, () => `Error in maxPool3dGrad: dy must be rank 5 but got rank ${dy5D.rank}.`);
   assert(input5D.rank === 5, () => `Error in maxPool3dGrad: input must be rank 5 but got rank ${input5D.rank}.`);
   assert(output5D.rank === 5, () => `Error in maxPool3dGrad: output must be rank 5 but got rank ${output5D.rank}.`);
-  checkPadOnDimRoundingMode("maxPool3dGrad", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("maxPool3dGrad", pad3, dimRoundingMode);
   const inputs = { dy: dy5D, input: input5D, output: output5D };
-  const attrs = { filterSize, strides, pad: pad2, dimRoundingMode };
+  const attrs = { filterSize, strides, pad: pad3, dimRoundingMode };
   const res = ENGINE.runKernel(MaxPool3DGrad, inputs, attrs);
   if (reshapedTo5D) {
     return reshape(res, [res.shape[1], res.shape[2], res.shape[3], res.shape[4]]);
@@ -13900,24 +16693,24 @@ var maxPool3DGradConfig = {
   outputsToSave: [true],
   gradFunc: (dy, saved, attrs) => {
     const [x, y] = saved;
-    const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+    const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
     return {
-      x: () => maxPool3dGrad(dy, x, y, filterSize, strides, pad2, dimRoundingMode)
+      x: () => maxPool3dGrad(dy, x, y, filterSize, strides, pad3, dimRoundingMode)
     };
   }
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/ops/max_pool_grad.js
-function maxPoolGrad_(dy, input2, output, filterSize, strides, pad2, dimRoundingMode) {
+function maxPoolGrad_(dy, input2, output, filterSize, strides, pad3, dimRoundingMode) {
   const $dy = convertToTensor(dy, "dy", "maxPoolGrad");
   const $input = convertToTensor(input2, "input", "maxPoolGrad");
   const $output = convertToTensor(output, "output", "maxPoolGrad");
   assert($input.rank === $dy.rank, () => `Rank of input (${$input.rank}) does not match rank of dy (${$dy.rank})`);
   assert($dy.rank === 4, () => `Error in maxPoolGrad: dy must be rank 4 but got rank ${$dy.rank}.`);
   assert($input.rank === 4, () => `Error in maxPoolGrad: input must be rank 4 but got rank ${$input.rank}.`);
-  checkPadOnDimRoundingMode("maxPoolGrad", pad2, dimRoundingMode);
+  checkPadOnDimRoundingMode("maxPoolGrad", pad3, dimRoundingMode);
   const inputs = { dy: $dy, input: $input, output: $output };
-  const attrs = { filterSize, strides, pad: pad2, dimRoundingMode };
+  const attrs = { filterSize, strides, pad: pad3, dimRoundingMode };
   return ENGINE.runKernel(MaxPoolGrad, inputs, attrs);
 }
 var maxPoolGrad = /* @__PURE__ */ op({ maxPoolGrad_ });
@@ -13929,9 +16722,9 @@ var maxPoolGradConfig = {
   outputsToSave: [true],
   gradFunc: (dy, saved, attrs) => {
     const [x, y] = saved;
-    const { filterSize, strides, pad: pad2 } = attrs;
+    const { filterSize, strides, pad: pad3 } = attrs;
     return {
-      x: () => maxPoolGrad(dy, x, y, filterSize, strides, pad2)
+      x: () => maxPoolGrad(dy, x, y, filterSize, strides, pad3)
     };
   }
 };
@@ -14916,9 +17709,9 @@ getGlobalTensorClass().prototype.atanh = function() {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/avg_pool.js
-getGlobalTensorClass().prototype.avgPool = function(filterSize, strides, pad2, dimRoundingMode) {
+getGlobalTensorClass().prototype.avgPool = function(filterSize, strides, pad3, dimRoundingMode) {
   this.throwIfDisposed();
-  return avgPool(this, filterSize, strides, pad2, dimRoundingMode);
+  return avgPool(this, filterSize, strides, pad3, dimRoundingMode);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/batch_to_space_nd.js
@@ -14928,9 +17721,9 @@ getGlobalTensorClass().prototype.batchToSpaceND = function(blockShape, crops) {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/batchnorm.js
-getGlobalTensorClass().prototype.batchNorm = function(mean3, variance, offset, scale2, varianceEpsilon) {
+getGlobalTensorClass().prototype.batchNorm = function(mean4, variance, offset, scale2, varianceEpsilon) {
   this.throwIfDisposed();
-  return batchNorm(this, mean3, variance, offset, scale2, varianceEpsilon);
+  return batchNorm(this, mean4, variance, offset, scale2, varianceEpsilon);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/broadcast_to.js
@@ -14952,9 +17745,9 @@ getGlobalTensorClass().prototype.ceil = function() {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/clip_by_value.js
-getGlobalTensorClass().prototype.clipByValue = function(min5, max5) {
+getGlobalTensorClass().prototype.clipByValue = function(min6, max6) {
   this.throwIfDisposed();
-  return clipByValue(this, min5, max5);
+  return clipByValue(this, min6, max6);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/concat.js
@@ -14967,21 +17760,21 @@ getGlobalTensorClass().prototype.concat = function(x, axis) {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/conv1d.js
-getGlobalTensorClass().prototype.conv1d = function(filter, stride, pad2, dataFormat, dilation, dimRoundingMode) {
+getGlobalTensorClass().prototype.conv1d = function(filter, stride, pad3, dataFormat, dilation, dimRoundingMode) {
   this.throwIfDisposed();
-  return conv1d(this, filter, stride, pad2, dataFormat, dilation, dimRoundingMode);
+  return conv1d(this, filter, stride, pad3, dataFormat, dilation, dimRoundingMode);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/conv2d_transpose.js
-getGlobalTensorClass().prototype.conv2dTranspose = function(filter, outputShape, strides, pad2, dimRoundingMode) {
+getGlobalTensorClass().prototype.conv2dTranspose = function(filter, outputShape, strides, pad3, dimRoundingMode) {
   this.throwIfDisposed();
-  return conv2dTranspose(this, filter, outputShape, strides, pad2, dimRoundingMode);
+  return conv2dTranspose(this, filter, outputShape, strides, pad3, dimRoundingMode);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/conv2d.js
-getGlobalTensorClass().prototype.conv2d = function(filter, strides, pad2, dataFormat, dilations, dimRoundingMode) {
+getGlobalTensorClass().prototype.conv2d = function(filter, strides, pad3, dataFormat, dilations, dimRoundingMode) {
   this.throwIfDisposed();
-  return conv2d(this, filter, strides, pad2, dataFormat, dilations, dimRoundingMode);
+  return conv2d(this, filter, strides, pad3, dataFormat, dilations, dimRoundingMode);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/cos.js
@@ -14997,15 +17790,15 @@ getGlobalTensorClass().prototype.cosh = function() {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/cumprod.js
-getGlobalTensorClass().prototype.cumprod = function(axis, exclusive, reverse4) {
+getGlobalTensorClass().prototype.cumprod = function(axis, exclusive, reverse5) {
   this.throwIfDisposed();
-  return cumprod(this, axis, exclusive, reverse4);
+  return cumprod(this, axis, exclusive, reverse5);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/cumsum.js
-getGlobalTensorClass().prototype.cumsum = function(axis, exclusive, reverse4) {
+getGlobalTensorClass().prototype.cumsum = function(axis, exclusive, reverse5) {
   this.throwIfDisposed();
-  return cumsum(this, axis, exclusive, reverse4);
+  return cumsum(this, axis, exclusive, reverse5);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/depth_to_space.js
@@ -15015,15 +17808,15 @@ getGlobalTensorClass().prototype.depthToSpace = function(blockSize, dataFormat) 
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/depthwise_conv2d.js
-getGlobalTensorClass().prototype.depthwiseConv2d = function(filter, strides, pad2, dataFormat, dilations, dimRoundingMode) {
+getGlobalTensorClass().prototype.depthwiseConv2d = function(filter, strides, pad3, dataFormat, dilations, dimRoundingMode) {
   this.throwIfDisposed();
-  return depthwiseConv2d(this, filter, strides, pad2, dataFormat, dilations, dimRoundingMode);
+  return depthwiseConv2d(this, filter, strides, pad3, dataFormat, dilations, dimRoundingMode);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/dilation2d.js
-getGlobalTensorClass().prototype.dilation2d = function(filter, strides, pad2, dilations, dataFormat) {
+getGlobalTensorClass().prototype.dilation2d = function(filter, strides, pad3, dilations, dataFormat) {
   this.throwIfDisposed();
-  return dilation2d(this, filter, strides, pad2, dilations, dataFormat);
+  return dilation2d(this, filter, strides, pad3, dilations, dataFormat);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/div_no_nan.js
@@ -15243,9 +18036,9 @@ getGlobalTensorClass().prototype.matMul = function(b, transposeA, transposeB) {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/max_pool.js
-getGlobalTensorClass().prototype.maxPool = function(filterSize, strides, pad2, dimRoundingMode) {
+getGlobalTensorClass().prototype.maxPool = function(filterSize, strides, pad3, dimRoundingMode) {
   this.throwIfDisposed();
-  return maxPool(this, filterSize, strides, pad2, dimRoundingMode);
+  return maxPool(this, filterSize, strides, pad3, dimRoundingMode);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/max.js
@@ -15429,9 +18222,9 @@ getGlobalTensorClass().prototype.selu = function() {
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/separable_conv2d.js
-getGlobalTensorClass().prototype.separableConv2d = function(depthwiseFilter, pointwiseFilter, strides, pad2, dilation, dataFormat) {
+getGlobalTensorClass().prototype.separableConv2d = function(depthwiseFilter, pointwiseFilter, strides, pad3, dilation, dataFormat) {
   this.throwIfDisposed();
-  return separableConv2d(this, depthwiseFilter, pointwiseFilter, strides, pad2, dilation, dataFormat);
+  return separableConv2d(this, depthwiseFilter, pointwiseFilter, strides, pad3, dilation, dataFormat);
 };
 
 // ../../node_modules/@tensorflow/tfjs-core/dist/public/chained_ops/sigmoid.js
@@ -16042,37 +18835,37 @@ function arrayProd(array2, begin, end) {
   if (end == null) {
     end = array2.length;
   }
-  let prod4 = 1;
+  let prod5 = 1;
   for (let i = begin; i < end; ++i) {
-    prod4 *= array2[i];
+    prod5 *= array2[i];
   }
-  return prod4;
+  return prod5;
 }
 function min2(array2) {
   if (array2.length === 0) {
     return Number.NaN;
   }
-  let min5 = Number.POSITIVE_INFINITY;
+  let min6 = Number.POSITIVE_INFINITY;
   for (let i = 0; i < array2.length; i++) {
     const value = array2[i];
-    if (value < min5) {
-      min5 = value;
+    if (value < min6) {
+      min6 = value;
     }
   }
-  return min5;
+  return min6;
 }
 function max2(array2) {
   if (array2.length === 0) {
     return Number.NaN;
   }
-  let max5 = Number.NEGATIVE_INFINITY;
+  let max6 = Number.NEGATIVE_INFINITY;
   for (let i = 0; i < array2.length; i++) {
     const value = array2[i];
-    if (value > max5) {
-      max5 = value;
+    if (value > max6) {
+      max6 = value;
     }
   }
-  return max5;
+  return max6;
 }
 function range2(begin, end) {
   if (end < begin) {
@@ -16259,8 +19052,8 @@ function tile2(x, n) {
   }
   return tile(x, n);
 }
-function randomNormal2(shape, mean3 = 0, stddev = 1, dtype, seed) {
-  return randomNormal(shape, mean3, stddev, dtype, seed);
+function randomNormal2(shape, mean4 = 0, stddev = 1, dtype, seed) {
+  return randomNormal(shape, mean4, stddev, dtype, seed);
 }
 function dot2(a, b, activation2, bias) {
   if (a.rank < 2 || b.rank < 2) {
@@ -16755,8 +19548,8 @@ var Orthogonal = class extends Initializer {
       const qr2 = linalg.qr(randNormalMat, false);
       let qMat = qr2[0];
       const rMat = qr2[1];
-      const diag3 = rMat.flatten().stridedSlice([0], [Math.min(numCols, numRows) * Math.min(numCols, numRows)], [Math.min(numCols, numRows) + 1]);
-      qMat = mul(qMat, diag3.sign());
+      const diag4 = rMat.flatten().stridedSlice([0], [Math.min(numCols, numRows) * Math.min(numCols, numRows)], [Math.min(numCols, numRows) + 1]);
+      qMat = mul(qMat, diag4.sign());
       if (numRows < numCols) {
         qMat = qMat.transpose();
       }
@@ -24789,11 +27582,11 @@ var RNN = class _RNN extends Layer {
         console.warn("Ignoring unroll = true for RNN layer, due to imperative backend.");
       }
       const cellCallKwargs = { training };
-      const step4 = (inputs2, states2) => {
+      const step5 = (inputs2, states2) => {
         const outputs2 = this.cell.call([inputs2].concat(states2), cellCallKwargs);
         return [outputs2[0], outputs2.slice(1)];
       };
-      const rnnOutputs = rnn(step4, inputs, initialState, this.goBackwards, mask, null, this.unroll, this.returnSequences);
+      const rnnOutputs = rnn(step5, inputs, initialState, this.goBackwards, mask, null, this.unroll, this.returnSequences);
       const lastOutput = rnnOutputs[0];
       const outputs = rnnOutputs[1];
       const states = rnnOutputs[2];
@@ -25678,13 +28471,13 @@ var ConvLSTM2DCell = class extends LSTMCell {
     if (this.useBias) {
       let biasInitializer;
       if (this.unitForgetBias) {
-        const init = this.biasInitializer;
+        const init2 = this.biasInitializer;
         const filters = this.filters;
         biasInitializer = new (_a = class CustomInit extends Initializer {
           apply(shape, dtype) {
-            const biasI = init.apply([filters]);
+            const biasI = init2.apply([filters]);
             const biasF = ones2([filters]);
-            const biasCAndO = init.apply([filters * 2]);
+            const biasCAndO = init2.apply([filters * 2]);
             return concatenate([biasI, biasF, biasCAndO]);
           }
         }, /** @nocollapse */
@@ -26957,14 +29750,14 @@ AlphaDropout.className = "AlphaDropout";
 serialization_exports.registerClass(AlphaDropout);
 
 // ../../node_modules/@tensorflow/tfjs-layers/dist/layers/normalization.js
-function batchNormalization(x, mean3, variance, beta, gamma, epsilon3 = 1e-3) {
+function batchNormalization(x, mean4, variance, beta, gamma, epsilon3 = 1e-3) {
   let out;
   if (x.rank === 2) {
-    out = batchNorm2d(x, mean3, variance, beta, gamma, epsilon3);
+    out = batchNorm2d(x, mean4, variance, beta, gamma, epsilon3);
   } else if (x.rank === 3) {
-    out = batchNorm3d(x, mean3, variance, beta, gamma, epsilon3);
+    out = batchNorm3d(x, mean4, variance, beta, gamma, epsilon3);
   } else if (x.rank === 4) {
-    out = batchNorm4d(x, mean3, variance, beta, gamma, epsilon3);
+    out = batchNorm4d(x, mean4, variance, beta, gamma, epsilon3);
   } else {
     throw new NotImplementedError(`batchNormalization is not implemented for array of rank ${x.rank} yet`);
   }
@@ -26973,16 +29766,16 @@ function batchNormalization(x, mean3, variance, beta, gamma, epsilon3 = 1e-3) {
 function regularNormalizeBatchInTraining(x, gamma, beta, reductionAxes, epsilon3 = 1e-3) {
   return tidy(() => {
     const meanAndVariance = moments(x, reductionAxes);
-    const mean3 = meanAndVariance.mean;
+    const mean4 = meanAndVariance.mean;
     const variance = meanAndVariance.variance;
-    const normed = batchNormalization(x, mean3, variance, beta, gamma, epsilon3);
-    return [normed, mean3, variance];
+    const normed = batchNormalization(x, mean4, variance, beta, gamma, epsilon3);
+    return [normed, mean4, variance];
   });
 }
 function broadcastNormalizeBatchInTraining(x, gamma, beta, reductionAxes, epsilon3 = 1e-3) {
   return tidy(() => {
     const meanAndVariance = moments(x, reductionAxes);
-    const mean3 = meanAndVariance.mean;
+    const mean4 = meanAndVariance.mean;
     const variance = meanAndVariance.variance;
     const targetShape = [];
     for (const axis of range2(0, x.rank)) {
@@ -26992,12 +29785,12 @@ function broadcastNormalizeBatchInTraining(x, gamma, beta, reductionAxes, epsilo
         targetShape.push(x.shape[axis]);
       }
     }
-    const broadcastMean = reshape(mean3, targetShape);
+    const broadcastMean = reshape(mean4, targetShape);
     const broadcastVariance = reshape(variance, targetShape);
     const broadcastGamma = gamma == null ? null : reshape(gamma, targetShape);
     const broadcastBeta = beta == null ? null : reshape(beta, targetShape);
     const normed = batchNormalization(x, broadcastMean, broadcastVariance, broadcastBeta, broadcastGamma, epsilon3);
-    return [normed, mean3, variance];
+    return [normed, mean4, variance];
   });
 }
 function normalizeBatchInTraining(x, gamma, beta, reductionAxes, epsilon3 = 1e-3) {
@@ -27075,7 +29868,7 @@ var BatchNormalization = class extends Layer {
       if (!training) {
         return normalizeInference();
       }
-      const [normedTraining, mean3, variance] = normalizeBatchInTraining(input2, this.gamma.read(), this.beta.read(), reductionAxes, this.epsilon);
+      const [normedTraining, mean4, variance] = normalizeBatchInTraining(input2, this.gamma.read(), this.beta.read(), reductionAxes, this.epsilon);
       const doMovingAverage = (variable2, value, momentum) => {
         tidy(() => {
           const decay = 1 - momentum;
@@ -27085,7 +29878,7 @@ var BatchNormalization = class extends Layer {
         });
       };
       const updateMovingMeanAndVariance = () => {
-        doMovingAverage(this.movingMean, mean3, this.momentum);
+        doMovingAverage(this.movingMean, mean4, this.momentum);
         doMovingAverage(this.movingVariance, variance, this.momentum);
       };
       updateMovingMeanAndVariance();
@@ -27183,7 +29976,7 @@ var LayerNormalization = class extends Layer {
     const nDims = inputShape.length;
     return tidy(() => {
       const keepDims = true;
-      let { mean: mean3, variance } = moments(input2, this.axis, keepDims);
+      let { mean: mean4, variance } = moments(input2, this.axis, keepDims);
       const broadcastShape = pyListRepeat(1, nDims);
       for (const dim of this.axis) {
         broadcastShape[dim] = inputShape[dim];
@@ -27208,7 +30001,7 @@ var LayerNormalization = class extends Layer {
           scaleOffsetTiling.push(inputShape[i]);
         }
       }
-      mean3 = tile(mean3, momentsTiling);
+      mean4 = tile(mean4, momentsTiling);
       variance = tile(variance, momentsTiling);
       if (scale2 != null) {
         scale2 = tile(scale2, scaleOffsetTiling);
@@ -27216,7 +30009,7 @@ var LayerNormalization = class extends Layer {
       if (offset != null) {
         offset = tile(offset, scaleOffsetTiling);
       }
-      return batchNormalization(input2, mean3, variance, offset, scale2, this.epsilon);
+      return batchNormalization(input2, mean4, variance, offset, scale2, this.epsilon);
     });
   }
   getConfig() {
@@ -27851,12 +30644,12 @@ var TimeDistributed = class extends Wrapper {
   call(inputs, kwargs) {
     return tidy(() => {
       inputs = getExactlyOneTensor(inputs);
-      const step4 = (inputs2, states) => {
+      const step5 = (inputs2, states) => {
         const output = getExactlyOneTensor(this.layer.call(inputs2, kwargs));
         return [output, []];
       };
       const rnnOutputs = rnn(
-        step4,
+        step5,
         inputs,
         [],
         false,
@@ -29213,8 +32006,8 @@ var LazyIterator = class {
    *
    * @returns A `LazyIterator` of transformed elements.
    */
-  map(transform4) {
-    return new MapIterator(this, transform4);
+  map(transform5) {
+    return new MapIterator(this, transform5);
   }
   /**
    * Maps this stream through an async 1-to-1 transform.
@@ -29224,8 +32017,8 @@ var LazyIterator = class {
    *
    * @returns A `LazyIterator` of transformed elements.
    */
-  mapAsync(transform4) {
-    return new AsyncMapIterator(this, transform4);
+  mapAsync(transform5) {
+    return new AsyncMapIterator(this, transform5);
   }
   /**
    * Maps this stream through a 1-to-1 transform, forcing serial execution.
@@ -29235,8 +32028,8 @@ var LazyIterator = class {
    *
    * @returns A `LazyIterator` of transformed elements.
    */
-  serialMapAsync(transform4) {
-    return new AsyncMapIterator(this, transform4).serial();
+  serialMapAsync(transform5) {
+    return new AsyncMapIterator(this, transform5).serial();
   }
   /**
    * Maps this stream through a 1-to-many transform.
@@ -29246,8 +32039,8 @@ var LazyIterator = class {
    *
    * @returns A `DataStream` of transformed elements.
    */
-  flatmap(transform4) {
-    return new FlatmapIterator(this, transform4);
+  flatmap(transform5) {
+    return new FlatmapIterator(this, transform5);
   }
   /**
    * Apply a function to every element of the stream.
@@ -29544,10 +32337,10 @@ var FilterIterator = class extends LazyIterator {
   }
 };
 var MapIterator = class extends LazyIterator {
-  constructor(upstream, transform4) {
+  constructor(upstream, transform5) {
     super();
     this.upstream = upstream;
-    this.transform = transform4;
+    this.transform = transform5;
   }
   summary() {
     return `${this.upstream.summary()} -> Map`;
@@ -29596,10 +32389,10 @@ var ErrorHandlingLazyIterator = class extends LazyIterator {
   }
 };
 var AsyncMapIterator = class extends LazyIterator {
-  constructor(upstream, transform4) {
+  constructor(upstream, transform5) {
     super();
     this.upstream = upstream;
-    this.transform = transform4;
+    this.transform = transform5;
   }
   summary() {
     return `${this.upstream.summary()} -> AsyncMap`;
@@ -29640,10 +32433,10 @@ var OneToManyIterator = class extends LazyIterator {
   }
 };
 var FlatmapIterator = class extends OneToManyIterator {
-  constructor(upstream, transform4) {
+  constructor(upstream, transform5) {
     super();
     this.upstream = upstream;
-    this.transform = transform4;
+    this.transform = transform5;
   }
   summary() {
     return `${this.upstream.summary()} -> Flatmap`;
@@ -29745,8 +32538,8 @@ var ShuffleIterator = class extends PrefetchIterator {
     this.lastRead = this.lastRead.then(() => this.serialNext());
     return this.lastRead;
   }
-  randomInt(max5) {
-    return Math.floor(this.random() * max5);
+  randomInt(max6) {
+    return Math.floor(this.random() * max6);
   }
   chooseIndex() {
     return this.randomInt(this.buffer.length());
@@ -29939,10 +32732,10 @@ var Dataset = class {
    *
    * @doc {heading: 'Data', subheading: 'Classes'}
    */
-  map(transform4) {
+  map(transform5) {
     const base = this;
     return datasetFromIteratorFn(async () => {
-      return (await base.iterator()).map((x) => tidy(() => transform4(x)));
+      return (await base.iterator()).map((x) => tidy(() => transform5(x)));
     }, this.size);
   }
   /**
@@ -29968,10 +32761,10 @@ var Dataset = class {
    *
    * @doc {heading: 'Data', subheading: 'Classes'}
    */
-  mapAsync(transform4) {
+  mapAsync(transform5) {
     const base = this;
     return datasetFromIteratorFn(async () => {
-      return (await base.iterator()).mapAsync(transform4);
+      return (await base.iterator()).mapAsync(transform5);
     }, this.size);
   }
   /**
@@ -30939,11 +33732,11 @@ var lessEqualConfig = {
 
 // ../../node_modules/@tensorflow/tfjs-backend-cpu/dist/kernels/LinSpace_impl.js
 function linSpaceImpl(start, stop, num) {
-  const step4 = (stop - start) / (num - 1);
+  const step5 = (stop - start) / (num - 1);
   const values = util_exports.makeZerosTypedArray(num, "float32");
   values[0] = start;
   for (let i = 1; i < values.length; i++) {
-    values[i] = values[i - 1] + step4;
+    values[i] = values[i - 1] + step5;
   }
   return values;
 }
@@ -30962,14 +33755,14 @@ function maxImpl(aVals, reduceSize, outShape, dtype) {
   const vals = util_exports.getTypedArrayFromDType(dtype, util_exports.sizeFromShape(outShape));
   for (let i = 0; i < vals.length; ++i) {
     const offset = i * reduceSize;
-    let max5 = aVals[offset];
+    let max6 = aVals[offset];
     for (let j = 0; j < reduceSize; ++j) {
       const value = aVals[offset + j];
-      if (Number.isNaN(value) || value > max5) {
-        max5 = value;
+      if (Number.isNaN(value) || value > max6) {
+        max6 = value;
       }
     }
-    vals[i] = max5;
+    vals[i] = max6;
   }
   return vals;
 }
@@ -31084,11 +33877,11 @@ function prodImpl(xShape, xDtype, xVals, reductionAxes) {
   const reduceSize = util_exports.sizeFromShape(reduceShape);
   for (let i = 0; i < outVals.length; ++i) {
     const offset = i * reduceSize;
-    let prod4 = 1;
+    let prod5 = 1;
     for (let j = 0; j < reduceSize; ++j) {
-      prod4 *= xVals[offset + j];
+      prod5 *= xVals[offset + j];
     }
-    outVals[i] = prod4;
+    outVals[i] = prod5;
   }
   return { outVals, outShape, outDtype };
 }
@@ -31213,8 +34006,8 @@ function writeValueSlices(paramsDenseValues, paramsDenseValuesShape, valueSlices
   const denseM = computeFlatOuterDims(paramsDenseValuesShape, 2)[1];
   const valuesM = computeFlatOuterDims(valuesShape, 2)[1];
   let outPos = 0;
-  for (const slice4 of valueSlices) {
-    for (let i = slice4[0]; i < slice4[1]; ++i) {
+  for (const slice5 of valueSlices) {
+    for (let i = slice5[0]; i < slice5[1]; ++i) {
       for (let j = 0; j < valueSize; ++j) {
         values[outPos * valuesM + j] = paramsDenseValues[i * denseM + j];
       }
@@ -31666,21 +34459,21 @@ function raggedTensorToTensorImpl(shape, shapesShape, values, valuesShape, value
 }
 
 // ../../node_modules/@tensorflow/tfjs-backend-cpu/dist/kernels/Range_impl.js
-function rangeImpl(start, stop, step4, dtype) {
+function rangeImpl(start, stop, step5, dtype) {
   const sameStartStop = start === stop;
-  const increasingRangeNegativeStep = start < stop && step4 < 0;
-  const decreasingRangePositiveStep = stop < start && step4 > 1;
+  const increasingRangeNegativeStep = start < stop && step5 < 0;
+  const decreasingRangePositiveStep = stop < start && step5 > 1;
   if (sameStartStop || increasingRangeNegativeStep || decreasingRangePositiveStep) {
     return util_exports.makeZerosTypedArray(0, dtype);
   }
-  const numElements = Math.abs(Math.ceil((stop - start) / step4));
+  const numElements = Math.abs(Math.ceil((stop - start) / step5));
   const values = util_exports.makeZerosTypedArray(numElements, dtype);
-  if (stop < start && step4 === 1) {
-    step4 = -1;
+  if (stop < start && step5 === 1) {
+    step5 = -1;
   }
   values[0] = start;
   for (let i = 1; i < values.length; i++) {
-    values[i] = values[i - 1] + step4;
+    values[i] = values[i - 1] + step5;
   }
   return values;
 }
@@ -32604,7 +35397,7 @@ function batchMatMul(args) {
           const kBlock = Math.min(k02 + blockSize, sharedDim);
           for (let i = i0; i < iBlock; i++) {
             for (let j = j0; j < jBlock; j++) {
-              let sum5 = 0;
+              let sum6 = 0;
               for (let k = k02; k < kBlock; k++) {
                 const aVal = (
                   // tslint:disable-next-line: max-line-length
@@ -32614,9 +35407,9 @@ function batchMatMul(args) {
                   // tslint:disable-next-line: max-line-length
                   b3dValues[k * bInnerStep + j * bOuterStep + batchIndexB * bBatch]
                 );
-                sum5 += aVal * bVal;
+                sum6 += aVal * bVal;
               }
-              resVals[bi * size + (i * rightDim + j)] += sum5;
+              resVals[bi * size + (i * rightDim + j)] += sum6;
             }
           }
         }
@@ -32724,12 +35517,12 @@ function all2(args) {
   const aVals = backend3.data.get($x.dataId).values;
   for (let i = 0; i < vals.length; ++i) {
     const offset = i * reduceSize;
-    let all4 = aVals[offset];
+    let all5 = aVals[offset];
     for (let j = 0; j < reduceSize; ++j) {
       const value = aVals[offset + j];
-      all4 = all4 && value;
+      all5 = all5 && value;
     }
-    vals[i] = all4;
+    vals[i] = all5;
   }
   if (permutedAxes != null) {
     backend3.disposeIntermediateTensorInfo($x);
@@ -32819,12 +35612,12 @@ function argMax2(args) {
   const aVals = backend3.data.get($x.dataId).values;
   for (let i = 0; i < vals.length; ++i) {
     const offset = i * reduceSize;
-    let max5 = aVals[offset];
+    let max6 = aVals[offset];
     let maxIndex = 0;
     for (let j = 0; j < reduceSize; ++j) {
       const value = aVals[offset + j];
-      if (value > max5) {
-        max5 = value;
+      if (value > max6) {
+        max6 = value;
         maxIndex = j;
       }
     }
@@ -32863,12 +35656,12 @@ function argMin2(args) {
   const aVals = backend3.data.get($x.dataId).values;
   for (let i = 0; i < vals.length; ++i) {
     const offset = i * reduceSize;
-    let min5 = aVals[offset];
+    let min6 = aVals[offset];
     let minIndex = 0;
     for (let j = 0; j < reduceSize; ++j) {
       const value = aVals[offset + j];
-      if (value < min5) {
-        min5 = value;
+      if (value < min6) {
+        min6 = value;
         minIndex = j;
       }
     }
@@ -33183,10 +35976,10 @@ function avgPool2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
   assertNotComplex(x, "avgPool");
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
   const dilations = 1;
   util_exports.assert(backend_util_exports.eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in avgPool: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
-  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad2, dimRoundingMode);
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad3, dimRoundingMode);
   let res;
   if (convInfo.filterWidth === 1 && convInfo.filterHeight === 1 && util_exports.arraysEqual(convInfo.inShape, convInfo.outShape)) {
     res = identity({ inputs: { x }, backend: backend3 });
@@ -33208,9 +36001,9 @@ var avgPoolConfig = {
 function avgPool3D(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
-  const { filterSize, strides, pad: pad2, dimRoundingMode, dataFormat } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode, dataFormat } = attrs;
   assertNotComplex(x, "avgPool3d");
-  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, 1, pad2, dimRoundingMode, dataFormat);
+  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, 1, pad3, dimRoundingMode, dataFormat);
   const xValues = backend3.data.get(x.dataId).values;
   const outBuf = pool3d2(xValues, x.shape, x.dtype, util_exports.computeStrides(x.shape), convInfo, "avg");
   return backend3.makeTensorInfo(outBuf.shape, "float32", outBuf.values);
@@ -33225,9 +36018,9 @@ var avgPool3DConfig = {
 function avgPool3DGrad(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, input: input2 } = inputs;
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
   assertNotComplex([dy, input2], "avgPool3DGrad");
-  const convInfo = backend_util_exports.computePool3DInfo(input2.shape, filterSize, strides, 1, pad2, dimRoundingMode);
+  const convInfo = backend_util_exports.computePool3DInfo(input2.shape, filterSize, strides, 1, pad3, dimRoundingMode);
   const strideDepth = convInfo.strideDepth;
   const strideHeight = convInfo.strideHeight;
   const strideWidth = convInfo.strideWidth;
@@ -33295,8 +36088,8 @@ function avgPoolGrad2(args) {
   const { dy, input: input2 } = inputs;
   const x = input2;
   assertNotComplex([dy, input2], "avgPoolGrad");
-  const { filterSize, strides, pad: pad2 } = attrs;
-  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad2);
+  const { filterSize, strides, pad: pad3 } = attrs;
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad3);
   const strideHeight = convInfo.strideHeight;
   const strideWidth = convInfo.strideWidth;
   const filterHeight = convInfo.filterHeight;
@@ -33348,17 +36141,17 @@ var avgPoolGradConfig2 = {
 // ../../node_modules/@tensorflow/tfjs-backend-cpu/dist/kernels/BatchNorm.js
 function batchNorm2(args) {
   const { inputs, backend: backend3, attrs } = args;
-  const { x, scale: scale2, offset, mean: mean3, variance } = inputs;
-  util_exports.assert(mean3.shape.length === variance.shape.length, () => "Batch normalization gradient requires mean and variance to have equal ranks.");
-  util_exports.assert(offset == null || mean3.shape.length === offset.shape.length, () => "Batch normalization gradient requires mean and offset to have equal ranks.");
-  util_exports.assert(scale2 == null || mean3.shape.length === scale2.shape.length, () => "Batch normalization gradient requires mean and scale to have equal ranks.");
-  assertNotComplex([x, mean3, variance, scale2, offset], "batchNorm");
+  const { x, scale: scale2, offset, mean: mean4, variance } = inputs;
+  util_exports.assert(mean4.shape.length === variance.shape.length, () => "Batch normalization gradient requires mean and variance to have equal ranks.");
+  util_exports.assert(offset == null || mean4.shape.length === offset.shape.length, () => "Batch normalization gradient requires mean and offset to have equal ranks.");
+  util_exports.assert(scale2 == null || mean4.shape.length === scale2.shape.length, () => "Batch normalization gradient requires mean and scale to have equal ranks.");
+  assertNotComplex([x, mean4, variance, scale2, offset], "batchNorm");
   let { varianceEpsilon } = attrs;
   if (varianceEpsilon == null) {
     varianceEpsilon = 1e-3;
   }
   const xVals = backend3.data.get(x.dataId).values;
-  const mVals = backend3.data.get(mean3.dataId).values;
+  const mVals = backend3.data.get(mean4.dataId).values;
   const varVals = backend3.data.get(variance.dataId).values;
   const sVals = scale2 ? backend3.data.get(scale2.dataId).values : new Float32Array([1]);
   const offVals = offset ? backend3.data.get(offset.dataId).values : new Float32Array([0]);
@@ -33400,10 +36193,10 @@ function batchToSpaceND2(args) {
   const { x } = inputs;
   const { blockShape, crops } = attrs;
   assertNotComplex([x], "batchToSpaceND");
-  const prod4 = blockShape.reduce((a, b) => a * b);
-  const reshaped = backend_util_exports.getReshaped(x.shape, blockShape, prod4);
+  const prod5 = blockShape.reduce((a, b) => a * b);
+  const reshaped = backend_util_exports.getReshaped(x.shape, blockShape, prod5);
   const permuted = backend_util_exports.getPermuted(reshaped.length, blockShape.length);
-  const reshapedPermuted = backend_util_exports.getReshapedPermuted(x.shape, blockShape, prod4);
+  const reshapedPermuted = backend_util_exports.getReshapedPermuted(x.shape, blockShape, prod5);
   const sliceBeginCoords = backend_util_exports.getSliceBeginCoords(crops, blockShape.length);
   const sliceSize = backend_util_exports.getSliceSize(reshapedPermuted, crops, blockShape.length);
   const xReshaped = reshape3({ inputs: { x }, backend: backend3, attrs: { shape: reshaped } });
@@ -33564,10 +36357,10 @@ var concatConfig = {
 function conv2D(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter } = inputs;
-  const { strides, pad: pad2, dataFormat, dilations, dimRoundingMode } = attrs;
+  const { strides, pad: pad3, dataFormat, dilations, dimRoundingMode } = attrs;
   assertNotComplex([x, filter], "conv2d");
   const $dataFormat = backend_util_exports.convertConv2DDataFormat(dataFormat);
-  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filter.shape, strides, dilations, pad2, dimRoundingMode, false, $dataFormat);
+  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filter.shape, strides, dilations, pad3, dimRoundingMode, false, $dataFormat);
   const filterHeight = convInfo.filterHeight;
   const filterWidth = convInfo.filterWidth;
   const dilationHeight = convInfo.dilationHeight;
@@ -33637,10 +36430,10 @@ var conv2DConfig = {
 function conv2DBackpropFilter2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, dy } = inputs;
-  const { strides, pad: pad2, dataFormat, dimRoundingMode, filterShape } = attrs;
+  const { strides, pad: pad3, dataFormat, dimRoundingMode, filterShape } = attrs;
   assertNotComplex([x, dy], "conv2dBackpropFilter");
   const $dataFormat = backend_util_exports.convertConv2DDataFormat(dataFormat);
-  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filterShape, strides, 1, pad2, dimRoundingMode, false, $dataFormat);
+  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filterShape, strides, 1, pad3, dimRoundingMode, false, $dataFormat);
   const { strideHeight, strideWidth, filterHeight, filterWidth } = convInfo;
   const isChannelsLast = convInfo.dataFormat === "channelsLast";
   const dW = new TensorBuffer(convInfo.filterShape, "float32");
@@ -33689,12 +36482,12 @@ var conv2DBackpropFilterConfig = {
 function conv2DBackpropInput2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, filter } = inputs;
-  const { inputShape, strides, pad: pad2, dataFormat, dimRoundingMode } = attrs;
+  const { inputShape, strides, pad: pad3, dataFormat, dimRoundingMode } = attrs;
   assertNotComplex([dy, filter], "conv2dBackpropInput");
   const filterStrides = util_exports.computeStrides(filter.shape);
   const dyStrides = util_exports.computeStrides(dy.shape);
   let $dataFormat = backend_util_exports.convertConv2DDataFormat(dataFormat);
-  const convInfo = backend_util_exports.computeConv2DInfo(inputShape, filter.shape, strides, 1, pad2, dimRoundingMode, false, $dataFormat);
+  const convInfo = backend_util_exports.computeConv2DInfo(inputShape, filter.shape, strides, 1, pad3, dimRoundingMode, false, $dataFormat);
   const dx = new TensorBuffer(convInfo.inShape, "float32");
   const dxValues = dx.values;
   const dyValues = backend3.data.get(dy.dataId).values;
@@ -33755,9 +36548,9 @@ var conv2DBackpropInputConfig = {
 function conv3D(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter } = inputs;
-  const { strides, pad: pad2, dilations } = attrs;
+  const { strides, pad: pad3, dilations } = attrs;
   assertNotComplex([x, filter], "conv3d");
-  const convInfo = backend_util_exports.computeConv3DInfo(x.shape, filter.shape, strides, dilations, pad2);
+  const convInfo = backend_util_exports.computeConv3DInfo(x.shape, filter.shape, strides, dilations, pad3);
   const { filterDepth, filterHeight, filterWidth, dilationDepth, dilationHeight, dilationWidth, padInfo } = convInfo;
   const padFront = padInfo.front;
   const padLeft = padInfo.left;
@@ -33828,11 +36621,11 @@ var conv3DConfig = {
 function conv3DBackpropFilterV2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, dy } = inputs;
-  const { strides, pad: pad2, filterShape } = attrs;
+  const { strides, pad: pad3, filterShape } = attrs;
   assertNotComplex([x, dy], "conv3dBackpropFilterV2");
   const xStrides = util_exports.computeStrides(x.shape);
   const dyStrides = util_exports.computeStrides(dy.shape);
-  const convInfo = backend_util_exports.computeConv3DInfo(x.shape, filterShape, strides, 1, pad2);
+  const convInfo = backend_util_exports.computeConv3DInfo(x.shape, filterShape, strides, 1, pad3);
   const strideDepth = convInfo.strideDepth;
   const strideHeight = convInfo.strideHeight;
   const strideWidth = convInfo.strideWidth;
@@ -33903,11 +36696,11 @@ var conv3DBackpropFilterV2Config = {
 function conv3DBackpropInputV2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, filter } = inputs;
-  const { pad: pad2, strides, inputShape } = attrs;
+  const { pad: pad3, strides, inputShape } = attrs;
   assertNotComplex([dy], "conv3dBackpropInputV2");
   const dyStrides = util_exports.computeStrides(dy.shape);
   const filterStrides = util_exports.computeStrides(filter.shape);
-  const convInfo = backend_util_exports.computeConv3DInfo(inputShape, filter.shape, strides, 1, pad2);
+  const convInfo = backend_util_exports.computeConv3DInfo(inputShape, filter.shape, strides, 1, pad3);
   const dx = new TensorBuffer(convInfo.inShape, "float32");
   const dxValues = dx.values;
   const [dxS0, dxS1, dxS2, dxS3] = dx.strides;
@@ -34081,7 +36874,7 @@ var cropAndResizeConfig = {
 function cumprod2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
-  const { axis, exclusive, reverse: reverse4 } = attrs;
+  const { axis, exclusive, reverse: reverse5 } = attrs;
   assertNotComplex(x, "cumprod");
   const permutation = backend_util_exports.getAxesPermutation([axis], x.shape.length);
   let $x = x;
@@ -34096,7 +36889,7 @@ function cumprod2(args) {
   const vals = util_exports.makeOnesTypedArray(util_exports.sizeFromShape($x.shape), resultDtype);
   const aVals = backend3.data.get($x.dataId).values;
   const finalDim = $x.shape[$x.shape.length - 1];
-  const indexAdjuster = reverse4 ? (i, j) => i + finalDim - j - 1 : (i, j) => i + j;
+  const indexAdjuster = reverse5 ? (i, j) => i + finalDim - j - 1 : (i, j) => i + j;
   for (let i = 0; i < aVals.length; i += finalDim) {
     for (let j = 0; j < finalDim; j++) {
       const idx = indexAdjuster(i, j);
@@ -34128,7 +36921,7 @@ var cumprodConfig = {
 function cumsum2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
-  const { axis, exclusive, reverse: reverse4 } = attrs;
+  const { axis, exclusive, reverse: reverse5 } = attrs;
   assertNotComplex(x, "cumsum");
   const permutation = backend_util_exports.getAxesPermutation([axis], x.shape.length);
   let $x = x;
@@ -34143,7 +36936,7 @@ function cumsum2(args) {
   const vals = util_exports.makeZerosTypedArray(util_exports.sizeFromShape($x.shape), resultDtype);
   const aVals = backend3.data.get($x.dataId).values;
   const finalDim = $x.shape[$x.shape.length - 1];
-  const indexAdjuster = reverse4 ? (i, j) => i + finalDim - j - 1 : (i, j) => i + j;
+  const indexAdjuster = reverse5 ? (i, j) => i + finalDim - j - 1 : (i, j) => i + j;
   for (let i = 0; i < aVals.length; i += finalDim) {
     for (let j = 0; j < finalDim; j++) {
       const idx = indexAdjuster(i, j);
@@ -34239,7 +37032,7 @@ var depthToSpaceConfig = {
 function depthwiseConv2dNative(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter } = inputs;
-  const { strides, pad: pad2, dilations, dimRoundingMode } = attrs;
+  const { strides, pad: pad3, dilations, dimRoundingMode } = attrs;
   assertNotComplex([x, filter], "depthwiseConv2DNative");
   const xStrides = util_exports.computeStrides(x.shape);
   const filterStrides = util_exports.computeStrides(filter.shape);
@@ -34253,7 +37046,7 @@ function depthwiseConv2dNative(args) {
     filter.shape,
     strides,
     $dilations,
-    pad2,
+    pad3,
     dimRoundingMode,
     true
     /* depthwise */
@@ -34316,14 +37109,14 @@ var depthwiseConv2dNativeConfig = {
 function depthwiseConv2dNativeBackpropFilter2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, dy } = inputs;
-  const { strides, dilations, pad: pad2, dimRoundingMode, filterShape } = attrs;
+  const { strides, dilations, pad: pad3, dimRoundingMode, filterShape } = attrs;
   assertNotComplex([x, dy], "depthwiseConv2dNativeBackpropFilter");
   const convInfo = backend_util_exports.computeConv2DInfo(
     x.shape,
     filterShape,
     strides,
     dilations,
-    pad2,
+    pad3,
     dimRoundingMode,
     true
     /* depthwise */
@@ -34372,7 +37165,7 @@ var depthwiseConv2dNativeBackpropFilterConfig = {
 function depthwiseConv2dNativeBackpropInput2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, filter } = inputs;
-  const { strides, dilations, pad: pad2, dimRoundingMode, inputShape } = attrs;
+  const { strides, dilations, pad: pad3, dimRoundingMode, inputShape } = attrs;
   assertNotComplex([dy, filter], "depthwiseConv2DNativeBackpropInput");
   const dyStrides = util_exports.computeStrides(dy.shape);
   const filterStrides = util_exports.computeStrides(filter.shape);
@@ -34381,7 +37174,7 @@ function depthwiseConv2dNativeBackpropInput2(args) {
     filter.shape,
     strides,
     dilations,
-    pad2,
+    pad3,
     dimRoundingMode,
     true
     /* depthwise */
@@ -34461,13 +37254,13 @@ var dilation2DConfig = {
   backendName: "cpu",
   kernelFunc: ({ inputs, backend: backend3, attrs }) => {
     const { x, filter } = inputs;
-    const { strides, pad: pad2, dilations } = attrs;
+    const { strides, pad: pad3, dilations } = attrs;
     const cpuBackend = backend3;
     const xVals = cpuBackend.data.get(x.dataId).values;
     const xRank = x.shape.length;
     const filterVals = cpuBackend.data.get(filter.dataId).values;
     const filterRank = filter.shape.length;
-    const { batchSize, inHeight, inWidth, inChannels, outHeight, outWidth, padInfo, strideHeight, strideWidth, filterHeight, filterWidth, dilationHeight, dilationWidth, outShape } = backend_util_exports.computeDilation2DInfo(x.shape, filter.shape, strides, pad2, "NHWC", dilations);
+    const { batchSize, inHeight, inWidth, inChannels, outHeight, outWidth, padInfo, strideHeight, strideWidth, filterHeight, filterWidth, dilationHeight, dilationWidth, outShape } = backend_util_exports.computeDilation2DInfo(x.shape, filter.shape, strides, pad3, "NHWC", dilations);
     const outSize = util_exports.sizeFromShape(outShape);
     const outRank = outShape.length;
     const outputVals = util_exports.getArrayFromDType(x.dtype, outSize);
@@ -34511,11 +37304,11 @@ var dilation2DBackpropFilterConfig = {
   backendName: "cpu",
   kernelFunc: ({ inputs, backend: backend3, attrs }) => {
     const { x, filter, dy } = inputs;
-    const { strides, pad: pad2, dilations } = attrs;
+    const { strides, pad: pad3, dilations } = attrs;
     const cpuBackend = backend3;
     const $x = util_exports.toNestedArray(x.shape, cpuBackend.data.get(x.dataId).values);
     const $filter = util_exports.toNestedArray(filter.shape, cpuBackend.data.get(filter.dataId).values);
-    const { batchSize, inHeight, inWidth, inChannels, outHeight, outWidth, padInfo, strideHeight, strideWidth, filterHeight, filterWidth, dilationHeight, dilationWidth, outShape } = backend_util_exports.computeDilation2DInfo(x.shape, filter.shape, strides, pad2, "NHWC", dilations);
+    const { batchSize, inHeight, inWidth, inChannels, outHeight, outWidth, padInfo, strideHeight, strideWidth, filterHeight, filterWidth, dilationHeight, dilationWidth, outShape } = backend_util_exports.computeDilation2DInfo(x.shape, filter.shape, strides, pad3, "NHWC", dilations);
     util_exports.assert(dy.rank === outShape.length, () => `Error in ${Dilation2DBackpropFilter}, dy must have the same rank as output ${outShape.length}, but got ${dy.rank}`);
     const $dy = util_exports.toNestedArray(outShape, cpuBackend.data.get(dy.dataId).values);
     const gradients = util_exports.makeZerosNestedTypedArray(filter.shape, filter.dtype);
@@ -34560,11 +37353,11 @@ var dilation2DBackpropInputConfig = {
   backendName: "cpu",
   kernelFunc: ({ inputs, backend: backend3, attrs }) => {
     const { x, filter, dy } = inputs;
-    const { strides, pad: pad2, dilations } = attrs;
+    const { strides, pad: pad3, dilations } = attrs;
     const cpuBackend = backend3;
     const $x = util_exports.toNestedArray(x.shape, cpuBackend.data.get(x.dataId).values);
     const $filter = util_exports.toNestedArray(filter.shape, cpuBackend.data.get(filter.dataId).values);
-    const { batchSize, inHeight, inWidth, inChannels, outHeight, outWidth, padInfo, strideHeight, strideWidth, filterHeight, filterWidth, dilationHeight, dilationWidth, outShape } = backend_util_exports.computeDilation2DInfo(x.shape, filter.shape, strides, pad2, "NHWC", dilations);
+    const { batchSize, inHeight, inWidth, inChannels, outHeight, outWidth, padInfo, strideHeight, strideWidth, filterHeight, filterWidth, dilationHeight, dilationWidth, outShape } = backend_util_exports.computeDilation2DInfo(x.shape, filter.shape, strides, pad3, "NHWC", dilations);
     util_exports.assert(dy.rank === outShape.length, () => `Error in ${Dilation2DBackpropInput}, dy must have the same rank as output ${outShape.length}, but got ${dy.rank}`);
     const $dy = util_exports.toNestedArray(outShape, cpuBackend.data.get(dy.dataId).values);
     const gradients = util_exports.makeZerosNestedTypedArray(x.shape, x.dtype);
@@ -34692,11 +37485,11 @@ function sum3(args) {
   const aVals = backend3.data.get(permutedX.dataId).values;
   for (let i = 0; i < vals.length; ++i) {
     const offset = i * reduceSize;
-    let sum5 = 0;
+    let sum6 = 0;
     for (let j = 0; j < reduceSize; ++j) {
-      sum5 += aVals[offset + j];
+      sum6 += aVals[offset + j];
     }
-    vals[i] = sum5;
+    vals[i] = sum6;
   }
   if (keepDims) {
     const newShape = backend_util_exports.expandShapeToKeepDim(result.shape, axes);
@@ -35130,11 +37923,11 @@ var flipLeftRightConfig = {
 function fusedConv2D(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter, bias, preluActivationWeights } = inputs;
-  const { strides, pad: pad2, dataFormat, dilations, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
+  const { strides, pad: pad3, dataFormat, dilations, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
   let result = conv2D({
     inputs: { x, filter },
     backend: backend3,
-    attrs: { strides, pad: pad2, dataFormat, dilations, dimRoundingMode }
+    attrs: { strides, pad: pad3, dataFormat, dilations, dimRoundingMode }
   });
   if (bias) {
     const resultOld = result;
@@ -35174,11 +37967,11 @@ var fusedConv2DConfig = {
 function fusedDepthwiseConv2D(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter, bias, preluActivationWeights } = inputs;
-  const { strides, pad: pad2, dataFormat, dilations, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
+  const { strides, pad: pad3, dataFormat, dilations, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
   let result = depthwiseConv2dNative({
     inputs: { x, filter },
     backend: backend3,
-    attrs: { strides, pad: pad2, dataFormat, dilations, dimRoundingMode }
+    attrs: { strides, pad: pad3, dataFormat, dilations, dimRoundingMode }
   });
   if (bias) {
     const oldResult = result;
@@ -35385,16 +38178,16 @@ function lRN(args) {
     const currentChannel = offset % channels;
     let beginSumOffset = offset - currentChannel + Math.max(0, currentChannel - depthRadius);
     const endSumOffset = offset - currentChannel + Math.min(currentChannel + depthRadius, maxD);
-    let sum5 = 0;
+    let sum6 = 0;
     for (; beginSumOffset <= endSumOffset; beginSumOffset++) {
       const z = xValues[beginSumOffset];
-      sum5 += z * z;
+      sum6 += z * z;
     }
-    return sum5;
+    return sum6;
   }
   for (let offset = 0; offset < size; offset++) {
-    const sum5 = sumAcrossChannels(offset);
-    const val = xValues[offset] * Math.pow(bias + alpha * sum5, -beta);
+    const sum6 = sumAcrossChannels(offset);
+    const val = xValues[offset] * Math.pow(bias + alpha * sum6, -beta);
     result[offset] = val;
   }
   return backend3.makeTensorInfo(x.shape, x.dtype, result);
@@ -35489,10 +38282,10 @@ function maxPool2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
   assertNotComplex(x, "maxPool");
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
   const dilations = 1;
   util_exports.assert(backend_util_exports.eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in maxPool: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
-  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad2, dimRoundingMode);
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad3, dimRoundingMode);
   let res;
   if (convInfo.filterWidth === 1 && convInfo.filterHeight === 1 && util_exports.arraysEqual(convInfo.inShape, convInfo.outShape)) {
     res = identity({ inputs: { x }, backend: backend3 });
@@ -35514,9 +38307,9 @@ var maxPoolConfig = {
 function maxPool3D(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
-  const { filterSize, strides, pad: pad2, dimRoundingMode, dataFormat } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode, dataFormat } = attrs;
   assertNotComplex(x, "maxPool3d");
-  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, 1, pad2, dimRoundingMode, dataFormat);
+  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, 1, pad3, dimRoundingMode, dataFormat);
   const xValues = backend3.data.get(x.dataId).values;
   const outBuf = pool3d2(xValues, x.shape, x.dtype, util_exports.computeStrides(x.shape), convInfo, "max");
   return backend3.makeTensorInfo(outBuf.shape, "float32", outBuf.values);
@@ -35531,9 +38324,9 @@ var maxPool3DConfig = {
 function maxPool3DGrad(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, input: input2 } = inputs;
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
   assertNotComplex([dy, input2], "maxPool3DGrad");
-  const convInfo = backend_util_exports.computePool3DInfo(input2.shape, filterSize, strides, 1, pad2, dimRoundingMode);
+  const convInfo = backend_util_exports.computePool3DInfo(input2.shape, filterSize, strides, 1, pad3, dimRoundingMode);
   const inputBuf = backend3.bufferSync(input2);
   const maxPosBuf = maxPool3dPositions(inputBuf, convInfo);
   const strideDepth = convInfo.strideDepth;
@@ -35605,8 +38398,8 @@ function maxPoolGrad2(args) {
   const { dy, input: input2, output } = inputs;
   const x = input2;
   assertNotComplex([input2, output], "maxPoolGrad");
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
-  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad2, dimRoundingMode);
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad3, dimRoundingMode);
   const xValues = backend3.data.get(x.dataId).values;
   const maxPosBuf = buffer(convInfo.outShape, x.dtype, maxPoolPositions(xValues, x.shape, x.dtype, convInfo).values);
   const strideHeight = convInfo.strideHeight;
@@ -35674,11 +38467,11 @@ var maxPoolWithArgmaxConfig = {
   backendName: "cpu",
   kernelFunc: ({ inputs, attrs, backend: backend3 }) => {
     const { x } = inputs;
-    const { filterSize, strides, pad: pad2, includeBatchInIndex } = attrs;
+    const { filterSize, strides, pad: pad3, includeBatchInIndex } = attrs;
     const cpuBackend = backend3;
     assertNotComplex(x, "MaxPoolWithArgmax");
     const values = cpuBackend.data.get(x.dataId).values;
-    const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, [1, 1], pad2);
+    const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, [1, 1], pad3);
     const [pooled, indexes] = maxPoolWithArgmaxImpl(values, x.shape, x.dtype, includeBatchInIndex, convInfo);
     const pooledDataId = cpuBackend.write(pooled, convInfo.outShape, x.dtype);
     const indexesDataId = cpuBackend.write(indexes, convInfo.outShape, x.dtype);
@@ -35736,14 +38529,14 @@ function min3(args) {
   const aVals = backend3.data.get($x.dataId).values;
   for (let i = 0; i < vals.length; ++i) {
     const offset = i * reduceSize;
-    let min5 = aVals[offset];
+    let min6 = aVals[offset];
     for (let j = 0; j < reduceSize; ++j) {
       const value = aVals[offset + j];
-      if (Number.isNaN(value) || value < min5) {
-        min5 = value;
+      if (Number.isNaN(value) || value < min6) {
+        min6 = value;
       }
     }
-    vals[i] = min5;
+    vals[i] = min6;
   }
   if (permutedAxes != null) {
     backend3.disposeIntermediateTensorInfo($x);
@@ -36183,8 +38976,8 @@ var raggedTensorToTensorConfig = {
 // ../../node_modules/@tensorflow/tfjs-backend-cpu/dist/kernels/Range.js
 function range3(args) {
   const { backend: backend3, attrs } = args;
-  const { start, stop, dtype, step: step4 } = attrs;
-  const values = rangeImpl(start, stop, step4, dtype);
+  const { start, stop, dtype, step: step5 } = attrs;
+  const values = rangeImpl(start, stop, step5, dtype);
   return backend3.makeTensorInfo([values.length], dtype, values);
 }
 var rangeConfig = {
@@ -36747,7 +39540,7 @@ function spaceToBatchND2(args) {
   const { x } = inputs;
   const { blockShape, paddings } = attrs;
   assertNotComplex([x], "spaceToBatchND");
-  const prod4 = util_exports.sizeFromShape(blockShape);
+  const prod5 = util_exports.sizeFromShape(blockShape);
   const completePaddings = [[0, 0]];
   completePaddings.push(...paddings);
   for (let i = 1 + blockShape.length; i < x.shape.length; ++i) {
@@ -36758,9 +39551,9 @@ function spaceToBatchND2(args) {
     backend: backend3,
     attrs: { paddings: completePaddings, constantValue: 0 }
   });
-  const reshapedPaddedShape = backend_util_exports.getReshaped(paddedX.shape, blockShape, prod4, false);
+  const reshapedPaddedShape = backend_util_exports.getReshaped(paddedX.shape, blockShape, prod5, false);
   const permutedReshapedPaddedPermutation = backend_util_exports.getPermuted(reshapedPaddedShape.length, blockShape.length, false);
-  const flattenShape = backend_util_exports.getReshapedPermuted(paddedX.shape, blockShape, prod4, false);
+  const flattenShape = backend_util_exports.getReshapedPermuted(paddedX.shape, blockShape, prod5, false);
   const reshapeInputs = { x: paddedX };
   const reshapeAttrs = { shape: reshapedPaddedShape };
   const paddedXReshaped = reshape3({ inputs: reshapeInputs, backend: backend3, attrs: reshapeAttrs });
@@ -37199,17 +39992,17 @@ function transform2(args) {
   const imageVals = backend3.data.get(image2.dataId).values;
   const transformVals = backend3.data.get(transforms.dataId).values;
   for (let b = 0; b < batch; ++b) {
-    const transform4 = transforms.shape[0] === 1 ? transformVals : transformVals.subarray(b * 8, b * 8 + 8);
+    const transform5 = transforms.shape[0] === 1 ? transformVals : transformVals.subarray(b * 8, b * 8 + 8);
     for (let outY = 0; outY < outHeight; ++outY) {
       for (let outX = 0; outX < outWidth; ++outX) {
         for (let channel = 0; channel < numChannels; ++channel) {
           let val;
-          const projection = transform4[6] * outX + transform4[7] * outY + 1;
+          const projection = transform5[6] * outX + transform5[7] * outY + 1;
           if (projection === 0) {
             continue;
           }
-          const inX = (transform4[0] * outX + transform4[1] * outY + transform4[2]) / projection;
-          const inY = (transform4[3] * outX + transform4[4] * outY + transform4[5]) / projection;
+          const inX = (transform5[0] * outX + transform5[1] * outY + transform5[2]) / projection;
+          const inY = (transform5[3] * outX + transform5[4] * outY + transform5[5]) / projection;
           const x = mapCoord(inX, imageWidth, fillMode);
           const y = mapCoord(inY, imageHeight, fillMode);
           switch (interpolation) {
@@ -37836,8 +40629,8 @@ function logShaderSourceAndInfoLog(shaderSource, shaderInfoLog) {
   }
   const lineNumber = +lineNumberRegexResult[1];
   const shaderLines = shaderSource.split("\n");
-  const pad2 = shaderLines.length.toString().length + 2;
-  const linesWithLineNumbers = shaderLines.map((line, lineNumber2) => util_exports.rightPad((lineNumber2 + 1).toString(), pad2) + line);
+  const pad3 = shaderLines.length.toString().length + 2;
+  const linesWithLineNumbers = shaderLines.map((line, lineNumber2) => util_exports.rightPad((lineNumber2 + 1).toString(), pad3) + line);
   let maxLineLength = 0;
   for (let i = 0; i < linesWithLineNumbers.length; i++) {
     maxLineLength = Math.max(linesWithLineNumbers[i].length, maxLineLength);
@@ -37893,8 +40686,8 @@ function validateTextureSize(width, height) {
   }
   if (width > maxTextureSize || height > maxTextureSize) {
     const requested = `[${width}x${height}]`;
-    const max5 = `[${maxTextureSize}x${maxTextureSize}]`;
-    throw new Error("Requested texture size " + requested + " greater than WebGL maximum on this browser / GPU " + max5 + ".");
+    const max6 = `[${maxTextureSize}x${maxTextureSize}]`;
+    throw new Error("Requested texture size " + requested + " greater than WebGL maximum on this browser / GPU " + max6 + ".");
   }
 }
 function createFramebuffer(gl) {
@@ -38287,7 +41080,7 @@ ENV5.registerFlag("ENGINE_COMPILE_ONLY", () => false);
 
 // ../../node_modules/@tensorflow/tfjs-backend-webgl/dist/glsl_version.js
 function getGlslDifferences() {
-  let version8;
+  let version9;
   let attribute;
   let varyingVs;
   let varyingFs;
@@ -38298,7 +41091,7 @@ function getGlslDifferences() {
   let defineSpecialInf;
   let defineRound;
   if (env().getNumber("WEBGL_VERSION") === 2) {
-    version8 = "#version 300 es";
+    version9 = "#version 300 es";
     attribute = "in";
     varyingVs = "out";
     varyingFs = "in";
@@ -38330,7 +41123,7 @@ function getGlslDifferences() {
       }
     `;
   } else {
-    version8 = "";
+    version9 = "";
     attribute = "attribute";
     varyingVs = "varying";
     varyingFs = "varying";
@@ -38367,7 +41160,7 @@ function getGlslDifferences() {
     `;
   }
   return {
-    version: version8,
+    version: version9,
     attribute,
     varyingVs,
     varyingFs,
@@ -41229,7 +44022,7 @@ var PackProgram = class {
       const channels = getChannels("rc", this.rank);
       const dtype = getCoordsDataType(this.rank);
       const outOfBoundsCondition = this.getOutOfBoundsCondition(channels);
-      const setup = this.getSetup(channels);
+      const setup76 = this.getSetup(channels);
       const output = this.getOutput(channels);
       this.userCode = `
         void main() {
@@ -41238,7 +44031,7 @@ var PackProgram = class {
           if(${outOfBoundsCondition}) {
             setOutput(vec4(0));
           } else {
-            ${setup}
+            ${setup76}
 
             setOutput(vec4(${output}));
           }
@@ -41797,8 +44590,8 @@ var MathBackendWebGL = class _MathBackendWebGL extends KernelBackend {
   }
   readSync(dataId) {
     const texData = this.texData.get(dataId);
-    const { values, dtype, complexTensorInfos, slice: slice4, shape, isPacked } = texData;
-    if (slice4 != null) {
+    const { values, dtype, complexTensorInfos, slice: slice5, shape, isPacked } = texData;
+    if (slice5 != null) {
       let program;
       if (isPacked) {
         program = new UnaryOpPackedProgram(shape, CLONE);
@@ -41840,8 +44633,8 @@ var MathBackendWebGL = class _MathBackendWebGL extends KernelBackend {
       return new Promise((resolve) => subscribers2.push(resolve));
     }
     const texData = this.texData.get(dataId);
-    const { values, shape, slice: slice4, dtype, complexTensorInfos, isPacked } = texData;
-    if (slice4 != null) {
+    const { values, shape, slice: slice5, dtype, complexTensorInfos, isPacked } = texData;
+    if (slice5 != null) {
       let program;
       if (isPacked) {
         program = new UnaryOpPackedProgram(shape, CLONE);
@@ -41916,11 +44709,11 @@ var MathBackendWebGL = class _MathBackendWebGL extends KernelBackend {
    */
   readToGPU(dataId, options = {}) {
     const texData = this.texData.get(dataId);
-    const { values, shape, slice: slice4, dtype, isPacked, texture } = texData;
+    const { values, shape, slice: slice5, dtype, isPacked, texture } = texData;
     if (dtype === "complex64") {
       throw new Error("Does not support reading texture for complex64 dtype.");
     }
-    if (slice4 != null) {
+    if (slice5 != null) {
       let program;
       if (isPacked) {
         program = new UnaryOpPackedProgram(shape, CLONE);
@@ -42101,8 +44894,8 @@ var MathBackendWebGL = class _MathBackendWebGL extends KernelBackend {
     return true;
   }
   releaseGPUData(dataId) {
-    const { texture, dtype, texShape, usage, isPacked, slice: slice4 } = this.texData.get(dataId);
-    const key = slice4 && slice4.origDataId || dataId;
+    const { texture, dtype, texShape, usage, isPacked, slice: slice5 } = this.texData.get(dataId);
+    const key = slice5 && slice5.origDataId || dataId;
     const refCount = this.dataRefCount.get(key);
     if (refCount > 1) {
       this.dataRefCount.set(key, refCount - 1);
@@ -44524,10 +47317,10 @@ function avgPool3(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
   assertNotComplex2(x, "avgPool");
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
   const dilations = 1;
   util_exports.assert(backend_util_exports.eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in avgPool: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
-  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad2, dimRoundingMode);
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad3, dimRoundingMode);
   if (convInfo.filterWidth === 1 && convInfo.filterHeight === 1 && util_exports.arraysEqual(convInfo.inShape, convInfo.outShape)) {
     return identity2({ inputs: { x }, backend: backend3 });
   }
@@ -44544,9 +47337,9 @@ var avgPoolConfig2 = {
 function avgPool3D2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
-  const { filterSize, strides, pad: pad2, dimRoundingMode, dataFormat } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode, dataFormat } = attrs;
   const dilations = [1, 1, 1];
-  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, dilations, pad2, dimRoundingMode, dataFormat);
+  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, dilations, pad3, dimRoundingMode, dataFormat);
   const avgPoolProgram = new Pool3DProgram(convInfo, "avg", false);
   return backend3.runWebGLProgram(avgPoolProgram, [x], "float32");
 }
@@ -44702,9 +47495,9 @@ function avgPool3DGrad2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, input: input2 } = inputs;
   const x = input2;
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
   const dilations = [1, 1, 1];
-  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, dilations, pad2, dimRoundingMode);
+  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, dilations, pad3, dimRoundingMode);
   const avgPoolBackpropProgram = new AvgPool3DBackpropProgram(convInfo);
   return backend3.runWebGLProgram(avgPoolBackpropProgram, [dy], x.dtype);
 }
@@ -44720,8 +47513,8 @@ function avgPoolGrad3(args) {
   const { dy, input: input2 } = inputs;
   const x = input2;
   assertNotComplex2([dy, input2], "avgPoolGrad");
-  const { filterSize, strides, pad: pad2 } = attrs;
-  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad2);
+  const { filterSize, strides, pad: pad3 } = attrs;
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad3);
   const avgPoolBackpropProgram = new AvgPool2DBackpropProgram(convInfo);
   return backend3.runWebGLProgram(avgPoolBackpropProgram, [dy], x.dtype);
 }
@@ -44818,15 +47611,15 @@ var BatchNormPackedProgram = class {
 
 // ../../node_modules/@tensorflow/tfjs-backend-webgl/dist/kernels/BatchNorm.js
 var batchNorm3 = ({ inputs, backend: backend3, attrs }) => {
-  const { x, mean: mean3, variance, offset, scale: scale2 } = inputs;
-  util_exports.assert(mean3.shape.length === variance.shape.length, () => "Batch normalization gradient requires mean and variance to have equal ranks.");
-  util_exports.assert(offset == null || mean3.shape.length === offset.shape.length, () => "Batch normalization gradient requires mean and offset to have equal ranks.");
-  util_exports.assert(scale2 == null || mean3.shape.length === scale2.shape.length, () => "Batch normalization gradient requires mean and scale to have equal ranks.");
+  const { x, mean: mean4, variance, offset, scale: scale2 } = inputs;
+  util_exports.assert(mean4.shape.length === variance.shape.length, () => "Batch normalization gradient requires mean and variance to have equal ranks.");
+  util_exports.assert(offset == null || mean4.shape.length === offset.shape.length, () => "Batch normalization gradient requires mean and offset to have equal ranks.");
+  util_exports.assert(scale2 == null || mean4.shape.length === scale2.shape.length, () => "Batch normalization gradient requires mean and scale to have equal ranks.");
   let { varianceEpsilon } = attrs;
   if (varianceEpsilon == null) {
     varianceEpsilon = 1e-3;
   }
-  const finalInputs = [x, mean3, variance];
+  const finalInputs = [x, mean4, variance];
   let offsetShape = null;
   if (offset != null) {
     offsetShape = offset.shape;
@@ -44837,7 +47630,7 @@ var batchNorm3 = ({ inputs, backend: backend3, attrs }) => {
     scaleShape = scale2.shape;
     finalInputs.push(scale2);
   }
-  const program = env().getBool("WEBGL_PACK_NORMALIZATION") ? new BatchNormPackedProgram(x.shape, mean3.shape, variance.shape, offsetShape, scaleShape, varianceEpsilon) : new BatchNormProgram(x.shape, mean3.shape, variance.shape, offsetShape, scaleShape, varianceEpsilon);
+  const program = env().getBool("WEBGL_PACK_NORMALIZATION") ? new BatchNormPackedProgram(x.shape, mean4.shape, variance.shape, offsetShape, scaleShape, varianceEpsilon) : new BatchNormProgram(x.shape, mean4.shape, variance.shape, offsetShape, scaleShape, varianceEpsilon);
   const output = backend3.runWebGLProgram(program, finalInputs, finalInputs[0].dtype);
   return output;
 };
@@ -44991,10 +47784,10 @@ var batchToSpaceND3 = (args) => {
   const { x } = inputs;
   const { blockShape, crops } = attrs;
   util_exports.assert(x.shape.length <= 4, () => "batchToSpaceND for rank > 4 with a WebGL backend not implemented yet");
-  const prod4 = blockShape.reduce((a, b) => a * b);
-  const reshaped = backend_util_exports.getReshaped(x.shape, blockShape, prod4);
+  const prod5 = blockShape.reduce((a, b) => a * b);
+  const reshaped = backend_util_exports.getReshaped(x.shape, blockShape, prod5);
   const permuted = backend_util_exports.getPermuted(reshaped.length, blockShape.length);
-  const reshapedPermuted = backend_util_exports.getReshapedPermuted(x.shape, blockShape, prod4);
+  const reshapedPermuted = backend_util_exports.getReshapedPermuted(x.shape, blockShape, prod5);
   const sliceBeginCoords = backend_util_exports.getSliceBeginCoords(crops, blockShape.length);
   const sliceSize = backend_util_exports.getSliceSize(reshapedPermuted, crops, blockShape.length);
   const toDispose = [];
@@ -46405,9 +49198,9 @@ function conv2dWithIm2Row({ x, filter, convInfo, backend: backend3, bias = null,
 function conv2d4(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter } = inputs;
-  const { strides, pad: pad2, dataFormat, dilations, dimRoundingMode } = attrs;
+  const { strides, pad: pad3, dataFormat, dilations, dimRoundingMode } = attrs;
   const $dataFormat = backend_util_exports.convertConv2DDataFormat(dataFormat);
-  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filter.shape, strides, dilations, pad2, dimRoundingMode, false, $dataFormat);
+  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filter.shape, strides, dilations, pad3, dimRoundingMode, false, $dataFormat);
   let out;
   if (convInfo.filterHeight === 1 && convInfo.filterWidth === 1 && convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 && convInfo.strideHeight === 1 && convInfo.strideWidth === 1 && (convInfo.padInfo.type === "SAME" || convInfo.padInfo.type === "VALID")) {
     out = conv2dByMatMul({ x, filter, convInfo, backend: backend3 });
@@ -46689,9 +49482,9 @@ var Conv3DDerInputProgram = class {
 function conv2DBackpropFilter3(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, dy } = inputs;
-  const { strides, pad: pad2, dataFormat, dimRoundingMode, filterShape } = attrs;
+  const { strides, pad: pad3, dataFormat, dimRoundingMode, filterShape } = attrs;
   const $dataFormat = backend_util_exports.convertConv2DDataFormat(dataFormat);
-  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filterShape, strides, 1, pad2, dimRoundingMode, false, $dataFormat);
+  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filterShape, strides, 1, pad3, dimRoundingMode, false, $dataFormat);
   const program = new Conv2DDerFilterProgram(convInfo);
   return backend3.runWebGLProgram(program, [x, dy], "float32");
 }
@@ -46798,9 +49591,9 @@ var Conv2DDerInputPackedProgram = class {
 function conv2DBackpropInput3(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, filter } = inputs;
-  const { inputShape, strides, pad: pad2, dataFormat, dimRoundingMode } = attrs;
+  const { inputShape, strides, pad: pad3, dataFormat, dimRoundingMode } = attrs;
   const $dataFormat = backend_util_exports.convertConv2DDataFormat(dataFormat);
-  const convInfo = backend_util_exports.computeConv2DInfo(inputShape, filter.shape, strides, 1, pad2, dimRoundingMode, false, $dataFormat);
+  const convInfo = backend_util_exports.computeConv2DInfo(inputShape, filter.shape, strides, 1, pad3, dimRoundingMode, false, $dataFormat);
   if (env().getBool("WEBGL_PACK_CONV2DTRANSPOSE") && $dataFormat === "channelsLast") {
     const customValues = [
       [convInfo.strideHeight, convInfo.strideWidth]
@@ -46822,8 +49615,8 @@ var conv2DBackpropInputConfig2 = {
 function conv3D2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter } = inputs;
-  const { strides, pad: pad2, dilations } = attrs;
-  const convInfo = backend_util_exports.computeConv3DInfo(x.shape, filter.shape, strides, dilations, pad2);
+  const { strides, pad: pad3, dilations } = attrs;
+  const convInfo = backend_util_exports.computeConv3DInfo(x.shape, filter.shape, strides, dilations, pad3);
   const program = new Conv3DProgram(convInfo);
   return backend3.runWebGLProgram(program, [x, filter], "float32");
 }
@@ -46837,8 +49630,8 @@ var conv3DConfig2 = {
 function conv3DBackpropFilterV22(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, dy } = inputs;
-  const { strides, pad: pad2, filterShape } = attrs;
-  const convInfo = backend_util_exports.computeConv3DInfo(x.shape, filterShape, strides, 1, pad2);
+  const { strides, pad: pad3, filterShape } = attrs;
+  const convInfo = backend_util_exports.computeConv3DInfo(x.shape, filterShape, strides, 1, pad3);
   const program = new Conv3DDerFilterProgram(convInfo);
   return backend3.runWebGLProgram(program, [x, dy], "float32");
 }
@@ -46852,8 +49645,8 @@ var conv3DBackpropFilterV2Config2 = {
 function conv3DBackpropInput2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, filter } = inputs;
-  const { pad: pad2, strides, inputShape } = attrs;
-  const convInfo = backend_util_exports.computeConv3DInfo(inputShape, filter.shape, strides, 1, pad2);
+  const { pad: pad3, strides, inputShape } = attrs;
+  const convInfo = backend_util_exports.computeConv3DInfo(inputShape, filter.shape, strides, 1, pad3);
   const program = new Conv3DDerInputProgram(convInfo);
   return backend3.runWebGLProgram(program, [dy, filter], "float32");
 }
@@ -47007,7 +49800,7 @@ var CumOpType;
   CumOpType2["Sum"] = "+";
 })(CumOpType || (CumOpType = {}));
 var CumProgram = class {
-  constructor(op2, outputShape, exclusive, reverse4) {
+  constructor(op2, outputShape, exclusive, reverse5) {
     this.op = op2;
     this.outputShape = outputShape;
     this.variableNames = ["x"];
@@ -47019,11 +49812,11 @@ var CumProgram = class {
     let condition = "";
     let idxString = "";
     if (exclusive) {
-      condition = reverse4 ? `end != ${length - 1}` : "end != 0";
-      idxString = reverse4 ? "end + 1" : "end - 1";
+      condition = reverse5 ? `end != ${length - 1}` : "end != 0";
+      idxString = reverse5 ? "end + 1" : "end - 1";
     } else {
-      condition = reverse4 ? `end + pow2 < ${length}` : "end >= pow2";
-      idxString = reverse4 ? "end + pow2" : "end - pow2";
+      condition = reverse5 ? `end + pow2 < ${length}` : "end >= pow2";
+      idxString = reverse5 ? "end + pow2" : "end - pow2";
     }
     this.userCode = `
       void main() {
@@ -47069,7 +49862,7 @@ function getFinalCoord(rank, name, op2) {
 }
 
 // ../../node_modules/@tensorflow/tfjs-backend-webgl/dist/kernels/Cum_impl.js
-function cumImpl(op2, x, backend3, axis, exclusive, reverse4) {
+function cumImpl(op2, x, backend3, axis, exclusive, reverse5) {
   const xRank = x.shape.length;
   const permutation = backend_util_exports.getAxesPermutation([axis], xRank);
   let permutedX = x;
@@ -47083,14 +49876,14 @@ function cumImpl(op2, x, backend3, axis, exclusive, reverse4) {
   const size = permutedX.shape[permutedAxis];
   let result = identity2({ inputs: { x: permutedX }, backend: backend3 });
   for (let i = 0; i <= Math.ceil(Math.log2(size)) - 1; i++) {
-    const program = new CumProgram(op2, permutedX.shape, false, reverse4);
+    const program = new CumProgram(op2, permutedX.shape, false, reverse5);
     const customValues = [[i]];
     const prevResult = result;
     result = backend3.runWebGLProgram(program, [result], result.dtype, customValues);
     backend3.disposeIntermediateTensorInfo(prevResult);
   }
   if (exclusive) {
-    const program = new CumProgram(op2, permutedX.shape, exclusive, reverse4);
+    const program = new CumProgram(op2, permutedX.shape, exclusive, reverse5);
     const prevResult = result;
     result = backend3.runWebGLProgram(program, [result], result.dtype);
     backend3.disposeIntermediateTensorInfo(prevResult);
@@ -47109,8 +49902,8 @@ function cumImpl(op2, x, backend3, axis, exclusive, reverse4) {
 function cumprod3(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
-  const { axis, exclusive, reverse: reverse4 } = attrs;
-  return cumImpl(CumOpType.Prod, x, backend3, axis, exclusive, reverse4);
+  const { axis, exclusive, reverse: reverse5 } = attrs;
+  return cumImpl(CumOpType.Prod, x, backend3, axis, exclusive, reverse5);
 }
 var cumprodConfig2 = {
   kernelName: Cumprod,
@@ -47122,8 +49915,8 @@ var cumprodConfig2 = {
 function cumsum3(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
-  const { axis, exclusive, reverse: reverse4 } = attrs;
-  return cumImpl(CumOpType.Sum, x, backend3, axis, exclusive, reverse4);
+  const { axis, exclusive, reverse: reverse5 } = attrs;
+  return cumImpl(CumOpType.Sum, x, backend3, axis, exclusive, reverse5);
 }
 var cumsumConfig2 = {
   kernelName: Cumsum,
@@ -47641,7 +50434,7 @@ var DepthwiseConvPacked2DProgram = class {
 function depthwiseConv2dNative2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter } = inputs;
-  const { strides, pad: pad2, dilations, dimRoundingMode } = attrs;
+  const { strides, pad: pad3, dilations, dimRoundingMode } = attrs;
   let $dilations = dilations;
   if ($dilations == null) {
     $dilations = [1, 1];
@@ -47652,7 +50445,7 @@ function depthwiseConv2dNative2(args) {
     filter.shape,
     strides,
     $dilations,
-    pad2,
+    pad3,
     dimRoundingMode,
     true
     /* depthwise */
@@ -47789,13 +50582,13 @@ var DepthwiseConv2DDerInputProgram = class {
 function depthwiseConv2dNativeBackpropFilter3(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, dy } = inputs;
-  const { strides, dilations, pad: pad2, dimRoundingMode, filterShape } = attrs;
+  const { strides, dilations, pad: pad3, dimRoundingMode, filterShape } = attrs;
   const convInfo = backend_util_exports.computeConv2DInfo(
     x.shape,
     filterShape,
     strides,
     dilations,
-    pad2,
+    pad3,
     dimRoundingMode,
     true
     /* depthwise */
@@ -47813,13 +50606,13 @@ var depthwiseConv2dNativeBackpropFilterConfig2 = {
 function depthwiseConv2dNativeBackpropInput3(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, filter } = inputs;
-  const { strides, dilations, pad: pad2, dimRoundingMode, inputShape } = attrs;
+  const { strides, dilations, pad: pad3, dimRoundingMode, inputShape } = attrs;
   const convInfo = backend_util_exports.computeConv2DInfo(
     inputShape,
     filter.shape,
     strides,
     dilations,
-    pad2,
+    pad3,
     dimRoundingMode,
     true
     /* depthwise */
@@ -47921,8 +50714,8 @@ var Dilation2DProgram = class {
 function dilation2D(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter } = inputs;
-  const { strides, pad: pad2, dilations } = attrs;
-  const convInfo = backend_util_exports.computeDilation2DInfo(x.shape, filter.shape, strides, pad2, "NHWC", dilations);
+  const { strides, pad: pad3, dilations } = attrs;
+  const convInfo = backend_util_exports.computeDilation2DInfo(x.shape, filter.shape, strides, pad3, "NHWC", dilations);
   let out;
   const program = new Dilation2DProgram(convInfo);
   out = backend3.runWebGLProgram(program, [x, filter], "float32");
@@ -48484,9 +51277,9 @@ function fromPixels(args) {
 function fusedConv2d(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter, bias, preluActivationWeights } = inputs;
-  const { strides, pad: pad2, dataFormat, dilations, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
+  const { strides, pad: pad3, dataFormat, dilations, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
   const $dataFormat = backend_util_exports.convertConv2DDataFormat(dataFormat);
-  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filter.shape, strides, dilations, pad2, dimRoundingMode, false, $dataFormat);
+  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filter.shape, strides, dilations, pad3, dimRoundingMode, false, $dataFormat);
   let out;
   const intermediates = [];
   const hasBias = bias != null;
@@ -48573,7 +51366,7 @@ var fusedConv2DConfig2 = {
 function fusedDepthwiseConv2D2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x, filter, bias, preluActivationWeights } = inputs;
-  const { strides, pad: pad2, dilations, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
+  const { strides, pad: pad3, dilations, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
   const intermediates = [];
   let $dilations = dilations;
   if ($dilations == null) {
@@ -48585,7 +51378,7 @@ function fusedDepthwiseConv2D2(args) {
     filter.shape,
     strides,
     $dilations,
-    pad2,
+    pad3,
     dimRoundingMode,
     true
     /* depthwise */
@@ -49302,10 +52095,10 @@ function maxPool3(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
   assertNotComplex2(x, "maxPool");
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
   const dilations = 1;
   util_exports.assert(backend_util_exports.eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in maxPool: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
-  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad2, dimRoundingMode);
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad3, dimRoundingMode);
   if (convInfo.filterWidth === 1 && convInfo.filterHeight === 1 && util_exports.arraysEqual(convInfo.inShape, convInfo.outShape)) {
     return identity2({ inputs: { x }, backend: backend3 });
   }
@@ -49322,9 +52115,9 @@ var maxPoolConfig2 = {
 function maxPool3d2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { x } = inputs;
-  const { filterSize, strides, pad: pad2, dataFormat, dimRoundingMode } = attrs;
+  const { filterSize, strides, pad: pad3, dataFormat, dimRoundingMode } = attrs;
   const dilations = [1, 1, 1];
-  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, dilations, pad2, dimRoundingMode, dataFormat);
+  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, dilations, pad3, dimRoundingMode, dataFormat);
   const maxPoolProgram = new Pool3DProgram(convInfo, "max", false);
   return backend3.runWebGLProgram(maxPoolProgram, [x], x.dtype);
 }
@@ -49486,9 +52279,9 @@ function maxPool3DGrad2(args) {
   const { inputs, backend: backend3, attrs } = args;
   const { dy, input: input2 } = inputs;
   const x = input2;
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
   const dilations = [1, 1, 1];
-  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, dilations, pad2, dimRoundingMode);
+  const convInfo = backend_util_exports.computePool3DInfo(x.shape, filterSize, strides, dilations, pad3, dimRoundingMode);
   const maxPool3dPositionsProgram = new Pool3DProgram(
     convInfo,
     "max",
@@ -49513,8 +52306,8 @@ function maxPoolGrad3(args) {
   const { dy, input: input2, output } = inputs;
   const x = input2;
   assertNotComplex2([input2, output], "maxPoolGrad");
-  const { filterSize, strides, pad: pad2, dimRoundingMode } = attrs;
-  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad2, dimRoundingMode);
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad3, dimRoundingMode);
   const getPositions = true;
   const maxPoolPositionsProgram = new Pool2DProgram(convInfo, "max", getPositions);
   const maxPoolPositions2 = backend3.runWebGLProgram(maxPoolPositionsProgram, [x], x.dtype);
@@ -49544,12 +52337,12 @@ var maxPoolWithArgmaxConfig2 = {
   backendName: "webgl",
   kernelFunc: ({ inputs, attrs, backend: backend3 }) => {
     const { x } = inputs;
-    const { filterSize, strides, pad: pad2, includeBatchInIndex } = attrs;
+    const { filterSize, strides, pad: pad3, includeBatchInIndex } = attrs;
     const webglBackend = backend3;
     util_exports.assert(x.shape.length === 4, () => `Error in maxPool: input must be rank 4 but got rank ${x.shape.length}.`);
     const dilations = [1, 1];
     util_exports.assert(backend_util_exports.eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in maxPool: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
-    const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad2);
+    const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, dilations, pad3);
     const [result, indexes] = maxPoolWithArgmaxImpl2(x, includeBatchInIndex, convInfo, webglBackend);
     return [result, indexes];
   }
@@ -50479,8 +53272,8 @@ var raggedTensorToTensorConfig2 = {
 // ../../node_modules/@tensorflow/tfjs-backend-webgl/dist/kernels/Range.js
 var range4 = (args) => {
   const { backend: backend3, attrs } = args;
-  const { start, stop, step: step4, dtype } = attrs;
-  const values = rangeImplCPU(start, stop, step4, dtype);
+  const { start, stop, step: step5, dtype } = attrs;
+  const values = rangeImplCPU(start, stop, step5, dtype);
   return backend3.makeTensorInfo([values.length], dtype, values);
 };
 var rangeConfig2 = {
@@ -51683,7 +54476,7 @@ var spaceToBatchND3 = (args) => {
   const { x } = inputs;
   const { blockShape, paddings } = attrs;
   util_exports.assert(x.shape.length <= 4, () => "spaceToBatchND for rank > 4 with a WebGL backend not implemented yet");
-  const prod4 = blockShape.reduce((a, b) => a * b);
+  const prod5 = blockShape.reduce((a, b) => a * b);
   const completePaddings = [[0, 0]];
   completePaddings.push(...paddings);
   for (let i = 1 + blockShape.length; i < x.shape.length; ++i) {
@@ -51695,9 +54488,9 @@ var spaceToBatchND3 = (args) => {
     backend: backend3,
     attrs: { paddings: completePaddings, constantValue: 0 }
   });
-  const reshapedPaddedShape = backend_util_exports.getReshaped(paddedX.shape, blockShape, prod4, false);
+  const reshapedPaddedShape = backend_util_exports.getReshaped(paddedX.shape, blockShape, prod5, false);
   const permutedReshapedPaddedPermutation = backend_util_exports.getPermuted(reshapedPaddedShape.length, blockShape.length, false);
-  const flattenShape = backend_util_exports.getReshapedPermuted(paddedX.shape, blockShape, prod4, false);
+  const flattenShape = backend_util_exports.getReshapedPermuted(paddedX.shape, blockShape, prod5, false);
   const reshapedPaddedX = reshape4({ inputs: { x: paddedX }, backend: backend3, attrs: { shape: reshapedPaddedShape } });
   const paddedXT = transpose3({
     inputs: { x: reshapedPaddedX },
@@ -52998,6 +55791,5422 @@ for (const kernelConfig of kernelConfigs2) {
   registerKernel(kernelConfig);
 }
 
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/types.js
+var CppDType;
+(function(CppDType2) {
+  CppDType2[CppDType2["float32"] = 0] = "float32";
+  CppDType2[CppDType2["int32"] = 1] = "int32";
+  CppDType2[CppDType2["bool"] = 2] = "bool";
+  CppDType2[CppDType2["string"] = 3] = "string";
+  CppDType2[CppDType2["complex64"] = 4] = "complex64";
+})(CppDType || (CppDType = {}));
+var FusableActivation;
+(function(FusableActivation2) {
+  FusableActivation2[FusableActivation2["linear"] = 0] = "linear";
+  FusableActivation2[FusableActivation2["relu"] = 1] = "relu";
+  FusableActivation2[FusableActivation2["relu6"] = 2] = "relu6";
+  FusableActivation2[FusableActivation2["prelu"] = 3] = "prelu";
+  FusableActivation2[FusableActivation2["leakyrelu"] = 4] = "leakyrelu";
+  FusableActivation2[FusableActivation2["sigmoid"] = 5] = "sigmoid";
+  FusableActivation2[FusableActivation2["elu"] = 6] = "elu";
+})(FusableActivation || (FusableActivation = {}));
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/_FusedMatMul.js
+var wasmFusedMatMul;
+function setup(backend3) {
+  wasmFusedMatMul = backend3.wasm.cwrap(_FusedMatMul, null, [
+    "number",
+    "array",
+    "number",
+    "number",
+    "array",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function fusedBatchMatMul(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { a, b, bias, preluActivationWeights } = inputs;
+  if (a.dtype !== "float32" || b.dtype !== "float32") {
+    throw new Error(`_FusedMatMul for non non-float32 tensors not yet supported.`);
+  }
+  const { transposeA, transposeB, activation: activation2, leakyreluAlpha } = attrs;
+  const aId = backend3.dataIdMap.get(a.dataId).id;
+  const bId = backend3.dataIdMap.get(b.dataId).id;
+  let biasId = 0;
+  if (bias != null) {
+    const biasData = backend3.dataIdMap.get(bias.dataId);
+    if (biasData.shape.length !== 1) {
+      throw new Error(`_FusedMatMul only supports rank-1 bias but got rank ${biasData.shape.length}.`);
+    }
+    biasId = biasData.id;
+  }
+  const preluActivationWeightsId = preluActivationWeights == null ? 0 : backend3.dataIdMap.get(preluActivationWeights.dataId).id;
+  const fusedActivation = FusableActivation[activation2];
+  if (fusedActivation == null) {
+    throw new Error(`${activation2} activation not yet supported for FusedConv2D in the wasm backend.`);
+  }
+  const leftDim = transposeA ? a.shape[2] : a.shape[1];
+  const rightDim = transposeB ? b.shape[1] : b.shape[2];
+  const batchDims = broadcast_util_exports.assertAndGetBroadcastShape(a.shape.slice(0, -2), b.shape.slice(0, -2));
+  const out = backend3.makeOutput([...batchDims, leftDim, rightDim], a.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const aShapeBytes = new Uint8Array(new Int32Array(a.shape).buffer);
+  const bShapeBytes = new Uint8Array(new Int32Array(b.shape).buffer);
+  wasmFusedMatMul(aId, aShapeBytes, a.shape.length, bId, bShapeBytes, b.shape.length, transposeA, transposeB, fusedActivation, biasId, preluActivationWeightsId, leakyreluAlpha || 0, outId);
+  return out;
+}
+var _fusedMatMulConfig3 = {
+  kernelName: _FusedMatMul,
+  backendName: "wasm",
+  setupFunc: setup,
+  kernelFunc: fusedBatchMatMul
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/unary_kernel.js
+function createUnaryKernelConfig(kernelName, outType) {
+  let wasmFunc8;
+  function setupFunc3(backend3) {
+    wasmFunc8 = backend3.wasm.cwrap(kernelName, null, [
+      "number",
+      "number",
+      "number"
+      // out_id
+    ]);
+  }
+  function kernelFunc3(args) {
+    const { backend: backend3, inputs: { x } } = args;
+    const xId = backend3.dataIdMap.get(x.dataId).id;
+    const out = backend3.makeOutput(x.shape, outType || x.dtype);
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    if (util_exports.sizeFromShape(out.shape) === 0) {
+      return out;
+    }
+    wasmFunc8(xId, CppDType[x.dtype], outId);
+    return out;
+  }
+  return { kernelName, backendName: "wasm", setupFunc: setupFunc3, kernelFunc: kernelFunc3 };
+}
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Abs.js
+var absConfig3 = createUnaryKernelConfig(Abs);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Acos.js
+var acosConfig3 = createUnaryKernelConfig(Acos);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Acosh.js
+var acoshConfig3 = createUnaryKernelConfig(Acosh);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/binary_kernel.js
+function createBinaryKernelConfig(kernelName, supportsFullBroadcast20, dtype) {
+  let wasmFunc8;
+  function setupFunc3(backend3) {
+    wasmFunc8 = backend3.wasm.cwrap(kernelName, null, [
+      "number",
+      "array",
+      "number",
+      "number",
+      "array",
+      "number",
+      "number",
+      "number"
+      // out_id
+    ]);
+  }
+  function kernelFunc3(args) {
+    const { backend: backend3, inputs } = args;
+    const { a, b } = inputs;
+    const aId = backend3.dataIdMap.get(a.dataId).id;
+    const bId = backend3.dataIdMap.get(b.dataId).id;
+    const outputType = dtype != null ? dtype : a.dtype;
+    const newShape = backend_util_exports.assertAndGetBroadcastShape(a.shape, b.shape);
+    const out = backend3.makeOutput(newShape, outputType);
+    if (util_exports.sizeFromShape(newShape) === 0) {
+      return out;
+    }
+    const aShapeBytes = new Uint8Array(new Int32Array(a.shape).buffer);
+    const bShapeBytes = new Uint8Array(new Int32Array(b.shape).buffer);
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    const kernelFunc4 = () => wasmFunc8(aId, aShapeBytes, a.shape.length, bId, bShapeBytes, b.shape.length, CppDType[a.dtype], outId);
+    kernelFunc4();
+    return out;
+  }
+  return { kernelName, backendName: "wasm", setupFunc: setupFunc3, kernelFunc: kernelFunc3 };
+}
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Add.js
+var supportsFullBroadcast = true;
+var addConfig3 = createBinaryKernelConfig(Add, supportsFullBroadcast);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/AddN.js
+var wasmFunc;
+function setupFunc(backend3) {
+  wasmFunc = backend3.wasm.cwrap(AddN, null, [
+    "array",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function addn(args) {
+  const { inputs, backend: backend3 } = args;
+  const out = backend3.makeOutput(inputs[0].shape, inputs[0].dtype);
+  if (util_exports.sizeFromShape(out.shape) === 0) {
+    return out;
+  }
+  const inputIds = inputs.map((x) => backend3.dataIdMap.get(x.dataId).id);
+  const inputIdsBytes = new Uint8Array(new Int32Array(inputIds).buffer);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmFunc(inputIdsBytes, inputIds.length, CppDType[out.dtype], outId);
+  return out;
+}
+var addNConfig3 = {
+  kernelName: AddN,
+  backendName: "wasm",
+  setupFunc,
+  kernelFunc: addn
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Identity.js
+function identity3(args) {
+  const { inputs: { x }, backend: backend3 } = args;
+  if (x.dtype === "string") {
+    return tensor(backend3.readSync(x.dataId), x.shape, x.dtype);
+  }
+  const out = backend3.makeOutput(x.shape, x.dtype);
+  const inVals = backend3.typedArrayFromHeap(x);
+  const outVals = backend3.typedArrayFromHeap(out);
+  outVals.set(inVals);
+  return out;
+}
+var identityConfig3 = {
+  kernelName: Identity,
+  backendName: "wasm",
+  kernelFunc: identity3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Transpose.js
+var wasmTranspose;
+function setup2(backend3) {
+  wasmTranspose = backend3.wasm.cwrap(Transpose, null, [
+    "number",
+    "array",
+    "number",
+    "number",
+    "number",
+    "array",
+    "number"
+    // perm.length
+  ]);
+}
+function transpose4(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const [reducedShape, perm] = removeOneSizeDims(inputs.x.shape, attrs.perm);
+  let permIsNoOp = true;
+  for (let i = 0; i < perm.length; i++) {
+    if (perm[i] !== i) {
+      permIsNoOp = false;
+    }
+  }
+  const outShape = computeOutShape4(inputs.x.shape, attrs.perm);
+  const x = {
+    dataId: inputs.x.dataId,
+    shape: reducedShape,
+    dtype: inputs.x.dtype
+  };
+  if (permIsNoOp) {
+    const cloned = identity3({ inputs, backend: backend3 });
+    cloned.shape = outShape;
+    return cloned;
+  }
+  const out = backend3.makeOutput(outShape, x.dtype);
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const permBytes = new Uint8Array(new Int32Array(perm).buffer);
+  const xShapeBytes = new Uint8Array(new Int32Array(x.shape).buffer);
+  wasmTranspose(xId, xShapeBytes, x.shape.length, CppDType[x.dtype], outId, permBytes, perm.length);
+  return out;
+}
+function computeOutShape4(inShape, perm) {
+  const outShape = new Array(inShape.length);
+  for (let i = 0; i < outShape.length; i++) {
+    outShape[i] = inShape[perm[i]];
+  }
+  return outShape;
+}
+function removeOneSizeDims(shape, perm) {
+  const newShape = [];
+  const newPerm = [];
+  for (let i = 0; i < shape.length; ++i) {
+    if (shape[i] !== 1) {
+      newShape.push(shape[i]);
+    }
+    if (shape[perm[i]] !== 1) {
+      newPerm.push(perm[i]);
+    }
+  }
+  for (let i = 0; i < newPerm.length; ++i) {
+    let minValIdx = -1;
+    for (let j = 0; j < newPerm.length; ++j) {
+      if (newPerm[j] >= i && (minValIdx === -1 || newPerm[minValIdx] > newPerm[j])) {
+        minValIdx = j;
+      }
+    }
+    newPerm[minValIdx] = i;
+  }
+  return [newShape, newPerm];
+}
+var transposeConfig3 = {
+  kernelName: Transpose,
+  backendName: "wasm",
+  kernelFunc: transpose4,
+  setupFunc: setup2
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/kernel_utils.js
+function permuteAxesAndTranspose(x, axis, backend3) {
+  const xShape = x.shape;
+  const xRank = x.shape.length;
+  const originalAxes = util_exports.parseAxisParam(axis, xShape);
+  let axes = originalAxes;
+  const permutedAxes = backend_util_exports.getAxesPermutation(axes, xRank);
+  let xTransposed = null;
+  let inputWasTransposed = false;
+  if (permutedAxes != null) {
+    const newShape = new Array(xRank);
+    for (let i = 0; i < newShape.length; i++) {
+      newShape[i] = xShape[permutedAxes[i]];
+    }
+    axes = backend_util_exports.getInnerMostAxes(axes.length, xRank);
+    xTransposed = transpose4({ inputs: { x }, attrs: { perm: permutedAxes }, backend: backend3 });
+    const xId = backend3.dataIdMap.get(x.dataId).id;
+    const transposedId = backend3.dataIdMap.get(xTransposed.dataId).id;
+    if (transposedId !== xId) {
+      inputWasTransposed = true;
+    }
+  }
+  return { transposed: xTransposed, originalAxes, axes, inputWasTransposed };
+}
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/All.js
+var wasmAll;
+function setup3(backend3) {
+  wasmAll = backend3.wasm.cwrap(All, null, ["number, number, number"]);
+}
+function all4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { axis, keepDims } = attrs;
+  const { x } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  let inputId = xId;
+  let input2 = x;
+  const { transposed, axes, originalAxes, inputWasTransposed } = permuteAxesAndTranspose(x, axis, backend3);
+  if (inputWasTransposed) {
+    const transposedId = backend3.dataIdMap.get(transposed.dataId).id;
+    input2 = transposed;
+    inputId = transposedId;
+  }
+  const inputRank = input2.shape.length;
+  backend_util_exports.assertAxesAreInnerMostDims("all", axes, inputRank);
+  const [outShape, reduceShape] = backend_util_exports.computeOutAndReduceShapes(input2.shape, axes);
+  const reduceSize = util_exports.sizeFromShape(reduceShape);
+  const out = backend3.makeOutput(outShape, x.dtype);
+  if (util_exports.sizeFromShape(input2.shape) !== 0) {
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    wasmAll(inputId, reduceSize, outId);
+  }
+  if (inputWasTransposed) {
+    backend3.disposeData(transposed.dataId);
+  }
+  if (keepDims) {
+    const newShape = backend_util_exports.expandShapeToKeepDim(out.shape, originalAxes);
+    out.shape = newShape;
+  }
+  return out;
+}
+var allConfig3 = {
+  kernelName: All,
+  backendName: "wasm",
+  setupFunc: setup3,
+  kernelFunc: all4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Any.js
+var wasmAny;
+function setup4(backend3) {
+  wasmAny = backend3.wasm.cwrap(Any, null, ["number, number, number"]);
+}
+function any4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { axis, keepDims } = attrs;
+  const { x } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  let inputId = xId;
+  let input2 = x;
+  const { transposed, axes, originalAxes, inputWasTransposed } = permuteAxesAndTranspose(x, axis, backend3);
+  if (inputWasTransposed) {
+    const transposedId = backend3.dataIdMap.get(transposed.dataId).id;
+    input2 = transposed;
+    inputId = transposedId;
+  }
+  const inputRank = input2.shape.length;
+  backend_util_exports.assertAxesAreInnerMostDims("any", axes, inputRank);
+  const [outShape, reduceShape] = backend_util_exports.computeOutAndReduceShapes(input2.shape, axes);
+  const reduceSize = util_exports.sizeFromShape(reduceShape);
+  const out = backend3.makeOutput(outShape, x.dtype);
+  if (util_exports.sizeFromShape(input2.shape) !== 0) {
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    wasmAny(inputId, reduceSize, outId);
+  }
+  if (inputWasTransposed) {
+    backend3.disposeData(transposed.dataId);
+  }
+  if (keepDims) {
+    const newShape = backend_util_exports.expandShapeToKeepDim(out.shape, originalAxes);
+    out.shape = newShape;
+  }
+  return out;
+}
+var anyConfig3 = {
+  kernelName: Any,
+  backendName: "wasm",
+  setupFunc: setup4,
+  kernelFunc: any4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/argminmax_kernel.js
+function createArgMinMaxKernelConfig(kernelName) {
+  let wasmFunc8;
+  function setupFunc3(backend3) {
+    wasmFunc8 = backend3.wasm.cwrap(kernelName, null, [
+      "number",
+      "number",
+      "number",
+      "number",
+      "number"
+      // out_id
+    ]);
+  }
+  function kernelFunc3(args) {
+    const { backend: backend3, inputs, attrs } = args;
+    const { axis } = attrs;
+    const { x } = inputs;
+    const xId = backend3.dataIdMap.get(x.dataId).id;
+    let inputId = xId;
+    let input2 = x;
+    const { transposed, axes, inputWasTransposed } = permuteAxesAndTranspose(x, axis, backend3);
+    if (inputWasTransposed) {
+      const transposedId = backend3.dataIdMap.get(transposed.dataId).id;
+      if (transposedId !== xId) {
+        input2 = transposed;
+        inputId = transposedId;
+      }
+    }
+    const outShape = input2.shape.slice(0, -1);
+    const out = backend3.makeOutput(outShape, "int32");
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    const outerSize = util_exports.sizeFromShape(out.shape);
+    const innerSize = input2.shape[axes[0]];
+    wasmFunc8(inputId, CppDType[input2.dtype], outerSize, innerSize, outId);
+    if (inputWasTransposed) {
+      backend3.disposeData(transposed.dataId);
+    }
+    return out;
+  }
+  return {
+    kernelName,
+    backendName: "wasm",
+    setupFunc: setupFunc3,
+    kernelFunc: kernelFunc3
+  };
+}
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ArgMax.js
+var argMaxConfig3 = createArgMinMaxKernelConfig(ArgMax);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ArgMin.js
+var argMinConfig3 = createArgMinMaxKernelConfig(ArgMin);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Asin.js
+var asinConfig3 = createUnaryKernelConfig(Asin);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Asinh.js
+var asinhConfig3 = createUnaryKernelConfig(Asinh);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Atan.js
+var atanConfig3 = createUnaryKernelConfig(Atan);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Atan2.js
+var atan2Config3 = createBinaryKernelConfig(
+  Atan2,
+  /*supportsFullBroadcast=*/
+  false
+);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Atanh.js
+var atanhConfig3 = createUnaryKernelConfig(Atanh);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/AvgPool.js
+var wasmAvgPool;
+function setup5(backend3) {
+  wasmAvgPool = backend3.wasm.cwrap(AvgPool, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function avgPool4(args) {
+  const { inputs, attrs, backend: backend3 } = args;
+  const x = inputs.x;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad3, dimRoundingMode);
+  const filterHeight = convInfo.filterHeight;
+  const filterWidth = convInfo.filterWidth;
+  const padTop = convInfo.padInfo.top;
+  const padRight = convInfo.padInfo.right;
+  const padBottom = convInfo.padInfo.bottom;
+  const padLeft = convInfo.padInfo.left;
+  const strideHeight = convInfo.strideHeight;
+  const strideWidth = convInfo.strideWidth;
+  const channels = convInfo.inChannels;
+  if (convInfo.dataFormat !== "channelsLast") {
+    throw new Error(`wasm backend does not support dataFormat:'${convInfo.dataFormat}'. Please use 'channelsLast'.`);
+  }
+  if (convInfo.dilationWidth !== 1 || convInfo.dilationHeight !== 1) {
+    throw new Error(`was backend only supports average pooling with dilation = [1, 1], got [${convInfo.dilationHeight}, ${convInfo.dilationWidth}].`);
+  }
+  const out = backend3.makeOutput(convInfo.outShape, "float32");
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmAvgPool(xId, x.shape[0], x.shape[1], x.shape[2], filterHeight, filterWidth, padTop, padRight, padBottom, padLeft, strideHeight, strideWidth, channels, outId);
+  return out;
+}
+var avgPoolConfig3 = {
+  kernelName: AvgPool,
+  backendName: "wasm",
+  setupFunc: setup5,
+  kernelFunc: avgPool4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/AvgPool3D.js
+var wasmAvgPool3D;
+function setup6(backend3) {
+  wasmAvgPool3D = backend3.wasm.cwrap("AvgPool3D", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function avgPool3D3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode, dataFormat } = attrs;
+  const convInfo = backend_util_exports.computePool3DInfo(
+    x.shape,
+    filterSize,
+    strides,
+    /*dilations=*/
+    1,
+    pad3,
+    dimRoundingMode,
+    dataFormat
+  );
+  const out = backend3.makeOutput(convInfo.outShape, x.dtype);
+  wasmAvgPool3D(
+    backend3.dataIdMap.get(x.dataId).id,
+    backend3.dataIdMap.get(out.dataId).id,
+    convInfo.batchSize,
+    // Since Pool3D ops (AvgPool3D and MaxPool3D) support 3D filter only, in
+    // channels should always equal to out channels.
+    /*channelSize=*/
+    convInfo.inChannels,
+    convInfo.inDepth,
+    convInfo.inHeight,
+    convInfo.inWidth,
+    convInfo.outDepth,
+    convInfo.outHeight,
+    convInfo.outWidth,
+    convInfo.strideDepth,
+    convInfo.strideHeight,
+    convInfo.strideWidth,
+    convInfo.dilationDepth,
+    convInfo.dilationHeight,
+    convInfo.dilationWidth,
+    convInfo.effectiveFilterDepth,
+    convInfo.effectiveFilterHeight,
+    convInfo.effectiveFilterWidth,
+    convInfo.padInfo.front,
+    convInfo.padInfo.top,
+    convInfo.padInfo.left
+  );
+  return out;
+}
+var avgPool3DConfig3 = {
+  kernelName: AvgPool3D,
+  backendName: "wasm",
+  setupFunc: setup6,
+  kernelFunc: avgPool3D3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/AvgPool3DGrad.js
+var wasmAvgPool3DGrad;
+function setup7(backend3) {
+  wasmAvgPool3DGrad = backend3.wasm.cwrap("AvgPool3DGrad", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // filterWidth
+  ]);
+}
+function avgPool3DGrad3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { dy, input: input2 } = inputs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
+  const convInfo = backend_util_exports.computePool3DInfo(
+    input2.shape,
+    filterSize,
+    strides,
+    /*dilations=*/
+    1,
+    pad3,
+    dimRoundingMode
+  );
+  const dx = backend3.makeOutput(input2.shape, input2.dtype);
+  wasmAvgPool3DGrad(
+    backend3.dataIdMap.get(dy.dataId).id,
+    backend3.dataIdMap.get(dx.dataId).id,
+    convInfo.batchSize,
+    // Since Pool3D ops (AvgPool3D and MaxPool3D) support 3D filter only, in
+    // channels should always equal to out channels.
+    /*channelSize=*/
+    convInfo.inChannels,
+    convInfo.inDepth,
+    convInfo.inHeight,
+    convInfo.inWidth,
+    convInfo.outDepth,
+    convInfo.outHeight,
+    convInfo.outWidth,
+    convInfo.strideDepth,
+    convInfo.strideHeight,
+    convInfo.strideWidth,
+    convInfo.dilationDepth,
+    convInfo.dilationHeight,
+    convInfo.dilationWidth,
+    convInfo.effectiveFilterDepth,
+    convInfo.effectiveFilterHeight,
+    convInfo.effectiveFilterWidth,
+    convInfo.padInfo.front,
+    convInfo.padInfo.top,
+    convInfo.padInfo.left,
+    convInfo.filterDepth,
+    convInfo.filterHeight,
+    convInfo.filterWidth
+  );
+  return dx;
+}
+var avgPool3DGradConfig4 = {
+  kernelName: AvgPool3DGrad,
+  backendName: "wasm",
+  setupFunc: setup7,
+  kernelFunc: avgPool3DGrad3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/AvgPoolGrad.js
+var wasmAvgPoolGrad;
+function setup8(backend3) {
+  wasmAvgPoolGrad = backend3.wasm.cwrap("AvgPoolGrad", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // filterWidth
+  ]);
+}
+function avgPoolGrad4(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { dy, input: input2 } = inputs;
+  const { filterSize, strides, pad: pad3 } = attrs;
+  const convInfo = backend_util_exports.computePool2DInfo(
+    input2.shape,
+    filterSize,
+    strides,
+    /*dilations=*/
+    1,
+    pad3
+  );
+  const dx = backend3.makeOutput(input2.shape, input2.dtype);
+  wasmAvgPoolGrad(
+    backend3.dataIdMap.get(dy.dataId).id,
+    backend3.dataIdMap.get(dx.dataId).id,
+    convInfo.batchSize,
+    // Since Pool ops (AvgPool and MaxPool) support 2D filter only, in
+    // channels should always equal to out channels.
+    /*channelSize=*/
+    convInfo.inChannels,
+    convInfo.inHeight,
+    convInfo.inWidth,
+    convInfo.outHeight,
+    convInfo.outWidth,
+    convInfo.strideHeight,
+    convInfo.strideWidth,
+    convInfo.dilationHeight,
+    convInfo.dilationWidth,
+    convInfo.effectiveFilterHeight,
+    convInfo.effectiveFilterWidth,
+    convInfo.padInfo.top,
+    convInfo.padInfo.left,
+    convInfo.filterHeight,
+    convInfo.filterWidth
+  );
+  return dx;
+}
+var avgPoolGradConfig4 = {
+  kernelName: AvgPoolGrad,
+  backendName: "wasm",
+  setupFunc: setup8,
+  kernelFunc: avgPoolGrad4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Reshape.js
+function reshape5(args) {
+  const { inputs, attrs } = args;
+  const { x } = inputs;
+  const { shape } = attrs;
+  const xSize = util_exports.sizeFromShape(x.shape);
+  const $shape = util_exports.inferFromImplicitShape(shape, xSize);
+  util_exports.assert(xSize === util_exports.sizeFromShape($shape), () => `new shape: ${$shape}, old shape: ${x.shape}. New shape and old shape must have the same number of elements.`);
+  args.backend.incRef(x.dataId);
+  return { dataId: x.dataId, shape: $shape, dtype: x.dtype };
+}
+var reshapeConfig3 = {
+  kernelName: Reshape,
+  backendName: "wasm",
+  kernelFunc: reshape5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/BatchMatMul.js
+var wasmBatchMatMul;
+function setup9(backend3) {
+  wasmBatchMatMul = backend3.wasm.cwrap(BatchMatMul, null, [
+    "number",
+    "array",
+    "number",
+    "number",
+    "array",
+    "number",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function batchMatMul3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { a, b } = inputs;
+  const { transposeA, transposeB } = attrs;
+  if (a.dtype !== "float32" || b.dtype !== "float32") {
+    throw new Error(`BatchMatMul for non non-float32 tensors not yet supported.`);
+  }
+  const aRank = a.shape.length;
+  const bRank = b.shape.length;
+  const innerShapeA = transposeA ? a.shape[aRank - 2] : a.shape[aRank - 1];
+  const innerShapeB = transposeB ? b.shape[bRank - 1] : b.shape[bRank - 2];
+  const outerShapeA = transposeA ? a.shape[aRank - 1] : a.shape[aRank - 2];
+  const outerShapeB = transposeB ? b.shape[bRank - 2] : b.shape[bRank - 1];
+  const outerDimsA = a.shape.slice(0, -2);
+  const outerDimsB = b.shape.slice(0, -2);
+  const batchDimA = util_exports.sizeFromShape(outerDimsA);
+  const batchDimB = util_exports.sizeFromShape(outerDimsB);
+  const outShapeOuterDims = broadcast_util_exports.assertAndGetBroadcastShape(a.shape.slice(0, -2), b.shape.slice(0, -2));
+  const outShape = outShapeOuterDims.concat([outerShapeA, outerShapeB]);
+  util_exports.assert(innerShapeA === innerShapeB, () => `Error in matMul: inner shapes (${innerShapeA}) and (${innerShapeB}) of Tensors with shapes ${a.shape} and ${b.shape} and transposeA=${transposeA} and transposeB=${transposeB} must match.`);
+  const a3dShape = transposeA ? [batchDimA, innerShapeA, outerShapeA] : [batchDimA, outerShapeA, innerShapeA];
+  const b3dShape = transposeB ? [batchDimB, outerShapeB, innerShapeB] : [batchDimB, innerShapeB, outerShapeB];
+  const a3d = reshape5({ inputs: { x: a }, backend: backend3, attrs: { shape: a3dShape } });
+  const b3d = reshape5({ inputs: { x: b }, backend: backend3, attrs: { shape: b3dShape } });
+  const a3dId = backend3.dataIdMap.get(a3d.dataId).id;
+  const b3dId = backend3.dataIdMap.get(b3d.dataId).id;
+  const leftDim = transposeA ? a3d.shape[2] : a3d.shape[1];
+  const rightDim = transposeB ? b3d.shape[1] : b3d.shape[2];
+  const batchDim = Math.max(batchDimA, batchDimB);
+  const out = backend3.makeOutput([batchDim, leftDim, rightDim], a3d.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const aShapeBytes = new Uint8Array(new Int32Array(a3d.shape).buffer);
+  const bShapeBytes = new Uint8Array(new Int32Array(b3d.shape).buffer);
+  wasmBatchMatMul(a3dId, aShapeBytes, a3d.shape.length, b3dId, bShapeBytes, b3d.shape.length, transposeA, transposeB, outId);
+  backend3.disposeData(a3d.dataId);
+  backend3.disposeData(b3d.dataId);
+  out.shape = outShape;
+  return out;
+}
+var batchMatMulConfig3 = {
+  kernelName: BatchMatMul,
+  backendName: "wasm",
+  setupFunc: setup9,
+  kernelFunc: batchMatMul3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Slice.js
+function slice4(args) {
+  const { inputs: { x }, attrs: { begin, size }, backend: backend3 } = args;
+  const [begin_, size_] = slice_util_exports.parseSliceParams(x, begin, size);
+  const isContinous = slice_util_exports.isSliceContinous(x.shape, begin_, size_);
+  const xVals = backend3.readSync(x.dataId);
+  const out = backend3.makeOutput(size_, x.dtype);
+  const xStrides = util_exports.computeStrides(x.shape);
+  const outData = backend3.dataIdMap.get(out.dataId);
+  if (isContinous) {
+    const flatOffset = slice_util_exports.computeFlatOffset(begin_, xStrides);
+    if (x.dtype === "string") {
+      outData.stringBytes = xVals.slice(flatOffset, flatOffset + util_exports.sizeFromShape(size_));
+    } else {
+      const outVals2 = backend3.typedArrayFromHeap(out);
+      outVals2.set(xVals.subarray(flatOffset, flatOffset + util_exports.sizeFromShape(size_)));
+    }
+    return out;
+  }
+  if (x.dtype === "string") {
+    const res = sliceImpl(xVals, begin_, size_, x.shape, x.dtype);
+    outData.stringBytes = res;
+    return out;
+  }
+  const outVals = backend3.typedArrayFromHeap(out);
+  const rank = x.shape.length;
+  if (rank === 2) {
+    slice2d2(xVals, xStrides[0], outVals, begin_, size_);
+  } else if (rank === 3) {
+    slice3d2(xVals, xStrides[0], xStrides[1], outVals, begin_, size_);
+  } else if (rank === 4) {
+    slice4d2(xVals, xStrides[0], xStrides[1], xStrides[2], outVals, begin_, size_);
+  } else {
+    const res = sliceImpl(xVals, begin_, size_, x.shape, x.dtype);
+    outVals.set(res);
+  }
+  return out;
+}
+function slice2d2(xVals, xStride, outVals, begin, size) {
+  let outOffset = 0;
+  const beginI = begin[0];
+  const beginJ = begin[1];
+  const endI = beginI + size[0];
+  for (let i = beginI; i < endI; i++) {
+    const xOffset = i * xStride + beginJ;
+    outVals.set(xVals.subarray(xOffset, xOffset + size[1]), outOffset);
+    outOffset += size[1];
+  }
+}
+function slice3d2(xVals, xStride1, xStride2, outVals, begin, size) {
+  let outOffset = 0;
+  const beginI = begin[0];
+  const beginJ = begin[1];
+  const beginK = begin[2];
+  const endI = beginI + size[0];
+  const endJ = beginJ + size[1];
+  for (let i = beginI; i < endI; i++) {
+    for (let j = beginJ; j < endJ; j++) {
+      const xOffset = i * xStride1 + j * xStride2 + beginK;
+      outVals.set(xVals.subarray(xOffset, xOffset + size[2]), outOffset);
+      outOffset += size[2];
+    }
+  }
+}
+function slice4d2(xVals, xStride1, xStride2, xStride3, outVals, begin, size) {
+  let outOffset = 0;
+  const beginI = begin[0];
+  const beginJ = begin[1];
+  const beginK = begin[2];
+  const endI = beginI + size[0];
+  const endJ = beginJ + size[1];
+  const endK = beginK + size[2];
+  const beginL = begin[3];
+  for (let i = beginI; i < endI; i++) {
+    for (let j = beginJ; j < endJ; j++) {
+      for (let k = beginK; k < endK; k++) {
+        const xOffset = i * xStride1 + j * xStride2 + k * xStride3 + beginL;
+        outVals.set(xVals.subarray(xOffset, xOffset + size[3]), outOffset);
+        outOffset += size[3];
+      }
+    }
+  }
+}
+var sliceConfig3 = {
+  kernelName: Slice,
+  backendName: "wasm",
+  kernelFunc: slice4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/BatchToSpaceND.js
+function batchToSpaceND4(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { blockShape, crops } = attrs;
+  const prod5 = blockShape.reduce((a, b) => a * b);
+  const reshaped = backend_util_exports.getReshaped(x.shape, blockShape, prod5);
+  const permuted = backend_util_exports.getPermuted(reshaped.length, blockShape.length);
+  const reshapedPermuted = backend_util_exports.getReshapedPermuted(x.shape, blockShape, prod5);
+  const sliceBeginCoords = backend_util_exports.getSliceBeginCoords(crops, blockShape.length);
+  const sliceSize = backend_util_exports.getSliceSize(reshapedPermuted, crops, blockShape.length);
+  const xReshaped = reshape5({ inputs: { x }, backend: backend3, attrs: { shape: reshaped } });
+  const xTransposed = transpose4({ inputs: { x: xReshaped }, backend: backend3, attrs: { perm: permuted } });
+  const xTransposedReshaped = reshape5({ inputs: { x: xTransposed }, backend: backend3, attrs: { shape: reshapedPermuted } });
+  const result = slice4({
+    inputs: { x: xTransposedReshaped },
+    backend: backend3,
+    attrs: { begin: sliceBeginCoords, size: sliceSize }
+  });
+  backend3.disposeData(xReshaped.dataId);
+  backend3.disposeData(xTransposed.dataId);
+  backend3.disposeData(xTransposedReshaped.dataId);
+  return result;
+}
+var batchToSpaceNDConfig3 = {
+  kernelName: BatchToSpaceND,
+  backendName: "wasm",
+  kernelFunc: batchToSpaceND4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Bincount.js
+var wasmBincount;
+function setup10(backend3) {
+  wasmBincount = backend3.wasm.cwrap(Bincount, null, [
+    "number",
+    "number",
+    "boolean",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function bincount4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { x, weights } = inputs;
+  const { size } = attrs;
+  const hasWeights = weights.shape.reduce((p2, v) => p2 * v, 1) !== 0;
+  const outShape = x.shape.length === 1 ? [size] : [x.shape[0], size];
+  const out = backend3.makeOutput(outShape, weights.dtype);
+  function tensorId(x2) {
+    return backend3.dataIdMap.get(x2.dataId).id;
+  }
+  wasmBincount(tensorId(x), size, hasWeights, tensorId(weights), CppDType[weights.dtype], tensorId(out));
+  return out;
+}
+var bincountConfig3 = {
+  kernelName: Bincount,
+  backendName: "wasm",
+  setupFunc: setup10,
+  kernelFunc: bincount4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/BitwiseAnd.js
+var supportsFullBroadcast2 = true;
+var bitwiseAndConfig3 = createBinaryKernelConfig(BitwiseAnd, supportsFullBroadcast2);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/BroadcastArgs.js
+function broadcastArgs3(args) {
+  const { inputs, backend: backend3 } = args;
+  const { s0, s1 } = inputs;
+  const s0Vals = backend3.typedArrayFromHeap(s0);
+  const s1Vals = backend3.typedArrayFromHeap(s1);
+  const broadcastShape = backend_util_exports.assertAndGetBroadcastShape(Array.from(s0Vals), Array.from(s1Vals));
+  return backend3.makeOutput(
+    [broadcastShape.length],
+    "int32",
+    /*memoryOffset=*/
+    void 0,
+    /*values=*/
+    new Int32Array(broadcastShape)
+  );
+}
+var broadcastArgsConfig3 = {
+  kernelName: BroadcastArgs,
+  backendName: "wasm",
+  kernelFunc: broadcastArgs3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Cast.js
+function cast5(args) {
+  const { inputs: { x }, attrs: { dtype }, backend: backend3 } = args;
+  const out = backend3.makeOutput(x.shape, dtype);
+  const inVals = backend3.typedArrayFromHeap(x);
+  const outVals = backend3.typedArrayFromHeap(out);
+  outVals.set(inVals);
+  return out;
+}
+var castConfig3 = {
+  kernelName: Cast,
+  backendName: "wasm",
+  kernelFunc: cast5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Ceil.js
+var ceilConfig3 = createUnaryKernelConfig(Ceil);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ClipByValue.js
+var wasmClip;
+function setup11(backend3) {
+  wasmClip = backend3.wasm.cwrap(ClipByValue, null, [
+    "number",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function clip(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { clipValueMin, clipValueMax } = attrs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const out = backend3.makeOutput(x.shape, x.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmClip(xId, clipValueMin, clipValueMax, outId);
+  return out;
+}
+var clipByValueConfig3 = {
+  kernelName: ClipByValue,
+  backendName: "wasm",
+  setupFunc: setup11,
+  kernelFunc: clip
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Concat.js
+function concat4(args) {
+  const { inputs, backend: backend3 } = args;
+  const axis = util_exports.parseAxisParam(args.attrs.axis, inputs[0].shape)[0];
+  const shapes = inputs.map((t) => t.shape);
+  backend_util_exports.assertParamsConsistent(shapes, axis);
+  let outShape = backend_util_exports.computeOutShape(inputs.map((t) => t.shape), axis);
+  const $inputs = inputs.filter((t) => util_exports.sizeFromShape(t.shape) > 0);
+  if ($inputs.length === 1) {
+    return identity3({ inputs: { x: $inputs[0] }, backend: backend3 });
+  }
+  const out = backend3.makeOutput(outShape, inputs[0].dtype);
+  if (util_exports.sizeFromShape(outShape) === 0) {
+    return out;
+  }
+  if ($inputs[0].dtype === "string") {
+    const inputs2D = $inputs.map((t) => {
+      const innerSize = util_exports.sizeFromShape(t.shape.slice(axis));
+      const shape = [-1, innerSize];
+      return reshape5({ inputs: { x: t }, backend: backend3, attrs: { shape } });
+    });
+    const inputsValShapes = inputs2D.map((t) => {
+      return { vals: backend3.readSync(t.dataId), shape: t.shape };
+    });
+    outShape = backend_util_exports.computeOutShape(
+      inputs2D.map((t) => t.shape),
+      1
+      /* axis */
+    );
+    const simplyConcat = inputs2D[0].shape[0] === 1;
+    const outVals2 = concatImpl(inputsValShapes, outShape, inputs[0].dtype, simplyConcat);
+    const finalOutShape = backend_util_exports.computeOutShape($inputs.map((t) => t.shape), axis);
+    out.shape = finalOutShape;
+    const outData = backend3.dataIdMap.get(out.dataId);
+    outData.stringBytes = backend_util_exports.fromStringArrayToUint8(outVals2);
+    inputs2D.forEach((t) => backend3.disposeData(t.dataId));
+    return out;
+  }
+  const batchDim = util_exports.sizeFromShape($inputs[0].shape.slice(0, axis));
+  let sumInnerDims = 0;
+  const innerDims = $inputs.map((input2) => {
+    const innerDim = util_exports.sizeFromShape(input2.shape.slice(axis));
+    sumInnerDims += innerDim;
+    return innerDim;
+  });
+  const inVals = $inputs.map((input2) => backend3.typedArrayFromHeap(input2));
+  const outVals = backend3.typedArrayFromHeap(out);
+  for (let b = 0; b < batchDim; b++) {
+    let outOffset = b * sumInnerDims;
+    for (let i = 0; i < inVals.length; i++) {
+      const innerDim = innerDims[i];
+      const inOffset = b * innerDim;
+      const vals = inVals[i].subarray(inOffset, inOffset + innerDim);
+      outVals.set(vals, outOffset);
+      outOffset += innerDim;
+    }
+  }
+  return out;
+}
+var concatConfig3 = {
+  kernelName: Concat,
+  backendName: "wasm",
+  kernelFunc: concat4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Conv2D.js
+var wasmConv2d;
+function setup12(backend3) {
+  wasmConv2d = backend3.wasm.cwrap(Conv2D, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function conv2d5(args) {
+  const { inputs, attrs, backend: backend3 } = args;
+  const { x, filter } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const filterId = backend3.dataIdMap.get(filter.dataId).id;
+  const { strides, dilations, pad: pad3, dimRoundingMode, dataFormat } = attrs;
+  const $dataFormat = backend_util_exports.convertConv2DDataFormat(dataFormat);
+  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filter.shape, strides, dilations, pad3, dimRoundingMode, false, $dataFormat);
+  const filterHeight = convInfo.filterHeight;
+  const filterWidth = convInfo.filterWidth;
+  const padTop = convInfo.padInfo.top;
+  const padRight = convInfo.padInfo.right;
+  const padBottom = convInfo.padInfo.bottom;
+  const padLeft = convInfo.padInfo.left;
+  const dilationHeight = convInfo.dilationHeight;
+  const dilationWidth = convInfo.dilationWidth;
+  const strideHeight = convInfo.strideHeight;
+  const strideWidth = convInfo.strideWidth;
+  const inputChannels = convInfo.inChannels;
+  const outputChannels = convInfo.outChannels;
+  const isSamePad = convInfo.padInfo.type === "SAME" ? 1 : 0;
+  if (convInfo.dataFormat !== "channelsLast") {
+    throw new Error(`wasm backend Conv2D does not support dataFormat:'${convInfo.dataFormat}'. Please use 'channelsLast'.`);
+  }
+  const out = backend3.makeOutput(convInfo.outShape, "float32");
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmConv2d(xId, x.shape[0], x.shape[1], x.shape[2], filterId, filterHeight, filterWidth, padTop, padRight, padBottom, padLeft, isSamePad, dilationHeight, dilationWidth, strideHeight, strideWidth, inputChannels, outputChannels, outId);
+  return out;
+}
+var conv2DConfig3 = {
+  kernelName: Conv2D,
+  backendName: "wasm",
+  setupFunc: setup12,
+  kernelFunc: conv2d5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Conv2DBackpropInput.js
+var wasmConv2DBackpropInput;
+function setup13(backend3) {
+  wasmConv2DBackpropInput = backend3.wasm.cwrap(Conv2DBackpropInput, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function conv2DBackpropInput4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { dy, filter } = inputs;
+  const { strides, pad: pad3, dataFormat, dimRoundingMode, inputShape } = attrs;
+  const dilations = 1;
+  const $dataFormat = backend_util_exports.convertConv2DDataFormat(dataFormat);
+  const convInfo = backend_util_exports.computeConv2DInfo(inputShape, filter.shape, strides, dilations, pad3, dimRoundingMode, false, $dataFormat);
+  const { batchSize, filterHeight, filterWidth, inChannels, inHeight, inWidth, outChannels, outHeight, outWidth, strideHeight, strideWidth } = convInfo;
+  const topPad = filterHeight - 1 - convInfo.padInfo.top;
+  const leftPad = filterWidth - 1 - convInfo.padInfo.left;
+  const isChannelsLast = convInfo.dataFormat === "channelsLast";
+  const dxStrides = util_exports.computeStrides(convInfo.inShape);
+  const dyStrides = util_exports.computeStrides(dy.shape);
+  const [fltS0, fltS1, fltS2] = util_exports.computeStrides(filter.shape);
+  const xBatchStride = dxStrides[0];
+  const xRowStride = isChannelsLast ? dxStrides[1] : dxStrides[2];
+  const xColStride = isChannelsLast ? dxStrides[2] : 1;
+  const xChannelStride = isChannelsLast ? 1 : dxStrides[1];
+  const yBatchStride = dyStrides[0];
+  const yRowStride = isChannelsLast ? dyStrides[1] : dyStrides[2];
+  const yColStride = isChannelsLast ? dyStrides[2] : 1;
+  const yChannelStride = isChannelsLast ? 1 : dyStrides[1];
+  const out = backend3.makeOutput(convInfo.inShape, "float32");
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const dyId = backend3.dataIdMap.get(dy.dataId).id;
+  const filterId = backend3.dataIdMap.get(filter.dataId).id;
+  wasmConv2DBackpropInput(dyId, filterId, batchSize, filterHeight, filterWidth, inHeight, inWidth, inChannels, outHeight, outWidth, outChannels, strideHeight, strideWidth, topPad, leftPad, fltS0, fltS1, fltS2, xBatchStride, xRowStride, xColStride, xChannelStride, yBatchStride, yRowStride, yColStride, yChannelStride, outId);
+  return out;
+}
+var conv2DBackpropInputConfig3 = {
+  kernelName: Conv2DBackpropInput,
+  backendName: "wasm",
+  setupFunc: setup13,
+  kernelFunc: conv2DBackpropInput4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Conv3D.js
+var wasmConv3D;
+function setup14(backend3) {
+  wasmConv3D = backend3.wasm.cwrap(Conv3D, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function conv3D3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x, filter } = inputs;
+  const { strides, pad: pad3, dilations } = attrs;
+  if (x.dtype !== "float32") {
+    throw new Error(`Tensor x must have dtype float32, got ${x.dtype}`);
+  }
+  if (filter.dtype !== "float32") {
+    throw new Error(`Tensor filter must have dtype float32, got ${filter.dtype}`);
+  }
+  const convInfo = backend_util_exports.computeConv3DInfo(x.shape, filter.shape, strides, dilations, pad3);
+  const out = backend3.makeOutput(convInfo.outShape, x.dtype);
+  wasmConv3D(backend3.dataIdMap.get(x.dataId).id, backend3.dataIdMap.get(filter.dataId).id, backend3.dataIdMap.get(out.dataId).id, convInfo.batchSize, convInfo.inDepth, convInfo.inHeight, convInfo.inWidth, convInfo.inChannels, convInfo.outDepth, convInfo.outHeight, convInfo.outWidth, convInfo.outChannels, convInfo.strideDepth, convInfo.strideHeight, convInfo.strideWidth, convInfo.dilationDepth, convInfo.dilationHeight, convInfo.dilationWidth, convInfo.filterDepth, convInfo.filterHeight, convInfo.filterWidth, convInfo.padInfo.front, convInfo.padInfo.top, convInfo.padInfo.left);
+  return out;
+}
+var conv3DConfig3 = {
+  kernelName: Conv3D,
+  backendName: "wasm",
+  setupFunc: setup14,
+  kernelFunc: conv3D3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Conv3DBackpropFilterV2.js
+var wasmConv3DBackpropFilterV2;
+function setup15(backend3) {
+  wasmConv3DBackpropFilterV2 = backend3.wasm.cwrap(Conv3DBackpropFilterV2, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function conv3DBackpropFilterV23(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x, dy } = inputs;
+  const { strides, pad: pad3, filterShape } = attrs;
+  if (x.dtype !== "float32") {
+    throw new Error(`Tensor dy must have dtype float32, got ${x.dtype}`);
+  }
+  if (dy.dtype !== "float32") {
+    throw new Error(`Tensor filter must have dtype float32, got ${dy.dtype}`);
+  }
+  const convInfo = backend_util_exports.computeConv3DInfo(
+    x.shape,
+    filterShape,
+    strides,
+    /*dilations=*/
+    1,
+    pad3
+  );
+  const dw = backend3.makeOutput(convInfo.filterShape, dy.dtype);
+  wasmConv3DBackpropFilterV2(backend3.dataIdMap.get(x.dataId).id, backend3.dataIdMap.get(dy.dataId).id, backend3.dataIdMap.get(dw.dataId).id, convInfo.batchSize, convInfo.inDepth, convInfo.inHeight, convInfo.inWidth, convInfo.inChannels, convInfo.outDepth, convInfo.outHeight, convInfo.outWidth, convInfo.outChannels, convInfo.strideDepth, convInfo.strideHeight, convInfo.strideWidth, convInfo.dilationDepth, convInfo.dilationHeight, convInfo.dilationWidth, convInfo.filterDepth, convInfo.filterHeight, convInfo.filterWidth, convInfo.padInfo.front, convInfo.padInfo.top, convInfo.padInfo.left);
+  return dw;
+}
+var conv3DBackpropFilterV2Config3 = {
+  kernelName: Conv3DBackpropFilterV2,
+  backendName: "wasm",
+  setupFunc: setup15,
+  kernelFunc: conv3DBackpropFilterV23
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Conv3DBackpropInputV2.js
+var wasmConv3DBackpropInputV2;
+function setup16(backend3) {
+  wasmConv3DBackpropInputV2 = backend3.wasm.cwrap(Conv3DBackpropInputV2, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function conv3DBackpropInputV22(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { dy, filter } = inputs;
+  const { pad: pad3, strides, inputShape } = attrs;
+  if (dy.dtype !== "float32") {
+    throw new Error(`Tensor dy must have dtype float32, got ${dy.dtype}`);
+  }
+  if (filter.dtype !== "float32") {
+    throw new Error(`Tensor filter must have dtype float32, got ${filter.dtype}`);
+  }
+  const convInfo = backend_util_exports.computeConv3DInfo(
+    inputShape,
+    filter.shape,
+    strides,
+    /*dilations=*/
+    1,
+    pad3
+  );
+  const dx = backend3.makeOutput(convInfo.inShape, dy.dtype);
+  wasmConv3DBackpropInputV2(backend3.dataIdMap.get(filter.dataId).id, backend3.dataIdMap.get(dy.dataId).id, backend3.dataIdMap.get(dx.dataId).id, convInfo.batchSize, convInfo.inDepth, convInfo.inHeight, convInfo.inWidth, convInfo.inChannels, convInfo.outDepth, convInfo.outHeight, convInfo.outWidth, convInfo.outChannels, convInfo.strideDepth, convInfo.strideHeight, convInfo.strideWidth, convInfo.dilationDepth, convInfo.dilationHeight, convInfo.dilationWidth, convInfo.filterDepth, convInfo.filterHeight, convInfo.filterWidth, convInfo.padInfo.front, convInfo.padInfo.top, convInfo.padInfo.left);
+  return dx;
+}
+var conv3DBackpropInputV2Config2 = {
+  kernelName: Conv3DBackpropInputV2,
+  backendName: "wasm",
+  setupFunc: setup16,
+  kernelFunc: conv3DBackpropInputV22
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Cos.js
+var cosConfig3 = createUnaryKernelConfig(Cos);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Cosh.js
+var coshConfig3 = createUnaryKernelConfig(Cosh);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/CropAndResize.js
+var InterpolationMethod;
+(function(InterpolationMethod2) {
+  InterpolationMethod2[InterpolationMethod2["bilinear"] = 0] = "bilinear";
+  InterpolationMethod2[InterpolationMethod2["nearest"] = 1] = "nearest";
+})(InterpolationMethod || (InterpolationMethod = {}));
+var wasmCropAndResize;
+function setup17(backend3) {
+  wasmCropAndResize = backend3.wasm.cwrap(CropAndResize, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "array",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // out id
+  ]);
+}
+function cropAndResize5(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { method, extrapolationValue, cropSize } = attrs;
+  const { image: image2, boxes, boxInd } = inputs;
+  const numBoxes = boxes.shape[0];
+  const [cropHeight, cropWidth] = cropSize;
+  const outShape = [numBoxes, cropHeight, cropWidth, image2.shape[3]];
+  let imagesData = backend3.dataIdMap.get(image2.dataId);
+  let castedData;
+  if (image2.dtype !== "float32") {
+    castedData = cast5({ backend: backend3, inputs: { x: image2 }, attrs: { dtype: "float32" } });
+    imagesData = backend3.dataIdMap.get(castedData.dataId);
+  }
+  const imagesId = imagesData.id;
+  const boxesId = backend3.dataIdMap.get(boxes.dataId).id;
+  const boxIndId = backend3.dataIdMap.get(boxInd.dataId).id;
+  const out = backend3.makeOutput(outShape, "float32");
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const imagesShapeBytes = new Uint8Array(new Int32Array(image2.shape).buffer);
+  wasmCropAndResize(imagesId, boxesId, boxIndId, numBoxes, imagesShapeBytes, cropHeight, cropWidth, InterpolationMethod[method], extrapolationValue, outId);
+  if (castedData != null) {
+    backend3.disposeData(castedData.dataId);
+  }
+  return out;
+}
+var cropAndResizeConfig3 = {
+  kernelName: CropAndResize,
+  backendName: "wasm",
+  setupFunc: setup17,
+  kernelFunc: cropAndResize5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Cumprod.js
+var wasmCumprod;
+function setup18(backend3) {
+  wasmCumprod = backend3.wasm.cwrap(Cumprod, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // dtype
+  ]);
+}
+function cumprod4(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { axis, exclusive, reverse: reverse5 } = attrs;
+  const xRank = x.shape.length;
+  util_exports.assert(x.dtype === "float32" || x.dtype === "int32", () => `cumprod does not support ${x.dtype} tensors in the WASM backend`);
+  const permutation = backend_util_exports.getAxesPermutation([axis], xRank);
+  let permutedX = x;
+  if (permutation !== null) {
+    permutedX = transpose4({ inputs: { x }, attrs: { perm: permutation }, backend: backend3 });
+  }
+  const permutedAxis = backend_util_exports.getInnerMostAxes(1, xRank)[0];
+  backend_util_exports.assertAxesAreInnerMostDims("cumprod", [permutedAxis], xRank);
+  const permutedOut = backend3.makeOutput(permutedX.shape, permutedX.dtype);
+  const finalDim = permutedX.shape[permutedAxis];
+  const permutedXId = backend3.dataIdMap.get(permutedX.dataId).id;
+  const permutedOutId = backend3.dataIdMap.get(permutedOut.dataId).id;
+  wasmCumprod(permutedXId, exclusive ? 1 : 0, reverse5 ? 1 : 0, finalDim, permutedOutId, CppDType[x.dtype]);
+  let out = permutedOut;
+  if (permutation !== null) {
+    const undoPermutation = backend_util_exports.getUndoAxesPermutation(permutation);
+    out = transpose4({ inputs: { x: permutedOut }, attrs: { perm: undoPermutation }, backend: backend3 });
+    backend3.disposeData(permutedX.dataId);
+    backend3.disposeData(permutedOut.dataId);
+  }
+  return out;
+}
+var cumprodConfig3 = {
+  kernelName: Cumprod,
+  backendName: "wasm",
+  setupFunc: setup18,
+  kernelFunc: cumprod4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Cumsum.js
+var wasmCumsum;
+function setup19(backend3) {
+  wasmCumsum = backend3.wasm.cwrap(Cumsum, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // dtype
+  ]);
+}
+function cumsum4(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { axis, exclusive, reverse: reverse5 } = attrs;
+  const xRank = x.shape.length;
+  util_exports.assert(x.dtype === "float32" || x.dtype === "int32", () => `cumsum does not support ${x.dtype} tensors in the WASM backend`);
+  const permutation = backend_util_exports.getAxesPermutation([axis], xRank);
+  let permutedX = x;
+  if (permutation !== null) {
+    permutedX = transpose4({ inputs: { x }, attrs: { perm: permutation }, backend: backend3 });
+  }
+  const permutedAxis = backend_util_exports.getInnerMostAxes(1, xRank)[0];
+  backend_util_exports.assertAxesAreInnerMostDims("cumsum", [permutedAxis], xRank);
+  const permutedOut = backend3.makeOutput(permutedX.shape, permutedX.dtype);
+  const finalDim = permutedX.shape[permutedAxis];
+  const permutedXId = backend3.dataIdMap.get(permutedX.dataId).id;
+  const permutedOutId = backend3.dataIdMap.get(permutedOut.dataId).id;
+  wasmCumsum(permutedXId, exclusive ? 1 : 0, reverse5 ? 1 : 0, finalDim, permutedOutId, CppDType[x.dtype]);
+  let out = permutedOut;
+  if (permutation !== null) {
+    const undoPermutation = backend_util_exports.getUndoAxesPermutation(permutation);
+    out = transpose4({ inputs: { x: permutedOut }, attrs: { perm: undoPermutation }, backend: backend3 });
+    backend3.disposeData(permutedX.dataId);
+    backend3.disposeData(permutedOut.dataId);
+  }
+  return out;
+}
+var cumsumConfig3 = {
+  kernelName: Cumsum,
+  backendName: "wasm",
+  setupFunc: setup19,
+  kernelFunc: cumsum4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/DenseBincount.js
+var wasmDenseBincount;
+function setup20(backend3) {
+  wasmDenseBincount = backend3.wasm.cwrap("DenseBincount", null, [
+    "number",
+    "array",
+    "number",
+    "number",
+    "boolean",
+    "number",
+    "number",
+    "boolean",
+    "number"
+    // outId
+  ]);
+}
+function denseBincount4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { x, weights } = inputs;
+  const { size, binaryOutput } = attrs;
+  const hasWeights = weights.shape.reduce((p2, v) => p2 * v, 1) !== 0;
+  const outShape = x.shape.length === 1 ? [size] : [x.shape[0], size];
+  const out = backend3.makeOutput(outShape, weights.dtype);
+  function tensorId(x2) {
+    return backend3.dataIdMap.get(x2.dataId).id;
+  }
+  wasmDenseBincount(tensorId(x), new Uint8Array(new Int32Array(x.shape).buffer), x.shape.length, size, hasWeights, tensorId(weights), CppDType[weights.dtype], binaryOutput, tensorId(out));
+  return out;
+}
+var denseBincountConfig3 = {
+  kernelName: DenseBincount,
+  backendName: "wasm",
+  setupFunc: setup20,
+  kernelFunc: denseBincount4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/DepthToSpace.js
+var wasmDepthToSpace;
+function setup21(backend3) {
+  wasmDepthToSpace = backend3.wasm.cwrap(DepthToSpace, null, [
+    "number",
+    "number",
+    "number",
+    "array",
+    "number",
+    "array",
+    "array",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function depthToSpace4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { x } = inputs;
+  const { blockSize, dataFormat } = attrs;
+  const batchSize = x.shape[0];
+  const inputHeight = dataFormat === "NHWC" ? x.shape[1] : x.shape[2];
+  const inputWidth = dataFormat === "NHWC" ? x.shape[2] : x.shape[3];
+  const inputDepth = dataFormat === "NHWC" ? x.shape[3] : x.shape[1];
+  const outputHeight = inputHeight * blockSize;
+  const outputWidth = inputWidth * blockSize;
+  const outputDepth = inputDepth / (blockSize * blockSize);
+  const outputShape = dataFormat === "NHWC" ? [batchSize, outputHeight, outputWidth, outputDepth] : [batchSize, outputDepth, outputHeight, outputWidth];
+  const out = backend3.makeOutput(outputShape, "float32");
+  const xData = backend3.dataIdMap.get(x.dataId);
+  const xId = xData.id;
+  const xStridesBytes = new Uint8Array(new Int32Array(util_exports.computeStrides(x.shape)).buffer);
+  const outputShapeBytes = new Uint8Array(new Int32Array(outputShape).buffer);
+  const outStridesBytes = new Uint8Array(new Int32Array(util_exports.computeStrides(outputShape)).buffer);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const channelsLast = dataFormat === "NHWC" ? 1 : 0;
+  wasmDepthToSpace(xId, blockSize, channelsLast, xStridesBytes, x.shape.length - 1, outputShapeBytes, outStridesBytes, outputShape.length, outId);
+  return out;
+}
+var depthToSpaceConfig3 = {
+  kernelName: DepthToSpace,
+  backendName: "wasm",
+  setupFunc: setup21,
+  kernelFunc: depthToSpace4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/DepthwiseConv2dNative.js
+var wasmDepthwiseConv2d;
+function setup22(backend3) {
+  wasmDepthwiseConv2d = backend3.wasm.cwrap(DepthwiseConv2dNative, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function depthwiseConv2d5(args) {
+  const { inputs, attrs, backend: backend3 } = args;
+  const { x, filter } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const filterId = backend3.dataIdMap.get(filter.dataId).id;
+  const { strides, dilations, pad: pad3, dimRoundingMode } = attrs;
+  const $dilations = dilations == null ? [1, 1] : dilations;
+  const convInfo = backend_util_exports.computeConv2DInfo(
+    x.shape,
+    filter.shape,
+    strides,
+    $dilations,
+    pad3,
+    dimRoundingMode,
+    true
+    /* depthwise */
+  );
+  const filterHeight = convInfo.filterHeight;
+  const filterWidth = convInfo.filterWidth;
+  const padTop = convInfo.padInfo.top;
+  const padRight = convInfo.padInfo.right;
+  const padBottom = convInfo.padInfo.bottom;
+  const padLeft = convInfo.padInfo.left;
+  const dilationHeight = convInfo.dilationHeight;
+  const dilationWidth = convInfo.dilationWidth;
+  const strideHeight = convInfo.strideHeight;
+  const strideWidth = convInfo.strideWidth;
+  const inputChannels = convInfo.inChannels;
+  const outputChannels = convInfo.outChannels;
+  const isSamePad = convInfo.padInfo.type === "SAME" ? 1 : 0;
+  if (convInfo.dataFormat !== "channelsLast") {
+    throw new Error(`wasm backend DepthwiseConv2dNative does not support dataFormat:'${convInfo.dataFormat}'. Please use 'channelsLast'.`);
+  }
+  const out = backend3.makeOutput(convInfo.outShape, "float32");
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmDepthwiseConv2d(xId, x.shape[0], x.shape[1], x.shape[2], filterId, filterHeight, filterWidth, padTop, padRight, padBottom, padLeft, isSamePad, dilationHeight, dilationWidth, strideHeight, strideWidth, inputChannels, outputChannels, outId);
+  return out;
+}
+var depthwiseConv2dNativeConfig3 = {
+  kernelName: DepthwiseConv2dNative,
+  backendName: "wasm",
+  setupFunc: setup22,
+  kernelFunc: depthwiseConv2d5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Diag.js
+var wasmDiag;
+function setup23(backend3) {
+  wasmDiag = backend3.wasm.cwrap("Diag", null, [
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function diag3(args) {
+  const { inputs, backend: backend3 } = args;
+  const { x } = inputs;
+  const xSize = util_exports.sizeFromShape(x.shape);
+  const out = backend3.makeOutput([...x.shape, ...x.shape], x.dtype);
+  wasmDiag(backend3.dataIdMap.get(x.dataId).id, CppDType[x.dtype], xSize, backend3.dataIdMap.get(out.dataId).id);
+  return out;
+}
+var diagConfig3 = {
+  kernelName: Diag,
+  backendName: "wasm",
+  setupFunc: setup23,
+  kernelFunc: diag3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Dilation2D.js
+var wasmDilation2D;
+function setup24(backend3) {
+  wasmDilation2D = backend3.wasm.cwrap(Dilation2D, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function dilation2D2(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x, filter } = inputs;
+  const { strides, pad: pad3, dilations } = attrs;
+  if (x.dtype !== filter.dtype) {
+    throw new Error(`Dilation2D error: x must have the same dtype as filter. Got ${x.dtype} and ${filter.dtype}`);
+  }
+  const dilationInfo = backend_util_exports.computeDilation2DInfo(
+    x.shape,
+    filter.shape,
+    strides,
+    pad3,
+    /*dataFormat=*/
+    "NHWC",
+    dilations
+  );
+  const out = backend3.makeOutput(dilationInfo.outShape, x.dtype);
+  wasmDilation2D(
+    backend3.dataIdMap.get(x.dataId).id,
+    backend3.dataIdMap.get(filter.dataId).id,
+    backend3.dataIdMap.get(out.dataId).id,
+    CppDType[x.dtype],
+    dilationInfo.batchSize,
+    /*depth=*/
+    dilationInfo.inChannels,
+    dilationInfo.inHeight,
+    dilationInfo.inWidth,
+    dilationInfo.outHeight,
+    dilationInfo.outWidth,
+    dilationInfo.strideHeight,
+    dilationInfo.strideWidth,
+    dilationInfo.dilationHeight,
+    dilationInfo.dilationWidth,
+    dilationInfo.filterHeight,
+    dilationInfo.filterWidth,
+    dilationInfo.padInfo.top,
+    dilationInfo.padInfo.left
+  );
+  return out;
+}
+var dilation2DConfig3 = {
+  kernelName: Dilation2D,
+  backendName: "wasm",
+  setupFunc: setup24,
+  kernelFunc: dilation2D2
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Dilation2DBackpropFilter.js
+var wasmDilation2DBackpropFilter;
+function setup25(backend3) {
+  wasmDilation2DBackpropFilter = backend3.wasm.cwrap(Dilation2DBackpropFilter, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function dilation2DBackpropFilter(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x, filter, dy } = inputs;
+  const { strides, pad: pad3, dilations } = attrs;
+  if (x.dtype !== filter.dtype || x.dtype !== dy.dtype) {
+    throw new Error(`Dilation2DBackpropFilter error: x must have the same dtype as filter and dy. Got ${x.dtype}, ${filter.dtype}, and ${dy.dtype}`);
+  }
+  const dilationInfo = backend_util_exports.computeDilation2DInfo(
+    x.shape,
+    filter.shape,
+    strides,
+    pad3,
+    /*dataFormat=*/
+    "NHWC",
+    dilations
+  );
+  const gradients = backend3.makeOutput(filter.shape, filter.dtype);
+  wasmDilation2DBackpropFilter(
+    backend3.dataIdMap.get(x.dataId).id,
+    backend3.dataIdMap.get(filter.dataId).id,
+    backend3.dataIdMap.get(dy.dataId).id,
+    backend3.dataIdMap.get(gradients.dataId).id,
+    CppDType[x.dtype],
+    dilationInfo.batchSize,
+    /*depth=*/
+    dilationInfo.inChannels,
+    dilationInfo.inHeight,
+    dilationInfo.inWidth,
+    dilationInfo.outHeight,
+    dilationInfo.outWidth,
+    dilationInfo.strideHeight,
+    dilationInfo.strideWidth,
+    dilationInfo.dilationHeight,
+    dilationInfo.dilationWidth,
+    dilationInfo.filterHeight,
+    dilationInfo.filterWidth,
+    dilationInfo.padInfo.top,
+    dilationInfo.padInfo.left
+  );
+  return gradients;
+}
+var dilation2DBackpropFilterConfig2 = {
+  kernelName: Dilation2DBackpropFilter,
+  backendName: "wasm",
+  setupFunc: setup25,
+  kernelFunc: dilation2DBackpropFilter
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Dilation2DBackpropInput.js
+var wasmDilation2DBackpropInput;
+function setup26(backend3) {
+  wasmDilation2DBackpropInput = backend3.wasm.cwrap(Dilation2DBackpropInput, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function dilation2DBackpropInput(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x, filter, dy } = inputs;
+  const { strides, pad: pad3, dilations } = attrs;
+  if (x.dtype !== filter.dtype || x.dtype !== dy.dtype) {
+    throw new Error(`Dilation2DBackpropInput error: x must have the same dtype as filter and dy. Got ${x.dtype}, ${filter.dtype}, and ${dy.dtype}`);
+  }
+  const dilationInfo = backend_util_exports.computeDilation2DInfo(
+    x.shape,
+    filter.shape,
+    strides,
+    pad3,
+    /*dataFormat=*/
+    "NHWC",
+    dilations
+  );
+  const gradients = backend3.makeOutput(x.shape, x.dtype);
+  wasmDilation2DBackpropInput(
+    backend3.dataIdMap.get(x.dataId).id,
+    backend3.dataIdMap.get(filter.dataId).id,
+    backend3.dataIdMap.get(dy.dataId).id,
+    backend3.dataIdMap.get(gradients.dataId).id,
+    CppDType[x.dtype],
+    dilationInfo.batchSize,
+    /*depth=*/
+    dilationInfo.inChannels,
+    dilationInfo.inHeight,
+    dilationInfo.inWidth,
+    dilationInfo.outHeight,
+    dilationInfo.outWidth,
+    dilationInfo.strideHeight,
+    dilationInfo.strideWidth,
+    dilationInfo.dilationHeight,
+    dilationInfo.dilationWidth,
+    dilationInfo.filterHeight,
+    dilationInfo.filterWidth,
+    dilationInfo.padInfo.top,
+    dilationInfo.padInfo.left
+  );
+  return gradients;
+}
+var dilation2DBackpropInputConfig2 = {
+  kernelName: Dilation2DBackpropInput,
+  backendName: "wasm",
+  setupFunc: setup26,
+  kernelFunc: dilation2DBackpropInput
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Elu.js
+var eluConfig3 = createUnaryKernelConfig(Elu);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/EluGrad.js
+var wasmEluGrad;
+function setup27(backend3) {
+  wasmEluGrad = backend3.wasm.cwrap(EluGrad, null, [
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function eluGrad3(args) {
+  const { inputs, backend: backend3 } = args;
+  const { dy, y } = inputs;
+  const out = backend3.makeOutput(y.shape, "float32");
+  const tensorId = (x) => {
+    return backend3.dataIdMap.get(x.dataId).id;
+  };
+  wasmEluGrad(tensorId(y), tensorId(dy), tensorId(out));
+  return out;
+}
+var eluGradConfig4 = {
+  kernelName: EluGrad,
+  backendName: "wasm",
+  setupFunc: setup27,
+  kernelFunc: eluGrad3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Equal.js
+var supportsFullBroadcast3 = false;
+var equalConfig3 = createBinaryKernelConfig(Equal, supportsFullBroadcast3, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Erf.js
+var erfConfig3 = createUnaryKernelConfig(Erf);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Exp.js
+var expConfig3 = createUnaryKernelConfig(Exp, "float32");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ExpandDims.js
+function expandDims5(args) {
+  const { inputs, attrs, backend: backend3 } = args;
+  const { input: input2 } = inputs;
+  const { dim } = attrs;
+  const inputRank = input2.shape.length;
+  const newShape = input2.shape.slice();
+  let $dim = dim;
+  if (dim < 0) {
+    util_exports.assert(-(inputRank + 1) <= dim, () => `Axis must be in the interval [${-(inputRank + 1)}, ${inputRank}]`);
+    $dim = inputRank + dim + 1;
+  }
+  newShape.splice($dim, 0, 1);
+  return reshape5({ inputs: { x: input2 }, backend: backend3, attrs: { shape: newShape } });
+}
+var expandDimsConfig3 = {
+  kernelName: ExpandDims,
+  backendName: "wasm",
+  kernelFunc: expandDims5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Expm1.js
+var expm1Config3 = createUnaryKernelConfig(Expm1, "float32");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Fill.js
+function fill4(args) {
+  const { attrs: { shape, value }, backend: backend3 } = args;
+  let { attrs: { dtype } } = args;
+  dtype = dtype || util_exports.inferDtype(value);
+  const out = backend3.makeOutput(shape, dtype);
+  const outVals = backend3.typedArrayFromHeap(out);
+  outVals.fill(value);
+  return out;
+}
+var fillConfig3 = {
+  kernelName: Fill,
+  backendName: "wasm",
+  kernelFunc: fill4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/FlipLeftRight.js
+var wasmFlipLeftRight;
+function setup28(backend3) {
+  wasmFlipLeftRight = backend3.wasm.cwrap(FlipLeftRight, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function flipLeftRight2(args) {
+  const { inputs, backend: backend3 } = args;
+  const { image: image2 } = inputs;
+  const out = backend3.makeOutput(image2.shape, image2.dtype);
+  const imageId = backend3.dataIdMap.get(image2.dataId).id;
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const [batch, imageHeight, imageWidth, numChannels] = image2.shape;
+  wasmFlipLeftRight(imageId, batch, imageHeight, imageWidth, numChannels, outId);
+  return out;
+}
+var flipLeftRightConfig3 = {
+  kernelName: FlipLeftRight,
+  backendName: "wasm",
+  kernelFunc: flipLeftRight2,
+  setupFunc: setup28
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Floor.js
+var floorConfig3 = createUnaryKernelConfig(Floor);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/FloorDiv.js
+var supportsFullBroadcast4 = false;
+var floorDivConfig3 = createBinaryKernelConfig(FloorDiv, supportsFullBroadcast4);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/FusedBatchNorm.js
+var wasmBatchNorm;
+function setup29(backend3) {
+  wasmBatchNorm = backend3.wasm.cwrap(FusedBatchNorm, null, ["number", "number", "number", "number", "number", "number", "number"]);
+}
+function fusedBatchNorm(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { varianceEpsilon } = attrs;
+  const { x, mean: mean4, variance, offset, scale: scale2 } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const meanId = backend3.dataIdMap.get(mean4.dataId).id;
+  const varianceId = backend3.dataIdMap.get(variance.dataId).id;
+  const offsetId = offset != null ? backend3.dataIdMap.get(offset.dataId).id : 0;
+  const scaleId = scale2 != null ? backend3.dataIdMap.get(scale2.dataId).id : 0;
+  const out = backend3.makeOutput(x.shape, x.dtype);
+  if (util_exports.sizeFromShape(x.shape) === 0) {
+    return out;
+  }
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmBatchNorm(xId, meanId, varianceId, offsetId, scaleId, varianceEpsilon, outId);
+  return out;
+}
+var fusedBatchNormConfig = {
+  kernelName: FusedBatchNorm,
+  backendName: "wasm",
+  setupFunc: setup29,
+  kernelFunc: fusedBatchNorm
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/FusedConv2D.js
+var wasmFusedConv2d;
+function setup30(backend3) {
+  wasmFusedConv2d = backend3.wasm.cwrap(FusedConv2D, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function fusedConv2d2(args) {
+  const { inputs, attrs, backend: backend3 } = args;
+  const { x, filter, bias, preluActivationWeights } = inputs;
+  const { strides, pad: pad3, dilations, dataFormat, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
+  const convInfo = backend_util_exports.computeConv2DInfo(x.shape, filter.shape, strides, dilations, pad3, dimRoundingMode);
+  const fusedActivation = FusableActivation[activation2];
+  if (fusedActivation == null) {
+    throw new Error(`${activation2} activation not yet supported for FusedConv2D in the wasm backend.`);
+  }
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const filterId = backend3.dataIdMap.get(filter.dataId).id;
+  const outputChannels = convInfo.outChannels;
+  let biasId = 0;
+  if (bias != null) {
+    const biasData = backend3.dataIdMap.get(bias.dataId);
+    if (biasData.shape.length !== 1) {
+      throw new Error(`FusedConv2D only supports rank-1 bias but got rank ${biasData.shape.length}.`);
+    }
+    if (biasData.shape[0] !== outputChannels) {
+      throw new Error(`FusedConv2D bias shape (${biasData.shape}) does not match the number of output channels (${outputChannels})`);
+    }
+    biasId = biasData.id;
+  }
+  const filterHeight = convInfo.filterHeight;
+  const filterWidth = convInfo.filterWidth;
+  const padTop = convInfo.padInfo.top;
+  const padRight = convInfo.padInfo.right;
+  const padBottom = convInfo.padInfo.bottom;
+  const padLeft = convInfo.padInfo.left;
+  const dilationHeight = convInfo.dilationHeight;
+  const dilationWidth = convInfo.dilationWidth;
+  const strideHeight = convInfo.strideHeight;
+  const strideWidth = convInfo.strideWidth;
+  const inputChannels = convInfo.inChannels;
+  const isSamePad = convInfo.padInfo.type === "SAME" ? 1 : 0;
+  const batchSize = convInfo.batchSize;
+  const inHeight = convInfo.inHeight;
+  const inWidth = convInfo.inWidth;
+  if (dataFormat !== "NHWC") {
+    throw new Error(`wasm backend FusedConv2D does not support dataFormat:'${dataFormat}'. Please use 'NHWC'.`);
+  }
+  const out = backend3.makeOutput(convInfo.outShape, "float32");
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const preluActivationWeightsId = preluActivationWeights == null ? 0 : backend3.dataIdMap.get(preluActivationWeights.dataId).id;
+  wasmFusedConv2d(xId, batchSize, inHeight, inWidth, filterId, filterHeight, filterWidth, biasId, padTop, padRight, padBottom, padLeft, isSamePad, dilationHeight, dilationWidth, strideHeight, strideWidth, inputChannels, outputChannels, fusedActivation, preluActivationWeightsId, leakyreluAlpha || 0, outId);
+  return out;
+}
+var fusedConv2DConfig3 = {
+  kernelName: FusedConv2D,
+  backendName: "wasm",
+  setupFunc: setup30,
+  kernelFunc: fusedConv2d2
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/FusedDepthwiseConv2D.js
+var wasmFusedDepthwiseConv2d;
+function setup31(backend3) {
+  wasmFusedDepthwiseConv2d = backend3.wasm.cwrap(FusedDepthwiseConv2D, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function fusedDepthwiseConv2d(args) {
+  const { inputs, attrs, backend: backend3 } = args;
+  const { x, filter, bias, preluActivationWeights } = inputs;
+  const { strides, pad: pad3, dilations, dataFormat, dimRoundingMode, activation: activation2, leakyreluAlpha } = attrs;
+  const convInfo = backend_util_exports.computeConv2DInfo(
+    x.shape,
+    filter.shape,
+    strides,
+    dilations,
+    pad3,
+    dimRoundingMode,
+    true
+    /* depthwise */
+  );
+  const fusedActivation = FusableActivation[activation2];
+  if (fusedActivation == null) {
+    throw new Error(`${activation2} activation not yet supported for FusedDepthwiseConv2D in the wasm backend.`);
+  }
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const filterId = backend3.dataIdMap.get(filter.dataId).id;
+  const outputChannels = convInfo.outChannels;
+  let biasId = 0;
+  if (bias != null) {
+    const biasData = backend3.dataIdMap.get(bias.dataId);
+    if (biasData.shape.length !== 1) {
+      throw new Error(`FusedDepthwiseConv2D only supports rank-1 bias but got rank ${biasData.shape.length}.`);
+    }
+    if (biasData.shape[0] !== outputChannels) {
+      throw new Error(`FusedDepthwiseConv2D bias shape (${biasData.shape}) does not match the number of output channels (${outputChannels})`);
+    }
+    biasId = biasData.id;
+  }
+  const filterHeight = convInfo.filterHeight;
+  const filterWidth = convInfo.filterWidth;
+  const padTop = convInfo.padInfo.top;
+  const padRight = convInfo.padInfo.right;
+  const padBottom = convInfo.padInfo.bottom;
+  const padLeft = convInfo.padInfo.left;
+  const dilationHeight = convInfo.dilationHeight;
+  const dilationWidth = convInfo.dilationWidth;
+  const strideHeight = convInfo.strideHeight;
+  const strideWidth = convInfo.strideWidth;
+  const inputChannels = convInfo.inChannels;
+  const isSamePad = convInfo.padInfo.type === "SAME" ? 1 : 0;
+  const batchSize = convInfo.batchSize;
+  const inHeight = convInfo.inHeight;
+  const inWidth = convInfo.inWidth;
+  if (dataFormat !== "NHWC") {
+    throw new Error(`wasm backend FusedDepthwiseConv2D does not support dataFormat:'${dataFormat}'. Please use 'NHWC'.`);
+  }
+  const out = backend3.makeOutput(convInfo.outShape, "float32");
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const preluActivationWeightsId = preluActivationWeights == null ? 0 : backend3.dataIdMap.get(preluActivationWeights.dataId).id;
+  wasmFusedDepthwiseConv2d(xId, batchSize, inHeight, inWidth, filterId, filterHeight, filterWidth, biasId, padTop, padRight, padBottom, padLeft, isSamePad, dilationHeight, dilationWidth, strideHeight, strideWidth, inputChannels, outputChannels, fusedActivation, preluActivationWeightsId, leakyreluAlpha || 0, outId);
+  return out;
+}
+var fusedDepthwiseConv2DConfig3 = {
+  kernelName: FusedDepthwiseConv2D,
+  backendName: "wasm",
+  setupFunc: setup31,
+  kernelFunc: fusedDepthwiseConv2d
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/GatherNd.js
+var wasmGatherNd;
+function setup32(backend3) {
+  wasmGatherNd = backend3.wasm.cwrap(GatherNd, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "array",
+    "number"
+    // outId
+  ]);
+}
+function gatherNd3(args) {
+  const { backend: backend3, inputs } = args;
+  const { params, indices } = inputs;
+  const [resultShape, numSlices, sliceSize, strides] = gather_nd_util_exports.prepareAndValidate(params, indices);
+  const out = backend3.makeOutput(resultShape, params.dtype);
+  if (numSlices === 0) {
+    return out;
+  }
+  const indicesShape = indices.shape;
+  const sliceRank = indicesShape[indicesShape.length - 1];
+  const xData = backend3.dataIdMap.get(params.dataId);
+  const xId = xData.id;
+  const indicesData = backend3.dataIdMap.get(indices.dataId);
+  const indicesId = indicesData.id;
+  const stridesBytes = new Uint8Array(new Int32Array(strides).buffer);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmGatherNd(xId, CppDType[params.dtype], indicesId, numSlices, sliceRank, sliceSize, stridesBytes, outId);
+  return out;
+}
+var gatherNdConfig3 = {
+  kernelName: GatherNd,
+  backendName: "wasm",
+  setupFunc: setup32,
+  kernelFunc: gatherNd3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/GatherV2.js
+var wasmGather;
+function setup33(backend3) {
+  wasmGather = backend3.wasm.cwrap("Gather", null, [
+    "number",
+    "number",
+    "array",
+    "number",
+    "number",
+    "number",
+    "array",
+    "number"
+    // outId
+  ]);
+}
+function gatherV23(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { x, indices } = inputs;
+  const { axis, batchDims } = attrs;
+  const parsedAxis = util_exports.parseAxisParam(axis, x.shape)[0];
+  const indicesVals = backend3.readSync(indices.dataId);
+  const axisDim = x.shape[parsedAxis];
+  for (let i = 0; i < indicesVals.length; ++i) {
+    const index = indicesVals[i];
+    util_exports.assert(index <= axisDim - 1 && index >= 0, () => `GatherV2: the index value ${index} is not in [0, ${axisDim - 1}]`);
+  }
+  const shapeInfo = backend_util_exports.segment_util.collectGatherOpShapeInfo(x, indices, parsedAxis, batchDims);
+  const flattenX = reshape5({
+    inputs: { x },
+    attrs: {
+      shape: [
+        shapeInfo.batchSize,
+        shapeInfo.outerSize,
+        shapeInfo.dimSize,
+        shapeInfo.sliceSize
+      ]
+    },
+    backend: backend3
+  });
+  const indicesSize = util_exports.sizeFromShape(indices.shape);
+  const flattenIndex = reshape5({
+    inputs: { x: indices },
+    attrs: { shape: [shapeInfo.batchSize, indicesSize / shapeInfo.batchSize] },
+    backend: backend3
+  });
+  const flattenOutputShape = [
+    shapeInfo.batchSize,
+    shapeInfo.outerSize,
+    indicesSize / shapeInfo.batchSize,
+    shapeInfo.sliceSize
+  ];
+  const out = backend3.makeOutput(flattenOutputShape, x.dtype);
+  if (util_exports.sizeFromShape(x.shape) === 0) {
+    return out;
+  }
+  const stridesSize = flattenX.shape.length - 1;
+  const xData = backend3.dataIdMap.get(flattenX.dataId);
+  const xId = xData.id;
+  const indicesData = backend3.dataIdMap.get(flattenIndex.dataId);
+  const indicesId = indicesData.id;
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const xStridesBytes = new Uint8Array(new Int32Array(util_exports.computeStrides(flattenX.shape)).buffer);
+  const outStridesBytes = new Uint8Array(new Int32Array(util_exports.computeStrides(flattenOutputShape)).buffer);
+  wasmGather(xId, CppDType[x.dtype], xStridesBytes, stridesSize, indicesId, shapeInfo.batchSize, outStridesBytes, outId);
+  backend3.disposeData(flattenX.dataId);
+  backend3.disposeData(flattenIndex.dataId);
+  out.shape = shapeInfo.outputShape;
+  return out;
+}
+var gatherV2Config3 = {
+  kernelName: GatherV2,
+  backendName: "wasm",
+  setupFunc: setup33,
+  kernelFunc: gatherV23
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Greater.js
+var supportsFullBroadcast5 = false;
+var greaterConfig3 = createBinaryKernelConfig(Greater, supportsFullBroadcast5, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/GreaterEqual.js
+var supportsFullBroadcast6 = false;
+var greaterEqualConfig3 = createBinaryKernelConfig(GreaterEqual, supportsFullBroadcast6, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/IsFinite.js
+var isFiniteConfig3 = createUnaryKernelConfig(IsFinite, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/IsInf.js
+var isInfConfig3 = createUnaryKernelConfig(IsInf, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/IsNan.js
+var isNaNConfig3 = createUnaryKernelConfig(IsNan, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/LeakyRelu.js
+var wasmFunc2;
+function setupFunc2(backend3) {
+  wasmFunc2 = backend3.wasm.cwrap(LeakyRelu, null, [
+    "number",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function leakyRelu4(args) {
+  const { inputs: { x }, attrs: { alpha }, backend: backend3 } = args;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const out = backend3.makeOutput(x.shape, "float32");
+  if (util_exports.sizeFromShape(x.shape) !== 0) {
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    wasmFunc2(xId, CppDType[x.dtype], alpha, outId);
+  }
+  return out;
+}
+var leakyReluConfig3 = {
+  kernelName: LeakyRelu,
+  backendName: "wasm",
+  setupFunc: setupFunc2,
+  kernelFunc: leakyRelu4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Less.js
+var supportsFullBroadcast7 = false;
+var lessConfig3 = createBinaryKernelConfig(Less, supportsFullBroadcast7, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/LessEqual.js
+var supportsFullBroadcast8 = false;
+var lessEqualConfig3 = createBinaryKernelConfig(LessEqual, supportsFullBroadcast8, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/LinSpace.js
+var wasmLinSpace;
+function setup34(backend3) {
+  wasmLinSpace = backend3.wasm.cwrap(LinSpace, null, [
+    "number",
+    "number",
+    "number",
+    "number"
+    // num
+  ]);
+}
+function linSpace3(args) {
+  const { attrs, backend: backend3 } = args;
+  const { start, stop, num } = attrs;
+  const numInt = Math.floor(num);
+  const out = backend3.makeOutput([numInt], "float32");
+  wasmLinSpace(backend3.dataIdMap.get(out.dataId).id, start, stop, numInt);
+  return out;
+}
+var linSpaceConfig3 = {
+  kernelName: LinSpace,
+  backendName: "wasm",
+  setupFunc: setup34,
+  kernelFunc: linSpace3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Log.js
+var logConfig3 = createUnaryKernelConfig(Log);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Log1p.js
+var log1pConfig3 = createUnaryKernelConfig(Log1p);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/LogicalAnd.js
+var supportsFullBroadcast9 = false;
+var logicalAndConfig3 = createBinaryKernelConfig(LogicalAnd, supportsFullBroadcast9, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/LogicalNot.js
+var logicalNotConfig3 = createUnaryKernelConfig(LogicalNot);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/LogicalOr.js
+var supportsFullBroadcast10 = false;
+var logicalOrConfig3 = createBinaryKernelConfig(LogicalOr, supportsFullBroadcast10, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/LogicalXor.js
+var supportsFullBroadcast11 = false;
+var logicalXorConfig = createBinaryKernelConfig(LogicalXor, supportsFullBroadcast11, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/LRN.js
+var wasmLRN;
+function setup35(backend3) {
+  wasmLRN = backend3.wasm.cwrap(LRN, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // beta
+  ]);
+}
+function lrn2(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { depthRadius, bias, alpha, beta } = attrs;
+  if (x.dtype !== "float32") {
+    throw new Error("LRN error: x must have dtype float32");
+  }
+  const out = backend3.makeOutput(x.shape, x.dtype);
+  wasmLRN(
+    backend3.dataIdMap.get(x.dataId).id,
+    backend3.dataIdMap.get(out.dataId).id,
+    /*channels=*/
+    x.shape[3],
+    depthRadius,
+    bias,
+    alpha,
+    beta
+  );
+  return out;
+}
+var lrnConfig = {
+  kernelName: LRN,
+  backendName: "wasm",
+  setupFunc: setup35,
+  kernelFunc: lrn2
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/LRNGrad.js
+var wasmLRNGrad;
+function setup36(backend3) {
+  wasmLRNGrad = backend3.wasm.cwrap(LRNGrad, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // beta
+  ]);
+}
+function lrnGrad2(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x, y, dy } = inputs;
+  const { depthRadius, bias, alpha, beta } = attrs;
+  if (x.dtype !== "float32" || y.dtype !== "float32" || dy.dtype !== "float32") {
+    throw new Error("LRNGrad error: x, y, and dy must have dtype float32");
+  }
+  const dx = backend3.makeOutput(x.shape, x.dtype);
+  wasmLRNGrad(
+    backend3.dataIdMap.get(x.dataId).id,
+    backend3.dataIdMap.get(y.dataId).id,
+    backend3.dataIdMap.get(dy.dataId).id,
+    backend3.dataIdMap.get(dx.dataId).id,
+    /*channels=*/
+    dy.shape[3],
+    depthRadius,
+    bias,
+    alpha,
+    beta
+  );
+  return dx;
+}
+var lrnGradConfig2 = {
+  kernelName: LRNGrad,
+  backendName: "wasm",
+  setupFunc: setup36,
+  kernelFunc: lrnGrad2
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Max.js
+var wasmMax;
+function setup37(backend3) {
+  wasmMax = backend3.wasm.cwrap(Max, null, [
+    "number",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function max5(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { reductionIndices: axis, keepDims } = attrs;
+  const { x } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  let inputId = xId;
+  let input2 = x;
+  const { transposed, axes, originalAxes, inputWasTransposed } = permuteAxesAndTranspose(x, axis, backend3);
+  if (inputWasTransposed) {
+    const transposedId = backend3.dataIdMap.get(transposed.dataId).id;
+    input2 = transposed;
+    inputId = transposedId;
+  }
+  const inputRank = input2.shape.length;
+  backend_util_exports.assertAxesAreInnerMostDims("max", axes, inputRank);
+  const [outShape, reduceShape] = backend_util_exports.computeOutAndReduceShapes(input2.shape, axes);
+  const reduceSize = util_exports.sizeFromShape(reduceShape);
+  const out = backend3.makeOutput(outShape, x.dtype);
+  if (util_exports.sizeFromShape(input2.shape) !== 0) {
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    wasmMax(inputId, CppDType[x.dtype], reduceSize, outId);
+  }
+  if (inputWasTransposed) {
+    backend3.disposeData(transposed.dataId);
+  }
+  if (keepDims) {
+    const newShape = backend_util_exports.expandShapeToKeepDim(out.shape, originalAxes);
+    out.shape = newShape;
+  }
+  return out;
+}
+var maxConfig3 = {
+  kernelName: Max,
+  backendName: "wasm",
+  setupFunc: setup37,
+  kernelFunc: max5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Maximum.js
+var supportsFullBroadcast12 = false;
+var maximumConfig3 = createBinaryKernelConfig(Maximum, supportsFullBroadcast12);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPool.js
+var wasmMaxPool;
+function setup38(backend3) {
+  wasmMaxPool = backend3.wasm.cwrap(MaxPool, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function maxPool4(args) {
+  const { inputs, attrs, backend: backend3 } = args;
+  const x = inputs.x;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  util_exports.assert(x.dtype === "float32", () => `Error in MaxPool: only float32 input is supported. Got ${x.dtype}.`);
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, 1, pad3, dimRoundingMode);
+  const filterHeight = convInfo.filterHeight;
+  const filterWidth = convInfo.filterWidth;
+  const padTop = convInfo.padInfo.top;
+  const padRight = convInfo.padInfo.right;
+  const padBottom = convInfo.padInfo.bottom;
+  const padLeft = convInfo.padInfo.left;
+  const dilationHeight = convInfo.dilationHeight;
+  const dilationWidth = convInfo.dilationWidth;
+  const strideHeight = convInfo.strideHeight;
+  const strideWidth = convInfo.strideWidth;
+  const inputChannels = convInfo.inChannels;
+  const outputChannels = convInfo.outChannels;
+  if (convInfo.dataFormat !== "channelsLast") {
+    throw new Error(`wasm backend does not support dataFormat:'${convInfo.dataFormat}'. Please use 'channelsLast'.`);
+  }
+  const out = backend3.makeOutput(convInfo.outShape, "float32");
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmMaxPool(xId, x.shape[0], x.shape[1], x.shape[2], filterHeight, filterWidth, padTop, padRight, padBottom, padLeft, dilationHeight, dilationWidth, strideHeight, strideWidth, inputChannels, outputChannels, outId);
+  return out;
+}
+var maxPoolConfig3 = {
+  kernelName: MaxPool,
+  backendName: "wasm",
+  setupFunc: setup38,
+  kernelFunc: maxPool4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPool3D.js
+var wasmMaxPool3D;
+function setup39(backend3) {
+  wasmMaxPool3D = backend3.wasm.cwrap("MaxPool3D", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function maxPool3D2(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode, dataFormat } = attrs;
+  const convInfo = backend_util_exports.computePool3DInfo(
+    x.shape,
+    filterSize,
+    strides,
+    /*dilations=*/
+    1,
+    pad3,
+    dimRoundingMode,
+    dataFormat
+  );
+  const out = backend3.makeOutput(convInfo.outShape, x.dtype);
+  wasmMaxPool3D(
+    backend3.dataIdMap.get(x.dataId).id,
+    backend3.dataIdMap.get(out.dataId).id,
+    convInfo.batchSize,
+    // Since Pool3D ops (AvgPool3D and MaxPool3D) support 3D filter only, in
+    // channels should always equal to out channels.
+    /*channelSize=*/
+    convInfo.inChannels,
+    convInfo.inDepth,
+    convInfo.inHeight,
+    convInfo.inWidth,
+    convInfo.outDepth,
+    convInfo.outHeight,
+    convInfo.outWidth,
+    convInfo.strideDepth,
+    convInfo.strideHeight,
+    convInfo.strideWidth,
+    convInfo.dilationDepth,
+    convInfo.dilationHeight,
+    convInfo.dilationWidth,
+    convInfo.effectiveFilterDepth,
+    convInfo.effectiveFilterHeight,
+    convInfo.effectiveFilterWidth,
+    convInfo.padInfo.front,
+    convInfo.padInfo.top,
+    convInfo.padInfo.left
+  );
+  return out;
+}
+var maxPool3DConfig3 = {
+  kernelName: MaxPool3D,
+  backendName: "wasm",
+  setupFunc: setup39,
+  kernelFunc: maxPool3D2
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPool3DGrad.js
+var wasmMaxPool3DGrad;
+function setup40(backend3) {
+  wasmMaxPool3DGrad = backend3.wasm.cwrap("MaxPool3DGrad", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function maxPool3DGrad3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { dy, input: input2 } = inputs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
+  const convInfo = backend_util_exports.computePool3DInfo(
+    input2.shape,
+    filterSize,
+    strides,
+    /*dilations=*/
+    1,
+    pad3,
+    dimRoundingMode
+  );
+  const dx = backend3.makeOutput(input2.shape, input2.dtype);
+  wasmMaxPool3DGrad(
+    backend3.dataIdMap.get(input2.dataId).id,
+    backend3.dataIdMap.get(dy.dataId).id,
+    backend3.dataIdMap.get(dx.dataId).id,
+    convInfo.batchSize,
+    // Since Pool3D ops (MaxPool3D and MaxPool3D) support 3D filter only, in
+    // channels should always equal to out channels.
+    /*channelSize=*/
+    convInfo.inChannels,
+    convInfo.inDepth,
+    convInfo.inHeight,
+    convInfo.inWidth,
+    convInfo.outDepth,
+    convInfo.outHeight,
+    convInfo.outWidth,
+    convInfo.strideDepth,
+    convInfo.strideHeight,
+    convInfo.strideWidth,
+    convInfo.dilationDepth,
+    convInfo.dilationHeight,
+    convInfo.dilationWidth,
+    convInfo.effectiveFilterDepth,
+    convInfo.effectiveFilterHeight,
+    convInfo.effectiveFilterWidth,
+    convInfo.padInfo.front,
+    convInfo.padInfo.top,
+    convInfo.padInfo.left
+  );
+  return dx;
+}
+var maxPool3DGradConfig4 = {
+  kernelName: MaxPool3DGrad,
+  backendName: "wasm",
+  setupFunc: setup40,
+  kernelFunc: maxPool3DGrad3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPoolGrad.js
+var wasmMaxPoolGrad;
+function setup41(backend3) {
+  wasmMaxPoolGrad = backend3.wasm.cwrap("MaxPoolGrad", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function maxPoolGrad4(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { dy, input: input2 } = inputs;
+  const { filterSize, strides, pad: pad3, dimRoundingMode } = attrs;
+  const convInfo = backend_util_exports.computePool2DInfo(
+    input2.shape,
+    filterSize,
+    strides,
+    /*dilations=*/
+    1,
+    pad3,
+    dimRoundingMode
+  );
+  const dx = backend3.makeOutput(input2.shape, input2.dtype);
+  wasmMaxPoolGrad(
+    backend3.dataIdMap.get(input2.dataId).id,
+    backend3.dataIdMap.get(dy.dataId).id,
+    backend3.dataIdMap.get(dx.dataId).id,
+    convInfo.batchSize,
+    // Since Pool ops (MaxPool and MaxPool) support 2D filter only, in
+    // channels should always equal to out channels.
+    /*channelSize=*/
+    convInfo.inChannels,
+    convInfo.inHeight,
+    convInfo.inWidth,
+    convInfo.outHeight,
+    convInfo.outWidth,
+    convInfo.strideHeight,
+    convInfo.strideWidth,
+    convInfo.dilationHeight,
+    convInfo.dilationWidth,
+    convInfo.effectiveFilterHeight,
+    convInfo.effectiveFilterWidth,
+    convInfo.padInfo.top,
+    convInfo.padInfo.left
+  );
+  return dx;
+}
+var maxPoolGradConfig4 = {
+  kernelName: MaxPoolGrad,
+  backendName: "wasm",
+  setupFunc: setup41,
+  kernelFunc: maxPoolGrad4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPoolWithArgmax.js
+var wasmMaxPoolWithArgmax;
+function setup42(backend3) {
+  wasmMaxPoolWithArgmax = backend3.wasm.cwrap("MaxPoolWithArgmax", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "boolean",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // padLeft
+  ]);
+}
+function maxPoolWithArgmax(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { filterSize, strides, pad: pad3, includeBatchInIndex } = attrs;
+  util_exports.assert(x.shape.length === 4, () => `Error in maxPool: input must be rank 4 but got rank ${x.shape.length}.`);
+  const dilations = [1, 1];
+  util_exports.assert(backend_util_exports.eitherStridesOrDilationsAreOne(strides, dilations), () => `Error in maxPool: Either strides or dilations must be 1. Got strides ${strides} and dilations '${dilations}'`);
+  const convInfo = backend_util_exports.computePool2DInfo(x.shape, filterSize, strides, [1, 1], pad3);
+  const pooled = backend3.makeOutput(convInfo.outShape, x.dtype);
+  const indexes = backend3.makeOutput(convInfo.outShape, "int32");
+  wasmMaxPoolWithArgmax(backend3.dataIdMap.get(x.dataId).id, backend3.dataIdMap.get(pooled.dataId).id, backend3.dataIdMap.get(indexes.dataId).id, CppDType[x.dtype], includeBatchInIndex, convInfo.batchSize, convInfo.inChannels, convInfo.inHeight, convInfo.inWidth, convInfo.outHeight, convInfo.outWidth, convInfo.strideHeight, convInfo.strideWidth, convInfo.dilationHeight, convInfo.dilationWidth, convInfo.effectiveFilterHeight, convInfo.effectiveFilterWidth, convInfo.padInfo.top, convInfo.padInfo.left);
+  return [pooled, indexes];
+}
+var maxPoolWithArgmaxConfig3 = {
+  kernelName: MaxPoolWithArgmax,
+  backendName: "wasm",
+  setupFunc: setup42,
+  kernelFunc: maxPoolWithArgmax
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Mean.js
+var wasmMean;
+function setup43(backend3) {
+  wasmMean = backend3.wasm.cwrap(Mean, null, ["number, number, number"]);
+}
+function mean3(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { axis, keepDims } = attrs;
+  const { x } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  let inputId = xId;
+  let input2 = x;
+  const { transposed, axes, originalAxes, inputWasTransposed } = permuteAxesAndTranspose(x, axis, backend3);
+  let reductionAxes = axes;
+  if (inputWasTransposed) {
+    const transposedId = backend3.dataIdMap.get(transposed.dataId).id;
+    if (transposedId !== xId) {
+      input2 = transposed;
+      inputId = transposedId;
+      reductionAxes = backend_util_exports.getInnerMostAxes(reductionAxes.length, input2.shape.length);
+    }
+  }
+  backend_util_exports.assertAxesAreInnerMostDims("mean", reductionAxes, input2.shape.length);
+  const [outShape, reduceShape] = backend_util_exports.computeOutAndReduceShapes(input2.shape, reductionAxes);
+  const reduceSize = util_exports.sizeFromShape(reduceShape);
+  let castedInput = input2;
+  if (input2.dtype !== "float32") {
+    castedInput = cast5({ backend: backend3, inputs: { x: input2 }, attrs: { dtype: "float32" } });
+    inputId = backend3.dataIdMap.get(castedInput.dataId).id;
+  }
+  const out = backend3.makeOutput(outShape, "float32");
+  if (util_exports.sizeFromShape(input2.shape) !== 0) {
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    wasmMean(inputId, reduceSize, outId);
+  }
+  if (inputWasTransposed) {
+    backend3.disposeData(transposed.dataId);
+  }
+  if (keepDims) {
+    const newShape = backend_util_exports.expandShapeToKeepDim(out.shape, originalAxes);
+    out.shape = newShape;
+  }
+  if (input2.dtype !== "float32") {
+    backend3.disposeData(castedInput.dataId);
+  }
+  return out;
+}
+var meanConfig3 = {
+  kernelName: Mean,
+  backendName: "wasm",
+  setupFunc: setup43,
+  kernelFunc: mean3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Min.js
+var wasmMin;
+function setup44(backend3) {
+  wasmMin = backend3.wasm.cwrap(Min, null, [
+    "number",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function min5(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { axis, keepDims } = attrs;
+  const { x } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  let inputId = xId;
+  let input2 = x;
+  const { transposed, axes, originalAxes, inputWasTransposed } = permuteAxesAndTranspose(x, axis, backend3);
+  if (inputWasTransposed) {
+    const transposedId = backend3.dataIdMap.get(transposed.dataId).id;
+    if (transposedId !== xId) {
+      input2 = transposed;
+      inputId = transposedId;
+    }
+  }
+  const inputRank = input2.shape.length;
+  backend_util_exports.assertAxesAreInnerMostDims("min", axes, inputRank);
+  const [outShape, reduceShape] = backend_util_exports.computeOutAndReduceShapes(input2.shape, axes);
+  const reduceSize = util_exports.sizeFromShape(reduceShape);
+  const out = backend3.makeOutput(outShape, input2.dtype);
+  if (util_exports.sizeFromShape(input2.shape) !== 0) {
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    wasmMin(inputId, CppDType[x.dtype], reduceSize, outId);
+  }
+  if (inputWasTransposed) {
+    backend3.disposeData(transposed.dataId);
+  }
+  if (keepDims) {
+    const newShape = backend_util_exports.expandShapeToKeepDim(out.shape, originalAxes);
+    out.shape = newShape;
+  }
+  return out;
+}
+var minConfig3 = {
+  kernelName: Min,
+  backendName: "wasm",
+  setupFunc: setup44,
+  kernelFunc: min5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Minimum.js
+var supportsFullBroadcast13 = false;
+var minimumConfig3 = createBinaryKernelConfig(Minimum, supportsFullBroadcast13);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/MirrorPad.js
+var MirrorPaddingMode;
+(function(MirrorPaddingMode2) {
+  MirrorPaddingMode2[MirrorPaddingMode2["reflect"] = 0] = "reflect";
+  MirrorPaddingMode2[MirrorPaddingMode2["symmetric"] = 1] = "symmetric";
+})(MirrorPaddingMode || (MirrorPaddingMode = {}));
+var wasmMirrorPad;
+function setup45(backend3) {
+  wasmMirrorPad = backend3.wasm.cwrap(MirrorPad, null, [
+    "number",
+    "array",
+    "number",
+    "number",
+    "array",
+    "array",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function mirrorPad3(args) {
+  const { inputs: { x }, backend: backend3, attrs: { paddings, mode } } = args;
+  const outShape = paddings.map(
+    (p2, i) => p2[0] + x.shape[i] + p2[1]
+    /* afterPad */
+  );
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const out = backend3.makeOutput(outShape, x.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const xShapeBytes = new Uint8Array(new Int32Array(x.shape).buffer);
+  const prePaddingsFlat = paddings.map((padTuple) => padTuple[0]);
+  const postPaddingsFlat = paddings.map((padTuple) => padTuple[1]);
+  const prePaddingsBytes = new Uint8Array(new Int32Array(prePaddingsFlat).buffer);
+  const postPaddingsBytes = new Uint8Array(new Int32Array(postPaddingsFlat).buffer);
+  wasmMirrorPad(xId, xShapeBytes, x.shape.length, CppDType[x.dtype], prePaddingsBytes, postPaddingsBytes, MirrorPaddingMode[mode], outId);
+  return out;
+}
+var mirrorPadConfig3 = {
+  kernelName: MirrorPad,
+  backendName: "wasm",
+  kernelFunc: mirrorPad3,
+  setupFunc: setup45
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Softmax.js
+var wasmFunc3;
+function setup46(backend3) {
+  wasmFunc3 = backend3.wasm.cwrap(Softmax, null, [
+    "number",
+    "number",
+    "number",
+    "number"
+    // batch
+  ]);
+}
+function softmax5(args) {
+  const { backend: backend3, inputs: { logits }, attrs: { dim } } = args;
+  const xId = backend3.dataIdMap.get(logits.dataId).id;
+  const out = backend3.makeOutput(logits.shape, logits.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const channels = logits.shape[dim];
+  const batch = util_exports.sizeFromShape(logits.shape) / channels;
+  if (util_exports.sizeFromShape(out.shape) === 0) {
+    return out;
+  }
+  wasmFunc3(xId, outId, channels, batch);
+  return out;
+}
+var softmaxConfig3 = {
+  kernelName: Softmax,
+  backendName: "wasm",
+  setupFunc: setup46,
+  kernelFunc: softmax5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Multinomial.js
+var wasmMultinomial;
+function setup47(backend3) {
+  wasmMultinomial = backend3.wasm.cwrap(Multinomial, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function multinomial3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { logits } = inputs;
+  const { numSamples, seed, normalized } = attrs;
+  if (logits.dtype !== "float32") {
+    throw new Error(`Tensor logits must have dtype float32, got ${logits.dtype}`);
+  }
+  const probabilities = normalized ? logits : softmax5({
+    inputs: { logits },
+    backend: backend3,
+    attrs: { dim: logits.shape.length - 1 }
+  });
+  const [batchSize, numEvents] = probabilities.shape;
+  const out = backend3.makeOutput([batchSize, numSamples], "int32");
+  wasmMultinomial(backend3.dataIdMap.get(probabilities.dataId).id, batchSize, numEvents, numSamples, seed, backend3.dataIdMap.get(out.dataId).id);
+  if (!normalized) {
+    backend3.disposeData(probabilities.dataId);
+  }
+  return out;
+}
+var multinomialConfig3 = {
+  kernelName: Multinomial,
+  backendName: "wasm",
+  setupFunc: setup47,
+  kernelFunc: multinomial3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Mod.js
+var modConfig3 = createBinaryKernelConfig(
+  Mod,
+  /*supportsFullBroadcast=*/
+  true
+);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Multiply.js
+var supportsFullBroadcast14 = true;
+var multiplyConfig3 = createBinaryKernelConfig(Multiply, supportsFullBroadcast14);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Neg.js
+var negConfig3 = createUnaryKernelConfig(Neg);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/NonMaxSuppression_util.js
+function parseResultStruct(backend3, resOffset) {
+  const result = new Int32Array(backend3.wasm.HEAPU8.buffer, resOffset, 4);
+  const pSelectedIndices = result[0];
+  const selectedSize = result[1];
+  const pSelectedScores = result[2];
+  const pValidOutputs = result[3];
+  backend3.wasm._free(resOffset);
+  return { pSelectedIndices, selectedSize, pSelectedScores, pValidOutputs };
+}
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/NonMaxSuppressionV3.js
+var wasmFunc4;
+function setup48(backend3) {
+  wasmFunc4 = backend3.wasm.cwrap(
+    NonMaxSuppressionV3,
+    "number",
+    // Result*
+    [
+      "number",
+      "number",
+      "number",
+      "number",
+      "number"
+      // scoreThreshold
+    ]
+  );
+}
+function kernelFunc(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { iouThreshold, maxOutputSize, scoreThreshold } = attrs;
+  const { boxes, scores } = inputs;
+  const boxesId = backend3.dataIdMap.get(boxes.dataId).id;
+  const scoresId = backend3.dataIdMap.get(scores.dataId).id;
+  const resOffset = wasmFunc4(boxesId, scoresId, maxOutputSize, iouThreshold, scoreThreshold);
+  const { pSelectedIndices, selectedSize, pSelectedScores, pValidOutputs } = parseResultStruct(backend3, resOffset);
+  backend3.wasm._free(pSelectedScores);
+  backend3.wasm._free(pValidOutputs);
+  const selectedIndicesTensor = backend3.makeOutput([selectedSize], "int32", pSelectedIndices);
+  return selectedIndicesTensor;
+}
+var nonMaxSuppressionV3Config3 = {
+  kernelName: NonMaxSuppressionV3,
+  backendName: "wasm",
+  setupFunc: setup48,
+  kernelFunc
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/NonMaxSuppressionV4.js
+var wasmFunc5;
+function setup49(backend3) {
+  wasmFunc5 = backend3.wasm.cwrap(
+    NonMaxSuppressionV4,
+    "number",
+    // Result*
+    [
+      "number",
+      "number",
+      "number",
+      "number",
+      "number",
+      "bool"
+      // padToMaxOutputSize
+    ]
+  );
+}
+function nonMaxSuppressionV43(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { iouThreshold, maxOutputSize, scoreThreshold, padToMaxOutputSize } = attrs;
+  const { boxes, scores } = inputs;
+  const boxesId = backend3.dataIdMap.get(boxes.dataId).id;
+  const scoresId = backend3.dataIdMap.get(scores.dataId).id;
+  const resOffset = wasmFunc5(boxesId, scoresId, maxOutputSize, iouThreshold, scoreThreshold, padToMaxOutputSize);
+  const { pSelectedIndices, selectedSize, pSelectedScores, pValidOutputs } = parseResultStruct(backend3, resOffset);
+  backend3.wasm._free(pSelectedScores);
+  const selectedIndicesTensor = backend3.makeOutput([selectedSize], "int32", pSelectedIndices);
+  const validOutputsTensor = backend3.makeOutput([], "int32", pValidOutputs);
+  return [selectedIndicesTensor, validOutputsTensor];
+}
+var nonMaxSuppressionV4Config3 = {
+  kernelName: NonMaxSuppressionV4,
+  backendName: "wasm",
+  setupFunc: setup49,
+  kernelFunc: nonMaxSuppressionV43
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/NonMaxSuppressionV5.js
+var wasmFunc6;
+function setup50(backend3) {
+  wasmFunc6 = backend3.wasm.cwrap(
+    NonMaxSuppressionV5,
+    "number",
+    // Result*
+    [
+      "number",
+      "number",
+      "number",
+      "number",
+      "number",
+      "number"
+      // softNmsSigma
+    ]
+  );
+}
+function kernelFunc2(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { iouThreshold, maxOutputSize, scoreThreshold, softNmsSigma } = attrs;
+  const { boxes, scores } = inputs;
+  const boxesId = backend3.dataIdMap.get(boxes.dataId).id;
+  const scoresId = backend3.dataIdMap.get(scores.dataId).id;
+  const resOffset = wasmFunc6(boxesId, scoresId, maxOutputSize, iouThreshold, scoreThreshold, softNmsSigma);
+  const { pSelectedIndices, selectedSize, pSelectedScores, pValidOutputs } = parseResultStruct(backend3, resOffset);
+  backend3.wasm._free(pValidOutputs);
+  const selectedIndicesTensor = backend3.makeOutput([selectedSize], "int32", pSelectedIndices);
+  const selectedScoresTensor = backend3.makeOutput([selectedSize], "float32", pSelectedScores);
+  return [selectedIndicesTensor, selectedScoresTensor];
+}
+var nonMaxSuppressionV5Config3 = {
+  kernelName: NonMaxSuppressionV5,
+  backendName: "wasm",
+  setupFunc: setup50,
+  kernelFunc: kernelFunc2
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/NotEqual.js
+var supportsFullBroadcast15 = false;
+var notEqualConfig3 = createBinaryKernelConfig(NotEqual, supportsFullBroadcast15, "bool");
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/OneHot.js
+var wasmOneHot;
+function setup51(backend3) {
+  wasmOneHot = backend3.wasm.cwrap(OneHot, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function oneHot4(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { indices } = inputs;
+  const { dtype, depth, onValue, offValue } = attrs;
+  const out = backend3.makeOutput([...indices.shape, depth], dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const indicesData = backend3.dataIdMap.get(indices.dataId);
+  const indicesId = indicesData.id;
+  wasmOneHot(indicesId, depth, onValue, offValue, outId);
+  return out;
+}
+var oneHotConfig3 = {
+  kernelName: OneHot,
+  backendName: "wasm",
+  setupFunc: setup51,
+  kernelFunc: oneHot4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/OnesLike.js
+function onesLike4(args) {
+  const { inputs: { x }, backend: backend3 } = args;
+  const out = backend3.makeOutput(x.shape, x.dtype);
+  const outVals = backend3.typedArrayFromHeap(out);
+  outVals.fill(1);
+  return out;
+}
+var onesLikeConfig3 = {
+  kernelName: OnesLike,
+  backendName: "wasm",
+  kernelFunc: onesLike4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Pack.js
+function pack3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { axis } = attrs;
+  if (inputs.length === 1) {
+    return expandDims5({ inputs: { input: inputs[0] }, backend: backend3, attrs: { dim: axis } });
+  }
+  const shape = inputs[0].shape;
+  const dtype = inputs[0].dtype;
+  inputs.forEach((t) => {
+    util_exports.assertShapesMatch(shape, t.shape, "All tensors passed to stack must have matching shapes");
+    util_exports.assert(dtype === t.dtype, () => "All tensors passed to stack must have matching dtypes");
+  });
+  const intermediateTensorInfos = [];
+  const expandedTensors = inputs.map((t) => {
+    const expandedT = expandDims5({ inputs: { input: t }, backend: backend3, attrs: { dim: axis } });
+    intermediateTensorInfos.push(expandedT);
+    return expandedT;
+  });
+  const result = concat4({ inputs: expandedTensors, backend: backend3, attrs: { axis } });
+  intermediateTensorInfos.forEach((t) => backend3.disposeData(t.dataId));
+  return result;
+}
+var packConfig3 = {
+  kernelName: Pack,
+  backendName: "wasm",
+  kernelFunc: pack3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/PadV2.js
+var wasmPadV2;
+function setup52(backend3) {
+  wasmPadV2 = backend3.wasm.cwrap(PadV2, null, [
+    "number",
+    "array",
+    "number",
+    "number",
+    "array",
+    "array",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function pad2(args) {
+  const { inputs: { x }, backend: backend3, attrs: { paddings, constantValue } } = args;
+  const outShape = paddings.map(
+    (p2, i) => p2[0] + x.shape[i] + p2[1]
+    /* afterPad */
+  );
+  if (util_exports.sizeFromShape(x.shape) === 0) {
+    return fill4({
+      backend: backend3,
+      attrs: { shape: outShape, value: constantValue, dtype: x.dtype }
+    });
+  }
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const out = backend3.makeOutput(outShape, x.dtype);
+  const outTensorData = backend3.dataIdMap.get(out.dataId);
+  const outId = outTensorData.id;
+  const xShapeBytes = new Uint8Array(new Int32Array(x.shape).buffer);
+  const prePaddingsFlat = paddings.map((padTuple) => padTuple[0]);
+  const postPaddingsFlat = paddings.map((padTuple) => padTuple[1]);
+  const prePaddingsBytes = new Uint8Array(new Int32Array(prePaddingsFlat).buffer);
+  const postPaddingsBytes = new Uint8Array(new Int32Array(postPaddingsFlat).buffer);
+  wasmPadV2(xId, xShapeBytes, x.shape.length, CppDType[x.dtype], prePaddingsBytes, postPaddingsBytes, constantValue, outId);
+  return out;
+}
+var padV2Config3 = {
+  kernelName: PadV2,
+  backendName: "wasm",
+  kernelFunc: pad2,
+  setupFunc: setup52
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Pow.js
+var supportsFullBroadcast16 = false;
+var powConfig3 = createBinaryKernelConfig(Pow, supportsFullBroadcast16);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Prelu.js
+var wasmPrelu;
+function setup53(backend3) {
+  wasmPrelu = backend3.wasm.cwrap(Prelu, null, [
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function prelu5(args) {
+  const { inputs, backend: backend3 } = args;
+  const { x, alpha } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const weightsId = backend3.dataIdMap.get(alpha.dataId).id;
+  let inputId = xId;
+  const input2 = x;
+  let castedInput = input2;
+  if (input2.dtype !== "float32") {
+    castedInput = cast5({ backend: backend3, inputs: { x }, attrs: { dtype: "float32" } });
+    inputId = backend3.dataIdMap.get(castedInput.dataId).id;
+  }
+  const out = backend3.makeOutput(x.shape, "float32");
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmPrelu(inputId, weightsId, outId);
+  if (input2.dtype !== "float32") {
+    backend3.disposeData(castedInput.dataId);
+  }
+  return out;
+}
+var preluConfig3 = {
+  kernelName: Prelu,
+  backendName: "wasm",
+  setupFunc: setup53,
+  kernelFunc: prelu5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Prod.js
+var wasmProd;
+function setup54(backend3) {
+  wasmProd = backend3.wasm.cwrap(Prod, null, [
+    "number",
+    "number",
+    "number",
+    "number"
+  ]);
+}
+function prod4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { axis, keepDims } = attrs;
+  const { x } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  let inputId = xId;
+  let input2 = x;
+  const { transposed, axes, originalAxes, inputWasTransposed } = permuteAxesAndTranspose(x, axis, backend3);
+  let reductionAxes = axes;
+  if (inputWasTransposed) {
+    const transposedId = backend3.dataIdMap.get(transposed.dataId).id;
+    if (transposedId !== xId) {
+      input2 = transposed;
+      inputId = transposedId;
+      reductionAxes = backend_util_exports.getInnerMostAxes(reductionAxes.length, input2.shape.length);
+    }
+  }
+  backend_util_exports.assertAxesAreInnerMostDims("prod", reductionAxes, input2.shape.length);
+  const [outShape, reduceShape] = backend_util_exports.computeOutAndReduceShapes(input2.shape, reductionAxes);
+  const reduceSize = util_exports.sizeFromShape(reduceShape);
+  const out = backend3.makeOutput(outShape, input2.dtype);
+  if (util_exports.sizeFromShape(input2.shape) !== 0) {
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    wasmProd(inputId, reduceSize, CppDType[out.dtype], outId);
+  }
+  if (inputWasTransposed) {
+    backend3.disposeData(transposed.dataId);
+  }
+  if (keepDims) {
+    const newShape = backend_util_exports.expandShapeToKeepDim(out.shape, originalAxes);
+    out.shape = newShape;
+  }
+  return out;
+}
+var prodConfig3 = {
+  kernelName: Prod,
+  backendName: "wasm",
+  setupFunc: setup54,
+  kernelFunc: prod4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Range.js
+var range5 = (args) => {
+  const { backend: backend3, attrs } = args;
+  const { start, stop, step: step5, dtype } = attrs;
+  const values = rangeImpl(start, stop, step5, dtype);
+  const out = backend3.makeOutput([values.length], dtype);
+  const outVals = backend3.typedArrayFromHeap(out);
+  outVals.set(values);
+  return out;
+};
+var rangeConfig3 = {
+  kernelName: Range,
+  backendName: "wasm",
+  kernelFunc: range5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/RealDiv.js
+var supportsFullBroadcast17 = true;
+var realDivConfig3 = createBinaryKernelConfig(RealDiv, supportsFullBroadcast17);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Reciprocal.js
+var reciprocalConfig3 = createUnaryKernelConfig(Reciprocal);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Relu.js
+var reluConfig3 = createUnaryKernelConfig(Relu);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Relu6.js
+var relu6Config3 = createUnaryKernelConfig(Relu6);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ResizeBilinear.js
+var wasmResizeBilinear;
+function setup55(backend3) {
+  wasmResizeBilinear = backend3.wasm.cwrap(ResizeBilinear, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function resizeBilinear5(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { images } = inputs;
+  const { alignCorners, halfPixelCenters, size } = attrs;
+  const [newHeight, newWidth] = size;
+  const [batch, oldHeight, oldWidth, numChannels] = images.shape;
+  const outShape = [batch, newHeight, newWidth, numChannels];
+  let xData = backend3.dataIdMap.get(images.dataId);
+  let castedData;
+  if (xData.dtype !== "float32") {
+    castedData = cast5({ backend: backend3, inputs: { x: images }, attrs: { dtype: "float32" } });
+    xData = backend3.dataIdMap.get(castedData.dataId);
+  }
+  const xId = xData.id;
+  const out = backend3.makeOutput(outShape, "float32");
+  if (util_exports.sizeFromShape(images.shape) === 0) {
+    return out;
+  }
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmResizeBilinear(xId, batch, oldHeight, oldWidth, numChannels, newHeight, newWidth, alignCorners ? 1 : 0, halfPixelCenters ? 1 : 0, outId);
+  if (castedData != null) {
+    backend3.disposeData(castedData.dataId);
+  }
+  return out;
+}
+var resizeBilinearConfig3 = {
+  kernelName: ResizeBilinear,
+  backendName: "wasm",
+  setupFunc: setup55,
+  kernelFunc: resizeBilinear5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ResizeBilinearGrad.js
+var wasmResizeBilinearGrad;
+function setup56(backend3) {
+  wasmResizeBilinearGrad = backend3.wasm.cwrap(ResizeBilinearGrad, null, [
+    "number",
+    "number",
+    "number",
+    "array",
+    "array",
+    "boolean"
+    // alignCorners
+  ]);
+}
+function resizeBilinearGrad3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { images, dy } = inputs;
+  const { alignCorners } = attrs;
+  const dx = backend3.makeOutput(images.shape, "float32");
+  let xData = backend3.dataIdMap.get(images.dataId);
+  let castedData;
+  if (xData.dtype !== "float32") {
+    castedData = cast5({
+      backend: backend3,
+      inputs: { x: images },
+      attrs: { dtype: "float32" }
+    });
+    xData = backend3.dataIdMap.get(castedData.dataId);
+  }
+  wasmResizeBilinearGrad(backend3.dataIdMap.get(images.dataId).id, backend3.dataIdMap.get(dy.dataId).id, backend3.dataIdMap.get(dx.dataId).id, new Uint8Array(new Int32Array(images.shape).buffer), new Uint8Array(new Int32Array(dy.shape).buffer), alignCorners);
+  if (castedData != null) {
+    backend3.disposeData(castedData.dataId);
+  }
+  return dx;
+}
+var resizeBilinearGradConfig4 = {
+  kernelName: ResizeBilinearGrad,
+  backendName: "wasm",
+  setupFunc: setup56,
+  kernelFunc: resizeBilinearGrad3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ResizeNearestNeighbor.js
+var wasmResizeNearestNeighbor;
+function setup57(backend3) {
+  wasmResizeNearestNeighbor = backend3.wasm.cwrap(ResizeNearestNeighbor, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function resizeNearestNeighbor4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { images } = inputs;
+  const { alignCorners, halfPixelCenters, size } = attrs;
+  const [newHeight, newWidth] = size;
+  const [batch, oldHeight, oldWidth, numChannels] = images.shape;
+  const outShape = [batch, newHeight, newWidth, numChannels];
+  const out = backend3.makeOutput(outShape, "float32");
+  if (util_exports.sizeFromShape(images.shape) === 0) {
+    return out;
+  }
+  let xData = backend3.dataIdMap.get(images.dataId);
+  let castedData;
+  if (xData.dtype !== "float32") {
+    castedData = cast5({
+      backend: backend3,
+      inputs: { x: images },
+      attrs: { dtype: "float32" }
+    });
+    xData = backend3.dataIdMap.get(castedData.dataId);
+  }
+  const xId = xData.id;
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmResizeNearestNeighbor(xId, batch, oldHeight, oldWidth, numChannels, newHeight, newWidth, alignCorners ? 1 : 0, halfPixelCenters ? 1 : 0, outId);
+  if (castedData != null) {
+    backend3.disposeData(castedData.dataId);
+  }
+  return out;
+}
+var resizeNearestNeighborConfig3 = {
+  kernelName: ResizeNearestNeighbor,
+  backendName: "wasm",
+  setupFunc: setup57,
+  kernelFunc: resizeNearestNeighbor4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ResizeNearestNeighborGrad.js
+var wasmResizeNearestNeighborGrad;
+function setup58(backend3) {
+  wasmResizeNearestNeighborGrad = backend3.wasm.cwrap(ResizeNearestNeighborGrad, null, [
+    "number",
+    "number",
+    "number",
+    "array",
+    "array",
+    "boolean"
+    // alignCorners
+  ]);
+}
+function resizeNearestNeighborGrad3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { images, dy } = inputs;
+  const { alignCorners } = attrs;
+  const dx = backend3.makeOutput(images.shape, "float32");
+  let xData = backend3.dataIdMap.get(images.dataId);
+  let castedData;
+  if (xData.dtype !== "float32") {
+    castedData = cast5({
+      backend: backend3,
+      inputs: { x: images },
+      attrs: { dtype: "float32" }
+    });
+    xData = backend3.dataIdMap.get(castedData.dataId);
+  }
+  wasmResizeNearestNeighborGrad(backend3.dataIdMap.get(images.dataId).id, backend3.dataIdMap.get(dy.dataId).id, backend3.dataIdMap.get(dx.dataId).id, new Uint8Array(new Int32Array(images.shape).buffer), new Uint8Array(new Int32Array(dy.shape).buffer), alignCorners);
+  if (castedData != null) {
+    backend3.disposeData(castedData.dataId);
+  }
+  return dx;
+}
+var resizeNearestNeighborGradConfig4 = {
+  kernelName: ResizeNearestNeighborGrad,
+  backendName: "wasm",
+  setupFunc: setup58,
+  kernelFunc: resizeNearestNeighborGrad3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Reverse.js
+var wasmReverse;
+function setup59(backend3) {
+  wasmReverse = backend3.wasm.cwrap(Reverse, null, [
+    "number",
+    "array",
+    "number",
+    "array",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function reverse4(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { dims } = attrs;
+  const axes = util_exports.parseAxisParam(dims, x.shape);
+  if (x.shape.length === 0) {
+    return identity3({ inputs: { x }, backend: backend3 });
+  }
+  const out = backend3.makeOutput(x.shape, x.dtype);
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const axesBytes = new Uint8Array(new Int32Array(axes).buffer);
+  const outShapeBytes = new Uint8Array(new Int32Array(x.shape).buffer);
+  wasmReverse(xId, axesBytes, axes.length, outShapeBytes, x.shape.length, outId);
+  const reshaped = reshape5({ inputs: { x: out }, attrs: { shape: x.shape }, backend: backend3 });
+  backend3.disposeData(out.dataId);
+  return reshaped;
+}
+var reverseConfig3 = {
+  kernelName: Reverse,
+  backendName: "wasm",
+  kernelFunc: reverse4,
+  setupFunc: setup59
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/RotateWithOffset.js
+var wasmRotate;
+function setup60(backend3) {
+  wasmRotate = backend3.wasm.cwrap(RotateWithOffset, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "array",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function rotateWithOffset2(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { image: image2 } = inputs;
+  const { radians, fillValue, center } = attrs;
+  const out = backend3.makeOutput(image2.shape, image2.dtype);
+  const imageId = backend3.dataIdMap.get(image2.dataId).id;
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const [batch, imageHeight, imageWidth, numChannels] = image2.shape;
+  const [centerX, centerY] = backend_util_exports.getImageCenter(center, imageHeight, imageWidth);
+  const fillIsBlack = fillValue === 0;
+  const fullOpacityValue = 255;
+  const fillValues2 = typeof fillValue === "number" ? [fillValue, fillValue, fillValue, fillIsBlack ? 0 : fullOpacityValue] : [...fillValue, fullOpacityValue];
+  const fillBytes = new Uint8Array(new Int32Array(fillValues2).buffer);
+  wasmRotate(imageId, batch, imageHeight, imageWidth, numChannels, radians, centerX, centerY, fillBytes, fillValues2.length, outId);
+  return out;
+}
+var rotateWithOffsetConfig3 = {
+  kernelName: RotateWithOffset,
+  backendName: "wasm",
+  kernelFunc: rotateWithOffset2,
+  setupFunc: setup60
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Round.js
+var roundConfig3 = createUnaryKernelConfig(Round);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Rsqrt.js
+var rsqrtConfig3 = createUnaryKernelConfig(Rsqrt);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ScatterNd.js
+var wasmScatterNd;
+function setup61(backend3) {
+  wasmScatterNd = backend3.wasm.cwrap(ScatterNd, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "array",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function scatterNd3(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { indices, updates } = inputs;
+  const { shape } = attrs;
+  const out = backend3.makeOutput(shape, updates.dtype);
+  if (util_exports.sizeFromShape(shape) === 0) {
+    return out;
+  }
+  const { sliceRank, numUpdates, sliceSize, strides, outputSize } = scatter_nd_util_exports.calculateShapes(updates, indices, shape);
+  const indicesData = backend3.dataIdMap.get(indices.dataId);
+  const indicesId = indicesData.id;
+  const updatesData = backend3.dataIdMap.get(updates.dataId);
+  const updatesId = updatesData.id;
+  const stridesBytes = new Uint8Array(new Int32Array(strides).buffer);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmScatterNd(indicesId, updatesId, CppDType[updates.dtype], sliceRank, numUpdates, sliceSize, stridesBytes, outputSize, outId);
+  return out;
+}
+var scatterNdConfig3 = {
+  kernelName: ScatterNd,
+  backendName: "wasm",
+  setupFunc: setup61,
+  kernelFunc: scatterNd3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SearchSorted.js
+var wasmSearchSorted;
+function setup62(backend3) {
+  wasmSearchSorted = backend3.wasm.cwrap(SearchSorted, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "bool",
+    "number"
+    // outId
+  ]);
+}
+function searchSorted3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { sortedSequence, values } = inputs;
+  const { side } = attrs;
+  if (sortedSequence.dtype !== values.dtype) {
+    throw new Error(`SearchSorted error: sorted_sequence must have the same dtype as values. Got ${sortedSequence.dtype} and ${values.dtype}`);
+  }
+  const out = backend3.makeOutput(values.shape, "int32");
+  function tensorId(x) {
+    return backend3.dataIdMap.get(x.dataId).id;
+  }
+  wasmSearchSorted(
+    tensorId(sortedSequence),
+    tensorId(values),
+    /*batchSize=*/
+    sortedSequence.shape[0],
+    /*sequenceSize=*/
+    sortedSequence.shape[1],
+    /*valuesSize=*/
+    values.shape[1],
+    /*dtype=*/
+    CppDType[sortedSequence.dtype],
+    /*isSideLeft=*/
+    side === "left",
+    tensorId(out)
+  );
+  return out;
+}
+var searchSortedConfig3 = {
+  kernelName: SearchSorted,
+  backendName: "wasm",
+  setupFunc: setup62,
+  kernelFunc: searchSorted3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Select.js
+var wasmSelect;
+function setup63(backend3) {
+  wasmSelect = backend3.wasm.cwrap("SelectV2", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function select4(args) {
+  const { inputs, backend: backend3 } = args;
+  const { condition, t, e } = inputs;
+  const conditionId = backend3.dataIdMap.get(condition.dataId).id;
+  const tId = backend3.dataIdMap.get(t.dataId).id;
+  const eId = backend3.dataIdMap.get(e.dataId).id;
+  const out = backend3.makeOutput(t.shape, t.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const cRank = condition.shape.length;
+  const tRank = t.shape.length;
+  const offset = cRank === 0 || cRank > 1 || tRank === 1 ? 1 : util_exports.sizeFromShape(t.shape.slice(1));
+  wasmSelect(conditionId, tId, eId, offset, outId);
+  return out;
+}
+var selectConfig3 = {
+  kernelName: Select,
+  backendName: "wasm",
+  kernelFunc: select4,
+  setupFunc: setup63
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Selu.js
+var seluConfig3 = createUnaryKernelConfig(Selu);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Sigmoid.js
+var wasmFunc7;
+function setup64(backend3) {
+  wasmFunc7 = backend3.wasm.cwrap(Sigmoid, null, ["number", "number"]);
+}
+function sigmoid4(args) {
+  const { backend: backend3, inputs: { x } } = args;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const out = backend3.makeOutput(x.shape, x.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  if (util_exports.sizeFromShape(out.shape) === 0) {
+    return out;
+  }
+  wasmFunc7(xId, outId);
+  return out;
+}
+var sigmoidConfig3 = {
+  kernelName: "Sigmoid",
+  backendName: "wasm",
+  setupFunc: setup64,
+  kernelFunc: sigmoid4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Sign.js
+var signConfig3 = createUnaryKernelConfig(Sign);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Sin.js
+var sinConfig3 = createUnaryKernelConfig(Sin);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Sinh.js
+var sinhConfig3 = createUnaryKernelConfig(Sinh);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Softplus.js
+var softplusConfig3 = createUnaryKernelConfig(Softplus);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SpaceToBatchND.js
+function spaceToBatchND4(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const { blockShape, paddings } = attrs;
+  const prod5 = util_exports.sizeFromShape(blockShape);
+  const completePaddings = [[0, 0]];
+  completePaddings.push(...paddings);
+  for (let i = 1 + blockShape.length; i < x.shape.length; ++i) {
+    completePaddings.push([0, 0]);
+  }
+  const paddedX = padV2Config3.kernelFunc({
+    inputs: { x },
+    backend: backend3,
+    attrs: { paddings: completePaddings, constantValue: 0 }
+  });
+  const reshapedPaddedShape = backend_util_exports.getReshaped(paddedX.shape, blockShape, prod5, false);
+  const permutedReshapedPaddedPermutation = backend_util_exports.getPermuted(reshapedPaddedShape.length, blockShape.length, false);
+  const flattenShape = backend_util_exports.getReshapedPermuted(paddedX.shape, blockShape, prod5, false);
+  const reshapeInputs = { x: paddedX };
+  const reshapeAttrs = { shape: reshapedPaddedShape };
+  const paddedXReshaped = reshape5({ inputs: reshapeInputs, backend: backend3, attrs: reshapeAttrs });
+  const transposeInputs = { x: paddedXReshaped };
+  const transposeAttrs = { perm: permutedReshapedPaddedPermutation };
+  const paddedXT = transpose4({ inputs: transposeInputs, backend: backend3, attrs: transposeAttrs });
+  const resultReshapeInputs = { x: paddedXT };
+  const resultReshapeAttrs = { shape: flattenShape };
+  const result = reshape5({ inputs: resultReshapeInputs, backend: backend3, attrs: resultReshapeAttrs });
+  backend3.disposeData(paddedX.dataId);
+  backend3.disposeData(paddedXReshaped.dataId);
+  backend3.disposeData(paddedXT.dataId);
+  return result;
+}
+var spaceToBatchNDConfig3 = {
+  kernelName: SpaceToBatchND,
+  backendName: "wasm",
+  kernelFunc: spaceToBatchND4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SparseFillEmptyRows.js
+var wasmSparseFillEmptyRows;
+function setup65(backend3) {
+  wasmSparseFillEmptyRows = backend3.wasm.cwrap("SparseFillEmptyRows", "number", [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // exceptionValuesId
+  ]);
+}
+function sparseFillEmptyRows3(args) {
+  const { backend: backend3, inputs } = args;
+  const { indices, values, denseShape, defaultValue } = inputs;
+  const indicesCount = indices.shape[0];
+  const rank = indices.shape[1];
+  const denseRows = backend3.readSync(denseShape.dataId)[0];
+  const maxOutputIndicesShape = [indicesCount + denseRows, rank];
+  const indicesId = backend3.dataIdMap.get(indices.dataId).id;
+  const valuesId = backend3.dataIdMap.get(values.dataId).id;
+  const defaultValueId = backend3.dataIdMap.get(defaultValue.dataId).id;
+  const outputIndices = backend3.makeOutput(maxOutputIndicesShape, indices.dtype);
+  const outputIndicesId = backend3.dataIdMap.get(outputIndices.dataId).id;
+  const outputValues = backend3.makeOutput(maxOutputIndicesShape.slice(0, 1), values.dtype);
+  const outputValuesId = backend3.dataIdMap.get(outputValues.dataId).id;
+  const emptyRowIndicator = backend3.makeOutput([denseRows], "bool");
+  const emptyRowIndicatorId = backend3.dataIdMap.get(emptyRowIndicator.dataId).id;
+  const reverseIndexMap = backend3.makeOutput([indicesCount], indices.dtype);
+  const reverseIndexMapId = backend3.dataIdMap.get(reverseIndexMap.dataId).id;
+  const exceptionValues = backend3.makeOutput([4], "int32");
+  const exceptionValuesId = backend3.dataIdMap.get(exceptionValues.dataId).id;
+  const outputRows = wasmSparseFillEmptyRows(indicesId, valuesId, CppDType[values.dtype], indicesCount, denseRows, rank, defaultValueId, outputIndicesId, outputValuesId, emptyRowIndicatorId, reverseIndexMapId, exceptionValuesId);
+  const exceptionValuesArray = backend3.readSync(exceptionValues.dataId);
+  let exceptionMessage;
+  switch (exceptionValuesArray[0]) {
+    case 1: {
+      exceptionMessage = backend_util_exports.getSparseFillEmptyRowsIndicesDenseShapeMismatch(exceptionValuesArray[1]);
+      break;
+    }
+    case 2: {
+      exceptionMessage = backend_util_exports.getSparseFillEmptyRowsNegativeIndexErrorMessage(exceptionValuesArray[1], exceptionValuesArray[2]);
+      break;
+    }
+    case 3:
+      exceptionMessage = backend_util_exports.getSparseFillEmptyRowsOutOfRangeIndexErrorMessage(exceptionValuesArray[1], exceptionValuesArray[2], exceptionValuesArray[3]);
+      break;
+    default:
+      exceptionMessage = "";
+  }
+  backend3.disposeData(exceptionValues.dataId);
+  if (exceptionMessage) {
+    backend3.disposeData(outputIndices.dataId);
+    backend3.disposeData(outputValues.dataId);
+    backend3.disposeData(emptyRowIndicator.dataId);
+    backend3.disposeData(reverseIndexMap.dataId);
+    throw new Error(exceptionMessage);
+  }
+  let resizedIndices = outputIndices;
+  let resizedValues = outputValues;
+  if (outputRows !== maxOutputIndicesShape[0]) {
+    resizedIndices = slice4({
+      inputs: { x: outputIndices },
+      attrs: { begin: 0, size: [outputRows, rank] },
+      backend: backend3
+    });
+    resizedValues = slice4({
+      inputs: { x: outputValues },
+      attrs: { begin: 0, size: outputRows },
+      backend: backend3
+    });
+    backend3.disposeData(outputIndices.dataId);
+    backend3.disposeData(outputValues.dataId);
+  }
+  return [resizedIndices, resizedValues, emptyRowIndicator, reverseIndexMap];
+}
+var sparseFillEmptyRowsConfig3 = {
+  kernelName: SparseFillEmptyRows,
+  backendName: "wasm",
+  setupFunc: setup65,
+  kernelFunc: sparseFillEmptyRows3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SparseReshape.js
+var wasmSparseReshape;
+function setup66(backend3) {
+  wasmSparseReshape = backend3.wasm.cwrap(SparseReshape, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // exceptionValuesId
+  ]);
+}
+function sparseReshape3(args) {
+  const { backend: backend3, inputs } = args;
+  const { inputIndices, inputShape, newShape } = inputs;
+  if (inputIndices.shape.length !== 2) {
+    throw new Error(`Input indices should be a matrix but received shape
+        ${inputIndices.shape}`);
+  }
+  if (inputShape.shape.length !== 1) {
+    throw new Error(`Input shape should be a vector but received shape
+        ${inputShape.shape}`);
+  }
+  if (newShape.shape.length !== 1) {
+    throw new Error(`Target shape should be a vector but received shape ${newShape.shape}`);
+  }
+  const inputIndicesId = backend3.dataIdMap.get(inputIndices.dataId).id;
+  const inputShapeId = backend3.dataIdMap.get(inputShape.dataId).id;
+  const newShapeId = backend3.dataIdMap.get(newShape.dataId).id;
+  const nnz = inputIndices.shape[0];
+  const outputRank = util_exports.sizeFromShape(newShape.shape);
+  const newIndices = backend3.makeOutput([nnz, outputRank], inputIndices.dtype);
+  const newIndicesId = backend3.dataIdMap.get(newIndices.dataId).id;
+  const outputShape = backend3.makeOutput([outputRank], newShape.dtype);
+  const outputShapeId = backend3.dataIdMap.get(outputShape.dataId).id;
+  const exceptionValues = backend3.makeOutput([3], "int32");
+  const exceptionValuesId = backend3.dataIdMap.get(exceptionValues.dataId).id;
+  wasmSparseReshape(inputIndicesId, inputShapeId, newShapeId, nnz, newIndicesId, outputShapeId, exceptionValuesId);
+  const exceptionValuesArray = backend3.readSync(exceptionValues.dataId);
+  let exceptionMessage;
+  switch (exceptionValuesArray[0]) {
+    case 0: {
+      exceptionMessage = backend_util_exports.getSparseReshapeMultipleNegativeOneOutputDimErrorMessage(exceptionValuesArray[1], exceptionValuesArray[2]);
+      break;
+    }
+    case 1: {
+      exceptionMessage = backend_util_exports.getSparseReshapeNegativeOutputDimErrorMessage(exceptionValuesArray[1], exceptionValuesArray[2]);
+      break;
+    }
+    case 2:
+      exceptionMessage = backend_util_exports.getSparseReshapeEmptyTensorZeroOutputDimErrorMessage();
+      break;
+    case 3: {
+      const inputShapeValues = Array.from(backend3.readSync(inputShape.dataId)), outputShapeValues = Array.from(backend3.readSync(outputShape.dataId));
+      exceptionMessage = backend_util_exports.getSparseReshapeInputOutputMultipleErrorMessage(inputShapeValues, outputShapeValues);
+      break;
+    }
+    case 4: {
+      const inputShapeValues = Array.from(backend3.readSync(inputShape.dataId)), outputShapeValues = Array.from(backend3.readSync(outputShape.dataId));
+      exceptionMessage = backend_util_exports.getSparseReshapeInputOutputMismatchErrorMessage(inputShapeValues, outputShapeValues);
+      break;
+    }
+    default:
+      exceptionMessage = "";
+  }
+  backend3.disposeData(exceptionValues.dataId);
+  if (exceptionMessage) {
+    backend3.disposeData(newIndices.dataId);
+    backend3.disposeData(outputShape.dataId);
+    throw new Error(exceptionMessage);
+  }
+  return [newIndices, outputShape];
+}
+var sparseReshapeConfig3 = {
+  kernelName: SparseReshape,
+  backendName: "wasm",
+  setupFunc: setup66,
+  kernelFunc: sparseReshape3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SparseSegmentReduction.js
+var wasmSparseSegmentReduction;
+function setup67(backend3) {
+  wasmSparseSegmentReduction = backend3.wasm.cwrap("SparseSegmentReduction", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // defaultValue
+  ]);
+}
+function sparseSegmentReduction(args, isMean) {
+  const { backend: backend3, inputs } = args;
+  const { data, indices, segmentIds } = inputs;
+  const numIndices = indices.shape[0];
+  const segmentIdsBack = backend3.readSync(segmentIds.dataId, numIndices - 1, numIndices)[0];
+  const lastSegmentIdPlusOne = numIndices > 0 ? segmentIdsBack + 1 : 0;
+  const outputRows = lastSegmentIdPlusOne;
+  if (outputRows < 0) {
+    throw new Error(backend_util_exports.getSparseSegmentReductionNegativeSegmentIdsErrorMessage());
+  }
+  const outputShape = data.shape.slice();
+  outputShape[0] = outputRows;
+  const dataId = backend3.dataIdMap.get(data.dataId).id;
+  const indicesId = backend3.dataIdMap.get(indices.dataId).id;
+  const segmentIdsId = backend3.dataIdMap.get(segmentIds.dataId).id;
+  const output = backend3.makeOutput(outputShape, data.dtype);
+  const outputId = backend3.dataIdMap.get(output.dataId).id;
+  const exceptionValues = backend3.makeOutput([4], "int32");
+  const exceptionValuesId = backend3.dataIdMap.get(exceptionValues.dataId).id;
+  wasmSparseSegmentReduction(dataId, CppDType[data.dtype], data.shape[0], indicesId, segmentIdsId, outputId, exceptionValuesId, isMean, 0);
+  const exceptionValuesArray = backend3.readSync(exceptionValues.dataId);
+  let exceptionMessage;
+  switch (exceptionValuesArray[0]) {
+    case 0: {
+      exceptionMessage = backend_util_exports.getSparseSegmentReductionNegativeSegmentIdsErrorMessage();
+      break;
+    }
+    case 1: {
+      exceptionMessage = backend_util_exports.getSparseSegmentReductionNonIncreasingSegmentIdsErrorMessage();
+      break;
+    }
+    case 2:
+      exceptionMessage = backend_util_exports.getSparseSegmentReductionSegmentIdOutOfRangeErrorMessage(exceptionValuesArray[1], exceptionValuesArray[2]);
+      break;
+    case 3:
+      exceptionMessage = backend_util_exports.getSparseSegmentReductionIndicesOutOfRangeErrorMessage(exceptionValuesArray[1], exceptionValuesArray[2], exceptionValuesArray[3]);
+      break;
+    default:
+      exceptionMessage = "";
+  }
+  backend3.disposeData(exceptionValues.dataId);
+  if (exceptionMessage) {
+    backend3.disposeData(output.dataId);
+    throw new Error(exceptionMessage);
+  }
+  return output;
+}
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SparseSegmentMean.js
+function sparseSegmentMean3(args) {
+  return sparseSegmentReduction(args, true);
+}
+var sparseSegmentMeanConfig3 = {
+  kernelName: SparseSegmentMean,
+  backendName: "wasm",
+  setupFunc: setup67,
+  kernelFunc: sparseSegmentMean3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SparseSegmentSum.js
+function sparseSegmentSum3(args) {
+  return sparseSegmentReduction(args, false);
+}
+var sparseSegmentSumConfig3 = {
+  kernelName: SparseSegmentSum,
+  backendName: "wasm",
+  setupFunc: setup67,
+  kernelFunc: sparseSegmentSum3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SparseToDense.js
+var wasmSparseToDense;
+function setup68(backend3) {
+  wasmSparseToDense = backend3.wasm.cwrap(SparseToDense, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "array",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function sparseToDense3(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { sparseIndices, sparseValues, defaultValue } = inputs;
+  const { outputShape } = attrs;
+  const out = backend3.makeOutput(outputShape, defaultValue.dtype);
+  if (util_exports.sizeFromShape(outputShape) === 0) {
+    return out;
+  }
+  const { sliceRank, numUpdates, sliceSize, strides, outputSize } = backend_util_exports.calculateShapes(sparseValues, sparseIndices, outputShape);
+  const sparseIndicesId = backend3.dataIdMap.get(sparseIndices.dataId).id;
+  const sparseValuesId = backend3.dataIdMap.get(sparseValues.dataId).id;
+  const defaultValueId = backend3.dataIdMap.get(defaultValue.dataId).id;
+  const stridesBytes = new Uint8Array(new Int32Array(strides).buffer);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmSparseToDense(sparseIndicesId, sparseValuesId, sparseValues.shape.length, defaultValueId, CppDType[defaultValue.dtype], sliceRank, numUpdates, sliceSize, stridesBytes, outputSize, outId);
+  return out;
+}
+var sparseToDenseConfig3 = {
+  kernelName: SparseToDense,
+  backendName: "wasm",
+  setupFunc: setup68,
+  kernelFunc: sparseToDense3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SplitV.js
+function splitV3(args) {
+  const { inputs, attrs, backend: backend3 } = args;
+  const { x } = inputs;
+  const { numOrSizeSplits, axis } = attrs;
+  const $axis = util_exports.parseAxisParam(axis, x.shape)[0];
+  const splitSizes = backend_util_exports.prepareSplitSize(x, numOrSizeSplits, $axis);
+  const begin = new Array(x.shape.length).fill(0);
+  const size = x.shape.slice();
+  return splitSizes.map((s) => {
+    const xSliceSize = [...size];
+    xSliceSize[$axis] = s;
+    const xSlice = slice4({ inputs: { x }, attrs: { begin, size: xSliceSize }, backend: backend3 });
+    begin[$axis] += s;
+    return xSlice;
+  });
+}
+var splitVConfig3 = {
+  kernelName: SplitV,
+  backendName: "wasm",
+  kernelFunc: splitV3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Sqrt.js
+var sqrtConfig3 = createUnaryKernelConfig(Sqrt);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Square.js
+var squareConfig3 = createUnaryKernelConfig(Square);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/SquaredDifference.js
+var supportsFullBroadcast18 = true;
+var squaredDifferenceConfig3 = createBinaryKernelConfig(SquaredDifference, supportsFullBroadcast18);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Step.js
+var wasmStep;
+function setup69(backend3) {
+  wasmStep = backend3.wasm.cwrap(Step, null, [
+    "number",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function step4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { alpha } = attrs;
+  const { x } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const out = backend3.makeOutput(x.shape, x.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmStep(xId, alpha, CppDType[x.dtype], outId);
+  return out;
+}
+var stepConfig3 = {
+  kernelName: Step,
+  backendName: "wasm",
+  setupFunc: setup69,
+  kernelFunc: step4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/StridedSlice.js
+var wasmStridedSlice;
+function setup70(backend3) {
+  wasmStridedSlice = backend3.wasm.cwrap(StridedSlice, null, [
+    "number",
+    "array",
+    "number",
+    "array",
+    "array",
+    "array",
+    "array",
+    "array",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function stridedSlice4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { x } = inputs;
+  const { begin, end, strides, beginMask, endMask, ellipsisMask, newAxisMask, shrinkAxisMask } = attrs;
+  const { finalShapeSparse, finalShape, isIdentity, sliceDim0, isSimpleSlice, begin: $begin, end: $end, strides: $strides } = slice_util_exports.sliceInfo(x.shape, begin, end, strides, beginMask, endMask, ellipsisMask, newAxisMask, shrinkAxisMask);
+  let result;
+  if (isIdentity) {
+    result = reshape5({ inputs: { x }, backend: backend3, attrs: { shape: finalShape } });
+  } else if (sliceDim0 || isSimpleSlice) {
+    util_exports.assert(x.shape.length >= 1, () => `Input must have rank at least 1, got: ${x.shape.length}`);
+    const size = slice_util_exports.computeOutShape($begin, $end, $strides);
+    const sliced = slice4({ inputs: { x }, backend: backend3, attrs: { begin: $begin, size } });
+    result = reshape5({ inputs: { x: sliced }, backend: backend3, attrs: { shape: finalShape } });
+    backend3.disposeData(sliced.dataId);
+  } else {
+    const out = backend3.makeOutput(finalShapeSparse, "float32");
+    const xId = backend3.dataIdMap.get(x.dataId).id;
+    const xStridesBytes = new Uint8Array(new Int32Array(util_exports.computeStrides(x.shape)).buffer);
+    const beginBytes = new Uint8Array(new Int32Array($begin).buffer);
+    const endBytes = new Uint8Array(new Int32Array($end).buffer);
+    const stridesBytes = new Uint8Array(new Int32Array($strides).buffer);
+    const outputShapeBytes = new Uint8Array(new Int32Array(finalShapeSparse).buffer);
+    const outStridesBytes = new Uint8Array(new Int32Array(util_exports.computeStrides(finalShapeSparse)).buffer);
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    wasmStridedSlice(xId, xStridesBytes, x.shape.length, beginBytes, endBytes, stridesBytes, outputShapeBytes, outStridesBytes, finalShapeSparse.length, outId);
+    result = reshape5({ inputs: { x: out }, backend: backend3, attrs: { shape: finalShape } });
+    backend3.disposeData(out.dataId);
+  }
+  return result;
+}
+var stridedSliceConfig3 = {
+  kernelName: StridedSlice,
+  backendName: "wasm",
+  setupFunc: setup70,
+  kernelFunc: stridedSlice4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/StringNGrams.js
+function stringNGrams3(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { data, dataSplits } = inputs;
+  const { separator, nGramWidths, leftPad, rightPad: rightPad2, padWidth, preserveShortSequences } = attrs;
+  const $data = backend3.readSync(data.dataId);
+  const $dataSplits = backend3.readSync(dataSplits.dataId);
+  const [nGrams, nGramsSplits] = stringNGramsImpl($data, $dataSplits, separator, nGramWidths, leftPad, rightPad2, padWidth, preserveShortSequences);
+  const nGramsOut = backend3.makeOutput([nGrams.length], "string");
+  const nGramsOutData = backend3.dataIdMap.get(nGramsOut.dataId);
+  nGramsOutData.stringBytes = nGrams;
+  const nGramsSplitsOut = backend3.makeOutput(dataSplits.shape, "int32");
+  const nGramsSplitsOutVals = backend3.typedArrayFromHeap(nGramsSplitsOut);
+  nGramsSplitsOutVals.set(nGramsSplits);
+  return [nGramsOut, nGramsSplitsOut];
+}
+var stringNGramsConfig3 = {
+  kernelName: StringNGrams,
+  backendName: "wasm",
+  kernelFunc: stringNGrams3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/StringSplit.js
+function stringSplit3(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { input: input2, delimiter } = inputs;
+  const { skipEmpty } = attrs;
+  const inputVals = backend3.readSync(input2.dataId);
+  const delimiterVals = backend3.readSync(delimiter.dataId);
+  const [indices, values, shape] = stringSplitImpl(inputVals, delimiterVals[0], skipEmpty);
+  const outputSize = values.length;
+  const indicesOut = backend3.makeOutput([outputSize, 2], "int32");
+  const indicesOutVals = backend3.typedArrayFromHeap(indicesOut);
+  indicesOutVals.set(indices);
+  const valuesOut = backend3.makeOutput([outputSize], "string");
+  const valuesOutData = backend3.dataIdMap.get(valuesOut.dataId);
+  valuesOutData.stringBytes = values;
+  const shapeOut = backend3.makeOutput([2], "int32");
+  const shapeOutVals = backend3.typedArrayFromHeap(shapeOut);
+  shapeOutVals.set(shape);
+  return [indicesOut, valuesOut, shapeOut];
+}
+var stringSplitConfig3 = {
+  kernelName: StringSplit,
+  backendName: "wasm",
+  kernelFunc: stringSplit3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/StringToHashBucketFast.js
+function stringToHashBucketFast3(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { input: input2 } = inputs;
+  const { numBuckets } = attrs;
+  const inputVals = backend3.readSync(input2.dataId);
+  const values = stringToHashBucketFastImpl(inputVals, numBuckets);
+  const out = backend3.makeOutput(input2.shape, "int32");
+  const outVals = backend3.typedArrayFromHeap(out);
+  outVals.set(values);
+  return out;
+}
+var stringToHashBucketFastConfig3 = {
+  kernelName: StringToHashBucketFast,
+  backendName: "wasm",
+  kernelFunc: stringToHashBucketFast3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Sub.js
+var supportsFullBroadcast19 = true;
+var subConfig3 = createBinaryKernelConfig(Sub, supportsFullBroadcast19);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Sum.js
+var wasmSum;
+function setup71(backend3) {
+  wasmSum = backend3.wasm.cwrap(Sum, null, [
+    "number",
+    "number",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function sum5(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { axis, keepDims } = attrs;
+  const { x } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  let inputId = xId;
+  let input2 = x;
+  const { transposed, axes, originalAxes, inputWasTransposed } = permuteAxesAndTranspose(x, axis, backend3);
+  let reductionAxes = axes;
+  if (inputWasTransposed) {
+    const transposedId = backend3.dataIdMap.get(transposed.dataId).id;
+    if (transposedId !== xId) {
+      input2 = transposed;
+      inputId = transposedId;
+      reductionAxes = backend_util_exports.getInnerMostAxes(reductionAxes.length, input2.shape.length);
+    }
+  }
+  backend_util_exports.assertAxesAreInnerMostDims("sum", reductionAxes, input2.shape.length);
+  const [outShape, reduceShape] = backend_util_exports.computeOutAndReduceShapes(input2.shape, reductionAxes);
+  const reduceSize = util_exports.sizeFromShape(reduceShape);
+  const out = backend3.makeOutput(outShape, input2.dtype);
+  if (util_exports.sizeFromShape(input2.shape) !== 0) {
+    const outId = backend3.dataIdMap.get(out.dataId).id;
+    wasmSum(inputId, reduceSize, CppDType[out.dtype], outId);
+  }
+  if (inputWasTransposed) {
+    backend3.disposeData(transposed.dataId);
+  }
+  if (keepDims) {
+    const newShape = backend_util_exports.expandShapeToKeepDim(out.shape, originalAxes);
+    out.shape = newShape;
+  }
+  return out;
+}
+var sumConfig3 = {
+  kernelName: Sum,
+  backendName: "wasm",
+  setupFunc: setup71,
+  kernelFunc: sum5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Tan.js
+var tanConfig3 = createUnaryKernelConfig(Tan);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Tanh.js
+var tanhConfig3 = createUnaryKernelConfig(Tanh);
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/TensorScatterUpdate.js
+var wasmTensorScatterUpdate;
+function setup72(backend3) {
+  wasmTensorScatterUpdate = backend3.wasm.cwrap(TensorScatterUpdate, null, [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "array",
+    "number",
+    "number",
+    "number"
+    // tensorId
+  ]);
+}
+function tensorScatterUpdate3(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { tensor: tensor2, indices, updates } = inputs;
+  const {} = attrs;
+  const out = backend3.makeOutput(tensor2.shape, tensor2.dtype);
+  if (util_exports.sizeFromShape(tensor2.shape) === 0) {
+    return out;
+  }
+  const { sliceRank, numUpdates, sliceSize, strides, outputSize } = scatter_nd_util_exports.calculateShapes(updates, indices, tensor2.shape);
+  const indicesData = backend3.dataIdMap.get(indices.dataId);
+  const indicesId = indicesData.id;
+  const updatesData = backend3.dataIdMap.get(updates.dataId);
+  const updatesId = updatesData.id;
+  const tensorData = backend3.dataIdMap.get(tensor2.dataId);
+  const tensorId = tensorData.id;
+  const stridesBytes = new Uint8Array(new Int32Array(strides).buffer);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmTensorScatterUpdate(indicesId, updatesId, CppDType[updates.dtype], sliceRank, numUpdates, sliceSize, stridesBytes, outputSize, outId, tensorId);
+  return out;
+}
+var tensorScatterUpdateConfig3 = {
+  kernelName: TensorScatterUpdate,
+  backendName: "wasm",
+  setupFunc: setup72,
+  kernelFunc: tensorScatterUpdate3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Tile.js
+var wasmTile;
+function setup73(backend3) {
+  wasmTile = backend3.wasm.cwrap(Tile, null, [
+    "number",
+    "array",
+    "number",
+    "array",
+    "number",
+    "number"
+    // out_id
+  ]);
+}
+function tile5(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { x } = inputs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const { reps } = attrs;
+  const newShape = new Array(x.shape.length);
+  for (let i = 0; i < newShape.length; i++) {
+    newShape[i] = x.shape[i] * reps[i];
+  }
+  const xShapeBytes = new Uint8Array(new Int32Array(x.shape).buffer);
+  const newShapeBytes = new Uint8Array(new Int32Array(newShape).buffer);
+  const out = backend3.makeOutput(newShape, x.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  wasmTile(xId, xShapeBytes, x.shape.length, newShapeBytes, newShape.length, CppDType[out.dtype], outId);
+  return out;
+}
+var tileConfig3 = {
+  kernelName: Tile,
+  backendName: "wasm",
+  setupFunc: setup73,
+  kernelFunc: tile5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/TopK.js
+var wasmTopK;
+function setup74(backend3) {
+  wasmTopK = backend3.wasm.cwrap(TopK, null, [
+    "number",
+    "array",
+    "number",
+    "number",
+    "number",
+    "bool",
+    "number",
+    "number"
+    // outIndicesId
+  ]);
+}
+var topk2 = ({ inputs, backend: backend3, attrs }) => {
+  const { x } = inputs;
+  const { k, sorted } = attrs;
+  const xId = backend3.dataIdMap.get(x.dataId).id;
+  const xShapeBytes = new Uint8Array(new Int32Array(x.shape).buffer);
+  const outputShape = x.shape.slice();
+  outputShape[outputShape.length - 1] = k;
+  const outValues = backend3.makeOutput(outputShape, x.dtype);
+  const outValuesId = backend3.dataIdMap.get(outValues.dataId).id;
+  const outIndices = backend3.makeOutput(outputShape, "int32");
+  const outIndicesId = backend3.dataIdMap.get(outIndices.dataId).id;
+  wasmTopK(xId, xShapeBytes, x.shape.length, CppDType[x.dtype], k, sorted, outValuesId, outIndicesId);
+  return [outValues, outIndices];
+};
+var topKConfig3 = {
+  kernelName: TopK,
+  backendName: "wasm",
+  setupFunc: setup74,
+  kernelFunc: topk2
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Transform.js
+var wasmTransform;
+function setup75(backend3) {
+  wasmTransform = backend3.wasm.cwrap(Transform, null, [
+    "number",
+    "number",
+    "bool",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+    "array",
+    "number",
+    "array",
+    "number",
+    "number",
+    "number",
+    "number",
+    "number"
+    // outId
+  ]);
+}
+function transform4(args) {
+  const { backend: backend3, inputs, attrs } = args;
+  const { image: image2, transforms } = inputs;
+  const { interpolation, fillMode, fillValue, outputShape } = attrs;
+  const [batch, imageHeight, imageWidth, numChannels] = image2.shape;
+  const [outHeight, outWidth] = outputShape != null ? outputShape : [imageHeight, imageWidth];
+  const outShape = [
+    batch,
+    outHeight,
+    outWidth,
+    numChannels
+  ];
+  const inputStrides = new Uint8Array(new Int32Array(util_exports.computeStrides(image2.shape)).buffer);
+  const outputStrides = new Uint8Array(new Int32Array(util_exports.computeStrides(outShape)).buffer);
+  const out = backend3.makeOutput(outShape, image2.dtype);
+  const outId = backend3.dataIdMap.get(out.dataId).id;
+  const imageData = backend3.dataIdMap.get(image2.dataId);
+  const imageId = imageData.id;
+  const transformsData = backend3.dataIdMap.get(transforms.dataId);
+  const transformsId = transformsData.id;
+  const interpolationModeId = interpolation === "nearest" ? 1 : 2;
+  let fillModeId;
+  switch (fillMode) {
+    case "constant":
+      fillModeId = 1;
+      break;
+    case "reflect":
+      fillModeId = 2;
+      break;
+    case "wrap":
+      fillModeId = 3;
+      break;
+    case "nearest":
+      fillModeId = 4;
+      break;
+    default:
+      fillModeId = 1;
+      break;
+  }
+  wasmTransform(imageId, transformsId, transforms.shape[0] > 1, batch, outHeight, outWidth, numChannels, imageWidth, imageHeight, inputStrides, image2.shape.length - 1, outputStrides, outShape.length - 1, interpolationModeId, fillModeId, fillValue, outId);
+  return out;
+}
+var transformConfig3 = {
+  kernelName: Transform,
+  backendName: "wasm",
+  setupFunc: setup75,
+  kernelFunc: transform4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Unique.js
+function unique5(args) {
+  const { inputs, attrs, backend: backend3 } = args;
+  const { axis } = attrs;
+  const { x } = inputs;
+  const { outputValues, outputShape, indices } = uniqueImpl(backend3.readSync(x.dataId), axis, x.shape, x.dtype);
+  return [
+    backend3.makeOutput(
+      outputShape,
+      x.dtype,
+      /*memoryOffset=*/
+      void 0,
+      outputValues
+    ),
+    backend3.makeOutput(
+      [indices.length],
+      "int32",
+      /*memoryOffset=*/
+      void 0,
+      indices
+    )
+  ];
+}
+var uniqueConfig3 = {
+  kernelName: Unique,
+  backendName: "wasm",
+  kernelFunc: unique5
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/Unpack.js
+function unpack3(args) {
+  const { inputs, backend: backend3, attrs } = args;
+  const { value } = inputs;
+  let { axis } = attrs;
+  if (axis < 0) {
+    axis += value.shape.length;
+  }
+  const numOutputs = value.shape[axis];
+  const rank = value.shape.length;
+  const outShape = new Array(rank - 1);
+  let outIndex = 0;
+  for (let i = 0; i < rank; i++) {
+    if (i !== axis) {
+      outShape[outIndex++] = value.shape[i];
+    }
+  }
+  const outs = new Array(numOutputs);
+  const begin = new Array(rank).fill(0);
+  const size = value.shape.slice();
+  size[axis] = 1;
+  for (let i = 0; i < outs.length; i++) {
+    begin[axis] = i;
+    outs[i] = slice4({ inputs: { x: value }, attrs: { begin, size }, backend: backend3 });
+  }
+  return outs.map(({ dataId, dtype }) => ({ dataId, dtype, shape: outShape }));
+}
+var unpackConfig3 = {
+  kernelName: Unpack,
+  backendName: "wasm",
+  kernelFunc: unpack3
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/kernels/ZerosLike.js
+function zerosLike4(args) {
+  const { inputs: { x }, backend: backend3 } = args;
+  const out = backend3.makeOutput(x.shape, x.dtype);
+  const outVals = backend3.typedArrayFromHeap(out);
+  outVals.fill(0);
+  return out;
+}
+var zerosLikeConfig3 = {
+  kernelName: ZerosLike,
+  backendName: "wasm",
+  kernelFunc: zerosLike4
+};
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/register_all_kernels.js
+var kernelConfigs3 = [
+  _fusedMatMulConfig3,
+  absConfig3,
+  acosConfig3,
+  acoshConfig3,
+  addConfig3,
+  addNConfig3,
+  allConfig3,
+  anyConfig3,
+  argMaxConfig3,
+  argMinConfig3,
+  asinConfig3,
+  asinhConfig3,
+  atanConfig3,
+  atan2Config3,
+  atanhConfig3,
+  avgPoolConfig3,
+  avgPoolGradConfig4,
+  avgPool3DConfig3,
+  avgPool3DGradConfig4,
+  batchMatMulConfig3,
+  batchToSpaceNDConfig3,
+  bincountConfig3,
+  bitwiseAndConfig3,
+  broadcastArgsConfig3,
+  castConfig3,
+  ceilConfig3,
+  clipByValueConfig3,
+  concatConfig3,
+  conv2DConfig3,
+  conv2DBackpropInputConfig3,
+  conv3DConfig3,
+  conv3DBackpropFilterV2Config3,
+  conv3DBackpropInputV2Config2,
+  cosConfig3,
+  coshConfig3,
+  cropAndResizeConfig3,
+  cumprodConfig3,
+  cumsumConfig3,
+  denseBincountConfig3,
+  depthToSpaceConfig3,
+  depthwiseConv2dNativeConfig3,
+  diagConfig3,
+  dilation2DConfig3,
+  dilation2DBackpropFilterConfig2,
+  dilation2DBackpropInputConfig2,
+  eluConfig3,
+  eluGradConfig4,
+  equalConfig3,
+  erfConfig3,
+  expConfig3,
+  expandDimsConfig3,
+  expm1Config3,
+  fillConfig3,
+  flipLeftRightConfig3,
+  floorConfig3,
+  floorDivConfig3,
+  fusedBatchNormConfig,
+  fusedConv2DConfig3,
+  fusedDepthwiseConv2DConfig3,
+  gatherNdConfig3,
+  gatherV2Config3,
+  greaterConfig3,
+  greaterEqualConfig3,
+  identityConfig3,
+  isFiniteConfig3,
+  isInfConfig3,
+  isNaNConfig3,
+  leakyReluConfig3,
+  lessConfig3,
+  lessEqualConfig3,
+  linSpaceConfig3,
+  log1pConfig3,
+  logConfig3,
+  logicalAndConfig3,
+  logicalNotConfig3,
+  logicalOrConfig3,
+  logicalXorConfig,
+  lrnConfig,
+  lrnGradConfig2,
+  maxConfig3,
+  maximumConfig3,
+  maxPoolConfig3,
+  maxPool3DConfig3,
+  maxPool3DGradConfig4,
+  maxPoolGradConfig4,
+  maxPoolWithArgmaxConfig3,
+  meanConfig3,
+  minConfig3,
+  minimumConfig3,
+  mirrorPadConfig3,
+  multinomialConfig3,
+  modConfig3,
+  multiplyConfig3,
+  negConfig3,
+  nonMaxSuppressionV3Config3,
+  nonMaxSuppressionV4Config3,
+  nonMaxSuppressionV5Config3,
+  notEqualConfig3,
+  oneHotConfig3,
+  onesLikeConfig3,
+  packConfig3,
+  padV2Config3,
+  powConfig3,
+  preluConfig3,
+  prodConfig3,
+  rangeConfig3,
+  realDivConfig3,
+  reciprocalConfig3,
+  reluConfig3,
+  relu6Config3,
+  reshapeConfig3,
+  resizeBilinearConfig3,
+  resizeBilinearGradConfig4,
+  resizeNearestNeighborConfig3,
+  resizeNearestNeighborGradConfig4,
+  reverseConfig3,
+  rotateWithOffsetConfig3,
+  roundConfig3,
+  rsqrtConfig3,
+  scatterNdConfig3,
+  searchSortedConfig3,
+  selectConfig3,
+  seluConfig3,
+  sigmoidConfig3,
+  signConfig3,
+  sinConfig3,
+  sinhConfig3,
+  sliceConfig3,
+  softmaxConfig3,
+  softplusConfig3,
+  spaceToBatchNDConfig3,
+  sparseFillEmptyRowsConfig3,
+  sparseReshapeConfig3,
+  sparseSegmentMeanConfig3,
+  sparseSegmentSumConfig3,
+  sparseToDenseConfig3,
+  splitVConfig3,
+  sqrtConfig3,
+  squareConfig3,
+  squaredDifferenceConfig3,
+  stepConfig3,
+  stridedSliceConfig3,
+  stringNGramsConfig3,
+  stringSplitConfig3,
+  stringToHashBucketFastConfig3,
+  subConfig3,
+  sumConfig3,
+  tanConfig3,
+  tanhConfig3,
+  tensorScatterUpdateConfig3,
+  tileConfig3,
+  topKConfig3,
+  transformConfig3,
+  transposeConfig3,
+  uniqueConfig3,
+  unpackConfig3,
+  zerosLikeConfig3
+];
+for (const kernelConfig of kernelConfigs3) {
+  registerKernel(kernelConfig);
+}
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/flags_wasm.js
+var ENV6 = env();
+ENV6.registerFlag("WASM_HAS_SIMD_SUPPORT", async () => {
+  try {
+    return WebAssembly.validate(new Uint8Array([
+      0,
+      97,
+      115,
+      109,
+      1,
+      0,
+      0,
+      0,
+      1,
+      4,
+      1,
+      96,
+      0,
+      0,
+      3,
+      2,
+      1,
+      0,
+      10,
+      9,
+      1,
+      7,
+      0,
+      65,
+      0,
+      253,
+      15,
+      26,
+      11
+    ]));
+  } catch (e) {
+    return false;
+  }
+});
+ENV6.registerFlag("WASM_HAS_MULTITHREAD_SUPPORT", async () => {
+  if (ENV6.get("IS_NODE")) {
+    return false;
+  }
+  try {
+    new MessageChannel().port1.postMessage(new SharedArrayBuffer(1));
+    return WebAssembly.validate(new Uint8Array([
+      0,
+      97,
+      115,
+      109,
+      1,
+      0,
+      0,
+      0,
+      1,
+      4,
+      1,
+      96,
+      0,
+      0,
+      3,
+      2,
+      1,
+      0,
+      5,
+      4,
+      1,
+      3,
+      1,
+      1,
+      10,
+      11,
+      1,
+      9,
+      0,
+      65,
+      0,
+      254,
+      16,
+      2,
+      0,
+      26,
+      11
+    ]));
+  } catch (e) {
+    return false;
+  }
+});
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/backend_wasm.js
+var wasmFactoryThreadedSimd_import = __toESM(require_tfjs_backend_wasm_threaded_simd());
+var import_tfjs_backend_wasm_threaded_simd_worker = __toESM(require_tfjs_backend_wasm_threaded_simd_worker());
+var wasmFactory_import = __toESM(require_tfjs_backend_wasm());
+var wasmFactoryThreadedSimd = wasmFactoryThreadedSimd_import.default || wasmFactoryThreadedSimd_import;
+var wasmFactory = wasmFactory_import.default || wasmFactory_import;
+var BackendWasm = class extends KernelBackend {
+  constructor(wasm) {
+    super();
+    this.wasm = wasm;
+    this.dataIdNextNumber = 1;
+    this.wasm.tfjs.initWithThreadsCount(threadsCount);
+    actualThreadsCount = this.wasm.tfjs.getThreadsCount();
+    this.dataIdMap = new DataStorage(this, engine());
+  }
+  write(values, shape, dtype) {
+    const dataId = { id: this.dataIdNextNumber++ };
+    this.move(dataId, values, shape, dtype, 1);
+    return dataId;
+  }
+  numDataIds() {
+    return this.dataIdMap.numDataIds();
+  }
+  async time(f) {
+    const start = util_exports.now();
+    f();
+    const kernelMs = util_exports.now() - start;
+    return { kernelMs };
+  }
+  move(dataId, values, shape, dtype, refCount) {
+    const id = this.dataIdNextNumber++;
+    if (dtype === "string") {
+      const stringBytes = values;
+      this.dataIdMap.set(dataId, { id, stringBytes, shape, dtype, memoryOffset: null, refCount });
+      return;
+    }
+    const size = util_exports.sizeFromShape(shape);
+    const numBytes = size * util_exports.bytesPerElement(dtype);
+    const memoryOffset = this.wasm._malloc(numBytes) >>> 0;
+    this.dataIdMap.set(dataId, { id, memoryOffset, shape, dtype, refCount });
+    this.wasm.tfjs.registerTensor(id, size, memoryOffset);
+    if (values != null) {
+      this.wasm.HEAPU8.set(new Uint8Array(values.buffer, values.byteOffset, numBytes), memoryOffset);
+    }
+  }
+  async read(dataId) {
+    return this.readSync(dataId);
+  }
+  readSync(dataId, start, end) {
+    const { memoryOffset, dtype, shape, stringBytes } = this.dataIdMap.get(dataId);
+    if (dtype === "string") {
+      if ((start == null || start === 0) && (end == null || end >= stringBytes.length)) {
+        return stringBytes;
+      }
+      return stringBytes.slice(start, end);
+    }
+    start = start || 0;
+    end = end || util_exports.sizeFromShape(shape);
+    const bytesPerElement2 = util_exports.bytesPerElement(dtype);
+    const bytes = this.wasm.HEAPU8.slice(memoryOffset + start * bytesPerElement2, memoryOffset + end * bytesPerElement2);
+    return typedArrayFromBuffer(bytes.buffer, dtype);
+  }
+  /**
+   * Dispose the memory if the dataId has 0 refCount. Return true if the memory
+   * is released, false otherwise.
+   * @param dataId
+   * @oaram force Optional, remove the data regardless of refCount
+   */
+  disposeData(dataId, force = false) {
+    if (this.dataIdMap.has(dataId)) {
+      const data = this.dataIdMap.get(dataId);
+      data.refCount--;
+      if (!force && data.refCount > 0) {
+        return false;
+      }
+      this.wasm._free(data.memoryOffset);
+      this.wasm.tfjs.disposeData(data.id);
+      this.dataIdMap.delete(dataId);
+    }
+    return true;
+  }
+  /** Return refCount of a `TensorData`. */
+  refCount(dataId) {
+    if (this.dataIdMap.has(dataId)) {
+      const tensorData = this.dataIdMap.get(dataId);
+      return tensorData.refCount;
+    }
+    return 0;
+  }
+  incRef(dataId) {
+    const data = this.dataIdMap.get(dataId);
+    if (data != null) {
+      data.refCount++;
+    }
+  }
+  floatPrecision() {
+    return 32;
+  }
+  // Returns the memory offset of a tensor. Useful for debugging and unit
+  // testing.
+  getMemoryOffset(dataId) {
+    return this.dataIdMap.get(dataId).memoryOffset;
+  }
+  dispose() {
+    this.wasm.tfjs.dispose();
+    if ("PThread" in this.wasm) {
+      this.wasm.PThread.terminateAllThreads();
+    }
+    this.wasm = null;
+  }
+  memory() {
+    return { unreliable: false };
+  }
+  /**
+   * Make a tensor info for the output of an op. If `memoryOffset` is not
+   * present, this method allocates memory on the WASM heap. If `memoryOffset`
+   * is present, the memory was allocated elsewhere (in c++) and we just record
+   * the pointer where that memory lives.
+   */
+  makeOutput(shape, dtype, memoryOffset, values) {
+    let dataId;
+    if (memoryOffset == null) {
+      dataId = this.write(values !== null && values !== void 0 ? values : null, shape, dtype);
+    } else {
+      const id = this.dataIdNextNumber++;
+      dataId = { id };
+      this.dataIdMap.set(dataId, { id, memoryOffset, shape, dtype, refCount: 1 });
+      const size = util_exports.sizeFromShape(shape);
+      this.wasm.tfjs.registerTensor(id, size, memoryOffset);
+    }
+    return { dataId, shape, dtype };
+  }
+  typedArrayFromHeap({ shape, dtype, dataId }) {
+    const buffer2 = this.wasm.HEAPU8.buffer;
+    const { memoryOffset } = this.dataIdMap.get(dataId);
+    const size = util_exports.sizeFromShape(shape);
+    switch (dtype) {
+      case "float32":
+        return new Float32Array(buffer2, memoryOffset, size);
+      case "int32":
+        return new Int32Array(buffer2, memoryOffset, size);
+      case "bool":
+        return new Uint8Array(buffer2, memoryOffset, size);
+      default:
+        throw new Error(`Unknown dtype ${dtype}`);
+    }
+  }
+};
+function createInstantiateWasmFunc(path) {
+  return (imports, callback) => {
+    util_exports.fetch(path, { credentials: "same-origin" }).then((response) => {
+      if (!response["ok"]) {
+        imports.env.a(`failed to load wasm binary file at '${path}'`);
+      }
+      response.arrayBuffer().then((binary) => {
+        WebAssembly.instantiate(binary, imports).then((output) => {
+          callback(output.instance, output.module);
+        });
+      });
+    });
+    return {};
+  };
+}
+function getPathToWasmBinary(simdSupported, threadsSupported, wasmModuleFolder) {
+  if (wasmPath != null) {
+    return wasmPath;
+  }
+  let path = "tfjs-backend-wasm.wasm";
+  if (simdSupported && threadsSupported) {
+    path = "tfjs-backend-wasm-threaded-simd.wasm";
+  } else if (simdSupported) {
+    path = "tfjs-backend-wasm-simd.wasm";
+  }
+  if (wasmFileMap != null) {
+    if (wasmFileMap[path] != null) {
+      return wasmFileMap[path];
+    }
+  }
+  return wasmModuleFolder + path;
+}
+async function init() {
+  const [simdSupported, threadsSupported] = await Promise.all([
+    env().getAsync("WASM_HAS_SIMD_SUPPORT"),
+    env().getAsync("WASM_HAS_MULTITHREAD_SUPPORT")
+  ]);
+  return new Promise((resolve, reject) => {
+    const factoryConfig = {};
+    factoryConfig.locateFile = (path, prefix) => {
+      if (path.endsWith(".worker.js")) {
+        const response = import_tfjs_backend_wasm_threaded_simd_worker.wasmWorkerContents.replace(/\n/g, "\\n");
+        const blob = new Blob([response], { type: "application/javascript" });
+        return URL.createObjectURL(blob);
+      }
+      if (path.endsWith(".wasm")) {
+        return getPathToWasmBinary(simdSupported, threadsSupported, wasmPathPrefix != null ? wasmPathPrefix : prefix);
+      }
+      return prefix + path;
+    };
+    if (customFetch) {
+      factoryConfig.instantiateWasm = createInstantiateWasmFunc(getPathToWasmBinary(simdSupported, threadsSupported, wasmPathPrefix != null ? wasmPathPrefix : ""));
+    }
+    let initialized = false;
+    factoryConfig.onAbort = () => {
+      if (initialized) {
+        return;
+      }
+      if (initAborted) {
+        return;
+      }
+      initAborted = true;
+      const rejectMsg = "Make sure the server can serve the `.wasm` file relative to the bundled js file. For more details see https://github.com/tensorflow/tfjs/blob/master/tfjs-backend-wasm/README.md#using-bundlers";
+      reject({ message: rejectMsg });
+    };
+    let wasm;
+    if (threadsSupported && simdSupported && wasmPath == null) {
+      factoryConfig.mainScriptUrlOrBlob = new Blob([`var WasmBackendModuleThreadedSimd = ` + wasmFactoryThreadedSimd.toString()], { type: "text/javascript" });
+      wasm = wasmFactoryThreadedSimd(factoryConfig);
+    } else {
+      wasm = wasmFactory(factoryConfig);
+    }
+    wasm.then((module) => {
+      initialized = true;
+      initAborted = false;
+      const voidReturnType = null;
+      module.tfjs = {
+        init: module.cwrap("init", null, []),
+        initWithThreadsCount: module.cwrap("init_with_threads_count", null, ["number"]),
+        getThreadsCount: module.cwrap("get_threads_count", "number", []),
+        registerTensor: module.cwrap("register_tensor", null, [
+          "number",
+          "number",
+          "number"
+          // memoryOffset
+        ]),
+        disposeData: module.cwrap("dispose_data", voidReturnType, ["number"]),
+        dispose: module.cwrap("dispose", voidReturnType, [])
+      };
+      resolve({ wasm: module });
+    }).catch(reject);
+  });
+}
+function typedArrayFromBuffer(buffer2, dtype) {
+  switch (dtype) {
+    case "float32":
+      return new Float32Array(buffer2);
+    case "int32":
+      return new Int32Array(buffer2);
+    case "bool":
+      return new Uint8Array(buffer2);
+    default:
+      throw new Error(`Unknown dtype ${dtype}`);
+  }
+}
+var wasmBinaryNames = [
+  "tfjs-backend-wasm.wasm",
+  "tfjs-backend-wasm-simd.wasm",
+  "tfjs-backend-wasm-threaded-simd.wasm"
+];
+var wasmPath = null;
+var wasmPathPrefix = null;
+var wasmFileMap = {};
+var initAborted = false;
+var customFetch = false;
+function setWasmPaths(prefixOrFileMap, usePlatformFetch = false) {
+  if (initAborted) {
+    throw new Error("The WASM backend was already initialized. Make sure you call `setWasmPaths()` before you call `tf.setBackend()` or `tf.ready()`");
+  }
+  if (typeof prefixOrFileMap === "string") {
+    wasmPathPrefix = prefixOrFileMap;
+  } else {
+    wasmFileMap = prefixOrFileMap;
+    const missingPaths = wasmBinaryNames.filter((name) => wasmFileMap[name] == null);
+    if (missingPaths.length > 0) {
+      throw new Error(`There were no entries found for the following binaries: ${missingPaths.join(",")}. Please either call setWasmPaths with a map providing a path for each binary, or with a string indicating the directory where all the binaries can be found.`);
+    }
+  }
+  customFetch = usePlatformFetch;
+}
+var threadsCount = -1;
+var actualThreadsCount = -1;
+
+// ../../node_modules/@tensorflow/tfjs-backend-wasm/dist/base.js
+var WASM_PRIORITY = 2;
+registerBackend("wasm", async () => {
+  const { wasm } = await init();
+  return new BackendWasm(wasm);
+}, WASM_PRIORITY);
+
 // ../../packages/diffusion/src/interfaces.ts
 var Model = class _Model {
   constructor(dim = 2, hidden = 64) {
@@ -53102,7 +61311,7 @@ function generateUniformGridSamples(gridResolution, domainRange, asTensor = fals
   }
 }
 
-// ../../packages/diffusion/src/schedulers.ts
+// ../../packages/diffusion/src/flow_matching/schedulers.ts
 function eulerStep(x_t, t_start, t_end, vectorField) {
   return tidy(() => {
     const t0 = t_start.reshape([x_t.shape[0], 1]);
@@ -53138,7 +61347,7 @@ function getScheduler(scheduler) {
   return stepFn;
 }
 
-// ../../packages/diffusion/src/flow_matching.ts
+// ../../packages/diffusion/src/flow_matching/flow_matching.ts
 var FlowModel = class extends Model {
   constructor(dim = 2, hidden = 64) {
     super(dim, hidden);
@@ -53238,7 +61447,7 @@ var FlowModel = class extends Model {
    */
   async train_rectified(data, source_distribution, num_rectified_steps, epochs_per_rectified_step, batchSize = 32, num_simulation_steps = 200, stopTraining = () => false, endEpochCallback = () => {
   }, endRectifiedStepCallback = () => {
-  }, test_source_distribution = null) {
+  }, test_source_distribution = null, reverseSampling = false) {
     const numSamples = data.shape[0];
     const dim = data.shape[1];
     let x0_coupling;
@@ -53273,21 +61482,42 @@ var FlowModel = class extends Model {
         // source distribution
       );
       if (rectifiedStep < num_rectified_steps - 1) {
-        const trajectories = await this.sample_from_initial_points(
-          x0_coupling,
-          num_simulation_steps
-        );
-        if (!trajectories) {
-          console.log(`Sampling cancelled at rectified step ${rectifiedStep}`);
-          break;
+        if (reverseSampling) {
+          const trajectories = await this.sample_from_initial_points(
+            x1_coupling,
+            num_simulation_steps,
+            { reverse: true }
+            // Time goes 1 → 0
+          );
+          if (!trajectories) {
+            console.log(`Sampling cancelled at rectified step ${rectifiedStep}`);
+            break;
+          }
+          const finalStep = trajectories.shape[0] - 1;
+          const newX0 = trajectories.slice([finalStep, 0, 0], [1, numSamples, dim]).squeeze([0]);
+          if (rectifiedStep > 0 || shouldDisposeX0) {
+            x0_coupling.dispose();
+          }
+          x0_coupling = newX0;
+          shouldDisposeX0 = true;
+          trajectories.dispose();
+        } else {
+          const trajectories = await this.sample_from_initial_points(
+            x0_coupling,
+            num_simulation_steps
+          );
+          if (!trajectories) {
+            console.log(`Sampling cancelled at rectified step ${rectifiedStep}`);
+            break;
+          }
+          const finalStep = trajectories.shape[0] - 1;
+          const newX1 = trajectories.slice([finalStep, 0, 0], [1, numSamples, dim]).squeeze([0]);
+          if (rectifiedStep > 0) {
+            x1_coupling.dispose();
+          }
+          x1_coupling = newX1;
+          trajectories.dispose();
         }
-        const finalStep = trajectories.shape[0] - 1;
-        const newX1 = trajectories.slice([finalStep, 0, 0], [1, numSamples, dim]).squeeze([0]);
-        if (rectifiedStep > 0) {
-          x1_coupling.dispose();
-        }
-        x1_coupling = newX1;
-        trajectories.dispose();
       }
       const sampleSource = test_source_distribution ?? x0_coupling;
       const vizTrajectories = await this.sample_from_initial_points(
@@ -53305,7 +61535,7 @@ var FlowModel = class extends Model {
     if (shouldDisposeX0) {
       x0_coupling.dispose();
     }
-    if (num_rectified_steps > 0) {
+    if (!reverseSampling && num_rectified_steps > 1) {
       x1_coupling.dispose();
     }
   }
@@ -53357,9 +61587,9 @@ var FlowModel = class extends Model {
   */
   async sample_from_initial_points(initial_points, num_total_steps = 100, options = {}, perStepCallback, shouldStop = () => false) {
     const scheduler = options.scheduler ?? "euler_midpoint";
-    const reverse4 = options.reverse ?? false;
+    const reverse5 = options.reverse ?? false;
     const num_samples = initial_points.shape[0];
-    const t_steps = reverse4 ? linspace(1, 0, num_total_steps + 1) : linspace(0, 1, num_total_steps + 1);
+    const t_steps = reverse5 ? linspace(1, 0, num_total_steps + 1) : linspace(0, 1, num_total_steps + 1);
     let x_t = initial_points;
     const all_step_data = [];
     for (let i = 0; i < num_total_steps; i++) {
@@ -53399,21 +61629,22 @@ var FlowModel = class extends Model {
   }
 };
 
-// src/lib/flow_matching/workers/sampling.worker.ts
+// ../../packages/diffusion/src/workers/flow_model.worker.ts
+setWasmPaths("/tfjs-backend-wasm/");
 var backend2 = "webgl";
 var trainingObjectiveToModelClass = {
   "Flow Matching": FlowModel
 };
-var cancelledRequests = /* @__PURE__ */ new Set();
+var activeRequests = /* @__PURE__ */ new Map();
 self.addEventListener("unhandledrejection", (event) => {
-  console.error("[Sampling Worker] Unhandled promise rejection:", event.reason);
+  console.error("[FlowModel Worker] Unhandled promise rejection:", event.reason);
   self.postMessage({
     type: "error",
     error: `Unhandled rejection: ${event.reason?.message || String(event.reason)}`
   });
 });
 self.addEventListener("error", (event) => {
-  console.error("[Sampling Worker] Uncaught error:", {
+  console.error("[FlowModel Worker] Uncaught error:", {
     message: event.message,
     filename: event.filename,
     lineno: event.lineno,
@@ -53424,137 +61655,273 @@ self.addEventListener("error", (event) => {
     error: `Uncaught error: ${event.message} at ${event.filename}:${event.lineno}`
   });
 });
-self.onmessage = async (e) => {
-  const { requestId, type, data } = e.data;
-  if (type === "stop") {
-    cancelledRequests.add(requestId);
-    console.log("[Sampling Worker] Cancel requested:", requestId);
-    return;
+async function loadDataset(path) {
+  const response = await fetch(path);
+  const data = await response.json();
+  const pointsTensor = tensor(data.points);
+  const classesTensor = data.classes ? tensor(data.classes) : null;
+  return { pointsTensor, classesTensor };
+}
+async function saveModel(model2, path) {
+  const modelSaveName = "indexeddb://" + path.replace(/\s+/g, "_") + "_" + Date.now();
+  await model2.save(modelSaveName);
+  return modelSaveName;
+}
+async function initializeBackend() {
+  if (backend2 === "webgl") {
+    await setBackend("webgl");
+    await ready();
+  } else if (backend2 === "wasm") {
+    await setBackend("wasm");
+    await ready();
+  } else {
+    throw new Error("Invalid backend specified");
   }
-  const shouldStop = () => cancelledRequests.has(requestId);
-  try {
-    console.log("[Sampling Worker] Received message:", { requestId, type, timestamp: Date.now() });
-    const modelJSONPath = data.modelJSONPath;
-    const trainingObjective = data.trainingObjective;
-    const modelConfig = data.modelConfig;
-    const numberOfSteps = data.numberOfSteps;
-    const timeValue = data.timeValue;
-    const domainRange = data.domainRange || null;
-    const options = data.options || {};
-    const streaming = data.streaming || false;
-    const perStepCallback = streaming ? (step4, x_t) => {
-      if (!shouldStop()) {
-        self.postMessage({ requestId, type: "step", step: step4, x_t });
-      }
-    } : void 0;
-    if (backend2 === "webgl") {
-      await setBackend("webgl");
-      await ready();
-    } else {
-      throw new Error("Invalid backend specified");
+}
+async function handleSamplingRequest(requestId, type, data) {
+  const shouldStop = () => activeRequests.get(requestId)?.cancelled ?? false;
+  const modelJSONPath = data.modelJSONPath;
+  const trainingObjective = data.trainingObjective;
+  const modelConfig = data.modelConfig;
+  const numberOfSteps = data.numberOfSteps;
+  const timeValue = data.timeValue;
+  const options = data.options || {};
+  const streaming = data.streaming || false;
+  const perStepCallback = streaming ? (step5, x_t) => {
+    if (!shouldStop()) {
+      self.postMessage({ requestId, type: "step", step: step5, x_t });
     }
-    const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-    const ourModel = ModelClass.fromConfig(modelConfig);
-    const tfModel = await loadLayersModel(modelJSONPath);
-    ourModel.setModel(tfModel);
-    let allSamples = null;
-    let guidanceData = null;
-    if (type === "sample") {
-      const numSamples = data.numSamples;
-      const samplingOptions = { ...options };
-      if (Array.isArray(samplingOptions.cond)) {
-        samplingOptions.cond = tensor(
-          samplingOptions.cond,
-          void 0,
-          "int32"
-        );
-      }
-      allSamples = await ourModel.sample(
-        numSamples,
-        numberOfSteps,
-        samplingOptions,
-        perStepCallback,
-        shouldStop
-      );
-    } else if (type === "sample_from_initial_points") {
-      const initialPoints = data.initialPoints;
-      const initialPointsTensor = tensor(initialPoints);
-      const samplingOptions = { ...options };
-      if (Array.isArray(samplingOptions.cond)) {
-        samplingOptions.cond = tensor(
-          samplingOptions.cond,
-          void 0,
-          "int32"
-        );
-      }
-      allSamples = await ourModel.sample_from_initial_points(
-        initialPointsTensor,
-        numberOfSteps,
-        samplingOptions,
-        perStepCallback,
-        shouldStop
-      );
-    } else if (type === "sample_grid") {
-      const gridResolution = data.gridResolution;
-      const gridDomainRange = data.domainRange;
-      const samplingOptions = { ...options };
-      if (Array.isArray(samplingOptions.cond)) {
-        samplingOptions.cond = tensor(
-          samplingOptions.cond,
-          void 0,
-          "int32"
-        );
-      }
-      allSamples = await ourModel.sample_grid(
-        gridResolution,
-        gridDomainRange,
-        numberOfSteps,
-        samplingOptions,
-        perStepCallback,
-        shouldStop
-      );
-    } else if (type === "vector_field_grid") {
-      const gridResolution = data.gridResolution;
-      const gridDomainRange = data.domainRange;
-      const gridPoints = generateUniformGridSamples(gridResolution, gridDomainRange, true);
-      const numPoints = gridPoints.shape[0];
-      const t = fill([numPoints, 1], timeValue || 0.5);
-      const velocities = ourModel.forward(gridPoints, t);
-      const gridPointsArray = gridPoints.arraySync();
-      const velocitiesArray = velocities.arraySync();
-      gridPoints.dispose();
-      t.dispose();
-      velocities.dispose();
-      self.postMessage({
-        requestId,
-        type: "result",
-        velocities: velocitiesArray,
-        gridPoints: gridPointsArray
-      });
-      return;
-    } else {
-      throw new Error(`Unknown message type: ${type}`);
-    }
-    if (shouldStop() || allSamples === null) {
-      console.log("[Sampling Worker] Request cancelled:", requestId);
-      self.postMessage({ requestId, type: "cancelled" });
-      return;
-    }
-    const allSamplesArray = allSamples.arraySync();
-    allSamples.dispose();
-    const resultMessage = {
+  } : void 0;
+  await initializeBackend();
+  const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+  const ourModel = ModelClass.fromConfig(modelConfig);
+  const tfModel = await loadLayersModel(modelJSONPath);
+  ourModel.setModel(tfModel);
+  let allSamples = null;
+  let guidanceData = null;
+  const samplingOptions = { ...options };
+  if (Array.isArray(samplingOptions.cond)) {
+    samplingOptions.cond = tensor(samplingOptions.cond, void 0, "int32");
+  }
+  if (type === "sample") {
+    const numSamples = data.numSamples;
+    allSamples = await ourModel.sample(
+      numSamples,
+      numberOfSteps,
+      samplingOptions,
+      perStepCallback,
+      shouldStop
+    );
+  } else if (type === "sample_from_initial_points") {
+    const initialPoints = data.initialPoints;
+    const initialPointsTensor = tensor(initialPoints);
+    allSamples = await ourModel.sample_from_initial_points(
+      initialPointsTensor,
+      numberOfSteps,
+      samplingOptions,
+      perStepCallback,
+      shouldStop
+    );
+  } else if (type === "sample_grid") {
+    const gridResolution = data.gridResolution;
+    const gridDomainRange = data.domainRange;
+    allSamples = await ourModel.sample_grid(
+      gridResolution,
+      gridDomainRange,
+      numberOfSteps,
+      samplingOptions,
+      perStepCallback,
+      shouldStop
+    );
+  } else if (type === "vector_field_grid") {
+    const gridResolution = data.gridResolution;
+    const gridDomainRange = data.domainRange;
+    const gridPoints = generateUniformGridSamples(gridResolution, gridDomainRange, true);
+    const numPoints = gridPoints.shape[0];
+    const t = fill([numPoints, 1], timeValue || 0.5);
+    const velocities = ourModel.forward(gridPoints, t);
+    const gridPointsArray = gridPoints.arraySync();
+    const velocitiesArray = velocities.arraySync();
+    gridPoints.dispose();
+    t.dispose();
+    velocities.dispose();
+    self.postMessage({
       requestId,
       type: "result",
-      allSamples: allSamplesArray
-    };
-    if (guidanceData) {
-      resultMessage.guidance = guidanceData;
+      velocities: velocitiesArray,
+      gridPoints: gridPointsArray
+    });
+    return;
+  }
+  if (shouldStop() || allSamples === null) {
+    console.log("[FlowModel Worker] Request cancelled:", requestId);
+    self.postMessage({ requestId, type: "cancelled" });
+    return;
+  }
+  const allSamplesArray = allSamples.arraySync();
+  allSamples.dispose();
+  const resultMessage = {
+    requestId,
+    type: "result",
+    allSamples: allSamplesArray
+  };
+  if (guidanceData) {
+    resultMessage.guidance = guidanceData;
+  }
+  console.log("[FlowModel Worker] Sending result:", { requestId, type: "result", timestamp: Date.now() });
+  self.postMessage(resultMessage);
+}
+async function handleTrainRequest(requestId, data) {
+  const shouldStop = () => activeRequests.get(requestId)?.cancelled ?? false;
+  const { trainingObjective, modelConfig, datasetPath, trainingConfig } = data;
+  await initializeBackend();
+  const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+  const ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
+  const { pointsTensor, classesTensor } = await loadDataset(datasetPath);
+  if (trainingObjective === "Conditional Diffusion") {
+    if (classesTensor === null) {
+      throw new Error("Classes tensor is null for conditional diffusion model");
     }
-    console.log("[Sampling Worker] Sending result:", { requestId, type: "result", timestamp: Date.now() });
-    self.postMessage(resultMessage);
+    await ourModel.train(
+      pointsTensor,
+      classesTensor,
+      trainingConfig.epochs,
+      trainingConfig.batchSize,
+      trainingConfig.updateInterval,
+      shouldStop,
+      (epoch, intermediateSamples, loss) => {
+        self.postMessage({
+          requestId,
+          type: "epoch_chunk",
+          epoch,
+          intermediateSamples,
+          loss
+        });
+      }
+    );
+  } else {
+    await ourModel.train(
+      pointsTensor,
+      trainingConfig.epochs,
+      trainingConfig.batchSize,
+      trainingConfig.updateInterval,
+      shouldStop,
+      (epoch, intermediateSamples, loss) => {
+        self.postMessage({
+          requestId,
+          type: "epoch_chunk",
+          epoch,
+          intermediateSamples,
+          loss
+        });
+      }
+    );
+  }
+  const modelSaveName = await saveModel(ourModel.model, trainingObjective);
+  console.log("[FlowModel Worker] Training complete:", { requestId, timestamp: Date.now() });
+  self.postMessage({
+    requestId,
+    type: "result",
+    tfModelPath: modelSaveName
+  });
+}
+async function handleRectifiedTrainRequest(requestId, data) {
+  const shouldStop = () => activeRequests.get(requestId)?.cancelled ?? false;
+  const { trainingObjective, modelConfig, datasetPath, rectifiedConfig } = data;
+  await initializeBackend();
+  const ModelClass = trainingObjectiveToModelClass[trainingObjective];
+  const ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
+  const { pointsTensor } = await loadDataset(datasetPath);
+  let sourceDistribution = null;
+  if (rectifiedConfig.sourceDistributionPath) {
+    const { pointsTensor: sourceTensor } = await loadDataset(rectifiedConfig.sourceDistributionPath);
+    sourceDistribution = sourceTensor;
+  }
+  let testSourceDistribution = null;
+  if (rectifiedConfig.testSourceDistributionPoints) {
+    testSourceDistribution = tensor2d(rectifiedConfig.testSourceDistributionPoints);
+  }
+  const allRectifiedTrajectories = [];
+  await ourModel.train_rectified(
+    pointsTensor,
+    sourceDistribution,
+    rectifiedConfig.num_rectified_steps,
+    rectifiedConfig.epochs_per_rectified_step,
+    rectifiedConfig.batchSize,
+    rectifiedConfig.num_simulation_steps,
+    shouldStop,
+    (epoch, rectifiedStep, intermediateSamples, loss) => {
+      self.postMessage({
+        requestId,
+        type: "epoch_chunk",
+        epoch,
+        rectifiedStep,
+        intermediateSamples,
+        loss
+      });
+    },
+    (rectifiedStep, trajectories) => {
+      if (trajectories) {
+        allRectifiedTrajectories.push(trajectories);
+      }
+      self.postMessage({
+        requestId,
+        type: "rectified_step_complete",
+        rectifiedStep,
+        trajectories
+      });
+    },
+    testSourceDistribution,
+    // Pass the test source distribution
+    rectifiedConfig.reverseSampling ?? false
+    // Reverse sampling mode
+  );
+  if (testSourceDistribution) {
+    testSourceDistribution.dispose();
+  }
+  const modelSaveName = await saveModel(ourModel.model, trainingObjective);
+  console.log("[FlowModel Worker] Rectified training complete:", { requestId, timestamp: Date.now() });
+  self.postMessage({
+    requestId,
+    type: "result",
+    tfModelPath: modelSaveName,
+    allRectifiedTrajectories
+  });
+}
+self.onmessage = async (e) => {
+  const { requestId, type, data } = e.data;
+  if (type === "stop" || type === "stop_training") {
+    const req = activeRequests.get(requestId);
+    if (req) {
+      req.cancelled = true;
+    }
+    console.log("[FlowModel Worker] Cancel requested:", requestId || "all");
+    self.postMessage({ requestId, type: "cancelled" });
+    return;
+  }
+  activeRequests.set(requestId, { cancelled: false });
+  try {
+    console.log("[FlowModel Worker] Received message:", { requestId, type, timestamp: Date.now() });
+    switch (type) {
+      case "sample":
+      case "sample_from_initial_points":
+      case "sample_grid":
+      case "vector_field_grid":
+        await handleSamplingRequest(requestId, type, data);
+        break;
+      case "train":
+        await handleTrainRequest(requestId, data);
+        break;
+      case "train_rectified":
+        await handleRectifiedTrainRequest(requestId, data);
+        break;
+      default:
+        throw new Error(`Unknown message type: ${type}`);
+    }
   } catch (error) {
+    const shouldStop = () => activeRequests.get(requestId)?.cancelled ?? false;
     if (!shouldStop()) {
-      console.error("[Sampling Worker] Error in message handler:", error);
+      console.error("[FlowModel Worker] Error in message handler:", error);
       self.postMessage({
         requestId,
         type: "error",
@@ -53562,7 +61929,7 @@ self.onmessage = async (e) => {
       });
     }
   } finally {
-    cancelledRequests.delete(requestId);
+    activeRequests.delete(requestId);
   }
 };
 /*! Bundled license information:
@@ -54219,6 +62586,33 @@ self.onmessage = async (e) => {
 @tensorflow/tfjs-backend-webgl/dist/kernels/UnsortedSegmentSum.js:
 @tensorflow/tfjs-backend-webgl/dist/register_all_kernels.js:
 @tensorflow/tfjs-backend-webgl/dist/index.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Identity.js:
+@tensorflow/tfjs-backend-wasm/dist/kernel_utils/shared.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Conv2DBackpropInput.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Cumsum.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Equal.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Fill.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Floor.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Mean.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Softmax.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Neg.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/NonMaxSuppressionV4.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/NotEqual.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/OneHot.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/OnesLike.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Pack.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Prod.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Range.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Reverse.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Select.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SplitV.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Sqrt.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Step.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/TopK.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/ZerosLike.js:
+@tensorflow/tfjs-backend-wasm/dist/register_all_kernels.js:
+@tensorflow/tfjs-backend-wasm/dist/flags_wasm.js:
+@tensorflow/tfjs-backend-wasm/dist/base.js:
   (**
    * @license
    * Copyright 2020 Google LLC. All Rights Reserved.
@@ -54515,6 +62909,76 @@ self.onmessage = async (e) => {
 @tensorflow/tfjs-backend-webgl/dist/resize_nearest_neighbor_packed_gpu.js:
 @tensorflow/tfjs-backend-webgl/dist/reverse_packed_gpu.js:
 @tensorflow/tfjs-backend-webgl/dist/kernels/Square.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/types.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/_FusedMatMul.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/unary_kernel.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Abs.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/binary_kernel.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Add.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/AddN.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Transpose.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/ArgMax.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/AvgPool.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Reshape.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/BatchMatMul.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Slice.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Cast.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/ClipByValue.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Concat.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Conv2D.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Cos.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/CropAndResize.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/DepthToSpace.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/DepthwiseConv2dNative.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Exp.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/ExpandDims.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/FlipLeftRight.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/FloorDiv.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/FusedBatchNorm.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/FusedConv2D.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/FusedDepthwiseConv2D.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/GatherNd.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/GatherV2.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Greater.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/GreaterEqual.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/LeakyRelu.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Less.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/LessEqual.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Log.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/LogicalAnd.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/LogicalNot.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/LogicalOr.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/LogicalXor.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Max.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Maximum.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPool.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Min.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Minimum.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Multiply.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/NonMaxSuppression_util.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/NonMaxSuppressionV3.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/NonMaxSuppressionV5.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/PadV2.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Pow.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Prelu.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/RealDiv.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Relu.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Relu6.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/ResizeBilinear.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/RotateWithOffset.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Rsqrt.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/ScatterNd.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Sigmoid.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Sin.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Square.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SquaredDifference.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Sub.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Sum.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Tanh.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Tile.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Unpack.js:
+@tensorflow/tfjs-backend-wasm/dist/backend_wasm.js:
+@tensorflow/tfjs-backend-wasm/dist/index.js:
   (**
    * @license
    * Copyright 2019 Google LLC. All Rights Reserved.
@@ -54541,6 +63005,51 @@ self.onmessage = async (e) => {
 @tensorflow/tfjs-backend-webgl/dist/conv_backprop_packed_gpu.js:
 @tensorflow/tfjs-backend-webgl/dist/scatter_packed_gpu.js:
 @tensorflow/tfjs-backend-webgl/dist/kernels/StaticRegexReplace.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Acos.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Acosh.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/argminmax_kernel.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/ArgMin.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Asin.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Asinh.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Atan.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Atan2.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Atanh.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/AvgPool3D.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/AvgPool3DGrad.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/AvgPoolGrad.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Bincount.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/BitwiseAnd.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/BroadcastArgs.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Conv3D.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Conv3DBackpropFilterV2.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Conv3DBackpropInputV2.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/DenseBincount.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Diag.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Dilation2D.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Dilation2DBackpropFilter.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Dilation2DBackpropInput.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/EluGrad.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Erf.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Expm1.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/IsFinite.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/IsInf.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Log1p.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/LRN.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/LRNGrad.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPool3D.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPool3DGrad.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPoolGrad.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/MaxPoolWithArgmax.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Multinomial.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Mod.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/ResizeBilinearGrad.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/ResizeNearestNeighborGrad.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SearchSorted.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Selu.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Sign.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Sinh.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Softplus.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Unique.js:
   (**
    * @license
    * Copyright 2023 Google LLC.
@@ -54601,6 +63110,27 @@ self.onmessage = async (e) => {
 @tensorflow/tfjs-backend-webgl/dist/kernels/StringToHashBucketFast.js:
 @tensorflow/tfjs-backend-webgl/dist/transform_gpu.js:
 @tensorflow/tfjs-backend-webgl/dist/kernels/Transform.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/All.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Any.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/BatchToSpaceND.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Ceil.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Cosh.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Elu.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/MirrorPad.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Round.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SpaceToBatchND.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SparseFillEmptyRows.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SparseReshape.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SparseSegmentReduction.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SparseSegmentMean.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SparseSegmentSum.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/SparseToDense.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/StridedSlice.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/StringNGrams.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/StringSplit.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/StringToHashBucketFast.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Tan.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Transform.js:
   (**
    * @license
    * Copyright 2021 Google LLC. All Rights Reserved.
@@ -54634,6 +63164,7 @@ self.onmessage = async (e) => {
 @tensorflow/tfjs-core/dist/gradients/Sum_grad.js:
 @tensorflow/tfjs-core/dist/gradients/Unpack_grad.js:
 @tensorflow/tfjs-backend-webgl/dist/base.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/kernel_utils.js:
   (**
    * @license
    * Copyright 2020 Google Inc. All Rights Reserved.
@@ -54691,6 +63222,8 @@ self.onmessage = async (e) => {
 @tensorflow/tfjs-backend-webgl/dist/search_sorted_gpu.js:
 @tensorflow/tfjs-backend-webgl/dist/kernels/SearchSorted.js:
 @tensorflow/tfjs-backend-webgl/dist/kernels/TensorScatterUpdate.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/Cumprod.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/TensorScatterUpdate.js:
   (**
    * @license
    * Copyright 2022 Google LLC. All Rights Reserved.
@@ -54855,6 +63388,7 @@ self.onmessage = async (e) => {
 @tensorflow/tfjs-converter/dist/version.js:
 @tensorflow/tfjs-data/dist/version.js:
 @tensorflow/tfjs/dist/version.js:
+@tensorflow/tfjs-backend-wasm/dist/version.js:
   (** @license See the LICENSE file. *)
 
 @tensorflow/tfjs-layers/dist/layers/convolutional_recurrent.js:
@@ -54935,6 +63469,7 @@ self.onmessage = async (e) => {
 @tensorflow/tfjs-converter/dist/operations/op_list/spectral.js:
 @tensorflow/tfjs-converter/dist/operations/op_list/string.js:
 @tensorflow/tfjs-converter/dist/operations/op_list/transformation.js:
+@tensorflow/tfjs-backend-wasm/dist/kernels/LinSpace.js:
   (**
    * @license
    * Copyright 2023 Google LLC. All Rights Reserved.
@@ -55044,6 +63579,60 @@ self.onmessage = async (e) => {
    *
    * Unless required by applicable law or agreed to in writing, software
    * distributed under the License is distributed on an AS IS BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   * =============================================================================
+   *)
+
+@tensorflow/tfjs-backend-wasm/dist/kernels/IsNan.js:
+  (**
+   * @license
+   * Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+   * Licensed under the Apache License, Version 2.0 (the License);
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   * http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an AS IS BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   * =============================================================================
+   *)
+
+@tensorflow/tfjs-backend-wasm/dist/kernels/Reciprocal.js:
+  (**
+   * @license
+   * Copyright 2022 The TensorFlow Authors. All Rights Reserved.
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   * http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   * =============================================================================
+   *)
+
+@tensorflow/tfjs-backend-wasm/dist/kernels/ResizeNearestNeighbor.js:
+  (**
+   * @license
+   * Copyright 2019 Google LLC. All Rights Reserved.
+   * Licensed under the Apache License, Version 2.0 (the 'License');
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   * http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an 'AS IS' BASIS,
    * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    * See the License for the specific language governing permissions and
    * limitations under the License.

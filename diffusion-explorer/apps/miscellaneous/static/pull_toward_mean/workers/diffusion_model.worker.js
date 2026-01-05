@@ -61721,7 +61721,7 @@ var DiffusionModel = class extends Model {
   }
 };
 
-// src/lib/workers/diffusion_model.worker.ts
+// ../../packages/diffusion/src/workers/diffusion_model.worker.ts
 setWasmPaths("/tfjs-backend-wasm/");
 var backend2 = "webgl";
 var activeRequests = /* @__PURE__ */ new Map();
@@ -61750,8 +61750,8 @@ async function loadDataset(path) {
   const pointsTensor = tensor(data.points);
   return { pointsTensor };
 }
-async function saveModel(model2, path) {
-  const modelSaveName = "indexeddb://" + path.replace(/\s+/g, "_") + "_" + Date.now();
+async function saveModel(model2, name) {
+  const modelSaveName = "indexeddb://" + name.replace(/\s+/g, "_") + "_" + Date.now();
   await model2.save(modelSaveName);
   return modelSaveName;
 }
@@ -61771,7 +61771,7 @@ async function handleSamplingRequest(requestId, type, data) {
   const modelJSONPath = data.modelJSONPath;
   const modelConfig = data.modelConfig;
   const numberOfSteps = data.numberOfSteps;
-  const options = { scheduler: "ddim", ...data.options };
+  const options = data.options || {};
   const streaming = data.streaming || false;
   const perStepCallback = streaming ? (step5, x_t) => {
     if (!shouldStop()) {
