@@ -3,6 +3,7 @@
   import { generateClippedGaussianSamples } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
   import { base } from "$app/paths";
+  import { ArticleHeader } from "@diffusion-explorer/ui";
   import Diffeomorphism from "$lib/figures/Diffeomorphism.svelte";
   import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
 
@@ -39,17 +40,13 @@
   <meta name="description" content="An interactive explainer on flow matching for generative modeling" />
 </svelte:head>
 
-<!-- Article Header -->
-<header>
-  <div class="title-header-wrapper">
-    <h1 class="article-title">Flow Matching</h1>
-    <h2 class="article-subtitle">An Interactive Introduction</h2>
-  </div>
-  <div class="byline-dateline-container">
-    <p class="byline">By Alec Helbling</p>
-    <p class="dateline">2025</p>
-  </div>
-</header>
+<ArticleHeader
+  title="Flow Matching"
+  subtitle="An Interactive Introduction"
+  author="Alec Helbling"
+  authorLink="https://alechelbling.com"
+  date="2025"
+/>
 
 <!-- Introduction Section -->
 <section id="introduction">
