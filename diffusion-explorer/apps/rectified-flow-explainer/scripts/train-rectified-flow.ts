@@ -24,7 +24,7 @@ export const CONFIG = {
   modelName: 'rectified_flow_model',
   dim: 2,
   hidden: 64,
-  numRectifiedSteps: 2,
+  numRectifiedSteps: 3,
   epochsPerStep: 2000,
   batchSize: 1024,
   numSimulationSteps: 200,

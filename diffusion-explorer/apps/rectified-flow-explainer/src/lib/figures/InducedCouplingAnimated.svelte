@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
+  import { clipTrajectoriesToStartingRadius } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -50,6 +51,9 @@
   const couplingLineColor = '#888';
   const couplingLineOpacity = 0.5;
   const couplingLineWidth = 2;
+
+  // Source distribution filtering - exclude outliers beyond this radius
+  const SOURCE_RADIUS_THRESHOLD = 2.5;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas = null;
@@ -153,13 +157,15 @@
   function runInitialComputation() {
     if (!generatedTrajectories || generatedTrajectories.length === 0) return;
 
-    numTimeSteps = generatedTrajectories.length;
+    // Filter trajectories to exclude outliers based on starting point radius
+    const filteredTrajectories = clipTrajectoriesToStartingRadius(generatedTrajectories, SOURCE_RADIUS_THRESHOLD);
+    numTimeSteps = filteredTrajectories.length;
 
-    // Source points = first timestep (Gaussian samples)
-    const sourcePoints = generatedTrajectories[0];
+    // Source points = first timestep (filtered Gaussian samples)
+    const sourcePoints = filteredTrajectories[0];
 
     // Generated endpoints = last timestep
-    const generatedEndpoints = generatedTrajectories[generatedTrajectories.length - 1];
+    const generatedEndpoints = filteredTrajectories[filteredTrajectories.length - 1];
 
     // Target points = ground truth + generated endpoints
     const groundTruthSamples = targetDistribution ? targetDistribution.slice(0, numPoints) : [];
@@ -192,7 +198,7 @@
     ];
     combinedMeanX = allX.reduce((a, b) => a + b, 0) / allX.length;
 
-    // Pre-compute source pixel coordinates
+    // Pre-compute source pixel coordinates (filtered points only)
     sourcePixelCoords = sourcePoints.map(point => {
       const pixelX = scales.sourceCenterPixelX +
         (point[0] - scales.sourceMeanX) * scales.xScaleFactor;
@@ -218,17 +224,18 @@
     shuffleArray(shuffledTargetIndices);
 
     // Pre-compute trajectories for animation
-    const numTrajToShow = Math.min(numTrajectoriesToShow, numPoints);
-    const trajectoryIndices = [...Array(numTrajToShow).keys()];
-    transformedTrajectories = trajectoryIndices.map((sampleIdx) => {
-      return generatedTrajectories.map((timestep, tIdx) => {
+    const numTrajToShow = Math.min(numTrajectoriesToShow, sourcePoints.length);
+    transformedTrajectories = [];
+    for (let sampleIdx = 0; sampleIdx < numTrajToShow; sampleIdx++) {
+      const trajectory = filteredTrajectories.map((timestep, tIdx) => {
         const point = timestep[sampleIdx];
-        const t = tIdx / (generatedTrajectories.length - 1);
+        const t = tIdx / (filteredTrajectories.length - 1);
         const pixelX = getPixelX(point[0], combinedMeanX, t);
         const pixelY = scales.yScale(point[1]);
         return [pixelX, pixelY];
       });
-    });
+      transformedTrajectories.push(trajectory);
+    }
   }
 
   // ----------------------------------------------------------------
