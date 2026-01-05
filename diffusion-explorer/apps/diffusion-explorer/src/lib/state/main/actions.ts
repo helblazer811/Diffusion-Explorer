@@ -10,7 +10,16 @@ import { downloadJSON } from '$lib/utils';
 import * as tf from '@tensorflow/tfjs';
 import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
 
-import {sampleMultivariateNormal, callTrainingWorkerThread, callSamplingWorkerThread, callSamplingWorkerThreadGrid} from '$lib/diffusion';
+import {
+    sampleMultivariateNormal,
+    FlowModelClient,
+    DiffusionModelClient,
+    type DomainRange
+} from '@diffusion-explorer/diffusion';
+
+// Worker URLs (bundled to static/workers/ for production)
+const flowModelWorkerUrl = '/workers/flow_model.worker.js';
+const diffusionModelWorkerUrl = '/workers/diffusion_model.worker.js';
 
 /**
  * Factory function that takes a MainState object and returns handlers bound to that state.
@@ -182,43 +191,69 @@ export function createMainStateHandlers(MainState: any) {
             if (!get(isTraining)) isPlaying.set(true);
         } else {
             console.log("No cached samples found.");
-            // Regenerate samples
+            // Regenerate samples using client-based API
             const defaultModelPath = base + settings.pretrainedModelPaths[trainingObjectiveVal][datasetNameVal];
-            callSamplingWorkerThread(
-                defaultModelPath,
-                trainingObjectiveVal,
-                settings.trainingObjectiveToModelConfig[trainingObjectiveVal],
-                get(numSamples),
-                get(numberOfSteps),
-                settings.domainRange,
-                settings.interfaceSettings.distributionWidth,
-                settings.interfaceSettings.displayAreaWidth,
-                (allSamples) => {
-                    allTimeSamples.set(allSamples);
-                    if (!get(isTraining)) isPlaying.set(true);
-                    if (settings.downloadSamplesIfNotCached) {
-                        downloadJSON(allSamples, `${datasetNameVal}_${trainingObjectiveVal}_samples.json`);
-                    }
-                }
-            );
+            const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
 
-            callSamplingWorkerThreadGrid(
-                defaultModelPath,
-                trainingObjectiveVal,
-                settings.trainingObjectiveToModelConfig[trainingObjectiveVal],
-                gridResolution,
-                numberOfStepsVal,
-                settings.domainRange,
-                settings.interfaceSettings.distributionWidth,
-                settings.interfaceSettings.displayAreaWidth,
-                (allSamples: number[][]) => {
-                    const trajectoryGrid = tf.tensor(allSamples).reshape([numberOfStepsVal, gridResolution, gridResolution, 2]).arraySync() as number[][][];
-                    allTimeGridSamples.set(trajectoryGrid);
-                    if (settings.downloadSamplesIfNotCached) {
-                        downloadJSON(trajectoryGrid, `${datasetNameVal}_${trainingObjectiveVal}_grid.json`);
-                    }
+            // Select appropriate client based on training objective
+            const workerUrl = trainingObjectiveVal === 'Flow Matching' ? flowModelWorkerUrl : diffusionModelWorkerUrl;
+            const client = trainingObjectiveVal === 'Flow Matching'
+                ? new FlowModelClient(workerUrl, defaultModelPath, trainingObjectiveVal, modelConfig)
+                : new DiffusionModelClient(workerUrl, defaultModelPath, modelConfig);
+
+            // Sample trajectories
+            const { promise: samplePromise } = client.sample(get(numSamples), get(numberOfSteps));
+            samplePromise.then((allSamples: number[][][]) => {
+                // Convert from domain coords to display coords
+                const convertedSamples = allSamples.map((samples: number[][], timeIdx: number) => {
+                    const t = timeIdx / (allSamples.length - 1);
+                    return convertDataToDisplayCoordinateFrame(
+                        samples,
+                        t,
+                        settings.interfaceSettings.distributionWidth,
+                        settings.interfaceSettings.displayAreaWidth,
+                        settings.domainRange
+                    );
+                });
+                allTimeSamples.set(convertedSamples);
+                if (!get(isTraining)) isPlaying.set(true);
+                if (settings.downloadSamplesIfNotCached) {
+                    downloadJSON(allSamples, `${datasetNameVal}_${trainingObjectiveVal}_samples.json`);
                 }
-            );
+            });
+
+            // Sample grid trajectories
+            const { promise: gridPromise } = trainingObjectiveVal === 'Flow Matching'
+                ? (client as FlowModelClient).sampleGrid(gridResolution, settings.domainRange as DomainRange, numberOfStepsVal)
+                : (client as DiffusionModelClient).sampleGrid(gridResolution, settings.domainRange as DomainRange, numberOfStepsVal);
+
+            gridPromise.then((gridSamples: number[][][]) => {
+                // Convert from domain coords to display coords and reshape
+                const reshapedGrid = gridSamples.map((timestep: number[][], timeIdx: number) => {
+                    const t = timeIdx / (gridSamples.length - 1);
+                    const convertedPoints = convertDataToDisplayCoordinateFrame(
+                        timestep,
+                        t,
+                        settings.interfaceSettings.distributionWidth,
+                        settings.interfaceSettings.displayAreaWidth,
+                        settings.domainRange
+                    );
+                    // Reshape [N, 2] to [gridRes, gridRes, 2]
+                    const result: number[][][] = [];
+                    for (let i = 0; i < gridResolution; i++) {
+                        const row: number[][] = [];
+                        for (let j = 0; j < gridResolution; j++) {
+                            row.push(convertedPoints[i * gridResolution + j]);
+                        }
+                        result.push(row);
+                    }
+                    return result;
+                });
+                allTimeGridSamples.set(reshapedGrid);
+                if (settings.downloadSamplesIfNotCached) {
+                    downloadJSON(gridSamples, `${datasetNameVal}_${trainingObjectiveVal}_grid.json`);
+                }
+            });
         }
     }
 
@@ -232,7 +267,7 @@ export function createMainStateHandlers(MainState: any) {
         tfModelPath: string,
         trainingObjectiveVal: string,
         datasetNameVal: string,
-        modelConfig: object,
+        modelConfig: any,
         jsonURL: string | null = null
     ) {
         if (jsonURL) URL.revokeObjectURL(jsonURL);
@@ -244,24 +279,33 @@ export function createMainStateHandlers(MainState: any) {
             }
         }));
 
-        callSamplingWorkerThread(
-            tfModelPath,
-            trainingObjectiveVal,
-            modelConfig,
-            get(numSamples),
-            get(numberOfSteps),
-            settings.domainRange,
-            settings.interfaceSettings.distributionWidth,
-            settings.interfaceSettings.displayAreaWidth,
-            (allSamples) => {
-                allTimeSamples.set(allSamples);
-                distributionVisiblity.set({ current: true, source: true, training: false, target: true });
-                isPlaying.set(true);
-                currentTime.set(0);
-            }
-        );
+        // Select appropriate client based on training objective
+        const workerUrl = trainingObjectiveVal === 'Flow Matching' ? flowModelWorkerUrl : diffusionModelWorkerUrl;
+        const client = trainingObjectiveVal === 'Flow Matching'
+            ? new FlowModelClient(workerUrl, tfModelPath, trainingObjectiveVal, modelConfig)
+            : new DiffusionModelClient(workerUrl, tfModelPath, modelConfig);
 
-        const squashedDomainRange = {
+        // Sample trajectories
+        const { promise: samplePromise } = client.sample(get(numSamples), get(numberOfSteps));
+        samplePromise.then((allSamples: number[][][]) => {
+            // Convert from domain coords to display coords
+            const convertedSamples = allSamples.map((samples: number[][], timeIdx: number) => {
+                const t = timeIdx / (allSamples.length - 1);
+                return convertDataToDisplayCoordinateFrame(
+                    samples,
+                    t,
+                    settings.interfaceSettings.distributionWidth,
+                    settings.interfaceSettings.displayAreaWidth,
+                    settings.domainRange
+                );
+            });
+            allTimeSamples.set(convertedSamples);
+            distributionVisiblity.set({ current: true, source: true, training: false, target: true });
+            isPlaying.set(true);
+            currentTime.set(0);
+        });
+
+        const squashedDomainRange: DomainRange = {
             xMin: settings.domainRange.xMin + 0.6,
             xMax: settings.domainRange.xMax - 0.6,
             yMin: settings.domainRange.yMin + 0.6,
@@ -269,23 +313,44 @@ export function createMainStateHandlers(MainState: any) {
         };
 
         const gridResolution = settings.meshPlotSettings.gridResolution;
-        callSamplingWorkerThreadGrid(
-            tfModelPath,
-            trainingObjectiveVal,
-            settings.trainingObjectiveToModelConfig[trainingObjectiveVal],
-            gridResolution,
-            get(numberOfSteps),
-            squashedDomainRange,
-            settings.interfaceSettings.distributionWidth,
-            settings.interfaceSettings.displayAreaWidth,
-            (allSamples: number[][]) => {
-                const trajectoryGrid = tf.tensor(allSamples).reshape([get(numberOfSteps), gridResolution, gridResolution, 2]).arraySync() as number[][][];
-                allTimeGridSamples.set(trajectoryGrid);
-            }
-        );
+        const numberOfStepsVal = get(numberOfSteps);
+
+        // Sample grid trajectories
+        const { promise: gridPromise } = trainingObjectiveVal === 'Flow Matching'
+            ? (client as FlowModelClient).sampleGrid(gridResolution, squashedDomainRange, numberOfStepsVal)
+            : (client as DiffusionModelClient).sampleGrid(gridResolution, squashedDomainRange, numberOfStepsVal);
+
+        gridPromise.then((gridSamples: number[][][]) => {
+            // Convert from domain coords to display coords and reshape
+            const reshapedGrid = gridSamples.map((timestep: number[][], timeIdx: number) => {
+                const t = timeIdx / (gridSamples.length - 1);
+                const convertedPoints = convertDataToDisplayCoordinateFrame(
+                    timestep,
+                    t,
+                    settings.interfaceSettings.distributionWidth,
+                    settings.interfaceSettings.displayAreaWidth,
+                    settings.domainRange
+                );
+                // Reshape [N, 2] to [gridRes, gridRes, 2]
+                const result: number[][][] = [];
+                for (let i = 0; i < gridResolution; i++) {
+                    const row: number[][] = [];
+                    for (let j = 0; j < gridResolution; j++) {
+                        row.push(convertedPoints[i * gridResolution + j]);
+                    }
+                    result.push(row);
+                }
+                return result;
+            });
+            allTimeGridSamples.set(reshapedGrid);
+        });
     }
 
-    function startTraining() {
+    // Store training client and request ID for stopping
+    let activeTrainingClient: FlowModelClient | DiffusionModelClient | null = null;
+    let activeTrainingRequestId: string | null = null;
+
+    function startTraining(): { requestId: string; client: FlowModelClient | DiffusionModelClient } {
         if (get(usePretrained)) usePretrained.set(false);
         distributionVisiblity.set({ current: false, source: false, training: true, target: true });
         isPlaying.set(false);
@@ -304,45 +369,69 @@ export function createMainStateHandlers(MainState: any) {
         let jsonURL: string | null = null;
         const datasetNameVal = get(datasetName);
         if (datasetNameVal === "brush") {
-            const translatedSamples = convertDisplayCoordinateFrameToData(
+            const brushSamples = convertDisplayCoordinateFrameToData(
                 get(targetDistributionSamples),
                 1.0,
                 settings.interfaceSettings.distributionWidth,
                 settings.interfaceSettings.displayAreaWidth,
                 settings.domainRange
             );
-            jsonURL = URL.createObjectURL(new Blob([JSON.stringify({ points: translatedSamples })], { type: 'application/json' }));
+            jsonURL = URL.createObjectURL(new Blob([JSON.stringify({ points: brushSamples })], { type: 'application/json' }));
         }
 
         const trainingObjectiveVal = get(trainingObjective);
         const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
+        const datasetPath = jsonURL ?? base + settings.datasetNameToPath[datasetNameVal];
 
-        const trainingWorker: Worker = callTrainingWorkerThread(
-            trainingObjectiveVal,
-            modelConfig,
-            jsonURL ?? base + settings.datasetNameToPath[datasetNameVal],
+        // Select appropriate client based on training objective
+        const workerUrl = trainingObjectiveVal === 'Flow Matching' ? flowModelWorkerUrl : diffusionModelWorkerUrl;
+        const client = trainingObjectiveVal === 'Flow Matching'
+            ? new FlowModelClient(workerUrl, '', trainingObjectiveVal, modelConfig)
+            : new DiffusionModelClient(workerUrl, '', modelConfig);
+
+        // Start training
+        const { requestId, promise } = client.train(
+            datasetPath,
             settings.trainingConfig,
-            (tfModelPath: string) => finishTraining(tfModelPath, trainingObjectiveVal, datasetNameVal, modelConfig, jsonURL),
-            (epoch: number, intermediateSamples: number[][]) => {
+            (epoch: number, intermediateSamples: number[][] | null, loss: number) => {
                 epochValue.set(epoch);
                 if (intermediateSamples) {
-                    const translatedSamples = convertDataToDisplayCoordinateFrame(
+                    const convertedSamples = convertDataToDisplayCoordinateFrame(
                         intermediateSamples,
                         1.0,
                         settings.interfaceSettings.distributionWidth,
                         settings.interfaceSettings.displayAreaWidth,
                         settings.domainRange
                     );
-                    intermediateTrainingSamples.set(translatedSamples);
+                    intermediateTrainingSamples.set(convertedSamples);
                 }
             }
         );
 
-        return trainingWorker;
+        // Handle training completion
+        promise.then((result: { tfModelPath: string }) => {
+            finishTraining(result.tfModelPath, trainingObjectiveVal, datasetNameVal, modelConfig, jsonURL);
+            activeTrainingClient = null;
+            activeTrainingRequestId = null;
+        }).catch((error: Error) => {
+            console.log('Training stopped or failed:', error.message);
+            activeTrainingClient = null;
+            activeTrainingRequestId = null;
+        });
+
+        // Store for stopping
+        activeTrainingClient = client;
+        activeTrainingRequestId = requestId;
+
+        return { requestId, client };
     }
 
-    async function stopTraining(trainingWorker: Worker) {
-        trainingWorker.postMessage({ type: 'stop_training' });
+    async function stopTraining() {
+        if (activeTrainingClient && activeTrainingRequestId) {
+            activeTrainingClient.stopRequest(activeTrainingRequestId);
+            activeTrainingClient = null;
+            activeTrainingRequestId = null;
+        }
     }
 
     function startEditing() {

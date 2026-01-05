@@ -10,7 +10,7 @@
     import DisplayArea from '$lib/components/display_area/DisplayArea.svelte';
     // import Explanation from '$lib/components/Explanation.svelte';
 
-    let trainingWorker: Worker; // Variable to hold the training worker
+    // Training is managed internally by the state handlers
 
     // Create the context
     const pageState = createMainState();
@@ -67,13 +67,13 @@
         if ($isEditing) {
             isEditing.set(false);
         }
-        trainingWorker = state_handlers.startTraining();
+        state_handlers.startTraining();
     }
     // If training stopped, then stop the training thread
-    // Becuase it is stopped by default, we need to check if training was ever initiated by the user
-    $: if (!$isTraining && trainingInitiated && trainingWorker) {
+    // Because it is stopped by default, we need to check if training was ever initiated by the user
+    $: if (!$isTraining && trainingInitiated) {
         trainingInitiated = false;
-        state_handlers.stopTraining(trainingWorker);
+        state_handlers.stopTraining();
     }
 
     // Handle the editing model logic
@@ -108,8 +108,8 @@
     }
 
     // Handle training objective change
-    $ : if ($trainingObjective && typeof window !== 'undefined') {
-        // Just start training the model 
+    $ : if ($trainingObjective && $datasetDict[$datasetName] && typeof window !== 'undefined') {
+        // Just start training the model
         state_handlers.handleTrainingObjectiveChange();
     }
 </script>

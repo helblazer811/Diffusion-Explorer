@@ -8,9 +8,16 @@ import { get } from 'svelte/store';
 import * as tf from '@tensorflow/tfjs';
 
 // Helper functions
-import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
-import { sampleMultivariateNormal, callTrainingWorkerThread, callSamplingWorkerThread, callSamplingWorkerThreadGrid } from '$lib/diffusion';
-import { downloadJSON } from '$lib/utils';
+import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData, downloadJSON } from '$lib/utils';
+import {
+    sampleMultivariateNormal,
+    FlowModelClient,
+    DiffusionModelClient
+} from '@diffusion-explorer/diffusion';
+
+// Worker URLs (bundled to static/workers/ for production)
+const flowModelWorkerUrl = '/workers/flow_model.worker.js';
+const diffusionModelWorkerUrl = '/workers/diffusion_model.worker.js';
 
 /**
  * Factory function that takes a state object and returns handlers bound to that state.
@@ -98,37 +105,40 @@ export function createCFGStateHandlers(cfgState: any) {
     * This function handles the logic for starting the training process.
     */
     function runTraining() {
-        // Load up the dataset and save it in a temp-file
-        let jsonURL: string | null = null;
         const datasetNameVal = get(datasetName) as string;
         const datasetNameToPath = settings.datasetNameToPath;
-        // Pull out the appropriate model config 
+        const datasetPath = base + datasetNameToPath[datasetNameVal];
+
+        // Pull out the appropriate model config
         const trainingObjectiveVal = get(trainingObjective) as string;
         const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
         console.log("Calling training worker with config: ", modelConfig);
-        // Call the training worker thread
-        const trainingWorker: Worker = callTrainingWorkerThread(
-            trainingObjectiveVal,
-            modelConfig,
-            jsonURL ? jsonURL : base + datasetNameToPath[datasetNameVal],
+
+        // Select appropriate client based on training objective
+        const workerUrl = trainingObjectiveVal === 'Flow Matching' ? flowModelWorkerUrl : diffusionModelWorkerUrl;
+        const client = trainingObjectiveVal === 'Flow Matching'
+            ? new FlowModelClient(workerUrl, '', trainingObjectiveVal, modelConfig)
+            : new DiffusionModelClient(workerUrl, '', modelConfig);
+
+        // Start training
+        const { requestId, promise } = client.train(
+            datasetPath,
             settings.trainingConfig,
-            async (tfModelPath: string) => {
-                // On model save callback
-                // console.error("Not implemented yet: loading trained model from path ", tfModelPath);
-                // // TODO: Save the model to a file. 
-                const model = await tf.loadLayersModel(tfModelPath);
-                await model.save("downloads://model");
-                // console.log(model)
-                // await model.save('downloads://trained_model');
-            },
-            // Update the intermediate training samples between epochs
-            (epoch: number, intermediateSamples: number[][]) => { 
+            (epoch: number, intermediateSamples: number[][] | null, loss: number) => {
                 console.log("Epoch: ", epoch);
             }
         );
 
-        // Return training worker to be used when stopping training
-        return trainingWorker;
+        // Handle training completion
+        promise.then(async (result: { tfModelPath: string }) => {
+            const model = await tf.loadLayersModel(result.tfModelPath);
+            await model.save("downloads://model");
+        }).catch((error: Error) => {
+            console.log('Training stopped or failed:', error.message);
+        });
+
+        // Return client and requestId for stopping
+        return { client, requestId };
     }
 
     return {

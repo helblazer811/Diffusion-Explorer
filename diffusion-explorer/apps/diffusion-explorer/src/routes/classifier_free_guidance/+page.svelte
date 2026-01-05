@@ -7,7 +7,10 @@
     import { get } from 'svelte/store';
     import { base } from '$app/paths';
     import * as settings from '$lib/settings';
-    import { callSamplingWorkerThread } from '$lib/flow_matching_workers/worker_helpers';
+    import { FlowModelClient } from '@diffusion-explorer/diffusion';
+
+    // Worker URL (bundled to static/workers/ for production)
+    const flowModelWorkerUrl = '/workers/flow_model.worker.js';
     import 'katex/dist/katex.min.css';
     import katex from 'katex';
 
@@ -65,37 +68,30 @@
             }
         }
         
-        return new Promise((resolve, reject) => {
-            callSamplingWorkerThread(
-                modelPath,
-                trainingObjectiveVal,
-                modelConfig,
-                totalSamples,
-                numberOfStepsVal,
-                settings.domainRange,
-                settings.interfaceSettings.distributionWidth,
-                settings.interfaceSettings.displayAreaWidth,
-                // Callback for when the sampling is done
-                (allSamples: any, guidance: any) => {
-                    // if (guidance) {
-                    //     console.log("Received guidance data:", guidance);
-                    //     resolve({ allSamples, guidance, classes });
-                    // } else {
-                    //     console.error("No guidance data returned");
-                    //     reject("No guidance data returned");
-                    // }
-                    console.log("Received guidance data:", guidance);
-                    allTimeSamples.set(allSamples);
-                    isPlaying.set(true);
-                    currentTime.set(0);
-                },
-                { // Options object
-                    cond: classes, // Pass the class labels for conditioning
-                    guidanceScale: 5.0, // Use a guidance scale of 5.0
-                    return_guidance: true // Request guidance information
-                }
-            );
-        });
+        // Create client with conditional sampling options
+        const client = new FlowModelClient(
+            flowModelWorkerUrl,
+            modelPath,
+            trainingObjectiveVal,
+            modelConfig
+        );
+
+        // Sample with conditional options
+        const { promise } = client.sample(
+            totalSamples,
+            numberOfStepsVal,
+            {
+                cond: classes, // Pass the class labels for conditioning
+                guidanceScale: 5.0, // Use a guidance scale of 5.0
+                return_guidance: true // Request guidance information
+            }
+        );
+
+        const allSamples = await promise;
+        console.log("Received samples:", allSamples);
+        allTimeSamples.set(allSamples);
+        isPlaying.set(true);
+        currentTime.set(0);
     }
 
     onMount(async () => {
