@@ -9,7 +9,20 @@
       "import": "./src/index.ts"
     }
   },
+  "scripts": {
+    "test": "tsx tests/run_tests.ts",
+    "test:vitest": "vitest run",
+    "test:watch": "vitest",
+    "train:flow": "tsx src/scripts/train_flow_model.ts",
+    "train:diffusion": "tsx src/scripts/train_diffusion.ts"
+  },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0"
+  },
+  "devDependencies": {
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "vitest": "^3.0.0"
   }
 }
