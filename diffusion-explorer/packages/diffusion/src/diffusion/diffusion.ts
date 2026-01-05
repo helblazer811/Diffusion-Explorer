@@ -250,7 +250,10 @@ export class DiffusionModel extends Model {
         for (let i = 0; i < timesteps.length - 1; i++) {
             // Check for cancellation
             if (shouldStop()) {
-                trajectory.forEach(t => t.dispose());
+                // Dispose all created tensors (skip initial_points at index 0)
+                for (let j = 1; j < trajectory.length; j++) {
+                    trajectory[j].dispose();
+                }
                 return null;
             }
 
@@ -262,10 +265,6 @@ export class DiffusionModel extends Model {
                 return this.step(x_t, tInt, scheduler);
             });
 
-            // Dispose previous if not the initial points
-            if (i > 0) {
-                x_t.dispose();
-            }
             x_t = x_next;
             trajectory.push(x_t);
 
@@ -281,7 +280,7 @@ export class DiffusionModel extends Model {
         // Stack trajectory into a single tensor
         const result = tf.stack(trajectory);
 
-        // Dispose intermediate tensors (except initial_points which we don't own)
+        // Dispose intermediate tensors (skip initial_points at index 0)
         for (let i = 1; i < trajectory.length; i++) {
             trajectory[i].dispose();
         }
