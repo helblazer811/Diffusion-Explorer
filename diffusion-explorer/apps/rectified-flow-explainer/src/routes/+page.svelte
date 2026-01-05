@@ -82,7 +82,7 @@
     try {
       const samples = await sample.loadTargetDistribution(
         `${base}/${settings.targetDistributionPointsPath}`,
-        settings.samplingSettings.flowMatching.numSamples
+        settings.samplingSettings.numSamples
       );
       if (samples) {
         targetDistributionSamples.set(samples);
@@ -202,15 +202,15 @@
       `${base}${settings.flowModelWorkerUrl}`,
       `${base}${settings.flowMatchingModelPath}`,
       "Flow Matching",
-      settings.trainingSettings.modelConfig,
-      settings.trainingSettings.domainRange
+      { dim: settings.modelSettings.dim, hidden: settings.modelSettings.hidden },
+      settings.modelSettings.domainRange
     );
     rectifiedFlowClient = new FlowModelClient(
       `${base}${settings.flowModelWorkerUrl}`,
       `${base}${settings.rectifiedFlowModelPath}`,
       "Flow Matching",
-      settings.trainingSettings.modelConfig,
-      settings.trainingSettings.domainRange
+      { dim: settings.modelSettings.dim, hidden: settings.modelSettings.hidden },
+      settings.modelSettings.domainRange
     );
 
     // Load target distribution first
@@ -1094,7 +1094,7 @@
         width={figureWidth}
         targetDistribution={$targetDistributionSamples}
         {flowMatchingClient}
-        numSteps={settings.samplingSettings.flowMatching.numSteps}
+        numSteps={settings.samplingSettings.numSteps}
         numPoints={50}
         numLinesToDraw={50}
         numTrajectoriesToShow={15}
