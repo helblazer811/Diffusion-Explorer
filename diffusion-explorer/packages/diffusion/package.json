@@ -13,8 +13,8 @@
     "test": "tsx tests/run_tests.ts",
     "test:vitest": "vitest run",
     "test:watch": "vitest",
-    "train:flow": "tsx src/scripts/train_flow_model.ts",
-    "train:diffusion": "tsx src/scripts/train_diffusion.ts"
+    "train:flow": "tsx scripts/train_flow_model.ts",
+    "train:diffusion": "tsx scripts/train_diffusion.ts"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0"

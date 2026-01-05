@@ -1,22 +1,19 @@
 /**
- * Diffusion Model Training Script
+ * Flow Matching Model Training Script
  *
- * This script trains a DiffusionModel on synthetic data to verify the implementation works.
- * Run with: npm run train:diffusion
+ * This script trains a FlowModel on synthetic data to verify the implementation works.
+ * Run with: npm run train:flow
  */
 
-import { DiffusionModel } from '../diffusion/diffusion';
+import { FlowModel } from '../src/flow_matching/flow_matching';
 import { initBackend, generateSyntheticData, saveModel, formatDuration, ROOT } from './utils';
 
 // Configuration
 const CONFIG = {
     outputDir: 'models',
-    modelName: 'diffusion_test',
+    modelName: 'flow_matching_test',
     dim: 2,
-    hidden: 128,
-    T: 200,           // Reduced from 1000 for faster testing
-    betaStart: 1e-4,
-    betaEnd: 2e-2,
+    hidden: 64,
     epochs: 500,
     batchSize: 256,
     updateInterval: 50,
@@ -25,7 +22,7 @@ const CONFIG = {
 
 async function main(): Promise<void> {
     console.log('\n========================================');
-    console.log('  Diffusion Model Training');
+    console.log('  Flow Matching Model Training');
     console.log('========================================\n');
 
     const startTime = Date.now();
@@ -39,14 +36,8 @@ async function main(): Promise<void> {
     console.log(`  Dataset shape: [${dataset.shape.join(', ')}]\n`);
 
     // Create model
-    console.log(`Creating DiffusionModel (dim=${CONFIG.dim}, hidden=${CONFIG.hidden}, T=${CONFIG.T})\n`);
-    const model = new DiffusionModel(
-        CONFIG.dim,
-        CONFIG.hidden,
-        CONFIG.T,
-        CONFIG.betaStart,
-        CONFIG.betaEnd
-    );
+    console.log(`Creating FlowModel (dim=${CONFIG.dim}, hidden=${CONFIG.hidden})\n`);
+    const model = new FlowModel(CONFIG.dim, CONFIG.hidden);
 
     // Training callback
     let lastLogTime = Date.now();
@@ -80,8 +71,7 @@ async function main(): Promise<void> {
 
     // Test sampling
     console.log('Testing sampling...');
-    const numSteps = 50;  // Use fewer steps for faster sampling
-    const samples = await model.sample(100, numSteps);
+    const samples = await model.sample(100, 30);
     if (samples) {
         console.log(`  Generated ${samples.shape[1]} samples over ${samples.shape[0]} steps`);
         console.log(`  Final samples shape: [${samples.shape.join(', ')}]`);
