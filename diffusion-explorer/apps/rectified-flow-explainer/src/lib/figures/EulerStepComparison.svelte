@@ -11,6 +11,7 @@
     FigureLegend,
     Timeline,
     useCanvas2D,
+    createVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -47,7 +48,7 @@
   // Target distribution styling
   export let targetColor = "#3b82f6";
   export let targetOpacity = 0.2;
-  export let targetPointRadius = 7;
+  export let targetPointRadius = 5;
 
   // Trajectory styling
   export let groundTruthColor = "#22c55e";
@@ -123,6 +124,10 @@
 
   // Initialization
   let isInitialized = false;
+
+  // Visibility
+  let figureIsActive;
+  const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
 
   // Animation timing config (in ms)
   const segmentDuration = 600;
@@ -382,9 +387,7 @@
         flowMatchingTrajectories[currentSteps] = flowMatchingTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
-        // Recreate timeline to pick up new data and start it
-        setupTimeline();
-        startApproxAnimation();
+        // Timeline tick callback will pick up updated trajectory data automatically
       }
     );
     fmApproxRequestId = fmApproxResult.requestId;
@@ -402,9 +405,7 @@
         rectifiedFlowTrajectories[currentSteps] = rectifiedFlowTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
-        // Recreate timeline to pick up new data and start it
-        setupTimeline();
-        startApproxAnimation();
+        // Timeline tick callback will pick up updated trajectory data automatically
       }
     );
     rfApproxRequestId = rfApproxResult.requestId;
@@ -617,6 +618,9 @@
 
   // Setup timeline for the current step count
   function setupTimeline() {
+    // Clean up previous timeline to prevent memory leaks
+    timeline?.dispose();
+
     const currentSteps = stepValues[currentStepIndex];
     const cycleTime = segmentDuration + segmentPauseDuration;
     const segmentPhaseMs = currentSteps * cycleTime;
@@ -796,6 +800,11 @@
     initializeVisualization();
   }
 
+  // Visibility handling - pause when scrolled off-screen
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
+  }
+
   $: currentSteps = stepValues[currentStepIndex];
 
   // Legend items (reactive to update step count)
@@ -818,12 +827,12 @@
   });
 
   onDestroy(() => {
-    stopApproxAnimation();
+    timeline?.dispose();
   });
 </script>
 
 {#if isDataValid}
-  <DoubleFigure {gap} {caption} {backgroundVisible}>
+  <DoubleFigure {gap} {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     {#snippet left()}
       <div class="panel-container" style="max-width: {canvasWidth}px;">
         <div

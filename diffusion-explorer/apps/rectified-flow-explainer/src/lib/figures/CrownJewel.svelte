@@ -1,7 +1,17 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import { DoubleFigure, TimeSlider, drawScatterPlot, drawTrajectories, computeContours, plotContours, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
+  import {
+    DoubleFigure,
+    TimeSlider,
+    drawScatterPlot,
+    drawTrajectories,
+    computeContours,
+    plotContours,
+    Timeline,
+    useCanvas2D,
+    createVisibilityHandler,
+  } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -42,8 +52,8 @@
   export let targetColor = "#3b82f6";
   export let targetOpacity = 0.35;
   export let targetPointRadius = 5;
-  export let showTargetScatter = true;   // On by default
-  export let showTargetContour = false;  // Off by default
+  export let showTargetScatter = true; // On by default
+  export let showTargetContour = false; // Off by default
 
   // Trajectory styling
   export let trajectoryColor = settings.stylingSettings.trajectory.color;
@@ -67,13 +77,14 @@
     settings.stylingSettings.trajectory.outline.enabled;
 
   // Animation
-  export let animationDuration = 10000;  // Total cycle duration (ms)
+  export let animationDuration = 10000; // Total cycle duration (ms)
   export let playingByDefault = true;
 
   // Interactive sampling
   export let highlightedTrajectoryOpacity = 1.0;
   export let dimmedTrajectoryOpacity = 0.15;
-  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
+  export let maxUserTrajectories =
+    settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
   export let onInitialized = undefined;
@@ -107,9 +118,9 @@
 
   // Animation state (combined for single Timeline)
   type AnimationState = {
-    leftTime: number;   // WARNING: Using time in draw() is an antipattern. Prefer derived state.
+    leftTime: number; // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     leftSegmentIndex: number;
-    rightTime: number;  // WARNING: Using time in draw() is an antipattern. Prefer derived state.
+    rightTime: number; // WARNING: Using time in draw() is an antipattern. Prefer derived state.
     rightSegmentIndex: number;
   };
 
@@ -121,7 +132,7 @@
 
   // Pause at end before looping (as fraction of total duration)
   // Timing constants
-  const endPauseDurationMs = 1500;  // End pause in ms
+  const endPauseDurationMs = 1500; // End pause in ms
   const rightSpeedMultiplier = 0.5; // Right animation runs at 2x speed (half duration)
 
   // Timeline for animation
@@ -139,7 +150,7 @@
 
   // Visibility
   let figureIsActive;
-  let wasPlayingBeforeHidden = false;
+  const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
 
   // User-defined trajectory state (supports multiple trajectories)
   let userStartPoints = []; // Array of [x, y] domain coordinates
@@ -172,7 +183,6 @@
       .range([marginHeight, canvasHeight - marginHeight]);
   }
 
-
   // Transpose trajectories from [timestep][sample][dim] to [sample][timestep][x,y] and scale to pixels
   function transposeAndScale(trajectories) {
     if (!xScale || !yScale || !trajectories || trajectories.length === 0)
@@ -201,8 +211,13 @@
     if (showTargetContour && targetDistribution.length > 0) {
       computedTargetContours = computeContours(targetDistribution, {
         bandwidth: settings.stylingSettings.contour.bandwidth,
-        thresholds: 8,  // More contour lines for CrownJewel
-        domain: [domainRange.xMin, domainRange.xMax, domainRange.yMin, domainRange.yMax]
+        thresholds: 8, // More contour lines for CrownJewel
+        domain: [
+          domainRange.xMin,
+          domainRange.xMax,
+          domainRange.yMin,
+          domainRange.yMax,
+        ],
       });
     } else {
       computedTargetContours = null;
@@ -255,9 +270,9 @@
     reduce(t: number) {
       return {
         leftTime: t,
-        leftSegmentIndex: Math.floor(t * numSegments)
+        leftSegmentIndex: Math.floor(t * numSegments),
       };
-    }
+    },
   };
 
   // Right segment clip - runs at 2x speed (completes in half the time)
@@ -267,9 +282,9 @@
     reduce(t: number) {
       return {
         rightTime: t,
-        rightSegmentIndex: Math.floor(t * numSegments)
+        rightSegmentIndex: Math.floor(t * numSegments),
       };
-    }
+    },
   };
 
   function setupTimeline() {
@@ -278,7 +293,7 @@
       leftTime: 0,
       leftSegmentIndex: 0,
       rightTime: 0,
-      rightSegmentIndex: 0
+      rightSegmentIndex: 0,
     };
 
     // Add clips - both start at 0, right finishes at 0.5
@@ -330,13 +345,14 @@
     ctx: CanvasRenderingContext2D,
     scaledTrajectories: number[][][],
     state: AnimationState,
-    panel: 'left' | 'right',
+    panel: "left" | "right",
     userTrajectories: number[][][]
   ) {
     if (!ctx) return;
 
-    const segmentIndex = panel === 'left' ? state.leftSegmentIndex : state.rightSegmentIndex;
-    const logicalTime = panel === 'left' ? state.leftTime : state.rightTime;
+    const segmentIndex =
+      panel === "left" ? state.leftSegmentIndex : state.rightSegmentIndex;
+    const logicalTime = panel === "left" ? state.leftTime : state.rightTime;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -348,9 +364,9 @@
         fillColor: targetColor,
         fill: true,
         stroke: false,
-        opacity: 0.15,  // Lower opacity for CrownJewel contours
+        opacity: 0.15, // Lower opacity for CrownJewel contours
         xScale,
-        yScale
+        yScale,
       });
     }
 
@@ -408,18 +424,30 @@
       leftTime,
       leftSegmentIndex: leftCurrentSegmentIndex,
       rightTime,
-      rightSegmentIndex: rightCurrentSegmentIndex
+      rightSegmentIndex: rightCurrentSegmentIndex,
     };
   }
 
   function updateLeftVisualization() {
     if (!isDataValid || !leftCtx) return;
-    draw(leftCtx, scaledLeftTrajectories, getCurrentState(), 'left', userFlowMatchingTrajectories);
+    draw(
+      leftCtx,
+      scaledLeftTrajectories,
+      getCurrentState(),
+      "left",
+      userFlowMatchingTrajectories
+    );
   }
 
   function updateRightVisualization() {
     if (!isDataValid || !rightCtx) return;
-    draw(rightCtx, scaledRightTrajectories, getCurrentState(), 'right', userRectifiedFlowTrajectories);
+    draw(
+      rightCtx,
+      scaledRightTrajectories,
+      getCurrentState(),
+      "right",
+      userRectifiedFlowTrajectories
+    );
   }
 
   // ----------------------------------------------------------------
@@ -438,11 +466,17 @@
     if (!pathsInitialized || numSegments === 0) return;
 
     // Snap to discrete segment and update left side
-    leftCurrentSegmentIndex = Math.min(Math.floor(newTime * numSegments), numSegments - 1);
+    leftCurrentSegmentIndex = Math.min(
+      Math.floor(newTime * numSegments),
+      numSegments - 1
+    );
     leftTime = leftCurrentSegmentIndex / numSegments;
 
     // Sync right side (right is 2x faster, so it's at 2x the left position, capped at 1)
-    rightCurrentSegmentIndex = Math.min(leftCurrentSegmentIndex * 2, numSegments - 1);
+    rightCurrentSegmentIndex = Math.min(
+      leftCurrentSegmentIndex * 2,
+      numSegments - 1
+    );
     rightTime = rightCurrentSegmentIndex / numSegments;
 
     // Seek timeline to corresponding position (leftTime is already normalized 0-1)
@@ -460,7 +494,10 @@
     if (!pathsInitialized || numSegments === 0) return;
 
     // Snap to discrete segment and update right side
-    rightCurrentSegmentIndex = Math.min(Math.floor(newTime * numSegments), numSegments - 1);
+    rightCurrentSegmentIndex = Math.min(
+      Math.floor(newTime * numSegments),
+      numSegments - 1
+    );
     rightTime = rightCurrentSegmentIndex / numSegments;
 
     // Calculate timeline position (right covers 0 to rightSpeedMultiplier of timeline)
@@ -468,7 +505,10 @@
 
     // Sync left side (left covers full timeline, so leftTime = timelinePosition)
     leftTime = timelinePosition;
-    leftCurrentSegmentIndex = Math.min(Math.floor(leftTime * numSegments), numSegments - 1);
+    leftCurrentSegmentIndex = Math.min(
+      Math.floor(leftTime * numSegments),
+      numSegments - 1
+    );
 
     // Seek timeline to corresponding position
     if (timeline) {
@@ -478,16 +518,6 @@
     // Update visualizations
     updateLeftVisualization();
     updateRightVisualization();
-  }
-
-  function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
-      wasPlayingBeforeHidden = true;
-      isPlaying = false;
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      isPlaying = true;
-    }
   }
 
   // Handle canvas click - convert to domain coordinates and sample
@@ -540,8 +570,12 @@
     streamingCompleteCount = 0;
 
     // Initialize trajectory arrays with initial pixel points for all start points
-    userFlowMatchingTrajectories = userStartPoints.map(p => [[xScale(p[0]), yScale(p[1])]]);
-    userRectifiedFlowTrajectories = userStartPoints.map(p => [[xScale(p[0]), yScale(p[1])]]);
+    userFlowMatchingTrajectories = userStartPoints.map((p) => [
+      [xScale(p[0]), yScale(p[1])],
+    ]);
+    userRectifiedFlowTrajectories = userStartPoints.map((p) => [
+      [xScale(p[0]), yScale(p[1])],
+    ]);
 
     // Reset and start animation immediately
     resetAnimation();
@@ -562,10 +596,9 @@
       {},
       // onStep callback - append new points for all trajectories
       (_step, x_t) => {
-        userFlowMatchingTrajectories = userFlowMatchingTrajectories.map((traj, i) => [
-          ...traj,
-          [xScale(x_t[i][0]), yScale(x_t[i][1])]
-        ]);
+        userFlowMatchingTrajectories = userFlowMatchingTrajectories.map(
+          (traj, i) => [...traj, [xScale(x_t[i][0]), yScale(x_t[i][1])]]
+        );
       }
     );
     activeFlowMatchingRequestId = fmResult.requestId;
@@ -578,10 +611,9 @@
       {},
       // onStep callback - append new points for all trajectories
       (_step, x_t) => {
-        userRectifiedFlowTrajectories = userRectifiedFlowTrajectories.map((traj, i) => [
-          ...traj,
-          [xScale(x_t[i][0]), yScale(x_t[i][1])]
-        ]);
+        userRectifiedFlowTrajectories = userRectifiedFlowTrajectories.map(
+          (traj, i) => [...traj, [xScale(x_t[i][0]), yScale(x_t[i][1])]]
+        );
       }
     );
     activeRectifiedFlowRequestId = rfResult.requestId;
@@ -596,8 +628,8 @@
   // This ensures they're created with the correct base path prefix
 
   onDestroy(() => {
-    // Stop animation
-    stopAnimation();
+    // Dispose timeline (stops animation and cleans up)
+    timeline?.dispose();
 
     // Cancel any pending worker requests to prevent orphaned promises
     if (activeFlowMatchingRequestId && flowMatchingClient) {
