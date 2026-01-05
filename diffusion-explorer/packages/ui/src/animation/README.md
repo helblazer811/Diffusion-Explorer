@@ -171,3 +171,66 @@ function onMouseLeave() {
   if (hoverId) timeline.remove(hoverId);
 }
 ```
+
+
+## Timeline Lifecycle
+
+### Cleanup
+Always call `timeline.dispose()` before creating a new Timeline instance to prevent memory leaks:
+
+```typescript
+function setupTimeline() {
+  // Clean up previous timeline
+  timeline?.dispose();
+
+  timeline = new Timeline<AnimationState>();
+  // ... configure timeline
+}
+```
+
+### Dynamic Data Updates
+When data changes (e.g., during streaming), prefer `replaceClips()` over recreating the timeline:
+
+```typescript
+// Instead of calling setupTimeline() on every data change:
+timeline.replaceClips([
+  { clip: createMainClip(newData), start: 0 }
+]);
+```
+
+### State Reset
+Use `resetState()` to restart an animation from the beginning without rebuilding clips:
+
+```typescript
+function handleRestart() {
+  timeline.resetState();
+  timeline.play();
+}
+```
+
+
+## Visibility Handling
+
+Use the `createVisibilityHandler` utility for consistent pause/resume when figures scroll in/out of view:
+
+```svelte
+<script lang="ts">
+  import { createVisibilityHandler, Timeline } from '@diffusion-explorer/ui';
+
+  let timeline: Timeline<AnimationState> | null = null;
+  let figureIsActive;
+  let isInitialized = false;
+
+  const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
+
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
+  }
+</script>
+
+<Figure bind:isActive={figureIsActive}>
+  <!-- canvas content -->
+</Figure>
+```
+
+This ensures animations pause when scrolled off-screen, reducing CPU usage.

@@ -12,6 +12,7 @@
     Timeline,
     FigureLegend,
     useCanvas2D,
+    createVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -128,6 +129,10 @@
   // Loading state
   let isLoading = true;
   let isInitialized = false;
+
+  // Visibility
+  let figureIsActive;
+  const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
 
   // Animation state type
   type AnimationState = {
@@ -505,7 +510,7 @@
   });
 
   onDestroy(() => {
-    stopAnimation();
+    timeline?.dispose();
   });
 
   // ----------------------------------------------------------------
@@ -515,10 +520,15 @@
   $: if (isDataValid && canvas && !isInitialized && timeline) {
     runInitialComputation();
   }
+
+  // Visibility handling - pause when scrolled off-screen
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
+  }
 </script>
 
 {#if isDataValid}
-  <Figure {caption} {backgroundVisible}>
+  <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
     <div class="panel-container" style="max-width: {canvasWidth}px;">
       {#if label}
         <div

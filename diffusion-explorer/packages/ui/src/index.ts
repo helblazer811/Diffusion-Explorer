@@ -66,3 +66,8 @@ export {
   type Clip,
   type ClipOptions,
 } from './animation/animation';
+
+export {
+  createVisibilityHandler,
+  type VisibilityState,
+} from './animation/visibility';

@@ -215,6 +215,39 @@ export class Timeline<TState> {
     this._cachedState = null;
   }
 
+  /**
+   * Fully dispose of the timeline, stopping playback and clearing all state.
+   * Call this before creating a new Timeline instance to prevent memory leaks.
+   */
+  dispose(): void {
+    this.pause();
+    this.tickCallbacks.clear();
+    this.clips = [];
+    this._cachedState = null;
+  }
+
+  /**
+   * Reset time and state without removing clips.
+   * Useful for restarting an animation with the same clip configuration.
+   */
+  resetState(): void {
+    this._time = 0;
+    this.endPauseRemaining = 0;
+    this._cachedState = null;
+    this.clips.forEach(s => s.playCount = 0);
+  }
+
+  /**
+   * Replace all clips at once without recreating the timeline.
+   * Useful when data changes and clips need to be updated.
+   * @param clips - Array of clips with their start times and options
+   */
+  replaceClips(clips: Array<{ clip: Clip<TState>; start: number; options?: ClipOptions }>): void {
+    this.clips = [];
+    this._cachedState = null;
+    clips.forEach(({ clip, start, options }) => this.add(clip, start, options));
+  }
+
   // ===== Events =====
 
   /**

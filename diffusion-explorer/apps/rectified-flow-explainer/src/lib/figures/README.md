@@ -107,3 +107,31 @@ The state should contain derived values computed from time (e.g., `segmentIndex`
 - **`draw()` depends on state, not time.** Time updates animation state via clips; `draw()` renders that state.
 - **Clips are reducers.** They take time `t` and return partial state updates.
 - **`onTick` bridges Timeline to Svelte.** The callback updates local variables and calls `draw()`.
+
+## Visibility Handling
+
+All animated figures **MUST** handle visibility to prevent background CPU usage when scrolled off-screen.
+
+Use the `createVisibilityHandler` utility:
+
+```typescript
+import { createVisibilityHandler } from '@diffusion-explorer/ui';
+
+let figureIsActive;
+const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
+
+// In reactive blocks section:
+$: if (figureIsActive !== undefined && isInitialized) {
+  handleVisibilityChange($figureIsActive);
+}
+```
+
+And bind the visibility store in the template:
+
+```svelte
+<Figure bind:isActive={figureIsActive}>
+  <!-- canvas content -->
+</Figure>
+```
+
+This pauses animations when the figure scrolls out of view and resumes when it returns.
