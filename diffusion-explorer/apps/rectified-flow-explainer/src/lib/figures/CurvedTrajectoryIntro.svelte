@@ -85,12 +85,23 @@
   // Helpers
   // ----------------------------------------------------------------
 
-  // Pick trajectories (first N samples)
+  // Pick trajectories (first N samples that start within bounds)
   function selectTrajectoryIndices() {
     if (!allTimeSamples || allTimeSamples.length === 0) return;
-    selectedTrajectoryIndices = [...Array(numTrajectoriesToShow).keys()].filter(
-      (i) => i < allTimeSamples[0].length
-    );
+
+    // Filter to only include trajectories with starting points within clipping radius
+    const clippingRadius = settings.stylingSettings.scatterPlot.clippingRadius;
+    const validIndices = [];
+
+    for (let i = 0; i < allTimeSamples[0].length && validIndices.length < numTrajectoriesToShow; i++) {
+      const startPoint = allTimeSamples[0][i];
+      const distance = Math.sqrt(startPoint[0] ** 2 + startPoint[1] ** 2);
+      if (distance <= clippingRadius) {
+        validIndices.push(i);
+      }
+    }
+
+    selectedTrajectoryIndices = validIndices;
   }
 
   function getPixelX(dataX, meanX, t) {

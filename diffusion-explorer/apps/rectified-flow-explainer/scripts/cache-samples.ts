@@ -23,6 +23,7 @@ interface CacheConfig {
   numSamples: number;
   numSteps: number;
   type: 'random' | 'grid';
+  isRectifiedFlow?: boolean; // If true, saves in RectifiedFlowData format
   gridResolution?: number;
   domainRange?: DomainRange;
   dim?: number;
@@ -34,8 +35,8 @@ const CACHES: CacheConfig[] = [
   {
     modelPath: 'static/models/flow_matching_model.json',
     outputPath: 'static/cached_samples/flow_matching_trajectories.json',
-    numSamples: 500,
-    numSteps: 30,
+    numSamples: 300,
+    numSteps: 200,
     type: 'random',
     dim: 2,
     hidden: 64,
@@ -43,9 +44,10 @@ const CACHES: CacheConfig[] = [
   {
     modelPath: 'static/models/rectified_flow_model.json',
     outputPath: 'static/cached_samples/rectified_flow_trajectories.json',
-    numSamples: 500,
-    numSteps: 30,
+    numSamples: 300,
+    numSteps: 200,
     type: 'random',
+    isRectifiedFlow: true,
     dim: 2,
     hidden: 64,
   },
@@ -53,10 +55,10 @@ const CACHES: CacheConfig[] = [
     modelPath: 'static/models/flow_matching_model.json',
     outputPath: 'static/cached_samples/flow_matching_grid_trajectories.json',
     numSamples: 0,
-    numSteps: 30,
+    numSteps: 200,
     type: 'grid',
-    gridResolution: 20,
-    domainRange: { xMin: -3, xMax: 3, yMin: -3, yMax: 3 },
+    gridResolution: 6,
+    domainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 },
     dim: 2,
     hidden: 64,
   },
@@ -64,10 +66,11 @@ const CACHES: CacheConfig[] = [
     modelPath: 'static/models/rectified_flow_model.json',
     outputPath: 'static/cached_samples/rectified_flow_grid_trajectories.json',
     numSamples: 0,
-    numSteps: 30,
+    numSteps: 200,
     type: 'grid',
-    gridResolution: 20,
-    domainRange: { xMin: -3, xMax: 3, yMin: -3, yMax: 3 },
+    isRectifiedFlow: true,
+    gridResolution: 6,
+    domainRange: { xMin: -1.5, xMax: 1.5, yMin: -1.5, yMax: 1.5 },
     dim: 2,
     hidden: 64,
   },
@@ -197,17 +200,31 @@ async function generateCache(config: CacheConfig): Promise<void> {
   }
 
   if (trajectories) {
-    const data = trajectories.arraySync();
+    const rawData = trajectories.arraySync();
     const outputFile = path.join(ROOT, config.outputPath);
 
     // Ensure output directory exists
     fs.mkdirSync(path.dirname(outputFile), { recursive: true });
 
+    // For rectified flow, wrap data in expected format: { allRectifiedTrajectories: [...], modelPath: "..." }
+    // The allRectifiedTrajectories is a 4D array where each element represents a rectification step
+    // Since we're caching the final model's output, we just have one "step" worth of data
+    let outputData: unknown;
+    if (config.isRectifiedFlow) {
+      outputData = {
+        allRectifiedTrajectories: [rawData], // Wrap in array for 4D format
+        modelPath: config.modelPath,
+      };
+    } else {
+      outputData = rawData;
+    }
+
     // Write JSON
-    fs.writeFileSync(outputFile, JSON.stringify(data));
+    fs.writeFileSync(outputFile, JSON.stringify(outputData));
 
     const shape = trajectories.shape;
     console.log(`  Shape: [${shape.join(', ')}]`);
+    console.log(`  Format: ${config.isRectifiedFlow ? 'RectifiedFlowData' : 'raw array'}`);
     console.log(`  Saved to: ${config.outputPath}`);
     console.log(`  Time: ${formatDuration(Date.now() - startTime)}`);
 
