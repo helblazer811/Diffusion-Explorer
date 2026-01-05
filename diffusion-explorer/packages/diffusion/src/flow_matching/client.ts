@@ -9,7 +9,7 @@
  */
 
 import { SchedulerType } from './schedulers';
-import { validateModelPath } from './utils';
+import { validateModelPath } from '../utils';
 
 // ===== Types =====
 

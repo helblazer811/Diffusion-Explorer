@@ -1,10 +1,10 @@
 import * as tf from '@tensorflow/tfjs'
-import { Model } from './interfaces';
-import { generateUniformGridSamples } from './utils';
+import { Model } from '../interfaces';
+import { generateUniformGridSamples } from '../utils';
 import { SchedulerType, SamplingOptions, getScheduler } from './schedulers';
 
 export class FlowModel extends Model {
-  
+
     constructor(dim: number = 2, hidden: number = 64) {
         super(dim, hidden);
     }
@@ -287,7 +287,7 @@ export class FlowModel extends Model {
             x1_coupling.dispose();
         }
     }
-  
+
     /**
      * Compute the vector field at (x_t, t)
      * @param x_t tf.Tensor2D of shape [batch, dim]
@@ -300,7 +300,7 @@ export class FlowModel extends Model {
         return this.model.predict(input) as tf.Tensor2D;
       });
     }
-  
+
     /**
      * Integrate one step from t_start to t_end using the specified scheduler
      * @param x_t tf.Tensor2D of shape [batch, dim]
@@ -398,8 +398,8 @@ export class FlowModel extends Model {
 
         t_steps.dispose();
         return tf.stack(all_step_data);
-    }    
-    
+    }
+
     /**
     * Sample from a uniform grid of initial points
     * @param gridResolution Number of points along each axis

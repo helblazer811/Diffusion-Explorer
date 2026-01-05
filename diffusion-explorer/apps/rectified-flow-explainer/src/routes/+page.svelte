@@ -36,7 +36,7 @@
   import CurvedTrajectorySuperimposed from "$lib/figures/CurvedTrajectorySuperimposed.svelte";
   import ReflowAlgorithm from "$lib/figures/ReflowAlgorithm.svelte";
   import EulerStepComparison from "$lib/figures/EulerStepComparison.svelte";
-  import { Bibliography, HoverableReference, Katex } from "@diffusion-explorer/ui";
+  import { Bibliography, HoverableReference, Katex, ArticleHeader } from "@diffusion-explorer/ui";
   import { base } from "$app/paths";
 
   // ========== DATA MANAGEMENT STATE ==========
@@ -263,16 +263,12 @@
   }
 </script>
 
-<div class="title-header-wrapper">
-    <h1 class="article-title">A Visual Introduction to Rectified Flows</h1>
-    <!-- <h2 class="article-subtitle">Why flow matching trajectories are curved and how to straighten them.</h2> -->
-    <div class="byline-dateline-container">
-      <h2 class="byline">
-        By <a href="https://alechelbling.com">Alec Helbling</a>
-      </h2>
-      <h2 class="dateline">December 24, 2025</h2>
-    </div>
-  </div>
+<ArticleHeader
+    title="A Visual Introduction to Rectified Flows"
+    author="Alec Helbling"
+    authorLink="https://alechelbling.com"
+    date="December 24, 2025"
+  />
 
   <CrownJewel
     width={figureWidth}
