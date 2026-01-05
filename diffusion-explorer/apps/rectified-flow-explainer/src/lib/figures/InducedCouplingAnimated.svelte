@@ -154,11 +154,21 @@
   // Setup
   // ----------------------------------------------------------------
 
-  function runInitialComputation() {
-    if (!generatedTrajectories || generatedTrajectories.length === 0) return;
+  function runInitialComputation(): boolean {
+    if (!generatedTrajectories || generatedTrajectories.length === 0) return false;
 
     // Filter trajectories to exclude outliers based on starting point radius
     const filteredTrajectories = clipTrajectoriesToStartingRadius(generatedTrajectories, SOURCE_RADIUS_THRESHOLD);
+
+    // Validate filtered trajectories have samples
+    if (!filteredTrajectories ||
+        filteredTrajectories.length === 0 ||
+        !filteredTrajectories[0] ||
+        filteredTrajectories[0].length === 0) {
+      console.warn('[InducedCouplingAnimated] No valid trajectories after filtering');
+      return false;
+    }
+
     numTimeSteps = filteredTrajectories.length;
 
     // Source points = first timestep (filtered Gaussian samples)
@@ -236,6 +246,8 @@
       });
       transformedTrajectories.push(trajectory);
     }
+
+    return true;
   }
 
   // ----------------------------------------------------------------
@@ -415,11 +427,16 @@
   }
 
   function drawNaiveCouplingLines(count: number, opacity = couplingLineOpacity) {
+    // Guard against empty arrays
+    if (!sourcePixelCoords.length || !targetPixelCoords.length || !shuffledTargetIndices.length) {
+      return;
+    }
+
     ctx.strokeStyle = couplingLineColor;
     ctx.lineWidth = couplingLineWidth;
     ctx.globalAlpha = opacity;
 
-    const linesToDraw = Math.min(count, numLinesToDraw, numPoints);
+    const linesToDraw = Math.min(count, numLinesToDraw, sourcePixelCoords.length);
     for (let i = 0; i < linesToDraw; i++) {
       const [sx, sy] = sourcePixelCoords[i];
       // Connect to random target from full target pool
@@ -445,11 +462,16 @@
   }
 
   function drawInducedCouplingLines(progress = 1) {
+    // Guard against empty arrays
+    if (!sourcePixelCoords.length || !generatedEndpointPixelCoords.length) {
+      return;
+    }
+
     ctx.strokeStyle = couplingLineColor;
     ctx.lineWidth = couplingLineWidth;
     ctx.globalAlpha = couplingLineOpacity;
 
-    const linesToDraw = Math.min(numLinesToDraw, numPoints, generatedEndpointPixelCoords.length);
+    const linesToDraw = Math.min(numLinesToDraw, sourcePixelCoords.length, generatedEndpointPixelCoords.length);
     for (let i = 0; i < linesToDraw; i++) {
       // Direct pairing: source[i] -> generated endpoint[i]
       const [sx, sy] = sourcePixelCoords[i];
@@ -562,11 +584,13 @@
     generatedTrajectories.length > 0 &&
     !initialized
   ) {
-    runInitialComputation();
-    initialized = true;
-    setupTimeline();
-    draw(timeline!.initialState);
-    startAnimation();
+    const success = runInitialComputation();
+    if (success) {
+      initialized = true;
+      setupTimeline();
+      draw(timeline!.initialState);
+      startAnimation();
+    }
   }
 
   // Handle visibility changes
