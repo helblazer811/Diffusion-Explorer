@@ -76,7 +76,8 @@ async function handleSamplingRequest(
   const modelJSONPath = data.modelJSONPath;
   const modelConfig = data.modelConfig;
   const numberOfSteps = data.numberOfSteps;
-  const options = data.options || {};
+  // Default to DDIM scheduler for faster sampling
+  const options = { scheduler: 'ddim' as const, ...data.options };
   const streaming = data.streaming || false;
 
   // Create perStepCallback if streaming is enabled
