@@ -18,6 +18,9 @@ export {
 export { default as TableOfContents } from './components/TableOfContents.svelte';
 export { default as Figure } from './components/Figure.svelte';
 export { default as DoubleFigure } from './components/DoubleFigure.svelte';
+export { default as TopNav } from './components/TopNav.svelte';
+export { default as ArticleHeader } from './components/ArticleHeader.svelte';
+export { default as PageContainer } from './components/PageContainer.svelte';
 
 // UI Controls
 export { default as PlayButton } from './components/PlayButton.svelte';

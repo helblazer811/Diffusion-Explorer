@@ -1,8 +1,9 @@
-// Core exports
-export * from './flow_matching';
-export * from './schedulers';
+// Shared exports
 export * from './interfaces';
 export * from './utils';
 
-// Unified client (recommended)
-export * from './flow_model_client';
+// Flow Matching module
+export * from './flow_matching/index';
+
+// Diffusion module
+export * from './diffusion/index';

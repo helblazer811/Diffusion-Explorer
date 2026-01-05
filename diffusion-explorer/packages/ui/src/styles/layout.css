@@ -1,0 +1,195 @@
+/* ==========================================================================
+   Page Layout
+   ========================================================================== */
+
+.page-container {
+  max-width: var(--page-max-width);
+  margin: 0 auto;
+  padding: var(--page-padding);
+}
+
+.page-container ol,
+.page-container ul {
+  font-size: 1.2rem;
+  line-height: 1.6em;
+  margin: 1rem 0;
+}
+
+.page-container ol li,
+.page-container ul li {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ==========================================================================
+   Top Navigation
+   ========================================================================== */
+
+.top-nav {
+  max-width: var(--page-max-width);
+  margin: 0 auto;
+  padding: 1rem var(--page-padding);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.top-nav .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted-color);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.top-nav .nav-link:hover {
+  color: var(--link-color);
+}
+
+/* ==========================================================================
+   Article Header
+   ========================================================================== */
+
+.title-header-wrapper {
+  width: fit-content;
+}
+
+.article-title {
+  font-size: 2.7em;
+  margin-bottom: 0;
+}
+
+.article-subtitle {
+  font-size: 1.4em;
+  font-weight: normal;
+  color: var(--muted-color);
+  margin-top: 0.3em;
+  margin-bottom: 0;
+  font-style: italic;
+}
+
+.byline-dateline-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 1em;
+  margin-bottom: 2em;
+}
+
+.byline {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.dateline {
+  margin: 0;
+  color: var(--date-color);
+  font-weight: normal;
+  font-size: 1.1rem;
+}
+
+/* ==========================================================================
+   Article Sections
+   ========================================================================== */
+
+.section-heading {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--divider-color);
+  margin: 2rem 0;
+}
+
+/* ==========================================================================
+   Figures
+   ========================================================================== */
+
+.figure-number {
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   References & Citations
+   ========================================================================== */
+
+.acknowledgements p {
+  font-size: 1rem;
+  line-height: 1.4rem;
+}
+
+.references ol {
+  padding-left: 1.5rem;
+  font-size: 1rem;
+  line-height: 1.6rem;
+}
+
+.references li {
+  margin-bottom: 1rem;
+}
+
+.cite-section p {
+  font-size: 1rem;
+  line-height: 1.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.cite-section pre {
+  background: #f5f5f5;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.cite-section code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
+@media (max-width: 600px) {
+  .page-container {
+    padding: 0 var(--page-padding-mobile) var(--page-padding);
+  }
+
+  .top-nav {
+    padding: var(--page-padding-mobile);
+  }
+
+  .byline-dateline-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25em;
+  }
+
+  .katex {
+    font-size: 0.85em;
+  }
+
+  .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+}
+
+/* Adjust layout when TOC sidebar is visible */
+@media (min-width: 1200px) {
+  .top-nav {
+    margin-left: max(280px, calc((100vw - 900px) / 2));
+  }
+
+  .page-container {
+    margin-left: max(280px, calc((100vw - 900px) / 2));
+  }
+}
