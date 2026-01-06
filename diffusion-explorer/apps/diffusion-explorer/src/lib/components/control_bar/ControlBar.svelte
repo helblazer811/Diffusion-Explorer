@@ -3,8 +3,7 @@
     import { getContext } from 'svelte';
     import { derived } from 'svelte/store';
     // Import components
-    import ToggleButton from '$lib/components/primitives/ToggleButton.svelte';
-    import DropDown from '$lib/components/primitives/DropDown.svelte';
+    import { DropDown, IconToggleButton as ToggleButton } from '@diffusion-explorer/ui';
     import MiniDistribution from '$lib/components/control_bar/MiniDistribution.svelte';
     // Import settings
     import *  as settings from '$lib/settings';
@@ -22,10 +21,10 @@
     } = pageState;
     
     const plotTypeIcons = {
-        "Scatter": `${base}/StyleIcons/PointsIcon.svg`,
-        "Contour": `${base}/StyleIcons/ContourIcon.svg`,
-        "Mesh": `${base}/StyleIcons/MeshIcon.svg`,
-        "Path": `${base}/StyleIcons/PathIcon.svg`
+        "Scatter": `${base}/icons/PointsIcon.svg`,
+        "Contour": `${base}/icons/ContourIcon.svg`,
+        "Mesh": `${base}/icons/MeshIcon.svg`,
+        "Path": `${base}/icons/PathIcon.svg`
     };
 
     function padEpochValue(value) {
@@ -47,6 +46,7 @@
         width: 100%;
         background-color: rgb(243, 243, 243);
         position: relative;
+        z-index: 10;
         box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 4px 0px;
         display: flex;
         justify-content: center;

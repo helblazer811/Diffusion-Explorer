@@ -72,7 +72,7 @@
         color: #b0b0b0;
         pointer-events: none;
     }
-    
+
 </style>
 
 <div class="dropdown">

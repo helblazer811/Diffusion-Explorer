@@ -184,12 +184,24 @@ export const contourPlotSettings: {
     borderWidth: number;
     bandwidth: number;
     contourLevels: number;
+    // Colors for different distribution types
+    sourceColor: string;
+    targetColor: string;
+    currentColor: string;
+    trainingColor: string;
 } = {
-    opacity: 0.4,
+    opacity: 0.2,
     showBorder: false,
+    fillColor: "#1983FF",
+    borderColor: "#333",
     borderWidth: 1,
-    bandwidth: 30,
+    bandwidth: 5,  // ~5% of grid size (100), for detailed contours
     contourLevels: 4,
+    // Distribution-specific colors (hex) - use with opacity separately
+    sourceColor: "#1983FF",      // Blue
+    targetColor: "#1983FF",      // Blue
+    currentColor: "#FF6400",     // Orange
+    trainingColor: "#FF6400",    // Orange
 };
 
 export const scatterPlotSettings: {
@@ -208,4 +220,14 @@ export const meshPlotSettings: {
 } = {
     gridResolution: 15,
     gridColor: "rgba(35, 35, 35, 1.0)",
+};
+
+export const titleSettings: {
+    fontSize: number;
+    color: string;
+    fontFamily: string;
+} = {
+    fontSize: 28,
+    color: "#555555",
+    fontFamily: "Inter, sans-serif",
 };
