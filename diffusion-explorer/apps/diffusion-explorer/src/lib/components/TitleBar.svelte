@@ -114,6 +114,6 @@
         </h1>
     </div>
     <a href="https://github.com/helblazer811/Diffusion-Explorer" id="github-logo" target="_blank">
-        <img src="{base}/github-logo.svg" alt="GitHub Logo"/>
+        <img src="{base}/icons/github-logo.svg" alt="GitHub Logo"/>
     </a>
 </div>

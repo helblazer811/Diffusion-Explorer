@@ -151,7 +151,7 @@
     on:click={handleClick}
 >
     {#if showBrush}
-        <img src="{base}/StyleIcons/BrushIcon.svg" alt="Brush" />
+        <img src="{base}/icons/BrushIcon.svg" alt="Brush" />
     {:else}
         <svg 
             bind:this={svgElement}

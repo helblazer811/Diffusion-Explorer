@@ -1,131 +1,195 @@
 <script lang="ts">
-    import * as d3 from 'd3';
-    import { getContext } from 'svelte';
+    import { getContext, onDestroy } from 'svelte';
+    import { interfaceSettings, contourPlotSettings } from '$lib/settings';
+    import { computeContours, plotContours } from '@diffusion-explorer/ui';
 
-    import { interfaceSettings, domainRange } from '$lib/settings';
-    
-    const pageState = getContext("pageState");
+    const pageState = getContext<any>("pageState");
     const { targetDistributionSamples, isEditing } = pageState;
 
-    // import { convertDataToDisplayCoordinateFrame } from '$lib/components/display_area/plots/utils';
-    
-    export let svgElement: SVGSVGElement;
-    export let drawTimeout: number = 50; // Number of milliseconds to wait before drawing the next point when mouse holding
-    export let active: boolean = false;
+    export let drawTimeout: number = 50;
 
-    let initialized = false; // Flag to indicate if the edit area has been initialized
-    let drawInterval;
-    let groupElement: SVGGElement; // Group element for the distribution
+    // Canvas dimensions (matches distribution area)
+    const width = interfaceSettings.distributionWidth;
+    const height = interfaceSettings.distributionHeight;
 
-    // Change the visibility of the distribution edit window based on the active state
-    $ : if (active && initialized) {
-        groupElement.style.visibility = "visible";
-    } else if (!active && initialized) {
-        groupElement.style.visibility = "hidden";
+    // Bounding box dimensions (80% of distribution area, centered)
+    const boxWidth = width * 0.8;
+    const boxHeight = height * 0.8;
+    const boxX = (width - boxWidth) / 2;
+    const boxY = (height - boxHeight) / 2;
+
+    // Canvas for rendering contours
+    let canvas: HTMLCanvasElement;
+    let ctx: CanvasRenderingContext2D | null = null;
+    let dpr = 1;
+
+    let isDrawing = false;
+    let lastPointer = [0, 0];
+    let drawInterval: ReturnType<typeof setInterval> | null = null;
+
+    // Contour options for local coordinate system (0-500)
+    const contourOptions = {
+        gridSize: 100,
+        bandwidth: contourPlotSettings.bandwidth,
+        thresholds: Array.from({ length: contourPlotSettings.contourLevels }, (_, i) =>
+            (i + 1) / (contourPlotSettings.contourLevels + 1)
+        ),
+        domain: [0, width, 0, height] as [number, number, number, number],
+    };
+
+    // Identity scale since we're working in local pixel coords
+    const identityScale = (v: number) => v;
+
+    // Initialize canvas context with DPI scaling when canvas becomes available
+    $: if (canvas && !ctx) {
+        dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
     }
 
-    $ : if (svgElement && !initialized) {
-        initialized = true; // Set the flag to true to prevent re-initialization
-        const svg = d3.select(svgElement);
-        // Create a group for the distribution edit window
-        const groupD3Element = svg.append('g')
-            .attr('id', 'distribution-edit-window')
-            // .style('display', 'none') // Initially hidden
-            .style('visibility', 'hidden') // Initially hidden
-        groupElement = groupD3Element.node();
-        // Compute location of bounding box 
-        const time = 1.0; // Time of target distribution
-        const width = interfaceSettings.distributionWidth * 0.8;
-        const height = interfaceSettings.distributionHeight * 0.8;
-        const xCoordinate = time * (interfaceSettings.displayAreaWidth - interfaceSettings.distributionWidth) + (interfaceSettings.distributionWidth - width) / 2;
-        const yCoordinate = (interfaceSettings.displayAreaHeight - height) / 2;
-        // Draw a rectangle in the svg at the given location
-        groupD3Element.append('rect')
-            .attr('x', xCoordinate)
-            .attr('y', yCoordinate)
-            .attr('width', width)
-            .attr('height', height)
-            .attr('fill', 'transparent')
-            .attr('stroke', 'rgb(0, 0, 0)')
-            .attr('stroke-opacity', 0.2)
-            .attr('stroke-width', 3)
-            // .attr('stroke-dasharray', '5, 5')
-            .attr('rx', 5) // Rounded corners
-            .attr('ry', 5);
-
-        // // Add styling for when hovering
-        // groupD3Element.append('style')
-        //     .text(`
-        //         #distribution-edit-window:hover rect {
-        //             stroke: rgba(0, 0, 0, 0.0);
-        //         }
-        //     `);
-
-        // Add a label centered above the rectangle
-        groupD3Element.append('text')
-            .attr('x', xCoordinate + width / 2)
-            .attr('y', yCoordinate + height / 2) // Adjust the y position to be above the rectangle
-            .attr('text-anchor', 'middle')
-            .attr('font-size', '24px')
-            .attr('fill', '#aaaaaa')
-            .text('Draw a Distribution Here');
-
-        // When mouse is in the rectangle, hide the label
-        groupD3Element.append('style')
-            .text(`
-                #distribution-edit-window:hover text {
-                    visibility: hidden;
-                }
-            `);
-
-        let isDrawing = false;
-        let lastPointer = [0, 0];
-
-        groupD3Element
-            .on('mousedown', function (event) {
-                const [x, y] = d3.pointer(event);
-                if (x > xCoordinate && x < xCoordinate + width && y > yCoordinate && y < yCoordinate + height) {
-                    isDrawing = true;
-                    lastPointer = [x, y];
-
-                    drawInterval = setInterval(() => {
-                        const [currX, currY] = lastPointer;
-                        if (currX > xCoordinate && currX < xCoordinate + width && currY > yCoordinate && currY < yCoordinate + height) {
-                            const sigma = 5.0;
-                            let newSamples = [];
-                            for (let i = 0; i < 10; i++) {
-                                // Sample from a normal distribution around the current mouse position
-                                // with a standard deviation of sigma
-                                const sampleX = d3.randomNormal(currX, sigma)();
-                                const sampleY = d3.randomNormal(currY, sigma)();
-                                // Clip the sample to the bounding box
-                                const clippedSample = [
-                                    Math.max(xCoordinate, Math.min(sampleX, xCoordinate + width)),
-                                    Math.max(yCoordinate, Math.min(sampleY, yCoordinate + height))
-                                ];
-                                newSamples.push(clippedSample);
-                            }
-                            // Convert the sample to data coordinates
-                            targetDistributionSamples.update(samples => {
-                                return [...samples, ...newSamples];
-                            });
-                        }
-                    }, drawTimeout);
-                }
-            })
-            .on('mousemove', function (event) {
-                if (isDrawing) {
-                    lastPointer = d3.pointer(event, svgElement);
-                }
-            })
-            .on('mouseup', () => {
-                isDrawing = false;
-                clearInterval(drawInterval);
-            })
-            .on('mouseleave', () => {
-                isDrawing = false;
-                clearInterval(drawInterval);
-            });
+    // Draw contours when samples change
+    $: if (ctx && $targetDistributionSamples && $targetDistributionSamples.length > 0) {
+        drawContours($targetDistributionSamples);
     }
 
+    // Clear canvas when samples are empty
+    $: if (ctx && (!$targetDistributionSamples || $targetDistributionSamples.length === 0)) {
+        ctx.clearRect(0, 0, width, height);
+    }
+
+    function drawContours(samples: number[][]) {
+        if (!ctx || samples.length === 0) return;
+
+        ctx.clearRect(0, 0, width, height);
+        const contours = computeContours(samples, contourOptions);
+
+        plotContours(ctx, contours, {
+            xScale: identityScale,
+            yScale: identityScale,
+            fillColor: contourPlotSettings.targetColor,
+            fill: true,
+            stroke: false,
+            opacity: contourPlotSettings.opacity,
+        });
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+        const svg = event.currentTarget as SVGSVGElement;
+        const pt = svg.createSVGPoint();
+        pt.x = event.clientX;
+        pt.y = event.clientY;
+        const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+
+        const x = svgP.x;
+        const y = svgP.y;
+
+        if (x > boxX && x < boxX + boxWidth && y > boxY && y < boxY + boxHeight) {
+            isDrawing = true;
+            lastPointer = [x, y];
+            (event.currentTarget as SVGSVGElement).setPointerCapture(event.pointerId);
+
+            drawInterval = setInterval(() => {
+                const [currX, currY] = lastPointer;
+                if (currX > boxX && currX < boxX + boxWidth && currY > boxY && currY < boxY + boxHeight) {
+                    const sigma = 5.0;
+                    let newSamples: number[][] = [];
+                    for (let i = 0; i < 10; i++) {
+                        const sampleX = currX + (Math.random() - 0.5) * 2 * sigma * 1.7;
+                        const sampleY = currY + (Math.random() - 0.5) * 2 * sigma * 1.7;
+                        // Keep samples in local coordinates (0-500)
+                        const clippedSample = [
+                            Math.max(boxX, Math.min(sampleX, boxX + boxWidth)),
+                            Math.max(boxY, Math.min(sampleY, boxY + boxHeight))
+                        ];
+                        newSamples.push(clippedSample);
+                    }
+                    targetDistributionSamples.update((samples: number[][]) => [...samples, ...newSamples]);
+                }
+            }, drawTimeout);
+        }
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+        if (isDrawing) {
+            const svg = event.currentTarget as SVGSVGElement;
+            const pt = svg.createSVGPoint();
+            pt.x = event.clientX;
+            pt.y = event.clientY;
+            const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+            lastPointer = [svgP.x, svgP.y];
+        }
+    }
+
+    function handlePointerEnd() {
+        isDrawing = false;
+        if (drawInterval) {
+            clearInterval(drawInterval);
+            drawInterval = null;
+        }
+    }
+
+    onDestroy(() => {
+        if (drawInterval) {
+            clearInterval(drawInterval);
+        }
+    });
 </script>
+
+<style>
+    .edit-box {
+        fill: transparent;
+        stroke: rgb(0, 0, 0);
+        stroke-opacity: 0.2;
+        stroke-width: 3;
+    }
+
+    .edit-label {
+        font-size: 24px;
+        fill: #aaaaaa;
+        user-select: none;
+        pointer-events: none;
+    }
+
+    .svg-overlay:hover .edit-label {
+        visibility: hidden;
+    }
+</style>
+
+{#if $isEditing}
+    <canvas
+        bind:this={canvas}
+        class="edit-canvas target-overlay"
+    ></canvas>
+    <svg
+        class="svg-overlay target-overlay"
+        viewBox="0 0 {width} {height}"
+        on:pointerdown={handlePointerDown}
+        on:pointermove={handlePointerMove}
+        on:pointerup={handlePointerEnd}
+        on:pointercancel={handlePointerEnd}
+        on:pointerleave={handlePointerEnd}
+    >
+        <rect
+            class="edit-box"
+            x={boxX}
+            y={boxY}
+            width={boxWidth}
+            height={boxHeight}
+            rx="5"
+            ry="5"
+        />
+        <text
+            class="edit-label"
+            x={boxX + boxWidth / 2}
+            y={boxY + boxHeight / 2}
+            text-anchor="middle"
+            dominant-baseline="middle"
+        >
+            Draw a Distribution Here
+        </text>
+    </svg>
+{/if}
