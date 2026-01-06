@@ -9,10 +9,10 @@
     // Import state
     import { getContext } from 'svelte';
     import { fill } from '@tensorflow/tfjs-core';
-    
+
     const pageState = getContext("pageState");
     const { trainingObjective } = pageState;
-    
+
     // Props
     export let svgElement; // Shared SVG element for all distributions
     export let time: number = 0.0; // Default value for the time
@@ -30,6 +30,9 @@
     export let borderColor: string = "#7b7b7b"; // Border color for the contour
     // TODO figure out how to take default settings but override them if custom ones are provided
     export let scatterPlotMaximumPoints: number = 300; // Maximum number of points to plot
+    // Props for PathPlot worker-based sampling
+    export let modelPath: string = ''; // Path to current model JSON
+    export let modelConfig: object = { dim: 2, hidden: 64 }; // Model configuration
 
     let groupElement: SVGGElement; // Group element for the distribution
 
@@ -84,6 +87,8 @@
         isActive={activePlotTypes.includes("Path")}
         isEnabled={trainingObjectiveToDisplayOptions[$trainingObjective]["Plot Types"].includes("Path")}
         distributionId={distributionId}
-        allTimeGridSamples={allTimeSamples}
+        modelPath={modelPath}
+        trainingObjective={$trainingObjective}
+        modelConfig={modelConfig}
     />
 </g>
