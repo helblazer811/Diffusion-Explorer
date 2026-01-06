@@ -1,9 +1,10 @@
 <script lang="ts">
     import { onMount, getContext } from 'svelte';
+    import { base } from '$app/paths';
 
     const pageState = getContext("pageState");
-    const { 
-        currentTime, 
+    const {
+        currentTime,
         sourceDistributionSamples,
         targetDistributionSamples,
         currentDistributionSamples,
@@ -13,9 +14,11 @@
         distributionVisiblity,
         intermediateTrainingSamples,
         isEditing,
+        trainingObjective,
+        datasetName,
     } = pageState;
 
-    import { interfaceSettings } from '$lib/settings';
+    import { interfaceSettings, pretrainedModelPaths, trainingObjectiveToModelConfig } from '$lib/settings';
 
     // Import components
     import Distribution from '$lib/components/display_area/Distribution.svelte';
@@ -25,6 +28,12 @@
     let sharedSVGElement: SVGSVGElement; // Shared SVG element for all distributions
 
     export let allTimeGridSamples; // All time grid samples for path plotting
+
+    // Compute model path for PathPlot
+    $: modelPath = pretrainedModelPaths[$trainingObjective]?.[$datasetName]
+        ? base + pretrainedModelPaths[$trainingObjective][$datasetName]
+        : '';
+    $: modelConfig = trainingObjectiveToModelConfig[$trainingObjective] || { dim: 2, hidden: 64 };
 
     // If the currentTime changes then update the current distribution samples in the UI state
     $: if ($currentTime !== undefined && $allTimeSamples && $allTimeSamples.length > 0) {
@@ -114,6 +123,8 @@
                 showBorder={false}
                 distributionId="current"
                 activePlotTypes={$activePlotTypes}
+                modelPath={modelPath}
+                modelConfig={modelConfig}
             />
             <Distribution
                 svgElement={sharedSVGElement}
