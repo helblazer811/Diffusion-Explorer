@@ -4,7 +4,7 @@
     import { derived } from 'svelte/store';
     // Import components
     import { DropDown, IconToggleButton as ToggleButton } from '@diffusion-explorer/ui';
-    import MiniDistribution from '$lib/components/control_bar/MiniDistribution.svelte';
+    import MiniDistribution from '$lib/components/MiniDistribution.svelte';
     // Import settings
     import *  as settings from '$lib/settings';
     

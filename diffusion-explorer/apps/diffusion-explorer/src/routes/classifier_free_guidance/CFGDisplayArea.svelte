@@ -1,7 +1,7 @@
 <script lang="ts">
     // Import components
     import Distribution from '$lib/components/display_area/Distribution.svelte';
-    import DistributionEditWindow from '$lib/components/display_area/DistributionEditWindow.svelte';
+    import DistributionEditWindow from '$lib/components/DistributionEditWindow.svelte';
     import ContourPlot from '$lib/components/display_area/plots/ContourPlot.svelte';
     import MultiClassDistribution from './MultiClassDistribution.svelte';
     import CFGVectors from './CFGVectors.svelte';

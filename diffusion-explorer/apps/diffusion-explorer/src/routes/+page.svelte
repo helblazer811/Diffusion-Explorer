@@ -4,8 +4,8 @@
   import { createMainState } from "$lib/state/main/state";
   import { createMainStateHandlers } from "$lib/state/main/actions";
   import TitleBar from "$lib/components/TitleBar.svelte";
-  import ControlBar from "$lib/components/control_bar/ControlBar.svelte";
-  import DistributionEditWindow from "$lib/components/display_area/DistributionEditWindow.svelte";
+  import ControlBar from "$lib/components/ControlBar.svelte";
+  import DistributionEditWindow from "$lib/components/DistributionEditWindow.svelte";
   import {
     TimeSlider,
     Timeline,
@@ -667,6 +667,17 @@
     state_handlers.stopTraining();
   }
 
+  // Redraw when intermediate training samples update (timeline is stopped during training)
+  $: if ($intermediateTrainingSamples && timeline) {
+    drawForeground(timeline.state);
+  }
+
+  // Trigger background redraw when visibility changes
+  $: if ($distributionVisiblity) {
+    bgNeedsRedraw = true;
+    if (timeline) drawForeground(timeline.state);
+  }
+
   // Editing start/stop
   $: if ($isEditing && !editingInitiated) {
     editingInitiated = true;
@@ -799,11 +810,13 @@
 <div class="container">
   <TitleBar />
   <ControlBar />
-  <!-- Distribution titles -->
-  <div class="titles-row">
-    <h1 class="distribution-title source-title">Source Distribution</h1>
-    <h1 class="distribution-title target-title">Target Distribution</h1>
-  </div>
+  <!-- Distribution titles (hidden during training) -->
+  {#if !$isTraining}
+    <div class="titles-row">
+      <h1 class="distribution-title source-title">Source Distribution</h1>
+      <h1 class="distribution-title target-title">Target Distribution</h1>
+    </div>
+  {/if}
   <div class="display-area">
     <!-- Background canvas: static source/target distributions -->
     <canvas use:bgCanvas2d.bindCanvas></canvas>
