@@ -1,12 +1,14 @@
 <script lang="ts">
     import { getContext, onDestroy } from 'svelte';
-    import { interfaceSettings, contourPlotSettings } from '$lib/settings';
-    import { computeContours, plotContours } from '@diffusion-explorer/ui';
+    import { interfaceSettings, contourPlotSettings, scatterPlotSettings } from '$lib/settings';
+    import { computeContours, plotContours, drawScatterPlot } from '@diffusion-explorer/ui';
 
     const pageState = getContext<any>("pageState");
     const { targetDistributionSamples, isEditing } = pageState;
 
     export let drawTimeout: number = 50;
+    export let showScatter: boolean = true;
+    export let showContour: boolean = true;
 
     // Canvas dimensions (matches distribution area)
     const width = interfaceSettings.distributionWidth;
@@ -51,9 +53,9 @@
         }
     }
 
-    // Draw contours when samples change
+    // Redraw when samples or toggle states change
     $: if (ctx && $targetDistributionSamples && $targetDistributionSamples.length > 0) {
-        drawContours($targetDistributionSamples);
+        draw($targetDistributionSamples, showScatter, showContour);
     }
 
     // Clear canvas when samples are empty
@@ -61,20 +63,34 @@
         ctx.clearRect(0, 0, width, height);
     }
 
-    function drawContours(samples: number[][]) {
+    function draw(samples: number[][], scatter: boolean, contour: boolean) {
         if (!ctx || samples.length === 0) return;
 
         ctx.clearRect(0, 0, width, height);
-        const contours = computeContours(samples, contourOptions);
 
-        plotContours(ctx, contours, {
-            xScale: identityScale,
-            yScale: identityScale,
-            fillColor: contourPlotSettings.targetColor,
-            fill: true,
-            stroke: false,
-            opacity: contourPlotSettings.opacity,
-        });
+        // Draw contour plot if enabled
+        if (contour) {
+            const contours = computeContours(samples, contourOptions);
+            plotContours(ctx, contours, {
+                xScale: identityScale,
+                yScale: identityScale,
+                fillColor: contourPlotSettings.targetColor,
+                fill: true,
+                stroke: false,
+                opacity: contourPlotSettings.opacity,
+            });
+        }
+
+        // Draw scatter plot if enabled
+        if (scatter) {
+            drawScatterPlot(
+                ctx,
+                samples,
+                scatterPlotSettings.pointRadius,
+                contourPlotSettings.targetColor,
+                0.3
+            );
+        }
     }
 
     function handlePointerDown(event: PointerEvent) {
