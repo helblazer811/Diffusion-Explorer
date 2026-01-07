@@ -18,9 +18,12 @@ TODO:
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
+
   // Caption slot (passed as default children)
   export let children = undefined;
-  $: caption = children;
 
   // Data props (passed from page)
   export let sourceDistributionSamples = [];
@@ -61,6 +64,12 @@ TODO:
   // Background visibility
   export let backgroundVisible = false;
 
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
+  $: caption = children;
+
   // Canvas state
   let canvas;
   let ctx;
@@ -94,57 +103,9 @@ TODO:
   let client = null;
   let activeRequestId = null;
 
-  // Pause animation when figure goes off-screen
-  $: if (figureIsActive !== undefined && isInitialized) {
-    handleVisibilityChange($figureIsActive);
-  }
-
-  function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
-      wasPlayingBeforeHidden = true;
-      isPlaying = false;
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      isPlaying = true;
-    }
-  }
-
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-  }
-
-  function handleSliderInput() {
-    lastTimestamp = null;
-    if (isPaused) {
-      isPaused = false;
-      pauseStartTime = null;
-    }
-  }
-
-  // Canvas initialization
-  function initializeCanvas() {
-    if (!canvas) return;
-    dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
-  }
-
-  // Pre-compute scatter coordinates
-  function precomputeScatterCoords() {
-    if (!scales) return;
-
-    sourcePixelCoords = sourceDistributionSamples.map((p) => [
-      scales.sourceCenterPixelX + (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
-      scales.yScale(p[1]),
-    ]);
-
-    targetPixelCoords = targetDistributionSamples.map((p) => [
-      scales.targetCenterPixelX + (p[0] - scales.targetMeanX) * scales.xScaleFactor,
-      scales.yScale(p[1]),
-    ]);
-  }
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   // Reshape flat trajectory data to grid structure
   // Input: [timesteps, gridResolution², 2]
@@ -197,6 +158,35 @@ TODO:
     return { xMin, xMax, yMin, yMax };
   }
 
+  // Pre-compute scatter coordinates
+  function precomputeScatterCoords() {
+    if (!scales) return;
+
+    sourcePixelCoords = sourceDistributionSamples.map((p) => [
+      scales.sourceCenterPixelX + (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
+      scales.yScale(p[1]),
+    ]);
+
+    targetPixelCoords = targetDistributionSamples.map((p) => [
+      scales.targetCenterPixelX + (p[0] - scales.targetMeanX) * scales.xScaleFactor,
+      scales.yScale(p[1]),
+    ]);
+  }
+
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  // Canvas initialization
+  function initializeCanvas() {
+    if (!canvas) return;
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+  }
+
   // Sample grid trajectories from model
   async function sampleGridTrajectories() {
     if (!client) return;
@@ -223,60 +213,42 @@ TODO:
     }
   }
 
-  // Main draw function
-  function draw() {
-    if (!ctx || !isInitialized) return;
-    ctx.clearRect(0, 0, width, height);
+  function initializeVisualization() {
+    if (!canvas) return;
+    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
-    // Draw text labels
-    const textY = marginHeight / 2;
-    drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
-      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
-      color: labelColor,
-      align: "center",
-      baseline: "top",
-    });
-    drawText(ctx, targetLabelText, scales.targetCenterPixelX, textY, {
-      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
-      color: labelColor,
-      align: "center",
-      baseline: "top",
+    // Create scales for horizontal layout
+    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
+      width,
+      height,
+      marginWidth,
+      marginHeight,
+      sourceCenterX: settings.stylingSettings.layout.sourceCenterX,
+      targetCenterX: settings.stylingSettings.layout.targetCenterX,
+      yShiftFactor: settings.stylingSettings.scatterPlot.yShiftFactor,
     });
 
-    // Draw scatter plots
-    drawScatterPlot(ctx, sourcePixelCoords, scatterPointRadius, scatterPointColor, scatterPointOpacity);
-    drawScatterPlot(ctx, targetPixelCoords, scatterPointRadius, scatterPointColor, scatterPointOpacity);
+    // Initialize canvas
+    initializeCanvas();
 
-    // Draw mesh grid if data is ready
-    if (allGridStates.length > 0) {
-      // Get current grid state based on animation time
-      const timestepIndex = Math.min(
-        Math.floor(time * (allGridStates.length - 1)),
-        allGridStates.length - 1
-      );
-      const currentGrid = allGridStates[timestepIndex];
+    // Pre-compute scatter coordinates
+    precomputeScatterCoords();
 
-      // Transform to pixel coordinates with horizontal interpolation
-      const pixelGrid = transformGridToPixels(currentGrid, time);
+    // Create model client and start sampling
+    client = new FlowModelClient(
+      settings.samplingWorkerUrl,
+      settings.flowMatchingModelPath,
+      "Flow Matching",
+      settings.trainingSettings.modelConfig
+    );
 
-      // Draw mesh grid
-      plotMeshGrid(ctx, pixelGrid, {
-        color: meshGridColor,
-        opacity: meshGridOpacity,
-        strokeWidth: meshGridStrokeWidth
-      });
-    } else if (isLoading) {
-      // Show loading indicator
-      drawText(ctx, "Loading model...", width / 2, height / 2, {
-        font: "16px Helvetica, Arial, sans-serif",
-        color: "#999",
-        align: "center",
-        baseline: "middle",
-      });
-    }
+    sampleGridTrajectories();
   }
 
-  // Animation
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
   function animate(timestamp) {
     if (!isPlaying) {
       animationFrameId = null;
@@ -335,37 +307,106 @@ TODO:
     }
   }
 
-  function initializeVisualization() {
-    if (!canvas) return;
-    if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
 
-    // Create scales for horizontal layout
-    scales = createSourceTargetScales(sourceDistributionSamples, targetDistributionSamples, {
-      width,
-      height,
-      marginWidth,
-      marginHeight,
-      sourceCenterX: settings.stylingSettings.layout.sourceCenterX,
-      targetCenterX: settings.stylingSettings.layout.targetCenterX,
-      yShiftFactor: settings.stylingSettings.scatterPlot.yShiftFactor,
+  function draw() {
+    if (!ctx || !isInitialized) return;
+    ctx.clearRect(0, 0, width, height);
+
+    // --- Static Background ---
+    // Draw text labels
+    const textY = marginHeight / 2;
+    drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
+      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
+      color: labelColor,
+      align: "center",
+      baseline: "top",
+    });
+    drawText(ctx, targetLabelText, scales.targetCenterPixelX, textY, {
+      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
+      color: labelColor,
+      align: "center",
+      baseline: "top",
     });
 
-    // Initialize canvas
-    initializeCanvas();
+    // Draw scatter plots
+    drawScatterPlot(ctx, sourcePixelCoords, scatterPointRadius, scatterPointColor, scatterPointOpacity);
+    drawScatterPlot(ctx, targetPixelCoords, scatterPointRadius, scatterPointColor, scatterPointOpacity);
 
-    // Pre-compute scatter coordinates
-    precomputeScatterCoords();
+    // --- Dynamic Foreground ---
+    // Draw mesh grid if data is ready
+    if (allGridStates.length > 0) {
+      // Get current grid state based on animation time
+      const timestepIndex = Math.min(
+        Math.floor(time * (allGridStates.length - 1)),
+        allGridStates.length - 1
+      );
+      const currentGrid = allGridStates[timestepIndex];
 
-    // Create model client and start sampling
-    client = new FlowModelClient(
-      settings.samplingWorkerUrl,
-      settings.flowMatchingModelPath,
-      "Flow Matching",
-      settings.trainingSettings.modelConfig
-    );
+      // Transform to pixel coordinates with horizontal interpolation
+      const pixelGrid = transformGridToPixels(currentGrid, time);
 
-    sampleGridTrajectories();
+      // Draw mesh grid
+      plotMeshGrid(ctx, pixelGrid, {
+        color: meshGridColor,
+        opacity: meshGridOpacity,
+        strokeWidth: meshGridStrokeWidth
+      });
+    } else if (isLoading) {
+      // Show loading indicator
+      drawText(ctx, "Loading model...", width / 2, height / 2, {
+        font: "16px Helvetica, Arial, sans-serif",
+        color: "#999",
+        align: "center",
+        baseline: "middle",
+      });
+    }
   }
+
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
+
+  function handleVisibilityChange(isActive) {
+    if (!isActive && isPlaying) {
+      wasPlayingBeforeHidden = true;
+      isPlaying = false;
+    } else if (isActive && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
+      isPlaying = true;
+    }
+  }
+
+  function toggleAnimation() {
+    isPlaying = !isPlaying;
+  }
+
+  function handleSliderInput() {
+    lastTimestamp = null;
+    if (isPaused) {
+      isPaused = false;
+      pauseStartTime = null;
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
+  onDestroy(() => {
+    stopAnimation();
+
+    // Cancel any pending worker request to prevent orphaned promises
+    if (activeRequestId && client) {
+      client.stopRequest(activeRequestId);
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
 
   // Reactive initialization
   $: if (
@@ -378,6 +419,11 @@ TODO:
     isInitialized = true;
     draw();
     if (isPlaying) startAnimation();
+  }
+
+  // Pause animation when figure goes off-screen
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
   }
 
   // Handle play/pause changes
@@ -398,15 +444,6 @@ TODO:
   $: if (isInitialized && allGridStates.length > 0) {
     draw();
   }
-
-  onDestroy(() => {
-    stopAnimation();
-
-    // Cancel any pending worker request to prevent orphaned promises
-    if (activeRequestId && client) {
-      client.stopRequest(activeRequestId);
-    }
-  });
 </script>
 
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
