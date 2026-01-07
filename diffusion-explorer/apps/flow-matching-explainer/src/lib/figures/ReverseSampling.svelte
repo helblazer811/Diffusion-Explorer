@@ -5,22 +5,38 @@
   import { settings } from "$lib/settings";
   import { base } from "$app/paths";
 
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
+
   // FlowModelClient instance (passed from parent or created internally)
   export let flowMatchingClient = null;
 
+  // Data props
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
+
+  // Animation
   export let animationDuration = 6000;
   export let playingByDefault = true;
   export let pauseBeforeRestart = 1000;
+
+  // Layout
   export let width = 750;
   export let height = 375;
   export let marginWidth = 50;
   export let marginHeight = 20;
+
+  // Sampling
   export let numTrajectorySamples = null; // Use settings if not provided
 
   // Caption slot (passed as default children)
   export let children = undefined;
+
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
   $: caption = children;
 
   // Effective number of samples
@@ -59,6 +75,10 @@
   // Derived values
   $: numTimeSteps = allTimeSamples?.length || 1;
   $: numSegments = numTimeSteps - 1;
+
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
 
   // Helper to get random subset of indices
   function getRandomSubsetIndices(totalLength, subsetSize) {
@@ -124,6 +144,23 @@
     });
   }
 
+  // Download data as JSON for caching
+  function downloadAsJson(data, filename) {
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
   // Initialize canvas
   function initializeCanvas() {
     if (!canvas) return;
@@ -154,19 +191,6 @@
 
     precomputeScatterCoords();
     precomputeTrajectories();
-  }
-
-  // Download data as JSON for caching
-  function downloadAsJson(data, filename) {
-    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   }
 
   // Load cached trajectories or sample fresh
@@ -235,59 +259,26 @@
     return { trajectories, fromCache: false };
   }
 
-  // Main draw function
-  function draw() {
-    if (!ctx || !initialized) return;
+  // Load trajectories when distributions are ready
+  async function initializeTrajectories() {
+    if (targetDistributionSamples.length === 0) return;
 
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-
-    // Draw source scatter (left)
-    drawScatterPlot(
-      ctx,
-      sourcePixelCoords,
-      settings.stylingSettings.scatterPlot.radius,
-      settings.stylingSettings.scatterPlot.color,
-      settings.stylingSettings.scatterPlot.opacity
-    );
-
-    // Draw target scatter (right)
-    drawScatterPlot(
-      ctx,
-      targetPixelCoords,
-      settings.stylingSettings.scatterPlot.radius,
-      settings.stylingSettings.scatterPlot.color,
-      settings.stylingSettings.scatterPlot.opacity
-    );
-
-    // Draw distribution labels
-    const labelColor = settings.stylingSettings.label.color;
-    const labelFontSize = settings.stylingSettings.label.fontSize;
-    const labelFontWeight = settings.stylingSettings.label.fontWeight;
-    const labelFont = `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`;
-    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
-    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
-
-    // Calculate current segment index from normalized time
-    const segmentIndex = Math.floor(time * numSegments);
-
-    // Trajectory styling from settings
-    const trajectoryColor = settings.stylingSettings.trajectory.color;
-    const trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-    const trajectoryEndpointRadius = settings.stylingSettings.trajectory.endpointRadius ?? settings.stylingSettings.trajectory.pointRadius ?? 3;
-    const normalOpacity = settings.stylingSettings.trajectory.progressOpacity;
-
-    if (transformedTrajectories.length > 0) {
-      drawTrajectories(ctx, transformedTrajectories, segmentIndex, {
-        strokeWidth: trajectoryStrokeWidth,
-        color: trajectoryColor,
-        progressOpacity: normalOpacity,
-        pointRadius: trajectoryEndpointRadius,
-      });
+    isLoading = true;
+    try {
+      const { trajectories } = await loadOrSampleTrajectories();
+      if (trajectories) {
+        allTimeSamples = trajectories;
+      }
+    } catch (error) {
+      console.error("Error loading trajectories:", error);
     }
+    isLoading = false;
   }
 
-  // Animation functions
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
   function animate(ts) {
     if (!isPlaying) {
       animationFrameId = null;
@@ -334,12 +325,66 @@
     }
   }
 
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (!isPlaying) {
-      stopAnimation();
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
+  function draw() {
+    if (!ctx || !initialized) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // --- Static Background ---
+    // Draw source scatter (left)
+    drawScatterPlot(
+      ctx,
+      sourcePixelCoords,
+      settings.stylingSettings.scatterPlot.radius,
+      settings.stylingSettings.scatterPlot.color,
+      settings.stylingSettings.scatterPlot.opacity
+    );
+
+    // Draw target scatter (right)
+    drawScatterPlot(
+      ctx,
+      targetPixelCoords,
+      settings.stylingSettings.scatterPlot.radius,
+      settings.stylingSettings.scatterPlot.color,
+      settings.stylingSettings.scatterPlot.opacity
+    );
+
+    // Draw distribution labels
+    const labelColor = settings.stylingSettings.label.color;
+    const labelFontSize = settings.stylingSettings.label.fontSize;
+    const labelFontWeight = settings.stylingSettings.label.fontWeight;
+    const labelFont = `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`;
+    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
+    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
+
+    // --- Dynamic Foreground ---
+    // Calculate current segment index from normalized time
+    const segmentIndex = Math.floor(time * numSegments);
+
+    // Trajectory styling from settings
+    const trajectoryColor = settings.stylingSettings.trajectory.color;
+    const trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
+    const trajectoryEndpointRadius = settings.stylingSettings.trajectory.endpointRadius ?? settings.stylingSettings.trajectory.pointRadius ?? 3;
+    const normalOpacity = settings.stylingSettings.trajectory.progressOpacity;
+
+    if (transformedTrajectories.length > 0) {
+      drawTrajectories(ctx, transformedTrajectories, segmentIndex, {
+        strokeWidth: trajectoryStrokeWidth,
+        color: trajectoryColor,
+        progressOpacity: normalOpacity,
+        pointRadius: trajectoryEndpointRadius,
+      });
     }
   }
+
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
 
   function handleVisibilityChange(isActive) {
     if (!isActive && isPlaying) {
@@ -351,21 +396,22 @@
     }
   }
 
-  // Load trajectories when distributions are ready
-  async function initializeTrajectories() {
-    if (targetDistributionSamples.length === 0) return;
-
-    isLoading = true;
-    try {
-      const { trajectories } = await loadOrSampleTrajectories();
-      if (trajectories) {
-        allTimeSamples = trajectories;
-      }
-    } catch (error) {
-      console.error("Error loading trajectories:", error);
+  function toggleAnimation() {
+    isPlaying = !isPlaying;
+    if (!isPlaying) {
+      stopAnimation();
     }
-    isLoading = false;
   }
+
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
+  onDestroy(() => stopAnimation());
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
 
   // Initialize when canvas and data are ready
   $: if (
@@ -399,8 +445,6 @@
 
   // Redraw when time changes
   $: if (initialized && time !== undefined) draw();
-
-  onDestroy(() => stopAnimation());
 </script>
 
 <Figure {caption} backgroundVisible={false} bind:isActive={figureIsActive}>
