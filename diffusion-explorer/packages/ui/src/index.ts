@@ -58,6 +58,7 @@ export * from './plotting/vector_field';
 export * from './plotting/mathjax';
 export * from './plotting/katex';
 export * from './plotting/pathlines';
+export * from './plotting/streamlines';
 export * from './plotting/mesh_grid';
 export { useCanvas2D } from './plotting/canvas';
 export * from './plotting/utils';
