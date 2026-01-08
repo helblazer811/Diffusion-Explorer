@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { writable } from "svelte/store";
-  import { drawTrajectories, generateStreamlines, generateStreamlinesMpl, Katex, type VectorFieldFn } from "@diffusion-explorer/ui";
+  import { drawTrajectories, generateStreamlines, resampleStreamlines, Katex, type VectorFieldFn } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
   // Props
@@ -19,30 +19,25 @@
   export let backgroundVisible = true;
 
   // Animation
-  export let animationNumSteps = 2000;  // Total animation steps
-  export let animationFrameTime = 30;  // Milliseconds per step
   export let playingByDefault = true;
 
   // Streamline generation
   export let domainRange = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
-  export let maxNumSteps = 3000;
-  export let stepSize = 0.01; // Integration step size
-  export let minSpacing = 0.1;  // Minimum spacing between streamlines
-  export let selfCollisionSteps = 500;  // Min steps before self-collision counts
+  export let density: number | [number, number] = 1.0;  // Controls spacing (1.0 = 30x30 grid)
   export let minPathLength = 2.0;  // Minimum streamline path length to keep
-
-  // Algorithm selection
-  export let streamlineAlgorithm: 'jobard-lefer' | 'matplotlib' = 'matplotlib';
-  export let density: number | [number, number] = 1.0;  // For matplotlib mode (1.0 = 30x30 grid)
+  export let segmentLength = 0.01;  // Resample to equal-length segments (in domain units)
 
   // Styling
   export let streamlineColor = "#e63946";
   export let streamlineWidth = 3.0;
-  export let trailLength = 150;  // Number of segments in the fading trail
-  export let gradientSubdivisions = 1;  // Subdivisions per segment for smooth alpha interpolation
+  export let gradientSubdivisions = 5;  // Subdivisions per segment for smooth alpha interpolation
   export let staticMode = false;  // If true, show all streamlines at full opacity without animation
   export let staticOpacity = 0.8;  // Opacity for static streamlines
-  export let pathlineSpacing = 175;  // Steps between pathline heads
+
+  // Animation pulse settings
+  export let pulseWidth = 0.20;        // Fraction of streamline length each pulse occupies
+  export let pulsePauseWidth = 0.05;   // Gap between pulses (fraction of streamline length)
+  export let pulseFrequency = 1.0;     // Pulses per second passing a fixed point
 
   // ----------------------------------------------------------------
   // State
@@ -80,6 +75,11 @@
   let streamlines1: number[][][] = [];
   let streamlines2: number[][][] = [];
   let streamlines3: number[][][] = [];
+
+  // Random animation offsets per streamline (0-1)
+  let offsets1: number[] = [];
+  let offsets2: number[] = [];
+  let offsets3: number[] = [];
 
   // Max streamline length for animation timing
   let maxStreamlineLength = 1;
@@ -171,44 +171,32 @@
     ctx2 = initializeCanvas(canvas2);
     ctx3 = initializeCanvas(canvas3);
 
-    let raw1: number[][][], raw2: number[][][], raw3: number[][][];
+    const streamlineOptions = {
+      domainMin: [domainRange.xMin, domainRange.yMin] as [number, number],
+      domainMax: [domainRange.xMax, domainRange.yMax] as [number, number],
+      density,
+      integrationDirection: 'both' as const,
+      minlength: minPathLength
+    };
 
-    if (streamlineAlgorithm === 'matplotlib') {
-      // Matplotlib-style streamline generation with RK12 adaptive integration
-      const mplOptions = {
-        domainMin: [domainRange.xMin, domainRange.yMin] as [number, number],
-        domainMax: [domainRange.xMax, domainRange.yMax] as [number, number],
-        density,
-        integrationDirection: 'both' as const,
-        minlength: minPathLength
-      };
+    const raw1 = generateStreamlines(convergingSpiralFieldFn(-0.5, 1.0), streamlineOptions);
+    const raw2 = generateStreamlines(divergingSpiralFieldFn(0.5, 1.0), streamlineOptions);
+    const raw3 = generateStreamlines(circulatingFieldFn(0.5), streamlineOptions);
 
-      raw1 = generateStreamlinesMpl(convergingSpiralFieldFn(-0.5, 1.0), mplOptions);
-      raw2 = generateStreamlinesMpl(divergingSpiralFieldFn(0.5, 1.0), mplOptions);
-      raw3 = generateStreamlinesMpl(circulatingFieldFn(0.5), mplOptions);
-    } else {
-      // Jobard & Lefer algorithm (default)
-      const streamlineOptions = {
-        deltaT: stepSize,
-        minD: minSpacing,
-        domainMin: [domainRange.xMin, domainRange.yMin] as [number, number],
-        domainMax: [domainRange.xMax, domainRange.yMax] as [number, number],
-        maxSteps: maxNumSteps,
-        domainPadding: 0.3,
-        minStreamlines: 20,
-        selfCollisionSteps: selfCollisionSteps,
-        minPathLength: minPathLength
-      };
-
-      raw1 = generateStreamlines(convergingSpiralFieldFn(-0.5, 1.0), streamlineOptions);
-      raw2 = generateStreamlines(divergingSpiralFieldFn(0.5, 1.0), streamlineOptions);
-      raw3 = generateStreamlines(circulatingFieldFn(0.5), streamlineOptions);
-    }
+    // Resample to equal-length segments (in domain coordinates)
+    const resampled1 = resampleStreamlines(raw1, segmentLength);
+    const resampled2 = resampleStreamlines(raw2, segmentLength);
+    const resampled3 = resampleStreamlines(raw3, segmentLength);
 
     // Convert to pixel coordinates
-    streamlines1 = streamlinesToPixelCoords(raw1, domainRange, canvasWidth, canvasHeight);
-    streamlines2 = streamlinesToPixelCoords(raw2, domainRange, canvasWidth, canvasHeight);
-    streamlines3 = streamlinesToPixelCoords(raw3, domainRange, canvasWidth, canvasHeight);
+    streamlines1 = streamlinesToPixelCoords(resampled1, domainRange, canvasWidth, canvasHeight);
+    streamlines2 = streamlinesToPixelCoords(resampled2, domainRange, canvasWidth, canvasHeight);
+    streamlines3 = streamlinesToPixelCoords(resampled3, domainRange, canvasWidth, canvasHeight);
+
+    // Generate random animation offsets for each streamline
+    offsets1 = streamlines1.map(() => Math.random());
+    offsets2 = streamlines2.map(() => Math.random());
+    offsets3 = streamlines3.map(() => Math.random());
 
     // Calculate max streamline length for animation timing
     const allLengths = [...streamlines1, ...streamlines2, ...streamlines3].map(s => s.length);
@@ -231,19 +219,14 @@
 
     const elapsed = timestamp - lastTimestamp;
 
-    // Only advance when enough time has passed for a step
-    if (elapsed >= animationFrameTime) {
-      const stepsElapsed = Math.floor(elapsed / animationFrameTime);
-      time += stepsElapsed / animationNumSteps;
+    // Time = spatial phase of wave train [0, 1)
+    // speed = spacing * frequency (curve-lengths per second)
+    const spacing = pulseWidth + pulsePauseWidth;
+    time += (elapsed / 1000) * pulseFrequency * spacing;
+    time %= 1.0;
 
-      // Loop back to start when reaching end
-      if (time >= 1.0) {
-        time = time % 1.0;
-      }
-
-      draw({ time });
-      lastTimestamp = timestamp;
-    }
+    draw({ time });
+    lastTimestamp = timestamp;
 
     animationFrameId = requestAnimationFrame(animate);
   }
@@ -265,35 +248,65 @@
   // Drawing
   // ----------------------------------------------------------------
 
+  /**
+   * Compute per-segment alpha values for animated pulses along a streamline.
+   *
+   * Uses centered pulse blobs with smooth quadratic falloff.
+   *
+   * @param numSegments - Number of segments in the streamline
+   * @param time - Spatial phase of wave train [0, 1)
+   * @param offset - Random phase offset for this streamline (0-1)
+   * @param pulseWidth - Fraction of streamline length each pulse occupies
+   * @param pulsePauseWidth - Gap between pulses (fraction of streamline length)
+   * @param baseOpacity - Maximum opacity at pulse center
+   */
   function computeAlphaTrail(
     numSegments: number,
-    time: number,           // 0-1 normalized time
-    trailLen: number,
-    baseOpacity: number,
-    spacing: number         // steps between pathline heads
+    time: number,
+    offset: number,
+    pulseWidth: number,
+    pulsePauseWidth: number,
+    baseOpacity: number
   ): number[] {
     const alphas = new Array(numSegments).fill(0);
+    if (numSegments === 0) return alphas;
 
-    // Cycle length: full streamline + trail (so trail fully exits)
-    const cycleLength = numSegments + trailLen;
+    const spacing = pulseWidth + pulsePauseWidth;
+    const posStep = 1 / numSegments;
 
-    // Calculate number of heads from spacing
-    const numHeads = Math.max(1, Math.floor(cycleLength / spacing));
-    const headSpacing = cycleLength / numHeads;
+    const phase = (time + offset) % 1;
+    const pulseCount = spacing > 1e-5 ? Math.ceil(1 / spacing) : 1;
 
-    // Base head position from time
-    const baseHeadPos = (time * cycleLength) % cycleLength;
-
-    // Draw trail for each head
-    for (let h = 0; h < numHeads; h++) {
-      const headPosition = (baseHeadPos + h * headSpacing) % cycleLength;
+    for (let p = 0; p < pulseCount; p++) {
+      // Front edge of this pulse (hard leading edge)
+      const front = (phase + p * spacing) % 1;
+      // Back edge trails behind by pulseWidth
+      const back = front - pulseWidth;
 
       for (let i = 0; i < numSegments; i++) {
-        const distToHead = headPosition - i;
+        const pos = i * posStep;
 
-        if (distToHead > 0 && distToHead <= trailLen) {
-          // Linear decay: alpha fades from full at head to 0 at tail
-          const alpha = baseOpacity * (1 - distToHead / trailLen);
+        // Check if position is within pulse (handling wrap-around)
+        let inPulse = false;
+        let distFromFront = 0;
+
+        if (back >= 0) {
+          // No wrap-around
+          inPulse = pos >= back && pos < front;
+          if (inPulse) distFromFront = front - pos;
+        } else {
+          // Pulse wraps around (back is negative)
+          inPulse = pos >= (back + 1) || pos < front;
+          if (inPulse) {
+            distFromFront = pos < front ? (front - pos) : (front + 1 - pos);
+          }
+        }
+
+        if (inPulse) {
+          // Fade from front (full opacity) to back (zero)
+          // distFromFront: 0 at front, pulseWidth at back
+          const u = distFromFront / pulseWidth;  // 0 at front → 1 at back
+          const alpha = baseOpacity * (1 - u);   // 1 at front → 0 at back
           alphas[i] = Math.max(alphas[i], alpha);
         }
       }
@@ -305,6 +318,7 @@
   function drawStreamlines(
     ctx: CanvasRenderingContext2D,
     streamlines: number[][][],
+    offsets: number[],
     time: number  // 0-1 normalized time
   ) {
     if (streamlines.length === 0) return;
@@ -327,13 +341,14 @@
       return;
     }
 
-    // Animated mode: draw with opacity gradient trail
+    // Animated mode: draw with multiple animated pulses
     const baseOpacity = 0.8;
 
-    // Compute per-segment alphas for each streamline (multiple cycling pathlines)
-    const perSegmentAlphas: number[][] = streamlines.map(streamline => {
+    // Compute per-segment alphas for each streamline (multiple simultaneous pulses)
+    const perSegmentAlphas: number[][] = streamlines.map((streamline, i) => {
       const numSegments = streamline.length - 1;
-      return computeAlphaTrail(numSegments, time, trailLength, baseOpacity, pathlineSpacing);
+      const offset = offsets[i] ?? 0;
+      return computeAlphaTrail(numSegments, time, offset, pulseWidth, pulsePauseWidth, baseOpacity);
     });
 
     // Draw using the per-segment alpha mode
@@ -359,19 +374,17 @@
 
     const { time: t } = state;
 
-    console.log(`[DivergenceIntro] Drawing at time: ${t.toFixed(3)}`);
-
     // --- Canvas 1: Converging spiral ---
     ctx1.clearRect(0, 0, canvasWidth, canvasHeight);
-    drawStreamlines(ctx1, streamlines1, t);
+    drawStreamlines(ctx1, streamlines1, offsets1, t);
 
     // --- Canvas 2: Diverging spiral ---
     ctx2.clearRect(0, 0, canvasWidth, canvasHeight);
-    drawStreamlines(ctx2, streamlines2, t);
+    drawStreamlines(ctx2, streamlines2, offsets2, t);
 
     // --- Canvas 3: Circulating field ---
     ctx3.clearRect(0, 0, canvasWidth, canvasHeight);
-    drawStreamlines(ctx3, streamlines3, t);
+    drawStreamlines(ctx3, streamlines3, offsets3, t);
   }
 
   // ----------------------------------------------------------------
@@ -475,7 +488,7 @@
       <div class="panel-label"><Katex math={"\\nabla \\cdot V > 0"} /></div>
     </div>
     <div class="figure-panel">
-      <div class="panel-title">Stable</div>
+      <div class="panel-title">Incompressible</div>
       <div class="figure-content" class:no-background={!backgroundVisible}>
         <canvas
           bind:this={canvas3}
