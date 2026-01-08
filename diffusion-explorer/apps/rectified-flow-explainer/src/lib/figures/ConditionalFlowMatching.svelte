@@ -1,5 +1,5 @@
 <script>
-  import { Figure, drawScatterPlot, drawArrow, drawMathjaxOnCanvas, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -135,7 +135,7 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  async function draw() {
+  function draw() {
     if (!ctx || !scales) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -234,7 +234,7 @@
       // v_t label near vector
       const vtCenterX = (interpX + vtEndX) / 2;
       const vtCenterY = (interpY + vtEndY) / 2;
-      await drawMathjaxOnCanvas(
+      drawMathjax(
         ctx, "v_t(x_t|x_1)", vtCenterX, vtCenterY,
         latexFontSize, 10, 45, { color: vectorColor }
       );
@@ -242,7 +242,7 @@
       // v_t^theta label near noisy vector
       const vtThetaCenterX = (interpX + vtThetaEndX) / 2;
       const vtThetaCenterY = (interpY + vtThetaEndY) / 2;
-      await drawMathjaxOnCanvas(
+      drawMathjax(
         ctx, "v_t^\\theta(x_t)", vtThetaCenterX, vtThetaCenterY,
         latexFontSize, -10, -20, { color: noisyVectorColor }
       );
@@ -252,19 +252,19 @@
     const latexColor = settings.stylingSettings.figureLatex.color;
 
     // x_0 label above source point
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_0", x0Pixel.x, x0Pixel.y,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
     // x_1 label above target point
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_1", x1Pixel.x, x1Pixel.y,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
     // x label above intermediate point
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x", interpX, interpY,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
@@ -274,12 +274,12 @@
     const yTop = yDomain[0];
     const distributionLabelY = scales.yScale(yTop) - 5;
 
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "p_0", scales.sourceCenterPixelX, distributionLabelY,
       latexFontSize, 0, 8, { color: latexColor }
     );
 
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "p_1", scales.targetCenterPixelX, distributionLabelY,
       latexFontSize, 0, 8, { color: latexColor }
     );

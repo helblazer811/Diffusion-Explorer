@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -228,7 +228,7 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  async function draw(state: AnimationState) {
+  function draw(state: AnimationState) {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -281,27 +281,27 @@
     const latexColor = settings.stylingSettings.figureLatex.color;
 
     // x_0 above source point
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_0", sourcePointPixel[0], sourcePointPixel[1],
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
     // x_1 above target point
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_1", targetPointPixel[0], targetPointPixel[1],
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
     // x_t above animated dot (visible when not at endpoints)
     if (t >= 0.07 && t <= 0.93) {
-      await drawMathjaxOnCanvas(
+      drawMathjax(
         ctx, "x_t", currentX, currentY,
         latexFontSize, 0, latexLabelOffsetY, { color: lineColor }
       );
     }
 
     // Formula at bottom center
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_t \\sim X_t = (1-t)X_0 + tX_1", width / 2, height - marginHeight,
       latexFontSize, 0, 15, { color: latexColor }
     );

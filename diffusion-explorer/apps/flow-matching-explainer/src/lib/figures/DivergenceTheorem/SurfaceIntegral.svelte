@@ -1,7 +1,7 @@
 <!-- Surface integral visualization with streamlines and rotating normal/field vectors. -->
 
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy } from "svelte";
   import {
     Timeline,
     generateStreamlines,
@@ -10,8 +10,7 @@
     drawArrow,
     useCanvas2D,
     Katex,
-    loadMathJax,
-    drawMathjaxOnCanvas,
+    drawMathjax,
     type VectorFieldFn
   } from "@diffusion-explorer/ui";
   import {
@@ -123,9 +122,6 @@
   let streamlineOffsets: number[] = [];
   let maxStreamlineLength = 1;
   let boundingBox: { xMin: number; xMax: number; yMin: number; yMax: number } | null = null;
-
-  // MathJax ready flag
-  let mathjaxReady = false;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -331,46 +327,44 @@
     ctx.fill();
 
     // Draw labels at arrow tips using MathJax
-    if (mathjaxReady) {
-      // Normal vector label (n hat) - orange with white outline
-      const normalLabelX = normalEnd[0] + normal[0] * labelOffset;
-      const normalLabelY = normalEnd[1] - normal[1] * labelOffset;
-      drawMathjaxOnCanvas(ctx, "\\hat{n}", normalLabelX, normalLabelY, labelFontSize, 0, labelFontSize / 2, { color: normalColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: labelStrokeOpacity });
+    // Normal vector label (n hat) - orange with white outline
+    const normalLabelX = normalEnd[0] + normal[0] * labelOffset;
+    const normalLabelY = normalEnd[1] - normal[1] * labelOffset;
+    drawMathjax(ctx, "\\hat{n}", normalLabelX, normalLabelY, labelFontSize, 0, labelFontSize / 2, { color: normalColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: labelStrokeOpacity });
 
-      // Field vector label (F) - blue with white outline
-      const fieldLabelX = fieldEnd[0] + fieldNorm[0] * labelOffset;
-      const fieldLabelY = fieldEnd[1] - fieldNorm[1] * labelOffset;
-      drawMathjaxOnCanvas(ctx, "\\mathbf{F}", fieldLabelX, fieldLabelY, labelFontSize, 0, labelFontSize / 2, { color: fieldColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: labelStrokeOpacity });
+    // Field vector label (F) - blue with white outline
+    const fieldLabelX = fieldEnd[0] + fieldNorm[0] * labelOffset;
+    const fieldLabelY = fieldEnd[1] - fieldNorm[1] * labelOffset;
+    drawMathjax(ctx, "\\mathbf{F}", fieldLabelX, fieldLabelY, labelFontSize, 0, labelFontSize / 2, { color: fieldColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: labelStrokeOpacity });
 
-      // Surface label (S) - above the surface with bounding box
-      if (showLabel && boundingBox) {
-        const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
-        const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
-        const bbHeight = boundingBox.yMax - boundingBox.yMin;
-        const labelY = centerY - surfaceLabelYOffset * bbHeight;
-        const [slx, sly] = toPixel([centerX, labelY]);
+    // Surface label (S) - above the surface with bounding box
+    if (showLabel && boundingBox) {
+      const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
+      const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
+      const bbHeight = boundingBox.yMax - boundingBox.yMin;
+      const labelY = centerY - surfaceLabelYOffset * bbHeight;
+      const [slx, sly] = toPixel([centerX, labelY]);
 
-        // Draw rounded rectangle background
-        const labelWidth = surfaceLabelFontSize * 0.8;
-        const labelHeight = surfaceLabelFontSize;
-        const rectX = slx - labelWidth / 2 - surfaceLabelBgPadding;
-        const rectY = sly - labelHeight / 2 - surfaceLabelBgPadding;
-        const rectW = labelWidth + surfaceLabelBgPadding * 2;
-        const rectH = labelHeight + surfaceLabelBgPadding * 2;
+      // Draw rounded rectangle background
+      const labelWidth = surfaceLabelFontSize * 0.8;
+      const labelHeight = surfaceLabelFontSize;
+      const rectX = slx - labelWidth / 2 - surfaceLabelBgPadding;
+      const rectY = sly - labelHeight / 2 - surfaceLabelBgPadding;
+      const rectW = labelWidth + surfaceLabelBgPadding * 2;
+      const rectH = labelHeight + surfaceLabelBgPadding * 2;
 
-        ctx.fillStyle = surfaceLabelBgColor;
-        ctx.beginPath();
-        ctx.roundRect(rectX, rectY, rectW, rectH, surfaceLabelBgRadius);
-        ctx.fill();
-        if (surfaceLabelBgStrokeWidth > 0) {
-          ctx.strokeStyle = surfaceLabelBgStrokeColor;
-          ctx.lineWidth = surfaceLabelBgStrokeWidth;
-          ctx.stroke();
-        }
-
-        // Draw label
-        drawMathjaxOnCanvas(ctx, labelText, slx, sly + labelHeight / 2, surfaceLabelFontSize, 0, 0, { color: surfaceLabelColor, stroke: surfaceLabelStrokeColor, strokeWidth: surfaceLabelStrokeWidth, strokeOpacity: labelStrokeOpacity });
+      ctx.fillStyle = surfaceLabelBgColor;
+      ctx.beginPath();
+      ctx.roundRect(rectX, rectY, rectW, rectH, surfaceLabelBgRadius);
+      ctx.fill();
+      if (surfaceLabelBgStrokeWidth > 0) {
+        ctx.strokeStyle = surfaceLabelBgStrokeColor;
+        ctx.lineWidth = surfaceLabelBgStrokeWidth;
+        ctx.stroke();
       }
+
+      // Draw label
+      drawMathjax(ctx, labelText, slx, sly + labelHeight / 2, surfaceLabelFontSize, 0, 0, { color: surfaceLabelColor, stroke: surfaceLabelStrokeColor, strokeWidth: surfaceLabelStrokeWidth, strokeOpacity: labelStrokeOpacity });
     }
   }
 
@@ -392,16 +386,6 @@
   // ----------------------------------------------------------------
   // Lifecycle
   // ----------------------------------------------------------------
-
-  onMount(async () => {
-    await loadMathJax();
-    // Pre-cache the formulas so draw() is synchronous
-    const tempCtx = document.createElement('canvas').getContext('2d')!;
-    await drawMathjaxOnCanvas(tempCtx, "\\hat{n}", 0, 0, labelFontSize, 0, 0, { color: normalColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: labelStrokeOpacity });
-    await drawMathjaxOnCanvas(tempCtx, "\\mathbf{F}", 0, 0, labelFontSize, 0, 0, { color: fieldColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: labelStrokeOpacity });
-    await drawMathjaxOnCanvas(tempCtx, labelText, 0, 0, surfaceLabelFontSize, 0, 0, { color: surfaceLabelColor, stroke: surfaceLabelStrokeColor, strokeWidth: surfaceLabelStrokeWidth, strokeOpacity: labelStrokeOpacity });
-    mathjaxReady = true;
-  });
 
   onDestroy(() => {
     if (timeline) timeline.pause();

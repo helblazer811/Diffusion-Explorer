@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjaxOnCanvas, computeContours, plotContours, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -43,8 +43,8 @@
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
   export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
   export let targetPointOpacity: number | null = null;  // Defaults to pointOpacity if null
-  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
-  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
+  export let sourceCenterX = 0.2;
+  export let targetCenterX = 0.8;
   export let yShiftFactor = -1.0;
   export let distributionScaleFactor = 0.6;
 
@@ -365,7 +365,7 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  async function draw(state: AnimationState) {
+  function draw(state: AnimationState) {
     if (!ctx || !isInitialized || !scales) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -498,7 +498,7 @@
       // p_t(x | x_1) label (above highest point, centered on mean x of current distribution)
       if (t >= 0.1 && t <= 0.9) {
         const currentLabelY = highestPixelY - currentLabelMargin;
-        await drawMathjaxOnCanvas(
+        drawMathjax(
           ctx, "p_t(x | x_1)", meanPixelX, currentLabelY,
           latexFontSize, 0, 0, { color: intermediatePointColor }
         );
@@ -515,19 +515,19 @@
     const mathLabelY = textLabelY + labelFontSize;
 
     // p_0 label
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "p_0", scales.sourceCenterPixelX, mathLabelY,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
     // p_1 label
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "p_1", scales.targetCenterPixelX, mathLabelY,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
     // x_1 label (above the highlighted point)
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_1", x1PixelCoords[0], x1PixelCoords[1] - highlightPointRadius - 10,
       latexFontSize, 0, 0, { color: highlightPointColor }
     );
