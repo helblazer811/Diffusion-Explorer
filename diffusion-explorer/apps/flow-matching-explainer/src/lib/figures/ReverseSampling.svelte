@@ -1,6 +1,6 @@
 <script>
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
   import { base } from "$app/paths";
@@ -42,21 +42,16 @@
   // Effective number of samples
   $: effectiveNumSamples = numTrajectorySamples ?? settings.samplingSettings.reverseSampling.numSamples;
 
-  // Canvas state
-  let canvas;
-  let ctx;
-  let dpr = 1;
+  // Canvas state - using useCanvas2D for DPR handling
+  let canvas = null;
+  const canvas2d = useCanvas2D(width, height);
+  $: ctx = canvas && canvas2d.ctx;
 
-  // Animation state
-  let time = 0;
-  let isPlaying = playingByDefault;
-  let animationFrameId = null;
-  let lastTimestamp = null;
-  let isPaused = false;
-  let pauseStartTime = null;
+  // Animation state - Timeline system
   let initialized = false;
   let isLoading = true;
   let loadingMessage = "Loading...";
+  let timeline = null;
 
   // Visibility tracking
   let figureIsActive;
@@ -161,18 +156,6 @@
   // Setup
   // ----------------------------------------------------------------
 
-  // Initialize canvas
-  function initializeCanvas() {
-    if (!canvas) return;
-
-    dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-
-    ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
-  }
-
   // Initialize scales and pre-compute all data
   function initializeData() {
     scales = createSourceTargetScales(
@@ -249,13 +232,6 @@
 
     const trajectories = await promise;
 
-    // Trigger download for caching
-    downloadAsJson({
-      trajectories: trajectories,
-      startPoints: startPoints,
-      numSteps: numSteps
-    }, 'reverse_sampling_trajectories.json');
-
     return { trajectories, fromCache: false };
   }
 
@@ -279,58 +255,54 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function animate(ts) {
-    if (!isPlaying) {
-      animationFrameId = null;
-      return;
+  // Forward clip (0→1)
+  const forwardClip = {
+    name: "Forward",
+    duration: 1,
+    reduce(t) {
+      return { time: t };
     }
-    if (lastTimestamp === null) lastTimestamp = ts;
-    const elapsed = ts - lastTimestamp;
+  };
 
-    if (isPaused && pauseStartTime !== null) {
-      if (ts - pauseStartTime >= pauseBeforeRestart) {
-        isPaused = false;
-        pauseStartTime = null;
-        lastTimestamp = null;
-        time = 0;
-        draw();
-      }
-      animationFrameId = requestAnimationFrame(animate);
-      return;
-    }
+  function setupTimeline() {
+    timeline = new Timeline();
+    timeline.initialState = { time: 0 };
 
-    time += elapsed / animationDuration;
-    if (time >= 1) {
-      time = 1;
-      draw();
-      isPaused = true;
-      pauseStartTime = ts;
-    } else {
-      draw();
-    }
-    lastTimestamp = ts;
-    animationFrameId = requestAnimationFrame(animate);
+    // Total cycle: forward + pause (then loops back to start)
+    const totalCycleDuration = animationDuration + pauseBeforeRestart;
+    const forwardDuration = animationDuration / totalCycleDuration;
+    const pauseNormalized = pauseBeforeRestart / totalCycleDuration;
+
+    // Add clips in sequence
+    timeline.add({ ...forwardClip, duration: forwardDuration }, 0);
+    timeline.add(createPauseClip(pauseNormalized), forwardDuration);
+
+    // Set duration in seconds
+    timeline.duration = totalCycleDuration / 1000;
+    timeline.looping = true;
+
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      draw(state);
+    });
   }
 
   function startAnimation() {
-    if (animationFrameId !== null) return;
-    lastTimestamp = null;
-    animationFrameId = requestAnimationFrame(animate);
+    if (timeline) timeline.play();
   }
 
   function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
+    if (timeline) timeline.pause();
   }
 
   // ----------------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------------
 
-  function draw() {
+  function draw(state) {
     if (!ctx || !initialized) return;
+
+    const time = state.time;
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -387,19 +359,13 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
+    if (!timeline) return;
+    if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
-      isPlaying = false;
+      stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
-      isPlaying = true;
-    }
-  }
-
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-    if (!isPlaying) {
-      stopAnimation();
+      startAnimation();
     }
   }
 
@@ -407,7 +373,9 @@
   // Lifecycle
   // ----------------------------------------------------------------
 
-  onDestroy(() => stopAnimation());
+  onDestroy(() => {
+    if (timeline) timeline.pause();
+  });
 
   // ----------------------------------------------------------------
   // Reactive Blocks
@@ -422,11 +390,11 @@
     targetDistributionSamples.length > 0 &&
     !initialized
   ) {
-    initializeCanvas();
     initializeData();
+    setupTimeline();
     initialized = true;
-    draw();
-    if (isPlaying) startAnimation();
+    draw(timeline.initialState);
+    if (playingByDefault) startAnimation();
   }
 
   // Load trajectories when target distribution becomes available
@@ -434,17 +402,10 @@
     initializeTrajectories();
   }
 
-  // Animation control
-  $: if (isPlaying && initialized && !animationFrameId) startAnimation();
-  $: if (!isPlaying && animationFrameId) stopAnimation();
-
   // Handle visibility changes
   $: if (figureIsActive !== undefined && initialized) {
     handleVisibilityChange($figureIsActive);
   }
-
-  // Redraw when time changes
-  $: if (initialized && time !== undefined) draw();
 </script>
 
 <Figure {caption} backgroundVisible={false} bind:isActive={figureIsActive}>
@@ -459,17 +420,14 @@
       {:else}
         <canvas
           bind:this={canvas}
+          use:canvas2d.bindCanvas
           style="width:100%;height:auto;max-width:{width}px;aspect-ratio:{width}/{height};"
         ></canvas>
       {/if}
       <TimeSlider
-        bind:value={time}
-        bind:isPlaying
-        min={0}
-        max={1}
+        {timeline}
         minLabel="t=1"
         maxLabel="t=0"
-        onTogglePlay={toggleAnimation}
         color={settings.stylingSettings.trajectory.color}
       />
     </div>

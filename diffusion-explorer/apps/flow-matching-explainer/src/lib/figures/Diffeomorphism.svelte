@@ -6,7 +6,7 @@ TODO:
 -->
 
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onDestroy } from "svelte";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import {
     Figure,
@@ -14,7 +14,10 @@ TODO:
     drawScatterPlot,
     drawText,
     plotMeshGrid,
-    createSourceTargetScales
+    createSourceTargetScales,
+    Timeline,
+    createPauseClip,
+    useCanvas2D
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -70,10 +73,10 @@ TODO:
 
   $: caption = children;
 
-  // Canvas state
-  let canvas;
-  let ctx;
-  let dpr = 1;
+  // Canvas state - using useCanvas2D for DPR handling
+  let canvas = null;
+  const canvas2d = useCanvas2D(width, height);
+  $: ctx = canvas && canvas2d.ctx;
 
   // Scales and coordinates
   let scales = null;
@@ -85,15 +88,9 @@ TODO:
   let allGridStates = [];
   let isLoading = true;
 
-  // Animation state
-  let isPlaying = playingByDefault;
-  let animationFrameId = null;
-  let time = 0;
-  let direction = 1;
-  let isPaused = false;
-  let pauseStartTime = null;
-  let lastTimestamp = null;
+  // Animation state - Timeline system
   let isInitialized = false;
+  let timeline = null;
 
   // Visibility-based animation control
   let figureIsActive;
@@ -177,16 +174,6 @@ TODO:
   // Setup
   // ----------------------------------------------------------------
 
-  // Canvas initialization
-  function initializeCanvas() {
-    if (!canvas) return;
-    dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
-  }
-
   // Sample grid trajectories from model
   async function sampleGridTrajectories() {
     if (!client) return;
@@ -228,9 +215,6 @@ TODO:
       yShiftFactor: settings.stylingSettings.scatterPlot.yShiftFactor,
     });
 
-    // Initialize canvas
-    initializeCanvas();
-
     // Pre-compute scatter coordinates
     precomputeScatterCoords();
 
@@ -249,71 +233,66 @@ TODO:
   // Animations
   // ----------------------------------------------------------------
 
-  function animate(timestamp) {
-    if (!isPlaying) {
-      animationFrameId = null;
-      return;
+  // Forward clip (0→1)
+  const forwardClip = {
+    name: "Forward",
+    duration: 1,
+    reduce(t) {
+      return { time: t };
     }
+  };
 
-    if (lastTimestamp === null) {
-      lastTimestamp = timestamp;
+  // Backward clip (1→0)
+  const backwardClip = {
+    name: "Backward",
+    duration: 1,
+    reduce(t) {
+      return { time: 1 - t };
     }
+  };
 
-    const elapsed = timestamp - lastTimestamp;
+  function setupTimeline() {
+    timeline = new Timeline();
+    timeline.initialState = { time: 0 };
 
-    // Handle pause at endpoints
-    if (isPaused && pauseStartTime !== null) {
-      const pauseElapsed = timestamp - pauseStartTime;
-      if (pauseElapsed >= pauseDuration) {
-        isPaused = false;
-        pauseStartTime = null;
-        lastTimestamp = timestamp;
-        direction = -direction;
-      }
-      animationFrameId = requestAnimationFrame(animate);
-      return;
-    }
+    // Total cycle: forward + pause + backward + pause
+    const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
+    const forwardDuration = animationDuration / totalCycleDuration;
+    const pauseNormalized = pauseDuration / totalCycleDuration;
 
-    // Update time based on direction
-    const deltaTime = elapsed / animationDuration;
-    time += direction * deltaTime;
+    // Add clips in sequence
+    timeline.add({ ...forwardClip, duration: forwardDuration }, 0);
+    timeline.add(createPauseClip(pauseNormalized), forwardDuration);
+    timeline.add({ ...backwardClip, duration: forwardDuration }, forwardDuration + pauseNormalized);
+    timeline.add(createPauseClip(pauseNormalized), 2 * forwardDuration + pauseNormalized);
 
-    // Clamp and handle endpoint pause
-    if (time >= 1.0) {
-      time = 1.0;
-      isPaused = true;
-      pauseStartTime = timestamp;
-    } else if (time <= 0.0) {
-      time = 0.0;
-      isPaused = true;
-      pauseStartTime = timestamp;
-    }
+    // Set duration in seconds
+    timeline.duration = totalCycleDuration / 1000;
+    timeline.looping = true;
 
-    draw();
-    lastTimestamp = timestamp;
-    animationFrameId = requestAnimationFrame(animate);
+    // Register tick callback
+    timeline.onTick((_t, state) => {
+      draw(state);
+    });
   }
 
   function startAnimation() {
-    if (animationFrameId !== null) return;
-    lastTimestamp = null;
-    animationFrameId = requestAnimationFrame(animate);
+    if (timeline) timeline.play();
   }
 
   function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
+    if (timeline) timeline.pause();
   }
 
   // ----------------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------------
 
-  function draw() {
+  function draw(state) {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
+
+    const time = state.time;
 
     // --- Static Background ---
     // Draw text labels
@@ -370,24 +349,13 @@ TODO:
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(isActive) {
-    if (!isActive && isPlaying) {
+    if (!timeline) return;
+    if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
-      isPlaying = false;
+      stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
       wasPlayingBeforeHidden = false;
-      isPlaying = true;
-    }
-  }
-
-  function toggleAnimation() {
-    isPlaying = !isPlaying;
-  }
-
-  function handleSliderInput() {
-    lastTimestamp = null;
-    if (isPaused) {
-      isPaused = false;
-      pauseStartTime = null;
+      startAnimation();
     }
   }
 
@@ -396,7 +364,7 @@ TODO:
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    stopAnimation();
+    if (timeline) timeline.pause();
 
     // Cancel any pending worker request to prevent orphaned promises
     if (activeRequestId && client) {
@@ -416,9 +384,10 @@ TODO:
     canvas
   ) {
     initializeVisualization();
+    setupTimeline();
     isInitialized = true;
-    draw();
-    if (isPlaying) startAnimation();
+    draw(timeline.initialState);
+    if (playingByDefault) startAnimation();
   }
 
   // Pause animation when figure goes off-screen
@@ -426,23 +395,9 @@ TODO:
     handleVisibilityChange($figureIsActive);
   }
 
-  // Handle play/pause changes
-  $: if (isPlaying && !animationFrameId && isInitialized) {
-    startAnimation();
-  }
-
-  $: if (!isPlaying && animationFrameId) {
-    stopAnimation();
-  }
-
-  // Update drawing when time changes (e.g., from slider drag)
-  $: if (isInitialized && time !== undefined) {
-    draw();
-  }
-
   // Redraw when grid data becomes available
-  $: if (isInitialized && allGridStates.length > 0) {
-    draw();
+  $: if (isInitialized && allGridStates.length > 0 && timeline) {
+    draw(timeline.state);
   }
 </script>
 
@@ -452,18 +407,11 @@ TODO:
       <div style="width: 100%; max-width: {width}px;">
         <canvas
           bind:this={canvas}
+          use:canvas2d.bindCanvas
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider
-        bind:value={time}
-        bind:isPlaying
-        min={0}
-        max={1}
-        onTogglePlay={toggleAnimation}
-        onInput={handleSliderInput}
-        color={meshGridColor}
-      />
+      <TimeSlider {timeline} color={meshGridColor} />
     </div>
   {/snippet}
 </Figure>
