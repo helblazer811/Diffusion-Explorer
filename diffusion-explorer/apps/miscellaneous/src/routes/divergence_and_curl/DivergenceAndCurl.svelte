@@ -1,4 +1,4 @@
-<!-- Introduces the concept of divergence in flow matching with three side-by-side canvases. -->
+<!-- Visualizes divergence and curl concepts with three vector fields. -->
 
 <script lang="ts">
   import { onDestroy } from "svelte";
@@ -14,9 +14,6 @@
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
-
-  // Caption slot
-  export let children = undefined;
 
   // Layout
   export let width = 900;
@@ -34,11 +31,9 @@
   export let segmentLength = 0.01;
 
   // Styling
-  export let streamlineColor = "#e63946";
+  export let streamlineColor = "#3b82f6";
   export let streamlineWidth = 3.0;
   export let gradientSubdivisions = 5;
-  export let staticMode = false;
-  export let staticOpacity = 0.8;
 
   // Animation pulse settings
   export let pulseWidth = 0.20;
@@ -49,10 +44,12 @@
   // State
   // ----------------------------------------------------------------
 
-  $: caption = children;
-
   // Visibility state from TripleFigure
   let isActive;
+
+  // Track visibility for animation control
+  let isInViewport = false;
+  let isTabVisible = true;
 
   // Three canvases
   let canvas1, canvas2, canvas3;
@@ -85,6 +82,68 @@
   let maxStreamlineLength = 1;
 
   // ----------------------------------------------------------------
+  // Vector Field Functions
+  // ----------------------------------------------------------------
+
+  /**
+   * Generate uniform grid of starting points for seeding.
+   */
+  function generateUniformStartPoints(
+    range: typeof domainRange,
+    gridSize: number = 8
+  ): [number, number][] {
+    const points: [number, number][] = [];
+    const xStep = (range.xMax - range.xMin) / (gridSize + 1);
+    const yStep = (range.yMax - range.yMin) / (gridSize + 1);
+
+    for (let i = 1; i <= gridSize; i++) {
+      for (let j = 1; j <= gridSize; j++) {
+        const x = range.xMin + i * xStep;
+        const y = range.yMin + j * yStep;
+        points.push([x, y]);
+      }
+    }
+    return points;
+  }
+
+  /**
+   * Pure divergence field (radial source).
+   * F(x, y) = (x, y)
+   * Divergence: 2 > 0 (expanding)
+   * Curl: 0 (no rotation)
+   */
+  function pureDivergenceField(): VectorFieldFn {
+    return (x: number, y: number): [number, number] => [x, y];
+  }
+
+  /**
+   * Pure curl field (rotation).
+   * F(x, y) = (-y, x)
+   * Divergence: 0 (incompressible)
+   * Curl: 2 > 0 (counterclockwise rotation)
+   */
+  function pureCurlField(): VectorFieldFn {
+    return (x: number, y: number): [number, number] => [-y, x];
+  }
+
+  /**
+   * Combined divergence and curl (spiral source).
+   * F(x, y) = (ax - by, bx + ay) with a > 0
+   * Divergence: 2a > 0 (expanding)
+   * Curl: 2b > 0 (rotating)
+   */
+  function combinedField(a: number = 0.5, b: number = 1.0): VectorFieldFn {
+    return (x: number, y: number): [number, number] => [
+      a * x - b * y,
+      b * x + a * y
+    ];
+  }
+
+  // Compute canvas dimensions
+  $: canvasWidth = Math.floor((width - 2 * gap) / 3);
+  $: canvasHeight = height;
+
+  // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
 
@@ -101,46 +160,6 @@
       ])
     );
   }
-
-  /**
-   * Converging spiral vector field (spiral sink).
-   * F(x, y) = (ax - by, bx + ay) with a < 0
-   * Divergence: 2a < 0 (volume contracting)
-   */
-  function convergingSpiralFieldFn(a: number = -0.3, b: number = 1.0): VectorFieldFn {
-    return (x: number, y: number): [number, number] => [
-      a * x - b * y,
-      b * x + a * y
-    ];
-  }
-
-  /**
-   * Diverging spiral vector field (spiral source).
-   * F(x, y) = (ax - by, bx + ay) with a > 0
-   * Divergence: 2a > 0 (volume expanding)
-   */
-  function divergingSpiralFieldFn(a: number = 0.3, b: number = 1.0): VectorFieldFn {
-    return (x: number, y: number): [number, number] => [
-      a * x - b * y,
-      b * x + a * y
-    ];
-  }
-
-  /**
-   * Circulating vector field (center, no in/out flow).
-   * F(x, y) = (-by, bx) - closed orbits around origin
-   * Divergence: 0 (no sources, no sinks)
-   */
-  function circulatingFieldFn(b: number = 1.0): VectorFieldFn {
-    return (x: number, y: number): [number, number] => [
-      -b * y,
-      b * x
-    ];
-  }
-
-  // Compute canvas dimensions
-  $: canvasWidth = Math.floor((width - 2 * gap) / 3);
-  $: canvasHeight = height;
 
   // ----------------------------------------------------------------
   // Setup
@@ -172,9 +191,16 @@
       segmentLength
     };
 
-    const raw1 = generateStreamlines(convergingSpiralFieldFn(-0.5, 1.0), streamlineOptions);
-    const raw2 = generateStreamlines(divergingSpiralFieldFn(0.5, 1.0), streamlineOptions);
-    const raw3 = generateStreamlines(circulatingFieldFn(0.5), streamlineOptions);
+    // Pure divergence uses uniform grid seeding for better coverage
+    const uniformStartPoints = generateUniformStartPoints(domainRange, 8);
+    const raw1 = generateStreamlines(pureDivergenceField(), {
+      ...streamlineOptions,
+      startPoints: uniformStartPoints,
+      integrationDirection: 'both' as const,  // Both directions for sunburst pattern
+      minlength: 0.5  // Lower minimum length for better coverage
+    });
+    const raw2 = generateStreamlines(pureCurlField(), streamlineOptions);
+    const raw3 = generateStreamlines(combinedField(0.5, 1.0), streamlineOptions);
 
     // Convert to pixel coordinates
     streamlines1 = streamlinesToPixelCoords(raw1, domainRange, canvasWidth, canvasHeight);
@@ -241,23 +267,6 @@
     time: number
   ) {
     if (streamlines.length === 0) return;
-
-    if (staticMode) {
-      drawTrajectories(
-        ctx,
-        streamlines,
-        maxStreamlineLength,
-        {
-          strokeWidth: streamlineWidth,
-          color: streamlineColor,
-          progressOpacity: staticOpacity,
-          pointRadius: 0,
-          showPreview: false,
-          showHeadMarker: false
-        }
-      );
-      return;
-    }
 
     const baseOpacity = 0.8;
 
@@ -335,17 +344,12 @@
   $: if (isActive !== undefined && isInitialized) {
     handleVisibilityChange($isActive);
   }
-
-  // Update drawing when time changes
-  $: if (isInitialized && time !== undefined) {
-    draw({ time });
-  }
 </script>
 
-<div style="width: {width}px; position: relative; left: 50%; transform: translateX(-50%);">
+<div style="width: {width}px;">
   <TripleFigure {gap} {backgroundVisible} bind:isActive>
     {#snippet leftTitle()}
-      Converging
+      Pure Divergence
     {/snippet}
     {#snippet left()}
       <canvas
@@ -354,11 +358,11 @@
       ></canvas>
     {/snippet}
     {#snippet leftLabel()}
-      <Katex math={"\\nabla \\cdot F < 0"} />
+      <Katex math={"\\nabla \\cdot F > 0, \\; \\nabla \\times F = 0"} />
     {/snippet}
 
     {#snippet centerTitle()}
-      Diverging
+      Pure Curl
     {/snippet}
     {#snippet center()}
       <canvas
@@ -367,11 +371,11 @@
       ></canvas>
     {/snippet}
     {#snippet centerLabel()}
-      <Katex math={"\\nabla \\cdot F > 0"} />
+      <Katex math={"\\nabla \\cdot F = 0, \\; \\nabla \\times F > 0"} />
     {/snippet}
 
     {#snippet rightTitle()}
-      Incompressible
+      Divergence + Curl
     {/snippet}
     {#snippet right()}
       <canvas
@@ -380,11 +384,12 @@
       ></canvas>
     {/snippet}
     {#snippet rightLabel()}
-      <Katex math={"\\nabla \\cdot F = 0"} />
+      <Katex math={"\\nabla \\cdot F > 0, \\; \\nabla \\times F > 0"} />
     {/snippet}
 
     {#snippet caption()}
-      {@render caption?.()}
+      Three vector fields demonstrating divergence and curl: a radial source (pure divergence),
+      a rotational field (pure curl), and a spiral source (both divergence and curl).
     {/snippet}
   </TripleFigure>
 </div>
