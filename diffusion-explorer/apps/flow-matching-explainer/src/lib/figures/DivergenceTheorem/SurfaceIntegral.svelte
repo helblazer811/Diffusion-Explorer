@@ -7,7 +7,6 @@
     StreamlineAnimation,
     drawArrow,
     useCanvas2D,
-    Katex,
     drawMathjax,
     type VectorFieldFn,
     type StreamlineAnimationState,
@@ -41,15 +40,6 @@
   export let surfaceLabelStrokeColor = "white";
   export let surfaceLabelStrokeWidth = 15;
   export let surfaceLabelYOffset = -0.7; // Fraction of bounding box height from center
-  export let surfaceLabelBgColor = "#fff7ed";
-  export let surfaceLabelBgPadding = 8;
-  export let surfaceLabelBgRadius = 6;
-  export let surfaceLabelBgStrokeColor = "#f97316";
-  export let surfaceLabelBgStrokeWidth = 0;
-
-  // Equation above canvas
-  export let showEquation = true;
-  export let equationText = "\\oint_S \\mathbf{F} \\cdot \\hat{n} \\, dS";
 
   // Surface styling
   export let surfaceOpacity = 0.15;
@@ -348,33 +338,15 @@
       }
     );
 
-    // Surface label (S) - above the surface with bounding box
+    // Surface label (S) - above the surface
     if (showLabel && boundingBox) {
       const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
       const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
       const bbHeight = boundingBox.yMax - boundingBox.yMin;
       const labelY = centerY - surfaceLabelYOffset * bbHeight;
       const [slx, sly] = toPixel([centerX, labelY]);
-
-      // Draw rounded rectangle background
-      const labelWidth = surfaceLabelFontSize * 0.8;
       const labelHeight = surfaceLabelFontSize;
-      const rectX = slx - labelWidth / 2 - surfaceLabelBgPadding;
-      const rectY = sly - labelHeight / 2 - surfaceLabelBgPadding;
-      const rectW = labelWidth + surfaceLabelBgPadding * 2;
-      const rectH = labelHeight + surfaceLabelBgPadding * 2;
 
-      ctx.fillStyle = surfaceLabelBgColor;
-      ctx.beginPath();
-      ctx.roundRect(rectX, rectY, rectW, rectH, surfaceLabelBgRadius);
-      ctx.fill();
-      if (surfaceLabelBgStrokeWidth > 0) {
-        ctx.strokeStyle = surfaceLabelBgStrokeColor;
-        ctx.lineWidth = surfaceLabelBgStrokeWidth;
-        ctx.stroke();
-      }
-
-      // Draw label
       drawMathjax(
         ctx,
         labelText,
@@ -436,11 +408,6 @@
 </script>
 
 <div class="surface-integral-wrapper">
-  {#if showEquation}
-    <div class="equation">
-      <Katex math={equationText} displayMode={true} />
-    </div>
-  {/if}
   <div class="surface-integral-container">
     <canvas
       bind:this={canvas}
@@ -458,11 +425,6 @@
     width: 100%;
   }
 
-  .equation {
-    margin-bottom: 0.5em;
-    text-align: center;
-    color: #374151;
-  }
 
   .surface-integral-container {
     width: 100%;

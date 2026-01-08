@@ -1,7 +1,7 @@
 <!-- Visualizes the Divergence Theorem with surface integral (left) and volume integral (right) side by side. -->
 
 <script lang="ts">
-  import { DoubleFigure } from "@diffusion-explorer/ui";
+  import { DoubleFigure, Katex } from "@diffusion-explorer/ui";
   import SurfaceIntegral from "./SurfaceIntegral.svelte";
   import VolumeIntegral from "./VolumeIntegral.svelte";
   import { createClosedCurve, createWavyVectorField, createUniformRightField } from "./divergence_theorem";
@@ -33,7 +33,7 @@
   export let wavyFrequency = 1.5;
 
   // Grid parameters
-  export let gridResolution = 6;
+  export let gridResolution = 4;
 
   // Surface styling
   export let surfaceOpacity = 0.7;
@@ -70,6 +70,10 @@
   // $: vectorFieldFn = createUniformRightField();
 </script>
 
+<div class="divergence-theorem-equation">
+  <Katex math={"\\oint_S \\mathbf{F} \\cdot \\hat{n} \\, dS \\qquad\\qquad = \\qquad\\qquad \\int_V \\nabla \\cdot \\mathbf{F} \\, dV"} displayMode={true} />
+</div>
+
 <DoubleFigure {gap} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet left()}
     <SurfaceIntegral
@@ -94,7 +98,7 @@
       width={canvasWidth}
       height={canvasHeight}
       {gridResolution}
-      {surfaceOpacity}
+      surfaceOpacity={0.95}
       {surfaceFillColor}
       {surfaceStrokeColor}
       {surfaceStrokeWidth}
@@ -107,3 +111,11 @@
     {@render children?.()}
   {/snippet}
 </DoubleFigure>
+
+<style>
+  .divergence-theorem-equation {
+    text-align: center;
+    margin-bottom: 0.75em;
+    color: #374151;
+  }
+</style>
