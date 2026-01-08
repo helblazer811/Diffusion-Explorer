@@ -32,7 +32,7 @@
   // Streamline generation
   export let domainRange = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
   export let density: number | [number, number] = 1.0;
-  export let minPathLength = 2.0;
+  export let minPathLength = 0.5;
   export let segmentLength = 0.01;
 
   // Styling
@@ -88,38 +88,41 @@
   // ----------------------------------------------------------------
 
   /**
-   * Converging spiral vector field (spiral sink).
-   * F(x, y) = (ax - by, bx + ay) with a < 0
-   * Divergence: 2a < 0 (volume contracting)
+   * Converging vector field (pure sink, no curl).
+   * F(x, y) = (-kx, -ky) - points radially inward
+   * Divergence: -2k < 0 (volume contracting)
+   * Curl: 0
    */
-  function convergingSpiralFieldFn(a: number = -0.3, b: number = 1.0): VectorFieldFn {
+  function convergingFieldFn(k: number = 0.5): VectorFieldFn {
     return (x: number, y: number): [number, number] => [
-      a * x - b * y,
-      b * x + a * y
+      -k * x,
+      -k * y
     ];
   }
 
   /**
-   * Diverging spiral vector field (spiral source).
-   * F(x, y) = (ax - by, bx + ay) with a > 0
-   * Divergence: 2a > 0 (volume expanding)
+   * Diverging vector field (pure source, no curl).
+   * F(x, y) = (kx, ky) - points radially outward
+   * Divergence: 2k > 0 (volume expanding)
+   * Curl: 0
    */
-  function divergingSpiralFieldFn(a: number = 0.3, b: number = 1.0): VectorFieldFn {
+  function divergingFieldFn(k: number = 0.5): VectorFieldFn {
     return (x: number, y: number): [number, number] => [
-      a * x - b * y,
-      b * x + a * y
+      k * x,
+      k * y
     ];
   }
 
   /**
-   * Circulating vector field (center, no in/out flow).
-   * F(x, y) = (-by, bx) - closed orbits around origin
-   * Divergence: 0 (no sources, no sinks)
+   * Diagonal uniform vector field (incompressible).
+   * F(x, y) = (c, c) - constant diagonal direction
+   * Divergence: 0 (incompressible)
+   * Curl: 0
    */
-  function circulatingFieldFn(b: number = 1.0): VectorFieldFn {
-    return (x: number, y: number): [number, number] => [
-      -b * y,
-      b * x
+  function diagonalFieldFn(c: number = 1.0): VectorFieldFn {
+    return (_x: number, _y: number): [number, number] => [
+      c,
+      c
     ];
   }
 
@@ -160,17 +163,17 @@
     };
 
     anim1 = StreamlineAnimation.create({
-      vectorFieldFn: convergingSpiralFieldFn(-0.5, 1.0),
+      vectorFieldFn: convergingFieldFn(0.5),
       ...commonOptions,
     });
 
     anim2 = StreamlineAnimation.create({
-      vectorFieldFn: divergingSpiralFieldFn(0.5, 1.0),
+      vectorFieldFn: divergingFieldFn(0.5),
       ...commonOptions,
     });
 
     anim3 = StreamlineAnimation.create({
-      vectorFieldFn: circulatingFieldFn(0.5),
+      vectorFieldFn: diagonalFieldFn(1.0),
       ...commonOptions,
     });
   }
