@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { writable } from "svelte/store";
-  import { drawTrajectories, generateStreamlines, Katex, type VectorFieldFn } from "@diffusion-explorer/ui";
+  import { drawTrajectories, generateStreamlines, generateStreamlinesMpl, Katex, type VectorFieldFn } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
   // Props
@@ -30,6 +30,10 @@
   export let minSpacing = 0.1;  // Minimum spacing between streamlines
   export let selfCollisionSteps = 500;  // Min steps before self-collision counts
   export let minPathLength = 2.0;  // Minimum streamline path length to keep
+
+  // Algorithm selection
+  export let streamlineAlgorithm: 'jobard-lefer' | 'matplotlib' = 'matplotlib';
+  export let density: number | [number, number] = 1.0;  // For matplotlib mode (1.0 = 30x30 grid)
 
   // Styling
   export let streamlineColor = "#e63946";
@@ -167,28 +171,39 @@
     ctx2 = initializeCanvas(canvas2);
     ctx3 = initializeCanvas(canvas3);
 
-    // Streamline generation options (seeds generated automatically by Jobard & Lefer algorithm)
-    const streamlineOptions = {
-      deltaT: stepSize,
-      minD: minSpacing,
-      domainMin: [domainRange.xMin, domainRange.yMin] as [number, number],
-      domainMax: [domainRange.xMax, domainRange.yMax] as [number, number],
-      maxSteps: maxNumSteps,
-      domainPadding: 0.3,
-      minStreamlines: 20,
-      selfCollisionSteps: selfCollisionSteps,
-      minPathLength: minPathLength
-    };
+    let raw1: number[][][], raw2: number[][][], raw3: number[][][];
 
-    // Circular field needs different settings (closed orbits)
-    const circularStreamlineOptions = {
-      ...streamlineOptions
-    };
+    if (streamlineAlgorithm === 'matplotlib') {
+      // Matplotlib-style streamline generation with RK12 adaptive integration
+      const mplOptions = {
+        domainMin: [domainRange.xMin, domainRange.yMin] as [number, number],
+        domainMax: [domainRange.xMax, domainRange.yMax] as [number, number],
+        density,
+        integrationDirection: 'both' as const,
+        minlength: minPathLength
+      };
 
-    // Generate streamlines for each vector field
-    const raw1 = generateStreamlines(convergingSpiralFieldFn(-0.3, 1.0), streamlineOptions);
-    const raw2 = generateStreamlines(divergingSpiralFieldFn(0.3, 1.0), streamlineOptions);
-    const raw3 = generateStreamlines(circulatingFieldFn(0.5), circularStreamlineOptions);
+      raw1 = generateStreamlinesMpl(convergingSpiralFieldFn(-0.5, 1.0), mplOptions);
+      raw2 = generateStreamlinesMpl(divergingSpiralFieldFn(0.5, 1.0), mplOptions);
+      raw3 = generateStreamlinesMpl(circulatingFieldFn(0.5), mplOptions);
+    } else {
+      // Jobard & Lefer algorithm (default)
+      const streamlineOptions = {
+        deltaT: stepSize,
+        minD: minSpacing,
+        domainMin: [domainRange.xMin, domainRange.yMin] as [number, number],
+        domainMax: [domainRange.xMax, domainRange.yMax] as [number, number],
+        maxSteps: maxNumSteps,
+        domainPadding: 0.3,
+        minStreamlines: 20,
+        selfCollisionSteps: selfCollisionSteps,
+        minPathLength: minPathLength
+      };
+
+      raw1 = generateStreamlines(convergingSpiralFieldFn(-0.5, 1.0), streamlineOptions);
+      raw2 = generateStreamlines(divergingSpiralFieldFn(0.5, 1.0), streamlineOptions);
+      raw3 = generateStreamlines(circulatingFieldFn(0.5), streamlineOptions);
+    }
 
     // Convert to pixel coordinates
     streamlines1 = streamlinesToPixelCoords(raw1, domainRange, canvasWidth, canvasHeight);
@@ -521,16 +536,16 @@
   }
 
   .panel-title {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     font-weight: 600;
-    color: #222;
+    color: #444;
     text-align: center;
     padding-bottom: 0.25rem;
   }
 
   .panel-label {
-    font-size: 1.15rem;
-    color: #111;
+    font-size: 1.35rem;
+    color: #444;
     text-align: center;
     width: 100%;
     display: flex;
