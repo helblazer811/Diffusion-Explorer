@@ -18,6 +18,7 @@ export {
 export { default as TableOfContents } from './components/TableOfContents.svelte';
 export { default as Figure } from './components/Figure.svelte';
 export { default as DoubleFigure } from './components/DoubleFigure.svelte';
+export { default as TripleFigure } from './components/TripleFigure.svelte';
 export { default as TopNav } from './components/TopNav.svelte';
 export { default as ArticleHeader } from './components/ArticleHeader.svelte';
 export { default as PageContainer } from './components/PageContainer.svelte';
@@ -76,3 +77,11 @@ export {
   createVisibilityHandler,
   type VisibilityState,
 } from './animation/visibility';
+
+export {
+  createStreamlineAnimation,
+  type StreamlineAnimationState,
+  type StreamlineAnimationOptions,
+  type StreamlineAnimation,
+  type StreamlineDomain,
+} from './animation/streamline-animation';
