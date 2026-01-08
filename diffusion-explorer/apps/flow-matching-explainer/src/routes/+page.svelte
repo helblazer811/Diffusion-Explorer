@@ -6,6 +6,7 @@
   import { ArticleHeader } from "@diffusion-explorer/ui";
   import Diffeomorphism from "$lib/figures/Diffeomorphism.svelte";
   import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
+  import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
 
   // Distribution samples
   let sourceDistributionSamples = [];
@@ -98,6 +99,19 @@
     Starting from points in the target distribution (right),
     the model traces paths back to the source distribution (left).
   </ReverseSampling>
+</section>
+
+<hr class="section-divider" />
+
+<section id="divergence">
+  <h2 class="section-heading">Divergence</h2>
+  <DivergenceIntro>
+    <span class="figure-number">Figure:</span>
+    <strong>Three types of vector field divergence.</strong>
+    <em>Left:</em> A converging (sink) field where trajectories spiral inward—the divergence is negative, meaning the field compresses volume over time.
+    <em>Center:</em> A diverging (source) field where trajectories spiral outward—the divergence is positive, meaning the field expands volume over time.
+    <em>Right:</em> An incompressible (rotational) field where trajectories form closed orbits—the divergence is zero, meaning the field preserves volume.
+  </DivergenceIntro>
 </section>
 
 <hr class="section-divider" />

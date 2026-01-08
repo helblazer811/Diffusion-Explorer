@@ -1,16 +1,19 @@
 /**
- * Streamline generation using sequential bidirectional integration.
- * Based on Jobard & Lefer (1997) evenly-spaced streamlines algorithm.
+ * Streamline generation for 2D vector fields.
  *
- * Also includes matplotlib-style streamline generation with RK12 adaptive integration.
+ * Based on matplotlib's streamplot algorithm:
+ * - Uses RK12 (Heun's method) with adaptive step size for integration
+ * - Density-based mask grid controls streamline spacing (density=1 → 30x30 grid)
+ * - Spiral seeding pattern from boundary inward for even coverage
+ * - Supports user-specified start points for custom seeding
  */
 
 export type VectorFieldFn = (x: number, y: number) => [number, number];
 
 /**
- * Options for matplotlib-style streamline generation.
+ * Options for streamline generation.
  */
-export interface StreamlineMplOptions {
+export interface StreamlineOptions {
   domainMin: [number, number];                 // Domain bounds [xMin, yMin]
   domainMax: [number, number];                 // Domain bounds [xMax, yMax]
   density?: number | [number, number];         // Default: 1.0 -> 30x30 mask grid
@@ -21,316 +24,6 @@ export interface StreamlineMplOptions {
   brokenStreamlines?: boolean;                 // Stop at collisions (default: true)
   maxerror?: number;                           // RK12 error tolerance (default: 0.003)
 }
-
-interface CellOccupancy {
-  streamlineIndex: number;
-  step: number;
-}
-
-export interface StreamlineOptions {
-  deltaT: number;               // Integration time step
-  minD: number;                 // Minimum spacing between streamlines (spatial hash cell size)
-  domainMin: [number, number];  // Domain bounds [xMin, yMin]
-  domainMax: [number, number];  // Domain bounds [xMax, yMax]
-  maxSteps?: number;            // Max integration steps per direction (default: 1000)
-  convergenceThreshold?: number; // Velocity magnitude to stop at sinks (default: 1e-6)
-  selfCollisionSteps?: number;  // Min steps before self-collision counts (default: 20)
-  minPathLength?: number;       // Minimum streamline path length to keep (default: minD * 20)
-  seedSpacing?: number;         // Distance between candidate seeds along streamline (default: minD * 2)
-  maxSeedAttempts?: number;     // Max consecutive failed seeds before stopping (default: 50)
-  domainPadding?: number;       // Fraction to expand domain for integration (default: 0, e.g., 0.2 = 20% padding)
-  minStreamlines?: number;      // Minimum streamlines before allowing termination (default: 0)
-}
-
-function getCellKey(x: number, y: number, minD: number, domainMin: [number, number]): string {
-  const cellX = Math.floor((x - domainMin[0]) / minD);
-  const cellY = Math.floor((y - domainMin[1]) / minD);
-  return `${cellX},${cellY}`;
-}
-
-function isInDomain(x: number, y: number, domainMin: [number, number], domainMax: [number, number]): boolean {
-  return x >= domainMin[0] && x <= domainMax[0] && y >= domainMin[1] && y <= domainMax[1];
-}
-
-/**
- * Compute the total path length of a streamline.
- */
-function computePathLength(streamline: number[][]): number {
-  let length = 0;
-  for (let i = 1; i < streamline.length; i++) {
-    const dx = streamline[i][0] - streamline[i - 1][0];
-    const dy = streamline[i][1] - streamline[i - 1][1];
-    length += Math.sqrt(dx * dx + dy * dy);
-  }
-  return length;
-}
-
-/**
- * Try to find a random seed in an unoccupied cell.
- */
-function tryRandomSeed(
-  domainMin: [number, number],
-  domainMax: [number, number],
-  spatialHash: Map<string, CellOccupancy>,
-  minD: number,
-  maxAttempts: number = 10
-): [number, number] | null {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const x = domainMin[0] + Math.random() * (domainMax[0] - domainMin[0]);
-    const y = domainMin[1] + Math.random() * (domainMax[1] - domainMin[1]);
-    const key = getCellKey(x, y, minD, domainMin);
-    if (!spatialHash.has(key)) return [x, y];
-  }
-  return null;
-}
-
-/**
- * Generate candidate seeds perpendicular to a streamline with small random offset.
- */
-function generateCandidateSeeds(
-  streamline: number[][],
-  deltaT: number,
-  minD: number,
-  seedSpacing: number,
-  spatialHash: Map<string, CellOccupancy>,
-  domainMin: [number, number],
-  domainMax: [number, number]
-): Array<[number, number]> {
-  const candidates: Array<[number, number]> = [];
-  const stepInterval = Math.max(1, Math.floor(seedSpacing / deltaT));
-  const randOffset = 0.2 * minD;  // 20% random offset
-
-  for (let i = 0; i < streamline.length - 1; i += stepInterval) {
-    const [x1, y1] = streamline[i];
-    const [x2, y2] = streamline[i + 1];
-
-    // Compute direction vector
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 1e-10) continue;
-
-    // Perpendicular direction (normalized)
-    const px = -dy / len;
-    const py = dx / len;
-
-    // Try both sides at distance minD with random offset
-    for (const sign of [1, -1]) {
-      const cx = x1 + sign * minD * px + (Math.random() - 0.5) * randOffset;
-      const cy = y1 + sign * minD * py + (Math.random() - 0.5) * randOffset;
-
-      if (isInDomain(cx, cy, domainMin, domainMax)) {
-        const cellKey = getCellKey(cx, cy, minD, domainMin);
-        if (!spatialHash.has(cellKey)) {
-          candidates.push([cx, cy]);
-        }
-      }
-    }
-  }
-
-  // Shuffle candidates for non-directional ordering
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-  }
-
-  return candidates;
-}
-
-/**
- * Integrate a streamline in one direction until termination.
- * Returns the points and cell keys added to the spatial hash.
- */
-function integrateDirection(
-  seed: [number, number],
-  vectorField: VectorFieldFn,
-  direction: 1 | -1,  // 1 for forward, -1 for backward
-  spatialHash: Map<string, CellOccupancy>,
-  streamlineIndex: number,
-  options: {
-    deltaT: number;
-    minD: number;
-    domainMin: [number, number];
-    domainMax: [number, number];
-    maxSteps: number;
-    convergenceThreshold: number;
-    selfCollisionSteps: number;
-  }
-): { points: number[][]; cellKeys: string[] } {
-  const { deltaT, minD, domainMin, domainMax, maxSteps, convergenceThreshold, selfCollisionSteps } = options;
-  const points: number[][] = [];
-  const cellKeys: string[] = [];
-
-  let [x, y] = seed;
-
-  for (let step = 0; step < maxSteps; step++) {
-    // Get velocity at current position
-    const [vx, vy] = vectorField(x, y);
-    const speed = Math.sqrt(vx * vx + vy * vy);
-
-    // Check convergence (sink/source)
-    if (speed < convergenceThreshold) {
-      break;
-    }
-
-    // Compute next position
-    const xNew = x + direction * deltaT * vx;
-    const yNew = y + direction * deltaT * vy;
-
-    // Check domain bounds
-    if (!isInDomain(xNew, yNew, domainMin, domainMax)) {
-      break;
-    }
-
-    // Check spatial hash for collisions
-    const cellKey = getCellKey(xNew, yNew, minD, domainMin);
-    const existing = spatialHash.get(cellKey);
-
-    if (existing !== undefined) {
-      if (existing.streamlineIndex !== streamlineIndex) {
-        // Different streamline - always terminate
-        break;
-      }
-      // Same streamline - check step distance
-      if (step - existing.step > selfCollisionSteps) {
-        // True loop back - terminate
-        break;
-      }
-      // Recent step in same cell - continue (slow movement)
-    }
-
-    // Add point and update cell occupancy
-    points.push([xNew, yNew]);
-    cellKeys.push(cellKey);
-    spatialHash.set(cellKey, { streamlineIndex, step });
-    x = xNew;
-    y = yNew;
-  }
-
-  return { points, cellKeys };
-}
-
-/**
- * Generates evenly-spaced streamlines using sequential bidirectional integration.
- * Uses perpendicular seeding with random offset for natural coverage.
- *
- * @param vectorField - Function that returns velocity [vx, vy] at position (x, y)
- * @param options - Configuration options
- * @returns Array of streamlines, each streamline is an array of [x, y] points (variable length)
- */
-export function generateStreamlines(
-  vectorField: VectorFieldFn,
-  options: StreamlineOptions
-): number[][][] {
-  const { deltaT, minD, domainMin, domainMax } = options;
-  const maxSteps = options.maxSteps ?? 1000;
-  const convergenceThreshold = options.convergenceThreshold ?? 1e-6;
-  const selfCollisionSteps = options.selfCollisionSteps ?? 20;
-  const minPathLength = options.minPathLength ?? minD * 20;
-  const seedSpacing = options.seedSpacing ?? minD * 2;
-  const maxSeedAttempts = options.maxSeedAttempts ?? 50;
-  const domainPadding = options.domainPadding ?? 0;
-  const minStreamlines = options.minStreamlines ?? 0;
-
-  // Calculate padded domain for integration (allows paths to leave and re-enter)
-  const domainWidth = domainMax[0] - domainMin[0];
-  const domainHeight = domainMax[1] - domainMin[1];
-  const paddedDomainMin: [number, number] = [
-    domainMin[0] - domainPadding * domainWidth,
-    domainMin[1] - domainPadding * domainHeight
-  ];
-  const paddedDomainMax: [number, number] = [
-    domainMax[0] + domainPadding * domainWidth,
-    domainMax[1] + domainPadding * domainHeight
-  ];
-
-  // Initialize spatial hash (tracks which streamline occupies each cell and when)
-  const spatialHash = new Map<string, CellOccupancy>();
-
-  const streamlines: number[][][] = [];
-  // Use padded domain for integration
-  const integrationOptions = { deltaT, minD, domainMin: paddedDomainMin, domainMax: paddedDomainMax, maxSteps, convergenceThreshold, selfCollisionSteps };
-  let streamlineIndex = 0;
-
-  // Initialize seed queue with a random seed
-  const seedQueue: Array<[number, number]> = [];
-  const initialSeed: [number, number] = [
-    domainMin[0] + Math.random() * (domainMax[0] - domainMin[0]),
-    domainMin[1] + Math.random() * (domainMax[1] - domainMin[1])
-  ];
-  seedQueue.push(initialSeed);
-
-  // Track consecutive failed seeds for termination
-  let consecutiveFailures = 0;
-
-  // Main loop: process seeds until queue is empty or too many failures (after reaching minStreamlines)
-  while (seedQueue.length > 0 && (streamlines.length < minStreamlines || consecutiveFailures < maxSeedAttempts)) {
-    const seed = seedQueue.pop()!;
-
-    // Skip if seed's cell is now occupied (use padded domain for consistent hashing)
-    const seedKey = getCellKey(seed[0], seed[1], minD, paddedDomainMin);
-    if (spatialHash.has(seedKey)) {
-      consecutiveFailures++;
-      continue;
-    }
-
-    // Add seed to spatial hash
-    spatialHash.set(seedKey, { streamlineIndex, step: 0 });
-
-    // Integrate forward and backward
-    const { points: forward, cellKeys: forwardKeys } = integrateDirection(seed, vectorField, 1, spatialHash, streamlineIndex, integrationOptions);
-    const { points: backward, cellKeys: backwardKeys } = integrateDirection(seed, vectorField, -1, spatialHash, streamlineIndex, integrationOptions);
-
-    // Combine into streamline: [...backward.reverse(), seed, ...forward]
-    const streamline: number[][] = [
-      ...backward.reverse(),
-      [seed[0], seed[1]],
-      ...forward
-    ];
-
-    // Discard short streamlines and free up their spatial hash cells
-    if (computePathLength(streamline) < minPathLength) {
-      for (const key of [...forwardKeys, ...backwardKeys, seedKey]) {
-        spatialHash.delete(key);
-      }
-      consecutiveFailures++;
-      continue;
-    }
-
-    // Success - reset failure counter
-    consecutiveFailures = 0;
-    streamlines.push(streamline);
-
-    // Generate perpendicular candidates and add to queue
-    const candidates = generateCandidateSeeds(
-      streamline,
-      deltaT,
-      minD,
-      seedSpacing,
-      spatialHash,
-      domainMin,
-      domainMax
-    );
-    seedQueue.push(...candidates);
-
-    // Add random seeds to explore isolated regions
-    for (let i = 0; i < 3; i++) {
-      const randomSeed = tryRandomSeed(domainMin, domainMax, spatialHash, minD);
-      if (randomSeed) {
-        seedQueue.push(randomSeed);
-      }
-    }
-
-    streamlineIndex++;
-  }
-
-  return streamlines;
-}
-
-// =============================================================================
-// Matplotlib-style streamline generation
-// Based on matplotlib's streamplot implementation with RK12 adaptive integration
-// =============================================================================
 
 /**
  * Mask to track which cells have been traversed by streamlines.
@@ -405,7 +98,6 @@ class StreamMask {
 class DomainMap {
   private mask: StreamMask;
   private domainMin: [number, number];
-  private domainMax: [number, number];
 
   // Grid dimensions (number of samples in velocity field)
   readonly nx: number;
@@ -431,7 +123,6 @@ class DomainMap {
   ) {
     this.mask = mask;
     this.domainMin = domainMin;
-    this.domainMax = domainMax;
 
     this.width = domainMax[0] - domainMin[0];
     this.height = domainMax[1] - domainMin[1];
@@ -505,7 +196,6 @@ class DomainMap {
 
 /**
  * 2nd-order Runge-Kutta integration with adaptive step size (Heun's method).
- * Based on matplotlib's _integrate_rk12.
  */
 function integrateRK12(
   vectorField: VectorFieldFn,
@@ -688,89 +378,16 @@ function* spiralStartingPoints(mask: StreamMask): Generator<[number, number]> {
 }
 
 /**
- * Generate streamlines using matplotlib-style algorithm with RK12 adaptive integration.
- *
- * @param vectorField - Function that returns velocity [vx, vy] at position (x, y)
- * @param options - Configuration options
- * @returns Array of streamlines, each streamline is an array of [x, y] points
+ * Compute total path length of a streamline.
  */
-export function generateStreamlinesMpl(
-  vectorField: VectorFieldFn,
-  options: StreamlineMplOptions
-): number[][][] {
-  const {
-    domainMin,
-    domainMax,
-    density = 1.0,
-    integrationDirection = 'both',
-    maxlength = Infinity,
-    minlength = 0,
-    startPoints,
-    brokenStreamlines = true,
-    maxerror = 0.003
-  } = options;
-
-  // Initialize mask and domain map
-  const mask = new StreamMask(density);
-  const dmap = new DomainMap(domainMin, domainMax, mask);
-
-  const streamlines: number[][][] = [];
-
-  // Effective maxlength per direction
-  const dirMaxlength = integrationDirection === 'both' ? maxlength / 2 : maxlength;
-
-  // Process seeds
-  if (startPoints && startPoints.length > 0) {
-    // User-specified start points
-    for (const [x0, y0] of startPoints) {
-      // Check bounds
-      if (x0 < domainMin[0] || x0 > domainMax[0] ||
-          y0 < domainMin[1] || y0 > domainMax[1]) {
-        continue;
-      }
-
-      const [xi, yi] = dmap.data2grid(x0, y0);
-      const [xm, ym] = dmap.grid2mask(xi, yi);
-
-      if (mask.isOccupied(xm, ym)) {
-        continue;
-      }
-
-      const streamline = integrateStreamline(
-        vectorField, dmap, x0, y0, xi, yi,
-        integrationDirection, dirMaxlength, { maxerror, brokenStreamlines }
-      );
-
-      if (streamline && computePathLengthMpl(streamline) >= minlength) {
-        streamlines.push(streamline);
-      } else {
-        dmap.undoTrajectory();
-      }
-    }
-  } else {
-    // Automatic seeding using spiral pattern
-    for (const [xm, ym] of spiralStartingPoints(mask)) {
-      if (mask.isOccupied(xm, ym)) {
-        continue;
-      }
-
-      const [xi, yi] = dmap.mask2grid(xm, ym);
-      const [x0, y0] = dmap.grid2data(xi, yi);
-
-      const streamline = integrateStreamline(
-        vectorField, dmap, x0, y0, xi, yi,
-        integrationDirection, dirMaxlength, { maxerror, brokenStreamlines }
-      );
-
-      if (streamline && computePathLengthMpl(streamline) >= minlength) {
-        streamlines.push(streamline);
-      } else {
-        dmap.undoTrajectory();
-      }
-    }
+function computePathLength(streamline: number[][]): number {
+  let length = 0;
+  for (let i = 1; i < streamline.length; i++) {
+    const dx = streamline[i][0] - streamline[i - 1][0];
+    const dy = streamline[i][1] - streamline[i - 1][1];
+    length += Math.sqrt(dx * dx + dy * dy);
   }
-
-  return streamlines;
+  return length;
 }
 
 /**
@@ -833,14 +450,169 @@ function integrateStreamline(
 }
 
 /**
- * Compute total path length for matplotlib-style streamline.
+ * Generate evenly-spaced streamlines for a 2D vector field.
+ *
+ * @param vectorField - Function that returns velocity [vx, vy] at position (x, y)
+ * @param options - Configuration options
+ * @returns Array of streamlines, each streamline is an array of [x, y] points
  */
-function computePathLengthMpl(streamline: number[][]): number {
-  let length = 0;
-  for (let i = 1; i < streamline.length; i++) {
-    const dx = streamline[i][0] - streamline[i - 1][0];
-    const dy = streamline[i][1] - streamline[i - 1][1];
-    length += Math.sqrt(dx * dx + dy * dy);
+export function generateStreamlines(
+  vectorField: VectorFieldFn,
+  options: StreamlineOptions
+): number[][][] {
+  const {
+    domainMin,
+    domainMax,
+    density = 1.0,
+    integrationDirection = 'both',
+    maxlength = Infinity,
+    minlength = 0,
+    startPoints,
+    brokenStreamlines = true,
+    maxerror = 0.003
+  } = options;
+
+  // Initialize mask and domain map
+  const mask = new StreamMask(density);
+  const dmap = new DomainMap(domainMin, domainMax, mask);
+
+  const streamlines: number[][][] = [];
+
+  // Effective maxlength per direction
+  const dirMaxlength = integrationDirection === 'both' ? maxlength / 2 : maxlength;
+
+  // Process seeds
+  if (startPoints && startPoints.length > 0) {
+    // User-specified start points
+    for (const [x0, y0] of startPoints) {
+      // Check bounds
+      if (x0 < domainMin[0] || x0 > domainMax[0] ||
+          y0 < domainMin[1] || y0 > domainMax[1]) {
+        continue;
+      }
+
+      const [xi, yi] = dmap.data2grid(x0, y0);
+      const [xm, ym] = dmap.grid2mask(xi, yi);
+
+      if (mask.isOccupied(xm, ym)) {
+        continue;
+      }
+
+      const streamline = integrateStreamline(
+        vectorField, dmap, x0, y0, xi, yi,
+        integrationDirection, dirMaxlength, { maxerror, brokenStreamlines }
+      );
+
+      if (streamline && computePathLength(streamline) >= minlength) {
+        streamlines.push(streamline);
+      } else {
+        dmap.undoTrajectory();
+      }
+    }
+  } else {
+    // Automatic seeding using spiral pattern
+    for (const [xm, ym] of spiralStartingPoints(mask)) {
+      if (mask.isOccupied(xm, ym)) {
+        continue;
+      }
+
+      const [xi, yi] = dmap.mask2grid(xm, ym);
+      const [x0, y0] = dmap.grid2data(xi, yi);
+
+      const streamline = integrateStreamline(
+        vectorField, dmap, x0, y0, xi, yi,
+        integrationDirection, dirMaxlength, { maxerror, brokenStreamlines }
+      );
+
+      if (streamline && computePathLength(streamline) >= minlength) {
+        streamlines.push(streamline);
+      } else {
+        dmap.undoTrajectory();
+      }
+    }
   }
-  return length;
+
+  return streamlines;
+}
+
+/**
+ * Resample a streamline to have approximately equal-length segments.
+ *
+ * @param streamline - Array of [x, y] points
+ * @param segmentLength - Desired length of each segment (in domain units)
+ * @returns Resampled streamline with equal-length segments
+ */
+export function resampleStreamline(
+  streamline: number[][],
+  segmentLength: number
+): number[][] {
+  if (streamline.length < 2) return streamline;
+
+  const result: number[][] = [streamline[0]];
+  let accumulatedLength = 0;
+  let prevPoint = streamline[0];
+
+  for (let i = 1; i < streamline.length; i++) {
+    const currPoint = streamline[i];
+    const dx = currPoint[0] - prevPoint[0];
+    const dy = currPoint[1] - prevPoint[1];
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+
+    if (segLen === 0) continue;
+
+    // Direction unit vector
+    const ux = dx / segLen;
+    const uy = dy / segLen;
+
+    // Walk along this segment, placing points at segmentLength intervals
+    let remaining = segLen;
+    let startX = prevPoint[0];
+    let startY = prevPoint[1];
+
+    while (remaining > 0) {
+      const distToNext = segmentLength - accumulatedLength;
+
+      if (remaining >= distToNext) {
+        // Place a point
+        startX += ux * distToNext;
+        startY += uy * distToNext;
+        result.push([startX, startY]);
+        remaining -= distToNext;
+        accumulatedLength = 0;
+      } else {
+        // Accumulate and move to next segment
+        accumulatedLength += remaining;
+        remaining = 0;
+      }
+    }
+
+    prevPoint = currPoint;
+  }
+
+  // Add the final point if it's not too close to the last added point
+  const lastAdded = result[result.length - 1];
+  const finalPoint = streamline[streamline.length - 1];
+  const finalDx = finalPoint[0] - lastAdded[0];
+  const finalDy = finalPoint[1] - lastAdded[1];
+  const finalDist = Math.sqrt(finalDx * finalDx + finalDy * finalDy);
+
+  if (finalDist > segmentLength * 0.1) {
+    result.push(finalPoint);
+  }
+
+  return result;
+}
+
+/**
+ * Resample all streamlines to have equal-length segments.
+ *
+ * @param streamlines - Array of streamlines
+ * @param segmentLength - Desired length of each segment
+ * @returns Resampled streamlines
+ */
+export function resampleStreamlines(
+  streamlines: number[][][],
+  segmentLength: number
+): number[][][] {
+  return streamlines.map(s => resampleStreamline(s, segmentLength));
 }

@@ -34,6 +34,8 @@ export interface TrajectoryStyleOptions {
   showHeadMarker?: boolean; // Whether to show marker at trajectory head (default: true)
   outline?: TrajectoryOutlineOptions; // Optional outline around trajectory
   headStyle?: HeadStyle;    // Head marker styling (default: circle)
+  gradientSubdivisions?: number; // Subdivisions per segment for smooth gradient (default: 1)
+  perSegmentAlphas?: number[][]; // Optional per-segment alphas: [trajectory][segment] -> alpha (0-1)
 }
 
 /**
@@ -197,19 +199,34 @@ export function drawTrajectoriesWithOpacityGradient(
 
     // Draw each segment with fading opacity
     if (headIdx > startIdx) {
-      for (let j = startIdx; j < headIdx; j++) {
-        // Calculate opacity: 0 at startIdx, progressOpacity at headIdx
-        const progress = (j - startIdx + 1) / (headIdx - startIdx);
-        ctx.globalAlpha = progress * style.progressOpacity;
+      const subdivisions = style.gradientSubdivisions ?? 1;
 
-        // Draw single segment from j to j+1
+      for (let j = startIdx; j < headIdx; j++) {
         const [x1, y1] = points[j];
         const [x2, y2] = points[j + 1];
 
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
+        for (let k = 0; k < subdivisions; k++) {
+          // Calculate overall progress through visible window
+          const segmentStart = (j - startIdx) / (headIdx - startIdx);
+          const segmentEnd = (j - startIdx + 1) / (headIdx - startIdx);
+          const subProgress = (k + 0.5) / subdivisions;
+          const overallProgress = segmentStart + (segmentEnd - segmentStart) * subProgress;
+
+          ctx.globalAlpha = overallProgress * style.progressOpacity;
+
+          // Draw sub-segment
+          const t0 = k / subdivisions;
+          const t1 = (k + 1) / subdivisions;
+          const sx1 = x1 + (x2 - x1) * t0;
+          const sy1 = y1 + (y2 - y1) * t0;
+          const sx2 = x1 + (x2 - x1) * t1;
+          const sy2 = y1 + (y2 - y1) * t1;
+
+          ctx.beginPath();
+          ctx.moveTo(sx1, sy1);
+          ctx.lineTo(sx2, sy2);
+          ctx.stroke();
+        }
       }
     }
 
@@ -300,11 +317,74 @@ export function drawTrajectories(
     }
 
     // 2. Draw animated path up to the current segment
-    // Draw outline first if specified
-    if (outline) {
-      ctx.lineWidth = outlineWidth;
-      ctx.strokeStyle = outlineColor;
-      ctx.globalAlpha = outlineOpacity;
+    const segmentAlphas = style.perSegmentAlphas?.[i];
+
+    if (segmentAlphas) {
+      // Per-segment alpha mode: draw each segment with interpolated alpha gradient
+      const subdivisions = style.gradientSubdivisions ?? 1;
+
+      for (let j = 0; j < points.length - 1; j++) {
+        const alpha = segmentAlphas[j] ?? 0;
+        const nextAlpha = segmentAlphas[j + 1] ?? 0;
+
+        // Skip if both ends are invisible
+        if (alpha <= 0 && nextAlpha <= 0) continue;
+
+        const [x1, y1] = points[j];
+        const [x2, y2] = points[j + 1];
+
+        for (let k = 0; k < subdivisions; k++) {
+          const t0 = k / subdivisions;
+          const t1 = (k + 1) / subdivisions;
+          // Interpolate alpha at midpoint of sub-segment
+          const subAlpha = alpha + (nextAlpha - alpha) * ((k + 0.5) / subdivisions);
+
+          if (subAlpha <= 0) continue;
+
+          const sx1 = x1 + (x2 - x1) * t0;
+          const sy1 = y1 + (y2 - y1) * t0;
+          const sx2 = x1 + (x2 - x1) * t1;
+          const sy2 = y1 + (y2 - y1) * t1;
+
+          // Draw outline first if specified
+          if (outline) {
+            ctx.lineWidth = outlineWidth;
+            ctx.strokeStyle = outlineColor;
+            ctx.globalAlpha = subAlpha * (outlineOpacity / style.progressOpacity);
+            ctx.beginPath();
+            ctx.moveTo(sx1, sy1);
+            ctx.lineTo(sx2, sy2);
+            ctx.stroke();
+          }
+
+          // Draw main stroke
+          ctx.lineWidth = style.strokeWidth;
+          ctx.strokeStyle = style.color;
+          ctx.globalAlpha = subAlpha;
+          ctx.beginPath();
+          ctx.moveTo(sx1, sy1);
+          ctx.lineTo(sx2, sy2);
+          ctx.stroke();
+        }
+      }
+    } else {
+      // Default mode: draw path up to segmentIndex with uniform opacity
+      // Draw outline first if specified
+      if (outline) {
+        ctx.lineWidth = outlineWidth;
+        ctx.strokeStyle = outlineColor;
+        ctx.globalAlpha = outlineOpacity;
+        ctx.beginPath();
+        for (let j = 0; j <= segmentIndex + 1 && j < points.length; j++) {
+          const [x, y] = points[j];
+          j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      // Draw main stroke on top
+      ctx.lineWidth = style.strokeWidth;
+      ctx.strokeStyle = style.color;
+      ctx.globalAlpha = style.progressOpacity;
       ctx.beginPath();
       for (let j = 0; j <= segmentIndex + 1 && j < points.length; j++) {
         const [x, y] = points[j];
@@ -312,16 +392,6 @@ export function drawTrajectories(
       }
       ctx.stroke();
     }
-    // Draw main stroke on top
-    ctx.lineWidth = style.strokeWidth;
-    ctx.strokeStyle = style.color;
-    ctx.globalAlpha = style.progressOpacity;
-    ctx.beginPath();
-    for (let j = 0; j <= segmentIndex + 1 && j < points.length; j++) {
-      const [x, y] = points[j];
-      j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
-    ctx.stroke();
 
     // 3. Draw marker at head position
     const markerIdx = Math.min(segmentIndex + 1, points.length - 1);
