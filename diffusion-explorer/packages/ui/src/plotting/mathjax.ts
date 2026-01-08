@@ -22,6 +22,7 @@ export interface LatexToSvgOptions {
   color?: string;           // Fill color (e.g., "#333", "red")
   stroke?: string;          // Outline color
   strokeWidth?: number;     // Outline width in pixels
+  strokeOpacity?: number;   // Outline opacity (0-1)
 }
 
 /**
@@ -87,9 +88,9 @@ async function getReferenceViewBoxHeight(): Promise<number> {
  */
 function applyStylesToSvg(
   svg: SVGSVGElement,
-  options: { color?: string; stroke?: string; strokeWidth?: number }
+  options: { color?: string; stroke?: string; strokeWidth?: number; strokeOpacity?: number }
 ): void {
-  const { color, stroke, strokeWidth } = options;
+  const { color, stroke, strokeWidth, strokeOpacity } = options;
 
   // MathJax renders text as <path> elements
   const paths = svg.querySelectorAll('path');
@@ -100,6 +101,9 @@ function applyStylesToSvg(
     if (stroke) {
       path.setAttribute('stroke', stroke);
       path.setAttribute('stroke-width', String(strokeWidth ?? 1));
+      if (strokeOpacity !== undefined) {
+        path.setAttribute('stroke-opacity', String(strokeOpacity));
+      }
       // Ensure stroke is painted behind fill
       path.setAttribute('paint-order', 'stroke fill');
     }
@@ -304,10 +308,10 @@ export async function drawMathjaxOnCanvas(
   fontSize: number,
   offsetX = 0,
   offsetY = 0,
-  options: { color?: string; stroke?: string; strokeWidth?: number } = {}
+  options: { color?: string; stroke?: string; strokeWidth?: number; strokeOpacity?: number } = {}
 ): Promise<void> {
   // Create cache key from latex + styling options
-  const cacheKey = `${latex}|${options.color ?? ''}|${options.stroke ?? ''}|${options.strokeWidth ?? ''}`;
+  const cacheKey = `${latex}|${options.color ?? ''}|${options.stroke ?? ''}|${options.strokeWidth ?? ''}|${options.strokeOpacity ?? ''}`;
 
   let cached = mathjaxCache.get(cacheKey);
 
