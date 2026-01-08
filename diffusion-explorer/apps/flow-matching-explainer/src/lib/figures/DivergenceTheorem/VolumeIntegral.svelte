@@ -4,14 +4,14 @@
   import { onDestroy } from "svelte";
   import {
     useCanvas2D,
-    generateStreamlines,
-    drawTrajectories,
     drawArrow,
     Katex,
     Timeline,
-    computeAlphaTrail,
+    createStreamlineAnimation,
     drawMathjax,
-    type VectorFieldFn
+    type VectorFieldFn,
+    type StreamlineAnimationState,
+    type StreamlineAnimation,
   } from "@diffusion-explorer/ui";
   import { drawClosedCurve, type CurveFn } from "./divergence_theorem";
 
@@ -114,27 +114,24 @@
   // State
   // ----------------------------------------------------------------
 
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   $: ctx = canvas && canvas2d.ctx;
 
   let isInitialized = false;
   let wasPlayingBeforeHidden = false;
 
-  // Animation state
-  type AnimationState = {
-    streamlinePhase: number;  // 0-1 for pulse animation
-  };
+  // Animation state (just streamlinePhase for this component)
+  type AnimationState = StreamlineAnimationState;
 
   let timeline: Timeline<AnimationState> | null = null;
+  let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
 
   // Pre-computed data
   let surfaceSamples: { points: [number, number][]; thetas: number[] } | null = null;
   let boundingBox: { xMin: number; xMax: number; yMin: number; yMax: number } | null = null;
   let gridLines: GridLines | null = null;
   let gridCells: GridCell[] = [];
-  let streamlines: number[][][] = [];
-  let streamlineOffsets: number[] = [];
 
   // ----------------------------------------------------------------
   // Helpers
@@ -219,7 +216,6 @@
 
     // Determine which direction the coordinate changes
     const valLow = curveFn(low)[coordIndex];
-    const valHigh = curveFn(high)[coordIndex];
 
     while (high - low > tolerance) {
       const mid = (low + high) / 2;
@@ -429,7 +425,7 @@
    */
   function drawGrid(
     ctx: CanvasRenderingContext2D,
-    gridLines: GridLines,
+    gridLinesData: GridLines,
     options: { strokeColor?: string; strokeWidth?: number } = {}
   ): void {
     const { strokeColor = gridColor, strokeWidth = gridWidth } = options;
@@ -439,7 +435,7 @@
     ctx.lineCap = "round";
 
     // Draw horizontal lines
-    for (const line of gridLines.horizontal) {
+    for (const line of gridLinesData.horizontal) {
       for (const segment of line.segments) {
         const [x1, y1] = toPixel(segment.start);
         const [x2, y2] = toPixel(segment.end);
@@ -451,7 +447,7 @@
     }
 
     // Draw vertical lines
-    for (const line of gridLines.vertical) {
+    for (const line of gridLinesData.vertical) {
       for (const segment of line.segments) {
         const [x1, y1] = toPixel(segment.start);
         const [x2, y2] = toPixel(segment.end);
@@ -507,20 +503,6 @@
   }
 
   /**
-   * Animation function (empty for now, just draws static grid).
-   */
-  function animateGrid(
-    ctx: CanvasRenderingContext2D,
-    gridLines: GridLines,
-    progress: number,  // 0 to 1
-    options: { strokeColor?: string; strokeWidth?: number } = {}
-  ): void {
-    // TODO: Implement progressive reveal from top-left to bottom-right
-    // For now, just draw the full grid
-    drawGrid(ctx, gridLines, options);
-  }
-
-  /**
    * Main draw function.
    */
   function draw(state: AnimationState): void {
@@ -531,29 +513,8 @@
     ctx.clearRect(0, 0, width, height);
 
     // 1. Draw streamlines (behind everything) with pulse animation
-    if (showStreamlines && streamlines.length > 0) {
-      const baseOpacity = streamlineOpacity;
-      const perSegmentAlphas: number[][] = streamlines.map((streamline, i) => {
-        const numSegments = streamline.length - 1;
-        const offset = streamlineOffsets[i] ?? 0;
-        return computeAlphaTrail(numSegments, streamlinePhase, offset, pulseWidth, pulsePauseWidth, baseOpacity);
-      });
-
-      drawTrajectories(
-        ctx,
-        streamlines,
-        0,
-        {
-          strokeWidth: streamlineWidth,
-          color: streamlineColor,
-          progressOpacity: baseOpacity,
-          pointRadius: 0,
-          showPreview: false,
-          showHeadMarker: false,
-          perSegmentAlphas,
-          gradientSubdivisions
-        }
-      );
+    if (showStreamlines && streamlineAnim) {
+      streamlineAnim.draw(ctx, streamlinePhase);
     }
 
     // 2. Draw surface fill (behind grid and arrows)
@@ -566,7 +527,7 @@
 
     // 3. Draw grid lines (above surface fill)
     if (gridLines) {
-      animateGrid(ctx, gridLines, 1.0);
+      drawGrid(ctx, gridLines);
     }
 
     // 4. Draw arrows in each cell (above surface fill), skip boundary cells
@@ -624,40 +585,39 @@
     // Compute grid cells
     gridCells = computeGridCells();
 
-    // Generate streamlines
-    const streamlineOptions = {
-      domainMin: [boundingBox.xMin - domainMargin, boundingBox.yMin - domainMargin] as [number, number],
-      domainMax: [boundingBox.xMax + domainMargin, boundingBox.yMax + domainMargin] as [number, number],
+    // Create streamline animation
+    streamlineAnim = createStreamlineAnimation<AnimationState>({
+      vectorFieldFn: vectorFieldFn as VectorFieldFn,
+      domain: {
+        xMin: boundingBox.xMin - domainMargin,
+        xMax: boundingBox.xMax + domainMargin,
+        yMin: boundingBox.yMin - domainMargin,
+        yMax: boundingBox.yMax + domainMargin,
+      },
+      toPixel,
       density: 0.8,
-      integrationDirection: 'both' as const,
-      minlength: minPathLength,
-      segmentLength
-    };
-
-    const raw = generateStreamlines(vectorFieldFn as VectorFieldFn, streamlineOptions);
-
-    // Convert to pixel coordinates
-    streamlines = raw.map(streamline =>
-      streamline.map(([x, y]) => toPixel([x, y]))
-    );
-
-    // Offsets for animation (use 0 for synchronized animation)
-    streamlineOffsets = streamlines.map(() => 0);
+      minPathLength,
+      segmentLength,
+      color: streamlineColor,
+      strokeWidth: streamlineWidth,
+      gradientSubdivisions,
+      pulseWidth,
+      pulsePauseWidth,
+      baseOpacity: streamlineOpacity,
+      offsets: "synchronized",
+    });
   }
 
   function setupTimeline() {
+    if (!streamlineAnim) return;
+
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { streamlinePhase: 0 };
     timeline.duration = streamlineDuration;
     timeline.looping = true;
 
-    timeline.add({
-      name: "Streamlines",
-      duration: 1,
-      reduce(t: number) {
-        return { streamlinePhase: t };
-      }
-    }, 0);
+    // Use the clip from streamline animation
+    timeline.add(streamlineAnim.clip, 0);
 
     timeline.onTick((_t, state) => {
       draw(state);

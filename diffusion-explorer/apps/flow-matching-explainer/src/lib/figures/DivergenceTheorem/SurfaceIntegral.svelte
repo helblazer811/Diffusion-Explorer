@@ -4,19 +4,19 @@
   import { onDestroy } from "svelte";
   import {
     Timeline,
-    generateStreamlines,
-    computeAlphaTrail,
-    drawTrajectories,
+    createStreamlineAnimation,
     drawArrow,
     useCanvas2D,
     Katex,
     drawMathjax,
-    type VectorFieldFn
+    type VectorFieldFn,
+    type StreamlineAnimationState,
+    type StreamlineAnimation,
   } from "@diffusion-explorer/ui";
   import {
     getTangentAndNormal,
     drawClosedCurve,
-    type CurveFn
+    type CurveFn,
   } from "./divergence_theorem";
 
   // ----------------------------------------------------------------
@@ -32,7 +32,7 @@
   export let height = 350;
 
   // Domain margin around bounding box (matches VolumeIntegral)
-  export let domainMargin = 0.7;  // Margin around bounding box
+  export let domainMargin = 0.7; // Margin around bounding box
 
   // Surface label (drawn on canvas)
   export let showLabel = true;
@@ -41,7 +41,7 @@
   export let surfaceLabelColor = "#f97316";
   export let surfaceLabelStrokeColor = "white";
   export let surfaceLabelStrokeWidth = 15;
-  export let surfaceLabelYOffset = -0.7;  // Fraction of bounding box height from center
+  export let surfaceLabelYOffset = -0.7; // Fraction of bounding box height from center
   export let surfaceLabelBgColor = "#fff7ed";
   export let surfaceLabelBgPadding = 8;
   export let surfaceLabelBgRadius = 6;
@@ -69,30 +69,29 @@
   export let gradientSubdivisions = 12;
 
   // Animation pulse settings
-  export let pulseWidth = 0.20;
+  export let pulseWidth = 0.2;
   export let pulsePauseWidth = 0.05;
-  export let pulseFrequency = 0.8;
 
   // Vector styling
-  export let normalColor = "#f97316";  // Orange
-  export let fieldColor = "#3b82f6";  // Blue
-  export let dotColor = "#f97316";  // Orange
+  export let normalColor = "#f97316"; // Orange
+  export let fieldColor = "#3b82f6"; // Blue
+  export let dotColor = "#f97316"; // Orange
   export let dotRadius = 4;
   export let vectorLength = 0.4;
-  export let vectorScale = 1.2;  // Scale factor for arrow length
+  export let vectorScale = 1.2; // Scale factor for arrow length
   export let vectorWidth = 3;
   export let arrowHeadSize = 8;
 
   // Label styling
-  export let labelOffset = 20;  // Distance from arrow tip
+  export let labelOffset = 20; // Distance from arrow tip
   export let labelFontSize = 18;
   export let labelStrokeColor = "white";
   export let labelStrokeWidth = 10;
   export let labelStrokeOpacity = 0.8;
 
   // Animation timing
-  export let streamlineDuration = 8;  // seconds for one streamline cycle
-  export let rotationDuration = 8;    // seconds for one full rotation
+  export let streamlineDuration = 8; // seconds for one streamline cycle
+  export let rotationDuration = 8; // seconds for one full rotation
   export let playingByDefault = true;
 
   // Visibility
@@ -102,26 +101,28 @@
   // State
   // ----------------------------------------------------------------
 
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   $: ctx = canvas && canvas2d.ctx;
 
   let isInitialized = false;
   let wasPlayingBeforeHidden = false;
 
-  // Animation state
-  type AnimationState = {
-    streamlinePhase: number;  // 0-1 for pulse animation
-    theta: number;            // 0-2π for rotation around surface
+  // Animation state extends StreamlineAnimationState
+  type AnimationState = StreamlineAnimationState & {
+    theta: number; // 0-2π for rotation around surface
   };
 
   let timeline: Timeline<AnimationState> | null = null;
+  let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
 
-  // Pre-computed data
-  let streamlines: number[][][] = [];
-  let streamlineOffsets: number[] = [];
-  let maxStreamlineLength = 1;
-  let boundingBox: { xMin: number; xMax: number; yMin: number; yMax: number } | null = null;
+  // Bounding box for the curve
+  let boundingBox: {
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+  } | null = null;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -135,19 +136,26 @@
     const yMax = boundingBox.yMax + domainMargin;
     return [
       ((p[0] - xMin) / (xMax - xMin)) * width,
-      ((yMax - p[1]) / (yMax - yMin)) * height
+      ((yMax - p[1]) / (yMax - yMin)) * height,
     ];
   }
 
   function scaleLength(domainLen: number): number {
     if (!boundingBox) return 0;
-    const domainWidth = (boundingBox.xMax - boundingBox.xMin) + 2 * domainMargin;
+    const domainWidth = boundingBox.xMax - boundingBox.xMin + 2 * domainMargin;
     return (domainLen / domainWidth) * width;
   }
 
-  function computeBoundingBox(numSamples: number = 360): { xMin: number; xMax: number; yMin: number; yMax: number } {
-    let xMin = Infinity, xMax = -Infinity;
-    let yMin = Infinity, yMax = -Infinity;
+  function computeBoundingBox(numSamples: number = 360): {
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+  } {
+    let xMin = Infinity,
+      xMax = -Infinity;
+    let yMin = Infinity,
+      yMax = -Infinity;
     const step = (2 * Math.PI) / numSamples;
 
     for (let i = 0; i < numSamples; i++) {
@@ -169,60 +177,60 @@
   function runInitialComputation() {
     if (!canvas) return;
 
-    // Compute bounding box from curve
+    // Compute bounding box from curve (needed for toPixel)
     boundingBox = computeBoundingBox();
 
-    // Generate streamlines using bounding box + margin
-    const streamlineOptions = {
-      domainMin: [boundingBox.xMin - domainMargin, boundingBox.yMin - domainMargin] as [number, number],
-      domainMax: [boundingBox.xMax + domainMargin, boundingBox.yMax + domainMargin] as [number, number],
+    // Create streamline animation
+    const totalDuration = Math.max(streamlineDuration, rotationDuration);
+
+    streamlineAnim = createStreamlineAnimation<AnimationState>({
+      vectorFieldFn: vectorFieldFn as VectorFieldFn,
+      domain: {
+        xMin: boundingBox.xMin - domainMargin,
+        xMax: boundingBox.xMax + domainMargin,
+        yMin: boundingBox.yMin - domainMargin,
+        yMax: boundingBox.yMax + domainMargin,
+      },
+      toPixel,
       density,
-      integrationDirection: 'both' as const,
-      minlength: minPathLength,
-      segmentLength  
-    };
-
-    const raw = generateStreamlines(vectorFieldFn as VectorFieldFn, streamlineOptions);
-
-    // Convert to pixel coordinates
-    streamlines = raw.map(streamline =>
-      streamline.map(([x, y]) => toPixel([x, y]))
-    );
-
-    // Offsets for animation (use 0 for synchronized animation)
-    streamlineOffsets = streamlines.map(() => 0);
-    maxStreamlineLength = Math.max(...streamlines.map(s => s.length), 1);
+      minPathLength,
+      segmentLength,
+      color: streamlineColor,
+      strokeWidth: streamlineWidth,
+      gradientSubdivisions,
+      pulseWidth,
+      pulsePauseWidth,
+      offsets: "synchronized",
+      clipDuration: streamlineDuration / totalDuration,
+      loopMultiplier: totalDuration / streamlineDuration,
+    });
   }
 
   function setupTimeline() {
+    if (!streamlineAnim) return;
+
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { streamlinePhase: 0, theta: 0 };
 
-    // Use the longer duration to determine timeline length
-    // Both clips run at their own pace but mapped to the same timeline
     const totalDuration = Math.max(streamlineDuration, rotationDuration);
     timeline.duration = totalDuration;
     timeline.looping = true;
 
-    // Streamline clip
-    timeline.add({
-      name: "Streamlines",
-      duration: streamlineDuration / totalDuration,
-      reduce(t: number) {
-        const loops = totalDuration / streamlineDuration;
-        return { streamlinePhase: (t * loops) % 1 };
-      }
-    }, 0);
+    // Add streamline clip from the animation
+    timeline.add(streamlineAnim.clip, 0);
 
     // Rotation clip
-    timeline.add({
-      name: "SurfaceRotation",
-      duration: rotationDuration / totalDuration,
-      reduce(t: number) {
-        const loops = totalDuration / rotationDuration;
-        return { theta: ((t * loops) % 1) * 2 * Math.PI };
-      }
-    }, 0);
+    timeline.add(
+      {
+        name: "SurfaceRotation",
+        duration: rotationDuration / totalDuration,
+        reduce(t: number) {
+          const loops = totalDuration / rotationDuration;
+          return { theta: ((t * loops) % 1) * 2 * Math.PI };
+        },
+      },
+      0
+    );
 
     timeline.onTick((_t, state) => {
       draw(state);
@@ -242,44 +250,21 @@
   // ----------------------------------------------------------------
 
   function draw(state: AnimationState) {
-    if (!ctx || !isInitialized) return;
+    if (!ctx || !isInitialized || !streamlineAnim) return;
 
     const { streamlinePhase, theta } = state;
 
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Draw streamlines (behind) - using pulse animation
-    if (streamlines.length > 0) {
-      const baseOpacity = 0.8;
-      const perSegmentAlphas: number[][] = streamlines.map((streamline, i) => {
-        const numSegments = streamline.length - 1;
-        const offset = streamlineOffsets[i] ?? 0;
-        return computeAlphaTrail(numSegments, streamlinePhase, offset, pulseWidth, pulsePauseWidth, baseOpacity);
-      });
-
-      drawTrajectories(
-        ctx,
-        streamlines,
-        0,
-        {
-          strokeWidth: streamlineWidth,
-          color: streamlineColor,
-          progressOpacity: baseOpacity,
-          pointRadius: 0,
-          showPreview: false,
-          showHeadMarker: false,
-          perSegmentAlphas,
-          gradientSubdivisions
-        }
-      );
-    }
+    // 1. Draw streamlines (behind) - using the animation's draw function
+    streamlineAnim.draw(ctx, streamlinePhase);
 
     // 2. Draw surface curve (on top of streamlines)
     drawClosedCurve(ctx, curveFn, toPixel, {
       fillColor: surfaceFillColor,
       fillOpacity: surfaceOpacity,
       strokeColor: surfaceStrokeColor,
-      strokeWidth: surfaceStrokeWidth
+      strokeWidth: surfaceStrokeWidth,
     });
 
     // 3. Draw normal and field vectors at current theta position
@@ -289,9 +274,8 @@
     // Field vector at this position
     const field = vectorFieldFn(position[0], position[1]);
     const fieldMag = Math.sqrt(field[0] * field[0] + field[1] * field[1]);
-    const fieldNorm: [number, number] = fieldMag > 0
-      ? [field[0] / fieldMag, field[1] / fieldMag]
-      : [1, 0];
+    const fieldNorm: [number, number] =
+      fieldMag > 0 ? [field[0] / fieldMag, field[1] / fieldMag] : [1, 0];
 
     // Scale vectors to pixel length (with scale factor)
     const vecPixelLen = scaleLength(vectorLength) * vectorScale;
@@ -299,13 +283,13 @@
     // Normal vector (pointing outward)
     const normalEnd: [number, number] = [
       px + normal[0] * vecPixelLen,
-      py - normal[1] * vecPixelLen  // Flip y for canvas coordinates
+      py - normal[1] * vecPixelLen, // Flip y for canvas coordinates
     ];
 
     // Field vector
     const fieldEnd: [number, number] = [
       px + fieldNorm[0] * vecPixelLen,
-      py - fieldNorm[1] * vecPixelLen
+      py - fieldNorm[1] * vecPixelLen,
     ];
 
     // Draw normal vector (orange)
@@ -330,12 +314,40 @@
     // Normal vector label (n hat) - orange with white outline
     const normalLabelX = normalEnd[0] + normal[0] * labelOffset;
     const normalLabelY = normalEnd[1] - normal[1] * labelOffset;
-    drawMathjax(ctx, "\\hat{n}", normalLabelX, normalLabelY, labelFontSize, 0, labelFontSize / 2, { color: normalColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: labelStrokeOpacity });
+    drawMathjax(
+      ctx,
+      "\\hat{n}",
+      normalLabelX,
+      normalLabelY,
+      labelFontSize,
+      0,
+      labelFontSize / 2,
+      {
+        color: normalColor,
+        stroke: labelStrokeColor,
+        strokeWidth: labelStrokeWidth,
+        strokeOpacity: labelStrokeOpacity,
+      }
+    );
 
     // Field vector label (F) - blue with white outline
     const fieldLabelX = fieldEnd[0] + fieldNorm[0] * labelOffset;
     const fieldLabelY = fieldEnd[1] - fieldNorm[1] * labelOffset;
-    drawMathjax(ctx, "\\mathbf{F}", fieldLabelX, fieldLabelY, labelFontSize, 0, labelFontSize / 2, { color: fieldColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: labelStrokeOpacity });
+    drawMathjax(
+      ctx,
+      "\\mathbf{F}",
+      fieldLabelX,
+      fieldLabelY,
+      labelFontSize,
+      0,
+      labelFontSize / 2,
+      {
+        color: fieldColor,
+        stroke: labelStrokeColor,
+        strokeWidth: labelStrokeWidth,
+        strokeOpacity: labelStrokeOpacity,
+      }
+    );
 
     // Surface label (S) - above the surface with bounding box
     if (showLabel && boundingBox) {
@@ -364,7 +376,21 @@
       }
 
       // Draw label
-      drawMathjax(ctx, labelText, slx, sly + labelHeight / 2, surfaceLabelFontSize, 0, 0, { color: surfaceLabelColor, stroke: surfaceLabelStrokeColor, strokeWidth: surfaceLabelStrokeWidth, strokeOpacity: labelStrokeOpacity });
+      drawMathjax(
+        ctx,
+        labelText,
+        slx,
+        sly + labelHeight / 2,
+        surfaceLabelFontSize,
+        0,
+        0,
+        {
+          color: surfaceLabelColor,
+          stroke: surfaceLabelStrokeColor,
+          strokeWidth: surfaceLabelStrokeWidth,
+          strokeOpacity: labelStrokeOpacity,
+        }
+      );
     }
   }
 

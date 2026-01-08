@@ -6,9 +6,10 @@
     TripleFigure,
     Katex,
     drawTrajectories,
-    generateStreamlines,
-    computeAlphaTrail,
-    type VectorFieldFn
+    createStreamlineAnimation,
+    type VectorFieldFn,
+    type StreamlineAnimation,
+    type StreamlineAnimationState,
   } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
@@ -49,58 +50,34 @@
   // State
   // ----------------------------------------------------------------
 
-  $: caption = children;
 
   // Visibility state from TripleFigure
   let isActive;
 
   // Three canvases
-  let canvas1, canvas2, canvas3;
-  let ctx1, ctx2, ctx3;
+  let canvas1: HTMLCanvasElement | null = null;
+  let canvas2: HTMLCanvasElement | null = null;
+  let canvas3: HTMLCanvasElement | null = null;
+  let ctx1: CanvasRenderingContext2D | null = null;
+  let ctx2: CanvasRenderingContext2D | null = null;
+  let ctx3: CanvasRenderingContext2D | null = null;
   let dpr = 1;
 
   // Animation state
   let isPlaying = playingByDefault;
-  let animationFrameId = null;
-  let time = 0;
-  let lastTimestamp = null;
+  let animationFrameId: number | null = null;
+  let phase = 0;
+  let lastTimestamp: number | null = null;
   let isInitialized = false;
 
-  // Animation state type
-  type AnimationState = {
-    time: number;
-  };
-
-  // Streamline data (in pixel coordinates)
-  let streamlines1: number[][][] = [];
-  let streamlines2: number[][][] = [];
-  let streamlines3: number[][][] = [];
-
-  // Random animation offsets per streamline
-  let offsets1: number[] = [];
-  let offsets2: number[] = [];
-  let offsets3: number[] = [];
-
-  // Max streamline length for animation timing
-  let maxStreamlineLength = 1;
+  // Streamline animations
+  let anim1: StreamlineAnimation<StreamlineAnimationState> | null = null;
+  let anim2: StreamlineAnimation<StreamlineAnimationState> | null = null;
+  let anim3: StreamlineAnimation<StreamlineAnimationState> | null = null;
 
   // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
-
-  function streamlinesToPixelCoords(
-    streamlines: number[][][],
-    range: typeof domainRange,
-    canvasW: number,
-    canvasH: number
-  ): number[][][] {
-    return streamlines.map(streamline =>
-      streamline.map(([x, y]) => [
-        ((x - range.xMin) / (range.xMax - range.xMin)) * canvasW,
-        ((range.yMax - y) / (range.yMax - range.yMin)) * canvasH
-      ])
-    );
-  }
 
   /**
    * Converging spiral vector field (spiral sink).
@@ -146,14 +123,21 @@
   // Setup
   // ----------------------------------------------------------------
 
-  function initializeCanvas(canvas) {
+  function initializeCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
     if (!canvas) return null;
     dpr = window.devicePixelRatio || 1;
     canvas.width = canvasWidth * dpr;
     canvas.height = canvasHeight * dpr;
     const ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
+    if (ctx) ctx.scale(dpr, dpr);
     return ctx;
+  }
+
+  function createToPixel(cw: number, ch: number): (p: [number, number]) => [number, number] {
+    return ([x, y]: [number, number]): [number, number] => [
+      ((x - domainRange.xMin) / (domainRange.xMax - domainRange.xMin)) * cw,
+      ((domainRange.yMax - y) / (domainRange.yMax - domainRange.yMin)) * ch
+    ];
   }
 
   function runInitialComputation() {
@@ -163,39 +147,49 @@
     ctx2 = initializeCanvas(canvas2);
     ctx3 = initializeCanvas(canvas3);
 
-    const streamlineOptions = {
-      domainMin: [domainRange.xMin, domainRange.yMin] as [number, number],
-      domainMax: [domainRange.xMax, domainRange.yMax] as [number, number],
-      density,
-      integrationDirection: 'both' as const,
-      minlength: minPathLength,
-      segmentLength
+    const toPixel = createToPixel(canvasWidth, canvasHeight);
+    const domain = {
+      xMin: domainRange.xMin,
+      xMax: domainRange.xMax,
+      yMin: domainRange.yMin,
+      yMax: domainRange.yMax
     };
 
-    const raw1 = generateStreamlines(convergingSpiralFieldFn(-0.5, 1.0), streamlineOptions);
-    const raw2 = generateStreamlines(divergingSpiralFieldFn(0.5, 1.0), streamlineOptions);
-    const raw3 = generateStreamlines(circulatingFieldFn(0.5), streamlineOptions);
+    const commonOptions = {
+      domain,
+      toPixel,
+      density,
+      minPathLength,
+      segmentLength,
+      color: streamlineColor,
+      strokeWidth: streamlineWidth,
+      gradientSubdivisions,
+      pulseWidth,
+      pulsePauseWidth,
+      offsets: 'random' as const,
+    };
 
-    // Convert to pixel coordinates
-    streamlines1 = streamlinesToPixelCoords(raw1, domainRange, canvasWidth, canvasHeight);
-    streamlines2 = streamlinesToPixelCoords(raw2, domainRange, canvasWidth, canvasHeight);
-    streamlines3 = streamlinesToPixelCoords(raw3, domainRange, canvasWidth, canvasHeight);
+    anim1 = createStreamlineAnimation({
+      vectorFieldFn: convergingSpiralFieldFn(-0.5, 1.0),
+      ...commonOptions,
+    });
 
-    // Generate random animation offsets
-    offsets1 = streamlines1.map(() => Math.random());
-    offsets2 = streamlines2.map(() => Math.random());
-    offsets3 = streamlines3.map(() => Math.random());
+    anim2 = createStreamlineAnimation({
+      vectorFieldFn: divergingSpiralFieldFn(0.5, 1.0),
+      ...commonOptions,
+    });
 
-    // Calculate max streamline length
-    const allLengths = [...streamlines1, ...streamlines2, ...streamlines3].map(s => s.length);
-    maxStreamlineLength = Math.max(...allLengths, 1);
+    anim3 = createStreamlineAnimation({
+      vectorFieldFn: circulatingFieldFn(0.5),
+      ...commonOptions,
+    });
   }
 
   // ----------------------------------------------------------------
   // Animations
   // ----------------------------------------------------------------
 
-  function animate(timestamp) {
+  function animate(timestamp: number) {
     if (!isPlaying) {
       animationFrameId = null;
       return;
@@ -208,10 +202,10 @@
     const elapsed = timestamp - lastTimestamp;
 
     const spacing = pulseWidth + pulsePauseWidth;
-    time += (elapsed / 1000) * pulseFrequency * spacing;
-    time %= 1.0;
+    phase += (elapsed / 1000) * pulseFrequency * spacing;
+    phase %= 1.0;
 
-    draw({ time });
+    draw(phase);
     lastTimestamp = timestamp;
 
     animationFrameId = requestAnimationFrame(animate);
@@ -234,76 +228,41 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  function drawStreamlines(
-    ctx: CanvasRenderingContext2D,
-    streamlines: number[][][],
-    offsets: number[],
-    time: number
-  ) {
-    if (streamlines.length === 0) return;
-
-    if (staticMode) {
-      drawTrajectories(
-        ctx,
-        streamlines,
-        maxStreamlineLength,
-        {
-          strokeWidth: streamlineWidth,
-          color: streamlineColor,
-          progressOpacity: staticOpacity,
-          pointRadius: 0,
-          showPreview: false,
-          showHeadMarker: false
-        }
-      );
-      return;
-    }
-
-    const baseOpacity = 0.8;
-
-    const perSegmentAlphas: number[][] = streamlines.map((streamline, i) => {
-      const numSegments = streamline.length - 1;
-      const offset = offsets[i] ?? 0;
-      return computeAlphaTrail(numSegments, time, offset, pulseWidth, pulsePauseWidth, baseOpacity);
+  function drawStatic(ctx: CanvasRenderingContext2D, anim: StreamlineAnimation<StreamlineAnimationState>) {
+    drawTrajectories(ctx, anim.streamlines, anim.streamlines[0]?.length ?? 0, {
+      strokeWidth: streamlineWidth,
+      color: streamlineColor,
+      progressOpacity: staticOpacity,
+      pointRadius: 0,
+      showPreview: false,
+      showHeadMarker: false
     });
-
-    drawTrajectories(
-      ctx,
-      streamlines,
-      0,
-      {
-        strokeWidth: streamlineWidth,
-        color: streamlineColor,
-        progressOpacity: baseOpacity,
-        pointRadius: 0,
-        showPreview: false,
-        showHeadMarker: false,
-        perSegmentAlphas,
-        gradientSubdivisions
-      }
-    );
   }
 
-  function draw(state: AnimationState) {
+  function draw(currentPhase: number) {
     if (!ctx1 || !ctx2 || !ctx3 || !isInitialized) return;
-
-    const { time: t } = state;
+    if (!anim1 || !anim2 || !anim3) return;
 
     ctx1.clearRect(0, 0, canvasWidth, canvasHeight);
-    drawStreamlines(ctx1, streamlines1, offsets1, t);
-
     ctx2.clearRect(0, 0, canvasWidth, canvasHeight);
-    drawStreamlines(ctx2, streamlines2, offsets2, t);
-
     ctx3.clearRect(0, 0, canvasWidth, canvasHeight);
-    drawStreamlines(ctx3, streamlines3, offsets3, t);
+
+    if (staticMode) {
+      drawStatic(ctx1, anim1);
+      drawStatic(ctx2, anim2);
+      drawStatic(ctx3, anim3);
+    } else {
+      anim1.draw(ctx1, currentPhase);
+      anim2.draw(ctx2, currentPhase);
+      anim3.draw(ctx3, currentPhase);
+    }
   }
 
   // ----------------------------------------------------------------
   // Event Handlers
   // ----------------------------------------------------------------
 
-  function handleVisibilityChange(active) {
+  function handleVisibilityChange(active: boolean) {
     if (!active && isPlaying) {
       stopAnimation();
     } else if (active && isPlaying && isInitialized) {
@@ -327,7 +286,7 @@
   $: if (!isInitialized && canvas1 && canvas2 && canvas3) {
     runInitialComputation();
     isInitialized = true;
-    draw({ time: 0 });
+    draw(0);
     if (playingByDefault) startAnimation();
   }
 
@@ -336,9 +295,9 @@
     handleVisibilityChange($isActive);
   }
 
-  // Update drawing when time changes
-  $: if (isInitialized && time !== undefined) {
-    draw({ time });
+  // Update drawing when phase changes
+  $: if (isInitialized && phase !== undefined) {
+    draw(phase);
   }
 </script>
 
@@ -384,7 +343,7 @@
     {/snippet}
 
     {#snippet caption()}
-      {@render caption?.()}
+      {@render children?.()}
     {/snippet}
   </TripleFigure>
 </div>
