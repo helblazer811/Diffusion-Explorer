@@ -71,6 +71,11 @@ export {
   createPauseClip,
   type Clip,
   type ClipOptions,
+} from './animation/timeline';
+
+export {
+  type Animation,
+  type AnimationWithData,
 } from './animation/animation';
 
 export {
@@ -79,9 +84,9 @@ export {
 } from './animation/visibility';
 
 export {
-  createStreamlineAnimation,
+  StreamlineAnimation,
   type StreamlineAnimationState,
   type StreamlineAnimationOptions,
-  type StreamlineAnimation,
+  type StreamlineData,
   type StreamlineDomain,
 } from './animation/streamline-animation';

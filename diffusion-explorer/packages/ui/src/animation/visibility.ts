@@ -1,4 +1,4 @@
-import type { Timeline } from './animation';
+import type { Timeline } from './timeline';
 
 export type VisibilityState = {
   wasPlayingBeforeHidden: boolean;

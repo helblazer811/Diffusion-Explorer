@@ -1,12 +1,14 @@
 /**
  * Reusable streamline animation abstraction.
  *
- * Provides a single setup function that returns:
- * - A Clip for use with Timeline
- * - A draw function for rendering animated streamlines
+ * Provides a class-based animation that:
+ * - Generates streamlines from a vector field
+ * - Creates a Clip for Timeline integration
+ * - Renders animated pulse effects along streamlines
  */
 
-import type { Clip } from './animation';
+import type { Clip } from './timeline';
+import type { AnimationWithData } from './animation';
 import { generateStreamlines, computeAlphaTrail, type VectorFieldFn } from '../plotting/streamlines';
 import { drawTrajectories } from '../plotting/trajectories';
 
@@ -68,31 +70,27 @@ export type StreamlineAnimationOptions = {
 };
 
 /**
- * Return type of createStreamlineAnimation.
+ * Data exposed by StreamlineAnimation.
  */
-export type StreamlineAnimation<TState extends StreamlineAnimationState> = {
-  /** Clip for use with Timeline - updates streamlinePhase state */
-  clip: Clip<TState>;
-  /** Draw function - renders streamlines at given phase */
-  draw: (ctx: CanvasRenderingContext2D, phase: number) => void;
-  /** Generated streamlines in pixel coordinates (for advanced use) */
+export type StreamlineData = {
+  /** Generated streamlines in pixel coordinates */
   streamlines: number[][][];
   /** Per-streamline animation offsets */
   offsets: number[];
 };
 
-// ===== Factory Function =====
+// ===== Class Implementation =====
 
 /**
- * Creates a reusable streamline animation.
+ * Animated streamlines for visualizing vector fields.
  *
- * One call sets up everything:
- * - Generates streamlines from the vector field
- * - Converts to pixel coordinates
- * - Returns a clip for Timeline and a draw function
+ * Implements AnimationWithData to provide:
+ * - A clip for Timeline integration
+ * - A draw method for rendering
+ * - Access to generated streamline data
  *
  * @example
- * const anim = createStreamlineAnimation<MyState>({
+ * const anim = StreamlineAnimation.create<MyState>({
  *   vectorFieldFn,
  *   domain: { xMin: -2, xMax: 2, yMin: -2, yMax: 2 },
  *   toPixel,
@@ -103,69 +101,101 @@ export type StreamlineAnimation<TState extends StreamlineAnimationState> = {
  * timeline.add(anim.clip, 0);
  *
  * // In draw function:
- * anim.draw(ctx, state.streamlinePhase);
+ * anim.draw(ctx, state);
  */
-export function createStreamlineAnimation<TState extends StreamlineAnimationState>(
-  options: StreamlineAnimationOptions
-): StreamlineAnimation<TState> {
-  const {
-    vectorFieldFn,
-    domain,
-    toPixel,
-    // Generation defaults
-    density = 1.0,
-    minPathLength = 2.0,
-    segmentLength = 0.01,
-    integrationDirection = 'both',
-    startPoints,
-    // Animation defaults
-    pulseWidth = 0.2,
-    pulsePauseWidth = 0.05,
-    baseOpacity = 0.8,
-    offsets: offsetMode = 'synchronized',
-    // Clip defaults
-    clipDuration = 1,
-    loopMultiplier = 1,
-    // Style defaults
-    color = '#3b82f6',
-    strokeWidth = 2.5,
-    gradientSubdivisions = 12,
-  } = options;
+export class StreamlineAnimation<TState extends StreamlineAnimationState>
+  implements AnimationWithData<TState, StreamlineData> {
 
-  // Generate streamlines in domain coordinates
-  const rawStreamlines = generateStreamlines(vectorFieldFn, {
-    domainMin: [domain.xMin, domain.yMin],
-    domainMax: [domain.xMax, domain.yMax],
-    density,
-    integrationDirection,
-    minlength: minPathLength,
-    segmentLength,
-    startPoints,
-  });
+  readonly clip: Clip<TState>;
+  readonly data: StreamlineData;
 
-  // Convert to pixel coordinates
-  const streamlines = rawStreamlines.map((streamline) =>
-    streamline.map((point) => toPixel(point as [number, number]))
-  );
+  // Style options (stored for draw)
+  private readonly pulseWidth: number;
+  private readonly pulsePauseWidth: number;
+  private readonly baseOpacity: number;
+  private readonly color: string;
+  private readonly strokeWidth: number;
+  private readonly gradientSubdivisions: number;
 
-  // Generate offsets
-  const offsets =
-    offsetMode === 'random'
-      ? streamlines.map(() => Math.random())
-      : streamlines.map(() => 0);
+  private constructor(options: StreamlineAnimationOptions) {
+    const {
+      vectorFieldFn,
+      domain,
+      toPixel,
+      // Generation defaults
+      density = 1.0,
+      minPathLength = 2.0,
+      segmentLength = 0.01,
+      integrationDirection = 'both',
+      startPoints,
+      // Animation defaults
+      pulseWidth = 0.2,
+      pulsePauseWidth = 0.05,
+      baseOpacity = 0.8,
+      offsets: offsetMode = 'synchronized',
+      // Clip defaults
+      clipDuration = 1,
+      loopMultiplier = 1,
+      // Style defaults
+      color = '#3b82f6',
+      strokeWidth = 2.5,
+      gradientSubdivisions = 12,
+    } = options;
 
-  // Create the clip
-  const clip: Clip<TState> = {
-    name: 'StreamlinePhase',
-    duration: clipDuration,
-    reduce(t: number) {
-      return { streamlinePhase: (t * loopMultiplier) % 1 } as Partial<TState>;
-    },
-  };
+    // Store style options
+    this.pulseWidth = pulseWidth;
+    this.pulsePauseWidth = pulsePauseWidth;
+    this.baseOpacity = baseOpacity;
+    this.color = color;
+    this.strokeWidth = strokeWidth;
+    this.gradientSubdivisions = gradientSubdivisions;
 
-  // Create the draw function
-  function draw(ctx: CanvasRenderingContext2D, phase: number): void {
+    // Generate streamlines in domain coordinates
+    const rawStreamlines = generateStreamlines(vectorFieldFn, {
+      domainMin: [domain.xMin, domain.yMin],
+      domainMax: [domain.xMax, domain.yMax],
+      density,
+      integrationDirection,
+      minlength: minPathLength,
+      segmentLength,
+      startPoints,
+    });
+
+    // Convert to pixel coordinates
+    const streamlines = rawStreamlines.map((streamline) =>
+      streamline.map((point) => toPixel(point as [number, number]))
+    );
+
+    // Generate offsets
+    const offsets =
+      offsetMode === 'random'
+        ? streamlines.map(() => Math.random())
+        : streamlines.map(() => 0);
+
+    // Store data
+    this.data = { streamlines, offsets };
+
+    // Create the clip
+    this.clip = {
+      name: 'StreamlinePhase',
+      duration: clipDuration,
+      reduce(t: number) {
+        return { streamlinePhase: (t * loopMultiplier) % 1 } as Partial<TState>;
+      },
+    };
+  }
+
+  /**
+   * Draw the streamlines at the current animation state.
+   *
+   * @param ctx - Canvas 2D rendering context
+   * @param state - Current animation state (uses streamlinePhase)
+   */
+  draw(ctx: CanvasRenderingContext2D, state: TState): void {
+    const { streamlines, offsets } = this.data;
     if (streamlines.length === 0) return;
+
+    const phase = state.streamlinePhase;
 
     // Compute per-segment alphas for pulse animation
     const perSegmentAlphas: number[][] = streamlines.map((streamline, i) => {
@@ -175,24 +205,35 @@ export function createStreamlineAnimation<TState extends StreamlineAnimationStat
         numSegments,
         phase,
         offset,
-        pulseWidth,
-        pulsePauseWidth,
-        baseOpacity
+        this.pulseWidth,
+        this.pulsePauseWidth,
+        this.baseOpacity
       );
     });
 
     // Draw all streamlines
     drawTrajectories(ctx, streamlines, 0, {
-      strokeWidth,
-      color,
-      progressOpacity: baseOpacity,
+      strokeWidth: this.strokeWidth,
+      color: this.color,
+      progressOpacity: this.baseOpacity,
       pointRadius: 0,
       showPreview: false,
       showHeadMarker: false,
       perSegmentAlphas,
-      gradientSubdivisions,
+      gradientSubdivisions: this.gradientSubdivisions,
     });
   }
 
-  return { clip, draw, streamlines, offsets };
+  /**
+   * Create a new StreamlineAnimation instance.
+   *
+   * @param options - Configuration options for the animation
+   * @returns A new StreamlineAnimation instance
+   */
+  static create<TState extends StreamlineAnimationState>(
+    options: StreamlineAnimationOptions
+  ): StreamlineAnimation<TState> {
+    return new StreamlineAnimation<TState>(options);
+  }
 }
+
