@@ -8,6 +8,17 @@ let referenceViewBoxHeight: number | null = null;
 // Cache for rendered MathJax images: key -> { img, aspectRatio, vbHeight }
 const mathjaxCache = new Map<string, { img: HTMLImageElement; aspectRatio: number; vbHeight: number }>();
 
+// Track formulas currently being rendered
+const pendingRenders = new Set<string>();
+
+// Style options type
+export type MathjaxStyleOptions = {
+  color?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  strokeOpacity?: number;
+};
+
 declare global {
   interface Window {
     MathJax: any;
@@ -81,6 +92,59 @@ async function getReferenceViewBoxHeight(): Promise<number> {
 
   referenceViewBoxHeight = viewBox[3]; // vbHeight
   return referenceViewBoxHeight;
+}
+
+// Auto-initialize MathJax when module is imported in browser
+if (typeof window !== 'undefined') {
+  getReferenceViewBoxHeight();
+}
+
+/**
+ * Build cache key from latex string and styling options
+ */
+function buildCacheKey(latex: string, options: MathjaxStyleOptions): string {
+  return `${latex}|${options.color ?? ''}|${options.stroke ?? ''}|${options.strokeWidth ?? ''}|${options.strokeOpacity ?? ''}`;
+}
+
+/**
+ * Render a formula to the cache (async, called in background)
+ */
+async function renderToCache(latex: string, options: MathjaxStyleOptions): Promise<void> {
+  const cacheKey = buildCacheKey(latex, options);
+  if (mathjaxCache.has(cacheKey)) return;
+
+  // Render LaTeX to SVG
+  const svg = await latexToSvgElement(latex, options);
+
+  // Get aspect ratio from viewBox
+  const viewBox = svg.getAttribute('viewBox')?.split(' ').map(Number);
+  if (!viewBox || viewBox.length !== 4) {
+    console.warn('MathJax SVG missing viewBox');
+    return;
+  }
+
+  const [, , vbWidth, vbHeight] = viewBox;
+  const aspectRatio = vbWidth / vbHeight;
+
+  // Render at a base size for caching (we'll scale when drawing)
+  const baseHeight = 100;
+  const baseWidth = baseHeight * aspectRatio;
+
+  svg.setAttribute('width', String(baseWidth));
+  svg.setAttribute('height', String(baseHeight));
+
+  // Convert to image
+  const svgString = new XMLSerializer().serializeToString(svg);
+  const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+
+  mathjaxCache.set(cacheKey, { img, aspectRatio, vbHeight });
 }
 
 /**
@@ -169,127 +233,10 @@ export async function latexToSvgElement(latex: string, options: LatexToSvgOption
 }
 
 /**
- * Places a MathJax SVG element with bottom-center anchor point
- * @param svgElement - The SVG element to place (will be cloned)
- * @param parentSvg - The parent SVG to append to
- * @param anchorX - X coordinate of anchor point
- * @param anchorY - Y coordinate of anchor point
- * @param offsetX - Optional horizontal offset
- * @param offsetY - Optional vertical offset
- * @param scaleFactor - Scale factor for the SVG dimensions (default 50)
- * @param sizeMultiplier - Visual scale multiplier (default 1, e.g., 1.5 = 50% larger)
- */
-export function placeMathjaxSVG(
-  svgElement: SVGSVGElement,
-  parentSvg: SVGSVGElement,
-  anchorX: number,
-  anchorY: number,
-  offsetX = 0,
-  offsetY = 0,
-  scaleFactor = 50,
-  sizeMultiplier = 1
-): void {
-  // Get dimensions from viewBox (consistent across browsers)
-  const viewBox = svgElement.getAttribute('viewBox')?.split(' ').map(Number);
-
-  let scaledWidth: number;
-  let scaledHeight: number;
-
-  if (viewBox && viewBox.length === 4) {
-    const [, , vbWidth, vbHeight] = viewBox;
-    scaledWidth = (vbWidth / scaleFactor) * sizeMultiplier;
-    scaledHeight = (vbHeight / scaleFactor) * sizeMultiplier;
-  } else {
-    // Fallback: append to DOM and measure (old behavior)
-    svgElement.setAttribute("x", "-1000");
-    svgElement.setAttribute("y", "-1000");
-    parentSvg.appendChild(svgElement);
-    const bboxFallback = svgElement.getBBox();
-    parentSvg.removeChild(svgElement);
-    scaledWidth = (bboxFallback.width / scaleFactor) * sizeMultiplier;
-    scaledHeight = (bboxFallback.height / scaleFactor) * sizeMultiplier;
-  }
-
-  // Compute bottom-center translation
-  const translateX = anchorX - scaledWidth / 2 + offsetX;
-  const translateY = anchorY - scaledHeight + offsetY;
-
-  // Wrap in a <g> at the correct position
-  const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  g.setAttribute("transform", `translate(${translateX}, ${translateY})`);
-
-  // Reset x/y attributes if they were set
-  svgElement.removeAttribute("x");
-  svgElement.removeAttribute("y");
-
-  // Apply visual scale transform
-  if (sizeMultiplier !== 1) {
-    svgElement.setAttribute("transform-origin", "0 0");
-    svgElement.setAttribute("transform", `scale(${sizeMultiplier})`);
-  }
-
-  g.appendChild(svgElement);
-  parentSvg.appendChild(g);
-}
-
-/**
- * Draws an SVG onto a canvas at the specified position.
- * @param ctx - Canvas 2D rendering context
- * @param svgElement - The SVG element to draw
- * @param x - X coordinate of the anchor point (bottom-center)
- * @param y - Y coordinate of the anchor point (bottom-center)
- * @param fontSize - Height of the rendered SVG in pixels
- * @param offsetX - Optional horizontal offset (default 0)
- * @param offsetY - Optional vertical offset (default 0)
- * @returns Promise that resolves when drawing is complete
- */
-export async function drawSVGOnCanvas(
-  ctx: CanvasRenderingContext2D,
-  svgElement: SVGSVGElement,
-  x: number,
-  y: number,
-  fontSize: number,
-  offsetX = 0,
-  offsetY = 0
-): Promise<void> {
-  // Get viewBox for aspect ratio
-  const viewBox = svgElement.getAttribute('viewBox')?.split(' ').map(Number);
-  if (!viewBox || viewBox.length !== 4) {
-    console.warn('SVG missing viewBox');
-    return;
-  }
-
-  const [, , vbWidth, vbHeight] = viewBox;
-  const aspectRatio = vbWidth / vbHeight;
-  const height = fontSize;
-  const width = height * aspectRatio;
-
-  // Set dimensions on SVG clone
-  const svgClone = svgElement.cloneNode(true) as SVGSVGElement;
-  svgClone.setAttribute('width', String(width));
-  svgClone.setAttribute('height', String(height));
-
-  // Convert to data URL and draw
-  const svgString = new XMLSerializer().serializeToString(svgClone);
-  const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
-
-  const img = new Image();
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => {
-      const drawX = x - width / 2 + offsetX;
-      const drawY = y - height + offsetY;
-      ctx.drawImage(img, drawX, drawY, width, height);
-      resolve();
-    };
-    img.onerror = reject;
-    img.src = dataUrl;
-  });
-}
-
-/**
- * Draws a LaTeX formula onto a canvas. Caches rendered formulas for performance.
- * Font size is calibrated so that "M" renders at exactly fontSize pixels.
- * Other characters scale proportionally (e.g., "x" will be smaller than "M").
+ * Draws a LaTeX formula onto a canvas synchronously.
+ * MathJax auto-initializes on module import. If a formula isn't cached yet,
+ * it queues background rendering and skips this frame.
+ *
  * @param ctx - Canvas 2D rendering context
  * @param latex - LaTeX formula string
  * @param x - X coordinate of the anchor point (bottom-center)
@@ -297,10 +244,9 @@ export async function drawSVGOnCanvas(
  * @param fontSize - Height of uppercase "M" in pixels (other chars scale proportionally)
  * @param offsetX - Optional horizontal offset (default 0)
  * @param offsetY - Optional vertical offset (default 0)
- * @param options - Optional styling { color, stroke, strokeWidth }
- * @returns Promise that resolves when drawing is complete
+ * @param options - Optional styling { color, stroke, strokeWidth, strokeOpacity }
  */
-export async function drawMathjaxOnCanvas(
+export function drawMathjax(
   ctx: CanvasRenderingContext2D,
   latex: string,
   x: number,
@@ -308,60 +254,32 @@ export async function drawMathjaxOnCanvas(
   fontSize: number,
   offsetX = 0,
   offsetY = 0,
-  options: { color?: string; stroke?: string; strokeWidth?: number; strokeOpacity?: number } = {}
-): Promise<void> {
-  // Create cache key from latex + styling options
-  const cacheKey = `${latex}|${options.color ?? ''}|${options.stroke ?? ''}|${options.strokeWidth ?? ''}|${options.strokeOpacity ?? ''}`;
-
-  let cached = mathjaxCache.get(cacheKey);
-
-  if (!cached) {
-    // Render LaTeX to SVG
-    const svg = await latexToSvgElement(latex, options);
-
-    // Get aspect ratio from viewBox
-    const viewBox = svg.getAttribute('viewBox')?.split(' ').map(Number);
-    if (!viewBox || viewBox.length !== 4) {
-      console.warn('MathJax SVG missing viewBox');
-      return;
-    }
-
-    const [, , vbWidth, vbHeight] = viewBox;
-    const aspectRatio = vbWidth / vbHeight;
-
-    // Render at a base size for caching (we'll scale when drawing)
-    const baseHeight = 100; // Large enough for quality
-    const baseWidth = baseHeight * aspectRatio;
-
-    svg.setAttribute('width', String(baseWidth));
-    svg.setAttribute('height', String(baseHeight));
-
-    // Convert to image
-    const svgString = new XMLSerializer().serializeToString(svg);
-    const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
-
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = reject;
-      img.src = dataUrl;
-    });
-
-    cached = { img, aspectRatio, vbHeight };
-    mathjaxCache.set(cacheKey, cached);
+  options: MathjaxStyleOptions = {}
+): void {
+  // If MathJax not ready yet, skip silently (it's loading)
+  if (referenceViewBoxHeight === null) {
+    return;
   }
 
-  // Get reference height for calibration
-  const refHeight = await getReferenceViewBoxHeight();
+  const cacheKey = buildCacheKey(latex, options);
+  const cached = mathjaxCache.get(cacheKey);
 
-  // Calculate actual pixel height based on ratio to reference
-  // fontSize is the height of "M", scale other chars proportionally
-  const scale = cached.vbHeight / refHeight;
+  if (!cached) {
+    // Not cached yet - queue background render and skip this frame
+    if (!pendingRenders.has(cacheKey)) {
+      pendingRenders.add(cacheKey);
+      renderToCache(latex, options).then(() => {
+        pendingRenders.delete(cacheKey);
+      });
+    }
+    return;
+  }
+
+  // Synchronous drawing
+  const scale = cached.vbHeight / referenceViewBoxHeight;
   const height = fontSize * scale;
   const width = height * cached.aspectRatio;
-
   const drawX = x - width / 2 + offsetX;
   const drawY = y - height + offsetY;
-
   ctx.drawImage(cached.img, drawX, drawY, width, height);
 }

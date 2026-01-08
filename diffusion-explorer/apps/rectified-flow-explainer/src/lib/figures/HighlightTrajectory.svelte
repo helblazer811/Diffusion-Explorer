@@ -4,7 +4,7 @@
     Figure,
     TimeSlider,
     drawScatterPlot,
-    drawMathjaxOnCanvas,
+    drawMathjax,
     drawTrajectories,
     createSourceTargetScales,
     Timeline,
@@ -262,7 +262,7 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  async function draw(state: AnimationState) {
+  function draw(state: AnimationState) {
     if (!ctx || !initialized) return;
 
     const t = state.time;
@@ -340,7 +340,7 @@
       const latexColor = settings.stylingSettings.figureLatex.color;
 
       // Draw "x" label at start
-      await drawMathjaxOnCanvas(
+      drawMathjax(
         ctx,
         "x",
         startPoint[0],
@@ -353,7 +353,7 @@
 
       // Draw "ψ_t(x)" label at current position (after initial movement)
       if (t >= 0.05) {
-        await drawMathjaxOnCanvas(
+        drawMathjax(
           ctx,
           "\\psi_t(x)",
           currentPoint[0],
@@ -374,7 +374,7 @@
       const currentPoint = getPointAtProgress(idx, t);
 
       // Draw "x" label at start
-      await drawMathjaxOnCanvas(
+      drawMathjax(
         ctx,
         "x",
         startPoint[0],
@@ -387,7 +387,7 @@
 
       // Draw "ψ_t(x)" label at current position (after initial movement)
       if (t >= 0.05) {
-        await drawMathjaxOnCanvas(
+        drawMathjax(
           ctx,
           "\\psi_t(x)",
           currentPoint[0],

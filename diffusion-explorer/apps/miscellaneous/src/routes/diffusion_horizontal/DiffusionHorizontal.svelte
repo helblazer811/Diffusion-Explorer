@@ -1,10 +1,9 @@
-<!-- This figure shows a source distribution mapped to a target distribution with animated intermediate samples. -->
+<!-- This figure shows a source distribution (noise) mapped to a target distribution with animated intermediate samples for diffusion models. -->
 
 <script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
   import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
-  import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
   // Props
@@ -17,27 +16,26 @@
   export let sourceDistributionSamples = [];
   export let targetDistributionSamples = [];
   export let allTimeSamples;
-  export let isTraining;
 
   // Props/Configuration
   export let width = 800;
   export let height = 450;
 
   // Styling props for visualization
-  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
-  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
+  export let sourcePointColor = "#3b82f6";
+  export let targetPointColor = "#3b82f6";
   export let marginWidth = 50;
   export let marginHeight = 20;
-  export let sourceLabelText = "Source Distribution";
+  export let sourceLabelText = "Noise Distribution";
   export let targetLabelText = "Target Distribution";
-  export let labelFontSize = settings.stylingSettings.label.fontSize;
-  export let labelFontWeight = settings.stylingSettings.label.fontWeight;
-  export let labelColor = settings.stylingSettings.label.color;
-  export let labelOpacity = settings.stylingSettings.label.opacity;
-  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
-  export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
-  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
-  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
+  export let labelFontSize = 16;
+  export let labelFontWeight = "600";
+  export let labelColor = "#333";
+  export let labelOpacity = 1.0;
+  export let pointRadius = 4;
+  export let pointOpacity = 0.7;
+  export let sourceCenterX = 0.22;
+  export let targetCenterX = 0.78;
   export let yShiftFactor = -1.0;
   export let distributionScaleFactor = 0.6;
 
@@ -60,15 +58,16 @@
 
   // Contour plot options for P_t
   export let showContours = false;
-  export let contourBandwidth = settings.stylingSettings.contour.bandwidth;
-  export let contourThresholds = settings.stylingSettings.contour.thresholds;
-  export let contourOpacity = settings.stylingSettings.contour.opacity;
-  export let contourFillColor = settings.stylingSettings.contour.fillColor;
-  export let contourBlendMode = settings.stylingSettings.contour.blendMode;
+  export let contourBandwidth = 0.15;
+  export let contourThresholds = 10;
+  export let contourOpacity = 0.6;
+  export let contourFillColor = "#f17720";
+  export let contourBlendMode = "multiply";
 
   // LaTeX label styling
   export let latexLabelOffsetY = 20;
-  export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
+  export let latexFontSize = 20;
+  export let latexColor = "#333";
 
   // ----------------------------------------------------------------
   // State
@@ -317,30 +316,28 @@
     }
 
     // Draw LaTeX labels directly on canvas
-    const latexColor = settings.stylingSettings.figureLatex.color;
-
     // Compute y position for math labels (below text labels)
     const yDomain = scales.yScale.domain();
     const yTop = yDomain[0];
     const textLabelY = scales.yScale(yTop) + 0.5 * labelFontSize;
     const mathLabelY = textLabelY + labelFontSize;
 
-    // p_0 label
+    // x_T label (noise at timestep T)
     drawMathjax(
-      ctx, "p_0", scales.sourceCenterPixelX, mathLabelY,
+      ctx, "x_T", scales.sourceCenterPixelX, mathLabelY,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
-    // p_1 label
+    // x_0 label (clean data at timestep 0)
     drawMathjax(
-      ctx, "p_1", scales.targetCenterPixelX, mathLabelY,
+      ctx, "x_0", scales.targetCenterPixelX, mathLabelY,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
-    // p_t label (visible when not at endpoints)
+    // x_t label (visible when not at endpoints)
     if (t >= 0.1 && t <= 0.9) {
       drawMathjax(
-        ctx, "p_t", state.centerX, mathLabelY,
+        ctx, "x_t", state.centerX, mathLabelY,
         latexFontSize, 0, latexLabelOffsetY, { color: intermediatePointColor }
       );
     }

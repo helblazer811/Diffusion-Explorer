@@ -1,7 +1,7 @@
 <!-- Visualizes intersecting linear paths between source and target distributions with velocity vectors at intersection. -->
 
 <script>
-  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjaxOnCanvas, createSourceTargetScales, dataToPixelX, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjax, createSourceTargetScales, dataToPixelX, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -178,7 +178,7 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  async function draw() {
+  function draw() {
     if (!ctx || !scales) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -343,21 +343,21 @@
       };
 
       // Draw arrow labels
-      await drawMathjaxOnCanvas(
+      drawMathjax(
         ctx, "v_t(x|x_0^a, x_1^a)",
         arrow2Mid.x + topArrowLabelOffset.x,
         arrow2Mid.y + topArrowLabelOffset.y,
         latexFontSize, 60, 100, { color: arrowColor }
       );
 
-      await drawMathjaxOnCanvas(
+      drawMathjax(
         ctx, "v_t(x|x_0^b, x_1^b)",
         arrow1Mid.x + bottomArrowLabelOffset.x,
         arrow1Mid.y + bottomArrowLabelOffset.y,
         latexFontSize, 60, -35, { color: arrowColor }
       );
 
-      await drawMathjaxOnCanvas(
+      drawMathjax(
         ctx, "v_t^\\theta(x) = \\mathbb{E}[X_1 - X_0 | x_t = x]",
         meanEnd.x + meanArrowLabelOffset.x,
         meanEnd.y + meanArrowLabelOffset.y,
@@ -365,29 +365,29 @@
       );
 
       // Draw intersection label 'x'
-      await drawMathjaxOnCanvas(
+      drawMathjax(
         ctx, "x", intersection.x, intersection.y,
         latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
       );
     }
 
     // Draw endpoint labels
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_0^a", line2Coords.x1, line2Coords.y1,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_0^b", line1Coords.x1, line1Coords.y1,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_1^a", line2Coords.x2, line2Coords.y2,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
-    await drawMathjaxOnCanvas(
+    drawMathjax(
       ctx, "x_1^b", line1Coords.x2, line1Coords.y2,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );

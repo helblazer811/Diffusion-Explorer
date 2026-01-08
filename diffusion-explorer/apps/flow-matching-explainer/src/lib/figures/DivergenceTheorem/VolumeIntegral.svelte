@@ -1,7 +1,7 @@
 <!-- Volume integral visualization with grid subdivision inside the closed curve. -->
 
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy } from "svelte";
   import {
     useCanvas2D,
     generateStreamlines,
@@ -10,8 +10,7 @@
     Katex,
     Timeline,
     computeAlphaTrail,
-    loadMathJax,
-    drawMathjaxOnCanvas,
+    drawMathjax,
     type VectorFieldFn
   } from "@diffusion-explorer/ui";
   import { drawClosedCurve, type CurveFn } from "./divergence_theorem";
@@ -121,7 +120,6 @@
 
   let isInitialized = false;
   let wasPlayingBeforeHidden = false;
-  let mathjaxReady = false;
 
   // Animation state
   type AnimationState = {
@@ -579,7 +577,7 @@
     }
 
     // 5. Draw volume label (V) with rounded rectangle background
-    if (showLabel && mathjaxReady && boundingBox) {
+    if (showLabel && boundingBox) {
       const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
       const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
       const [cx, cy] = toPixel([centerX, centerY]);
@@ -603,7 +601,7 @@
       ctx.stroke();
 
       // Draw label
-      drawMathjaxOnCanvas(ctx, labelText, cx, cy + labelHeight / 2, volumeLabelFontSize, 0, 0, { color: volumeLabelColor, stroke: volumeLabelStrokeColor, strokeWidth: volumeLabelStrokeWidth });
+      drawMathjax(ctx, labelText, cx, cy + labelHeight / 2, volumeLabelFontSize, 0, 0, { color: volumeLabelColor, stroke: volumeLabelStrokeColor, strokeWidth: volumeLabelStrokeWidth });
     }
   }
 
@@ -692,14 +690,6 @@
   // ----------------------------------------------------------------
   // Lifecycle
   // ----------------------------------------------------------------
-
-  onMount(async () => {
-    await loadMathJax();
-    // Pre-cache the formula so draw() is synchronous
-    const tempCtx = document.createElement('canvas').getContext('2d')!;
-    await drawMathjaxOnCanvas(tempCtx, labelText, 0, 0, volumeLabelFontSize, 0, 0, { color: volumeLabelColor, stroke: volumeLabelStrokeColor, strokeWidth: volumeLabelStrokeWidth });
-    mathjaxReady = true;
-  });
 
   onDestroy(() => {
     if (timeline) timeline.pause();
