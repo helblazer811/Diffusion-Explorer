@@ -56,7 +56,6 @@ export * from './plotting/trajectories';
 export * from './plotting/contours';
 export * from './plotting/vector_field';
 export * from './plotting/mathjax';
-export * from './plotting/katex';
 export * from './plotting/pathlines';
 export * from './plotting/streamlines';
 export * from './plotting/mesh_grid';
