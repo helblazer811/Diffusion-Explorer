@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { Timeline } from '../animation/animation';
+  import type { Timeline } from '../animation/timeline';
   import Slider from './Slider.svelte';
 
   // Props

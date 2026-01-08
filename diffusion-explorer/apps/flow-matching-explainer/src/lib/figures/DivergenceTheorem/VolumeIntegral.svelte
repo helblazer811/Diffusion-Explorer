@@ -7,11 +7,10 @@
     drawArrow,
     Katex,
     Timeline,
-    createStreamlineAnimation,
+    StreamlineAnimation,
     drawMathjax,
     type VectorFieldFn,
     type StreamlineAnimationState,
-    type StreamlineAnimation,
   } from "@diffusion-explorer/ui";
   import { drawClosedCurve, type CurveFn } from "./divergence_theorem";
 
@@ -514,7 +513,7 @@
 
     // 1. Draw streamlines (behind everything) with pulse animation
     if (showStreamlines && streamlineAnim) {
-      streamlineAnim.draw(ctx, streamlinePhase);
+      streamlineAnim.draw(ctx, state);
     }
 
     // 2. Draw surface fill (behind grid and arrows)
@@ -586,7 +585,7 @@
     gridCells = computeGridCells();
 
     // Create streamline animation
-    streamlineAnim = createStreamlineAnimation<AnimationState>({
+    streamlineAnim = StreamlineAnimation.create<AnimationState>({
       vectorFieldFn: vectorFieldFn as VectorFieldFn,
       domain: {
         xMin: boundingBox.xMin - domainMargin,

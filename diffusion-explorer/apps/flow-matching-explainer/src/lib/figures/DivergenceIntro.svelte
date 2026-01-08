@@ -6,11 +6,10 @@
     TripleFigure,
     Katex,
     drawTrajectories,
-    createStreamlineAnimation,
+    StreamlineAnimation,
     useCanvas2D,
     Timeline,
     type VectorFieldFn,
-    type StreamlineAnimation,
     type StreamlineAnimationState,
   } from "@diffusion-explorer/ui";
 
@@ -160,17 +159,17 @@
       offsets: 'random' as const,
     };
 
-    anim1 = createStreamlineAnimation({
+    anim1 = StreamlineAnimation.create({
       vectorFieldFn: convergingSpiralFieldFn(-0.5, 1.0),
       ...commonOptions,
     });
 
-    anim2 = createStreamlineAnimation({
+    anim2 = StreamlineAnimation.create({
       vectorFieldFn: divergingSpiralFieldFn(0.5, 1.0),
       ...commonOptions,
     });
 
-    anim3 = createStreamlineAnimation({
+    anim3 = StreamlineAnimation.create({
       vectorFieldFn: circulatingFieldFn(0.5),
       ...commonOptions,
     });
@@ -212,7 +211,7 @@
   // ----------------------------------------------------------------
 
   function drawStatic(ctx: CanvasRenderingContext2D, anim: StreamlineAnimation<StreamlineAnimationState>) {
-    drawTrajectories(ctx, anim.streamlines, anim.streamlines[0]?.length ?? 0, {
+    drawTrajectories(ctx, anim.data.streamlines, anim.data.streamlines[0]?.length ?? 0, {
       strokeWidth: streamlineWidth,
       color: streamlineColor,
       progressOpacity: staticOpacity,
@@ -237,9 +236,9 @@
       drawStatic(ctx2, anim2);
       drawStatic(ctx3, anim3);
     } else {
-      anim1.draw(ctx1, streamlinePhase);
-      anim2.draw(ctx2, streamlinePhase);
-      anim3.draw(ctx3, streamlinePhase);
+      anim1.draw(ctx1, state);
+      anim2.draw(ctx2, state);
+      anim3.draw(ctx3, state);
     }
   }
 

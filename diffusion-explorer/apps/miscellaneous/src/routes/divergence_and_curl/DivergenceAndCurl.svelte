@@ -5,11 +5,10 @@
   import {
     TripleFigure,
     Katex,
-    createStreamlineAnimation,
+    StreamlineAnimation,
     useCanvas2D,
     Timeline,
     type VectorFieldFn,
-    type StreamlineAnimation,
     type StreamlineAnimationState,
   } from "@diffusion-explorer/ui";
 
@@ -178,19 +177,19 @@
 
     // Pure divergence uses uniform grid seeding for better coverage
     const uniformStartPoints = generateUniformStartPoints(domainRange, 8);
-    anim1 = createStreamlineAnimation({
+    anim1 = StreamlineAnimation.create({
       vectorFieldFn: pureDivergenceField(),
       ...commonOptions,
       startPoints: uniformStartPoints,
       minPathLength: 0.5,  // Lower minimum length for better coverage
     });
 
-    anim2 = createStreamlineAnimation({
+    anim2 = StreamlineAnimation.create({
       vectorFieldFn: pureCurlField(),
       ...commonOptions,
     });
 
-    anim3 = createStreamlineAnimation({
+    anim3 = StreamlineAnimation.create({
       vectorFieldFn: combinedField(0.5, 1.0),
       ...commonOptions,
     });
@@ -237,15 +236,13 @@
     if (!ctx1 || !ctx2 || !ctx3 || !isInitialized) return;
     if (!anim1 || !anim2 || !anim3) return;
 
-    const { streamlinePhase } = state;
-
     ctx1.clearRect(0, 0, canvasWidth, canvasHeight);
     ctx2.clearRect(0, 0, canvasWidth, canvasHeight);
     ctx3.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    anim1.draw(ctx1, streamlinePhase);
-    anim2.draw(ctx2, streamlinePhase);
-    anim3.draw(ctx3, streamlinePhase);
+    anim1.draw(ctx1, state);
+    anim2.draw(ctx2, state);
+    anim3.draw(ctx3, state);
   }
 
   // ----------------------------------------------------------------

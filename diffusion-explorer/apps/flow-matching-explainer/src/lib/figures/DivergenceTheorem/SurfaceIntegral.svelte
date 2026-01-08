@@ -4,14 +4,13 @@
   import { onDestroy } from "svelte";
   import {
     Timeline,
-    createStreamlineAnimation,
+    StreamlineAnimation,
     drawArrow,
     useCanvas2D,
     Katex,
     drawMathjax,
     type VectorFieldFn,
     type StreamlineAnimationState,
-    type StreamlineAnimation,
   } from "@diffusion-explorer/ui";
   import {
     getTangentAndNormal,
@@ -183,7 +182,7 @@
     // Create streamline animation
     const totalDuration = Math.max(streamlineDuration, rotationDuration);
 
-    streamlineAnim = createStreamlineAnimation<AnimationState>({
+    streamlineAnim = StreamlineAnimation.create<AnimationState>({
       vectorFieldFn: vectorFieldFn as VectorFieldFn,
       domain: {
         xMin: boundingBox.xMin - domainMargin,
@@ -257,7 +256,7 @@
     ctx.clearRect(0, 0, width, height);
 
     // 1. Draw streamlines (behind) - using the animation's draw function
-    streamlineAnim.draw(ctx, streamlinePhase);
+    streamlineAnim.draw(ctx, state);
 
     // 2. Draw surface curve (on top of streamlines)
     drawClosedCurve(ctx, curveFn, toPixel, {
