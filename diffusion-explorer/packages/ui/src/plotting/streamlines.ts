@@ -23,6 +23,7 @@ export interface StreamlineOptions {
   startPoints?: [number, number][];            // User-specified seeds (optional)
   brokenStreamlines?: boolean;                 // Stop at collisions (default: true)
   maxerror?: number;                           // RK12 error tolerance (default: 0.003)
+  segmentLength?: number;                      // If provided, resample to equal-length segments
 }
 
 /**
@@ -223,36 +224,6 @@ function integrateRK12(
   const maxSteps = 10000; // Safety limit
 
   for (let step = 0; step < maxSteps && stotal < maxlength; step++) {
-    // Check if within grid
-    if (!dmap.isWithinGrid(xi, yi)) {
-      // Take Euler step to boundary
-      const [x, y] = dmap.grid2data(xi, yi);
-      const [vx, vy] = vectorField(x, y);
-      const speed = Math.sqrt(vx * vx + vy * vy);
-      if (speed > 1e-10) {
-        // Compute scaled velocity in grid coordinates
-        const vxi = direction * vx * dmap.x_data2grid;
-        const vyi = direction * vy * dmap.y_data2grid;
-        // Find distance to boundary
-        let dsx = Infinity, dsy = Infinity;
-        if (vxi !== 0) {
-          dsx = vxi < 0 ? xi / -vxi : (dmap.nx - 1 - xi) / vxi;
-        }
-        if (vyi !== 0) {
-          dsy = vyi < 0 ? yi / -vyi : (dmap.ny - 1 - yi) / vyi;
-        }
-        const finalDs = Math.min(dsx, dsy);
-        if (isFinite(finalDs) && finalDs > 0) {
-          const xiFinal = xi + vxi * finalDs;
-          const yiFinal = yi + vyi * finalDs;
-          const [xFinal, yFinal] = dmap.grid2data(xiFinal, yiFinal);
-          points.push([xFinal, yFinal]);
-          stotal += finalDs;
-        }
-      }
-      break;
-    }
-
     // Get velocity at current position
     const [x, y] = dmap.grid2data(xi, yi);
     const [vx, vy] = vectorField(x, y);
@@ -296,12 +267,46 @@ function integrateRK12(
       const xiNew = xi + dx2;
       const yiNew = yi + dy2;
 
-      // Check bounds
+      // Check bounds - if stepping out, find boundary crossing and terminate
       if (!dmap.isWithinGrid(xiNew, yiNew)) {
-        // Out of bounds - will be handled in next iteration
-        xi = xiNew;
-        yi = yiNew;
-        continue;
+        // Compute intersection with grid boundary from current position
+        // We're at (xi, yi) inside, stepping to (xiNew, yiNew) outside
+        const dxi = xiNew - xi;
+        const dyi = yiNew - yi;
+
+        // Find parameter t where we cross each boundary
+        let tMin = 1.0;
+
+        // Left boundary (x = 0)
+        if (dxi < 0 && xiNew < 0) {
+          const t = -xi / dxi;
+          if (t > 0 && t < tMin) tMin = t;
+        }
+        // Right boundary (x = nx-1)
+        if (dxi > 0 && xiNew > dmap.nx - 1) {
+          const t = (dmap.nx - 1 - xi) / dxi;
+          if (t > 0 && t < tMin) tMin = t;
+        }
+        // Bottom boundary (y = 0)
+        if (dyi < 0 && yiNew < 0) {
+          const t = -yi / dyi;
+          if (t > 0 && t < tMin) tMin = t;
+        }
+        // Top boundary (y = ny-1)
+        if (dyi > 0 && yiNew > dmap.ny - 1) {
+          const t = (dmap.ny - 1 - yi) / dyi;
+          if (t > 0 && t < tMin) tMin = t;
+        }
+
+        // Add boundary point if valid
+        if (tMin > 0 && tMin < 1) {
+          const xiBoundary = xi + dxi * tMin;
+          const yiBoundary = yi + dyi * tMin;
+          const [xBoundary, yBoundary] = dmap.grid2data(xiBoundary, yiBoundary);
+          points.push([xBoundary, yBoundary]);
+          stotal += Math.sqrt(dxi * dxi + dyi * dyi) * tMin;
+        }
+        break;
       }
 
       // Update mask
@@ -469,7 +474,8 @@ export function generateStreamlines(
     minlength = 0,
     startPoints,
     brokenStreamlines = true,
-    maxerror = 0.003
+    maxerror = 0.003,
+    segmentLength
   } = options;
 
   // Initialize mask and domain map
@@ -532,6 +538,11 @@ export function generateStreamlines(
     }
   }
 
+  // Resample if segmentLength specified
+  if (segmentLength !== undefined) {
+    return streamlines.map(s => resampleStreamline(s, segmentLength));
+  }
+
   return streamlines;
 }
 
@@ -542,7 +553,7 @@ export function generateStreamlines(
  * @param segmentLength - Desired length of each segment (in domain units)
  * @returns Resampled streamline with equal-length segments
  */
-export function resampleStreamline(
+function resampleStreamline(
   streamline: number[][],
   segmentLength: number
 ): number[][] {
@@ -604,15 +615,70 @@ export function resampleStreamline(
 }
 
 /**
- * Resample all streamlines to have equal-length segments.
+ * Compute per-segment alpha values for animated pulses along a streamline.
  *
- * @param streamlines - Array of streamlines
- * @param segmentLength - Desired length of each segment
- * @returns Resampled streamlines
+ * Uses centered pulse blobs with smooth quadratic falloff.
+ *
+ * @param numSegments - Number of segments in the streamline
+ * @param time - Spatial phase of wave train [0, 1)
+ * @param offset - Random phase offset for this streamline (0-1)
+ * @param pulseWidth - Fraction of streamline length each pulse occupies
+ * @param pulsePauseWidth - Gap between pulses (fraction of streamline length)
+ * @param baseOpacity - Maximum opacity at pulse center
+ * @returns Array of alpha values for each segment
  */
-export function resampleStreamlines(
-  streamlines: number[][][],
-  segmentLength: number
-): number[][][] {
-  return streamlines.map(s => resampleStreamline(s, segmentLength));
+export function computeAlphaTrail(
+  numSegments: number,
+  time: number,
+  offset: number,
+  pulseWidth: number,
+  pulsePauseWidth: number,
+  baseOpacity: number
+): number[] {
+  const alphas = new Array(numSegments).fill(0);
+  if (numSegments === 0) return alphas;
+
+  const spacing = pulseWidth + pulsePauseWidth;
+  const posStep = 1 / numSegments;
+
+  const phase = (time + offset) % 1;
+  const pulseCount = spacing > 1e-5 ? Math.ceil(1 / spacing) : 1;
+
+  for (let p = 0; p < pulseCount; p++) {
+    // Front edge of this pulse (hard leading edge)
+    const front = (phase + p * spacing) % 1;
+    // Back edge trails behind by pulseWidth
+    const back = front - pulseWidth;
+
+    for (let i = 0; i < numSegments; i++) {
+      const pos = i * posStep;
+
+      // Check if position is within pulse (handling wrap-around)
+      let inPulse = false;
+      let distFromFront = 0;
+
+      if (back >= 0) {
+        // No wrap-around
+        inPulse = pos >= back && pos < front;
+        if (inPulse) distFromFront = front - pos;
+      } else {
+        // Pulse wraps around (back is negative)
+        inPulse = pos >= (back + 1) || pos < front;
+        if (inPulse) {
+          distFromFront = pos < front ? (front - pos) : (front + 1 - pos);
+        }
+      }
+
+      if (inPulse) {
+        // Fade from front (full opacity) to back (zero)
+        // distFromFront: 0 at front, pulseWidth at back
+        const u = distFromFront / pulseWidth;  // 0 at front → 1 at back
+        const alpha = baseOpacity * (1 - u);   // 1 at front → 0 at back
+        alphas[i] = Math.max(alphas[i], alpha);
+      }
+    }
+  }
+
+  return alphas;
 }
+
