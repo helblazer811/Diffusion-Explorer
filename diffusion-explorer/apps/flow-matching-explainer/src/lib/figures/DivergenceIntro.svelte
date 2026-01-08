@@ -7,6 +7,8 @@
     Katex,
     drawTrajectories,
     createStreamlineAnimation,
+    useCanvas2D,
+    Timeline,
     type VectorFieldFn,
     type StreamlineAnimation,
     type StreamlineAnimationState,
@@ -50,25 +52,32 @@
   // State
   // ----------------------------------------------------------------
 
-
   // Visibility state from TripleFigure
-  let isActive;
+  let isActive: ReturnType<typeof import('svelte/store').writable<boolean>> | undefined;
 
-  // Three canvases
+  // Compute canvas dimensions
+  const initialCanvasWidth = Math.floor((width - 2 * gap) / 3);
+  const initialCanvasHeight = height;
+  $: canvasWidth = Math.floor((width - 2 * gap) / 3);
+  $: canvasHeight = height;
+
+  // Three canvases with DPR-aware initialization
   let canvas1: HTMLCanvasElement | null = null;
   let canvas2: HTMLCanvasElement | null = null;
   let canvas3: HTMLCanvasElement | null = null;
-  let ctx1: CanvasRenderingContext2D | null = null;
-  let ctx2: CanvasRenderingContext2D | null = null;
-  let ctx3: CanvasRenderingContext2D | null = null;
-  let dpr = 1;
+  const canvas2d1 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
+  const canvas2d2 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
+  const canvas2d3 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
+  $: ctx1 = canvas1 && canvas2d1.ctx;
+  $: ctx2 = canvas2 && canvas2d2.ctx;
+  $: ctx3 = canvas3 && canvas2d3.ctx;
 
   // Animation state
-  let isPlaying = playingByDefault;
-  let animationFrameId: number | null = null;
-  let phase = 0;
-  let lastTimestamp: number | null = null;
   let isInitialized = false;
+  let wasPlayingBeforeHidden = false;
+
+  // Timeline for animation
+  let timeline: Timeline<StreamlineAnimationState> | null = null;
 
   // Streamline animations
   let anim1: StreamlineAnimation<StreamlineAnimationState> | null = null;
@@ -115,23 +124,9 @@
     ];
   }
 
-  // Compute canvas dimensions
-  $: canvasWidth = Math.floor((width - 2 * gap) / 3);
-  $: canvasHeight = height;
-
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
-
-  function initializeCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
-    if (!canvas) return null;
-    dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasWidth * dpr;
-    canvas.height = canvasHeight * dpr;
-    const ctx = canvas.getContext("2d");
-    if (ctx) ctx.scale(dpr, dpr);
-    return ctx;
-  }
 
   function createToPixel(cw: number, ch: number): (p: [number, number]) => [number, number] {
     return ([x, y]: [number, number]): [number, number] => [
@@ -141,11 +136,7 @@
   }
 
   function runInitialComputation() {
-    if (!canvas1 || !canvas2 || !canvas3) return;
-
-    ctx1 = initializeCanvas(canvas1);
-    ctx2 = initializeCanvas(canvas2);
-    ctx3 = initializeCanvas(canvas3);
+    if (!ctx1 || !ctx2 || !ctx3) return;
 
     const toPixel = createToPixel(canvasWidth, canvasHeight);
     const domain = {
@@ -185,43 +176,35 @@
     });
   }
 
+  function setupTimeline() {
+    if (!anim1) return;
+
+    const animationDuration = pulseFrequency * 10;
+
+    timeline = new Timeline<StreamlineAnimationState>();
+    timeline.initialState = { streamlinePhase: 0 };
+    timeline.duration = animationDuration;
+    timeline.looping = true;
+
+    // Add the streamline phase clip (all animations share the same phase)
+    timeline.add(anim1.clip, 0);
+
+    // Register draw callback
+    timeline.onTick((_t, state) => {
+      draw(state);
+    });
+  }
+
   // ----------------------------------------------------------------
   // Animations
   // ----------------------------------------------------------------
 
-  function animate(timestamp: number) {
-    if (!isPlaying) {
-      animationFrameId = null;
-      return;
-    }
-
-    if (lastTimestamp === null) {
-      lastTimestamp = timestamp;
-    }
-
-    const elapsed = timestamp - lastTimestamp;
-
-    const spacing = pulseWidth + pulsePauseWidth;
-    phase += (elapsed / 1000) * pulseFrequency * spacing;
-    phase %= 1.0;
-
-    draw(phase);
-    lastTimestamp = timestamp;
-
-    animationFrameId = requestAnimationFrame(animate);
-  }
-
   function startAnimation() {
-    if (animationFrameId !== null) return;
-    lastTimestamp = null;
-    animationFrameId = requestAnimationFrame(animate);
+    if (timeline) timeline.play();
   }
 
   function stopAnimation() {
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
+    if (timeline) timeline.pause();
   }
 
   // ----------------------------------------------------------------
@@ -239,9 +222,11 @@
     });
   }
 
-  function draw(currentPhase: number) {
+  function draw(state: StreamlineAnimationState) {
     if (!ctx1 || !ctx2 || !ctx3 || !isInitialized) return;
     if (!anim1 || !anim2 || !anim3) return;
+
+    const { streamlinePhase } = state;
 
     ctx1.clearRect(0, 0, canvasWidth, canvasHeight);
     ctx2.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -252,9 +237,9 @@
       drawStatic(ctx2, anim2);
       drawStatic(ctx3, anim3);
     } else {
-      anim1.draw(ctx1, currentPhase);
-      anim2.draw(ctx2, currentPhase);
-      anim3.draw(ctx3, currentPhase);
+      anim1.draw(ctx1, streamlinePhase);
+      anim2.draw(ctx2, streamlinePhase);
+      anim3.draw(ctx3, streamlinePhase);
     }
   }
 
@@ -263,9 +248,12 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!active && isPlaying) {
+    if (!timeline) return;
+    if (!active && timeline.isPlaying) {
+      wasPlayingBeforeHidden = true;
       stopAnimation();
-    } else if (active && isPlaying && isInitialized) {
+    } else if (active && wasPlayingBeforeHidden) {
+      wasPlayingBeforeHidden = false;
       startAnimation();
     }
   }
@@ -275,7 +263,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    stopAnimation();
+    if (timeline) timeline.dispose();
   });
 
   // ----------------------------------------------------------------
@@ -283,21 +271,19 @@
   // ----------------------------------------------------------------
 
   // Initialize when canvases are ready
-  $: if (!isInitialized && canvas1 && canvas2 && canvas3) {
+  $: if (!isInitialized && ctx1 && ctx2 && ctx3) {
     runInitialComputation();
+    setupTimeline();
     isInitialized = true;
-    draw(0);
-    if (playingByDefault) startAnimation();
+    if (timeline) {
+      draw(timeline.initialState);
+      if (playingByDefault) startAnimation();
+    }
   }
 
   // Handle visibility changes
-  $: if (isActive !== undefined && isInitialized) {
+  $: if (isActive !== undefined && isInitialized && $isActive !== undefined) {
     handleVisibilityChange($isActive);
-  }
-
-  // Update drawing when phase changes
-  $: if (isInitialized && phase !== undefined) {
-    draw(phase);
   }
 </script>
 
@@ -309,6 +295,7 @@
     {#snippet left()}
       <canvas
         bind:this={canvas1}
+        use:canvas2d1.bindCanvas
         style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
       ></canvas>
     {/snippet}
@@ -322,6 +309,7 @@
     {#snippet center()}
       <canvas
         bind:this={canvas2}
+        use:canvas2d2.bindCanvas
         style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
       ></canvas>
     {/snippet}
@@ -335,6 +323,7 @@
     {#snippet right()}
       <canvas
         bind:this={canvas3}
+        use:canvas2d3.bindCanvas
         style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
       ></canvas>
     {/snippet}
