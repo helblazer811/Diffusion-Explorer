@@ -79,7 +79,7 @@ export {
 } from './animation/animation';
 
 export {
-  createVisibilityHandler,
+  useVisibilityHandler,
   type VisibilityState,
 } from './animation/visibility';
 

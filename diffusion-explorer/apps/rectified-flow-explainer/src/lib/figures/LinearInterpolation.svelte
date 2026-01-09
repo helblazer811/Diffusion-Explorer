@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -87,7 +87,7 @@
 
   // Visibility-based animation control
   let figureIsActive;
-  let wasPlayingBeforeHidden = false;
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -305,21 +305,6 @@
       ctx, "x_t \\sim X_t = (1-t)X_0 + tX_1", width / 2, height - marginHeight,
       latexFontSize, 0, 15, { color: latexColor }
     );
-  }
-
-  // ----------------------------------------------------------------
-  // Event Handlers
-  // ----------------------------------------------------------------
-
-  function handleVisibilityChange(isActive) {
-    if (!timeline) return;
-    if (!isActive && timeline.isPlaying) {
-      wasPlayingBeforeHidden = true;
-      stopAnimation();
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      startAnimation();
-    }
   }
 
   // ----------------------------------------------------------------

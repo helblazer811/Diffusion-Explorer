@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { clipTrajectoriesToStartingRadius } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
 
@@ -96,7 +96,7 @@
 
   // Visibility tracking
   let figureIsActive;
-  let wasPlayingBeforeHidden = false;
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
   let initialized = false;
 
   // State index for toggle button (derived from animation state)
@@ -542,17 +542,6 @@
 
     // Resume playing if it was playing before
     if (wasPlaying) {
-      startAnimation();
-    }
-  }
-
-  function handleVisibilityChange(isActive: boolean) {
-    if (!timeline) return;
-    if (!isActive && timeline.isPlaying) {
-      wasPlayingBeforeHidden = true;
-      stopAnimation();
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
       startAnimation();
     }
   }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, PathlineAnimation, type PathlineAnimationState } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -58,7 +58,7 @@
 
   // Visibility tracking
   let figureIsActive;
-  let wasPlayingBeforeHidden = false;
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Pre-computed data (computed once on mount/data change)
   let scales = null;
@@ -356,17 +356,6 @@
       userStartPoints = [];
       activeRequestId = null;
     });
-  }
-
-  function handleVisibilityChange(isActive) {
-    if (!timeline) return;
-    if (!isActive && timeline.isPlaying) {
-      wasPlayingBeforeHidden = true;
-      timeline.pause();
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      timeline.play();
-    }
   }
 
   // ----------------------------------------------------------------
