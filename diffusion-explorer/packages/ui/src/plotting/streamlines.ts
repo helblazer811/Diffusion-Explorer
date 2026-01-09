@@ -682,3 +682,88 @@ export function computeAlphaTrail(
   return alphas;
 }
 
+/**
+ * Compute cumulative lengths along a streamline (in pixel coordinates).
+ *
+ * @param streamline - Array of [x, y] points in pixel coordinates
+ * @returns Object with segmentLengths, cumulativeLengths, and totalLength
+ */
+export function computeStreamlineLengths(streamline: number[][]): {
+  segmentLengths: number[];
+  cumulativeLengths: number[];
+  totalLength: number;
+} {
+  const segmentLengths: number[] = [];
+  const cumulativeLengths: number[] = [0];
+  let totalLength = 0;
+
+  for (let i = 1; i < streamline.length; i++) {
+    const dx = streamline[i][0] - streamline[i - 1][0];
+    const dy = streamline[i][1] - streamline[i - 1][1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    segmentLengths.push(len);
+    totalLength += len;
+    cumulativeLengths.push(totalLength);
+  }
+
+  return { segmentLengths, cumulativeLengths, totalLength };
+}
+
+/**
+ * Compute per-segment alpha values using pixel-based distances.
+ *
+ * Unlike computeAlphaTrail which uses normalized positions (0-1),
+ * this function uses absolute pixel distances. This ensures:
+ * - All streamlines have same pulse introduction rate regardless of length
+ * - Without resampling, high-velocity regions (longer segments) show faster pulses
+ *
+ * @param cumulativeLengths - Cumulative pixel length at each point [0, len1, len1+len2, ...]
+ * @param totalLength - Total streamline length in pixels
+ * @param phase - Animation phase [0, 1)
+ * @param offset - Random phase offset for this streamline (0-1)
+ * @param pulseWidth - Width of pulse in pixels
+ * @param pulsePauseWidth - Gap between pulses in pixels
+ * @param travelDistance - Total distance pulses travel per animation cycle (pixels)
+ * @param baseOpacity - Maximum opacity at pulse front
+ * @returns Array of alpha values for each segment
+ */
+export function computeAlphaTrailPixelBased(
+  cumulativeLengths: number[],
+  totalLength: number,
+  phase: number,
+  offset: number,
+  pulseWidth: number,
+  pulsePauseWidth: number,
+  travelDistance: number,  // Kept for API compatibility, now ignored
+  baseOpacity: number
+): number[] {
+  const numPoints = cumulativeLengths.length;
+  // Return per-POINT alphas (not per-segment) so gradient interpolation works smoothly
+  const alphas = new Array(numPoints).fill(0);
+  if (numPoints === 0) return alphas;
+
+  const spacing = pulseWidth + pulsePauseWidth;
+  if (spacing <= 0) return alphas;
+
+  // Phase cycles the pattern by one full spacing per animation cycle
+  // This ensures seamless looping - pattern repeats exactly at phase=0 and phase=1
+  const patternOffset = ((phase + offset) % 1) * spacing;
+
+  for (let i = 0; i < numPoints; i++) {
+    const pos = cumulativeLengths[i];
+
+    // Where is this point within the repeating pulse pattern?
+    // Use double-modulo to handle negative values correctly
+    const posInPattern = ((pos - patternOffset) % spacing + spacing) % spacing;
+
+    // Within pulse region (0 to pulseWidth)?
+    // Gap region is (pulseWidth to spacing)
+    if (posInPattern < pulseWidth) {
+      const u = posInPattern / pulseWidth; // 0 at front → 1 at back
+      alphas[i] = baseOpacity * u;         // Fades in at front, full at back (trail behind motion)
+    }
+  }
+
+  return alphas;
+}
+

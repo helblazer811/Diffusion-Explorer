@@ -33,19 +33,18 @@
   export let domainRange = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
   export let density: number | [number, number] = 1.0;
   export let minPathLength = 0.5;
-  export let segmentLength = 0.01;
 
   // Styling
   export let streamlineColor = "#e63946";
   export let streamlineWidth = 3.0;
-  export let gradientSubdivisions = 5;
+  export let gradientSubdivisions = 1;
   export let staticMode = false;
   export let staticOpacity = 0.8;
 
-  // Animation pulse settings
-  export let pulseWidth = 0.20;
-  export let pulsePauseWidth = 0.05;
-  export let pulseFrequency = 0.8;
+  // Animation pulse settings (pixel-based)
+  export let pulseWidthPixels = 40;       // Width of pulse in pixels
+  export let pulsePauseWidthPixels = 10;  // Gap between pulses in pixels
+  export let animationDuration = 4;       // Seconds for one animation cycle
 
   // ----------------------------------------------------------------
   // State
@@ -153,12 +152,13 @@
       toPixel,
       density,
       minPathLength,
-      segmentLength,
+      subdivisionFactor: 8,
       color: streamlineColor,
       strokeWidth: streamlineWidth,
       gradientSubdivisions,
-      pulseWidth,
-      pulsePauseWidth,
+      // Pixel-based pulse animation
+      pulseWidthPixels,
+      pulsePauseWidthPixels,
       offsets: 'random' as const,
     };
 
@@ -180,8 +180,6 @@
 
   function setupTimeline() {
     if (!anim1) return;
-
-    const animationDuration = pulseFrequency * 10;
 
     timeline = new Timeline<StreamlineAnimationState>();
     timeline.initialState = { streamlinePhase: 0 };
