@@ -302,7 +302,7 @@
       ></canvas>
     {/snippet}
     {#snippet leftLabel()}
-      <Katex math={"\\nabla \\cdot F > 0, \\; \\nabla \\times F = 0"} />
+      <Katex math={"\\nabla \\cdot F > 0, \\; (\\nabla \\times F)_z = 0"} />
     {/snippet}
 
     {#snippet centerTitle()}
@@ -316,7 +316,7 @@
       ></canvas>
     {/snippet}
     {#snippet centerLabel()}
-      <Katex math={"\\nabla \\cdot F = 0, \\; \\nabla \\times F > 0"} />
+      <Katex math={"\\nabla \\cdot F = 0, \\; (\\nabla \\times F)_z > 0"} />
     {/snippet}
 
     {#snippet rightTitle()}
@@ -330,12 +330,16 @@
       ></canvas>
     {/snippet}
     {#snippet rightLabel()}
-      <Katex math={"\\nabla \\cdot F > 0, \\; \\nabla \\times F > 0"} />
+      <Katex math={"\\nabla \\cdot F > 0, \\; (\\nabla \\times F)_z > 0"} />
     {/snippet}
 
     {#snippet caption()}
-      Three vector fields demonstrating divergence and curl: a radial source (pure divergence),
-      a rotational field (pure curl), and a spiral source (both divergence and curl).
+      <strong>Divergence and curl of vector fields.</strong>
+      <Katex math={String.raw`\nabla \cdot \mathbf{F}`} /> denotes divergence (expansion/contraction),
+      <Katex math={String.raw`(\nabla \times \mathbf{F})_z`} /> denotes curl (rotation).
+      <em>Left:</em> A radial source field with pure divergence and no curl.
+      <em>Center:</em> A rotational field with pure curl and no divergence.
+      <em>Right:</em> A spiral source field with both divergence and curl.
     {/snippet}
   </TripleFigure>
 </div>
