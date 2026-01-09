@@ -11,18 +11,16 @@
     useCanvas2D,
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
-  import type { FlowModelClient, DiffusionModelClient } from "@diffusion-explorer/diffusion";
+  import type { DiffusionModelClient } from "@diffusion-explorer/diffusion";
 
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
-  // Model clients (passed from parent)
   interface Props {
-    flowMatchingClient?: FlowModelClient | null;
     diffusionClient?: DiffusionModelClient | null;
-    leftTrajectories?: number[][][]; // [timestep][sample][dim]
-    rightTrajectories?: number[][][]; // [timestep][sample][dim]
+    leftTrajectories?: number[][][]; // [timestep][sample][dim] - DDPM
+    rightTrajectories?: number[][][]; // [timestep][sample][dim] - DDIM
     targetDistribution?: number[][];
     canvasWidth?: number;
     canvasHeight?: number;
@@ -48,13 +46,13 @@
     highlightedTrajectoryOpacity?: number;
     dimmedTrajectoryOpacity?: number;
     maxUserTrajectories?: number;
+    numSteps?: number;
     onInitialized?: () => void;
     backgroundVisible?: boolean;
     children?: Snippet;
   }
 
   let {
-    flowMatchingClient = null,
     diffusionClient = null,
     leftTrajectories = [],
     rightTrajectories = [],
@@ -65,8 +63,8 @@
     marginHeight = 10,
     gap = 20,
     domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 },
-    leftLabel = "Flow Matching",
-    rightLabel = "Diffusion",
+    leftLabel = "DDPM (Stochastic)",
+    rightLabel = "DDIM (Deterministic)",
     labelFontSize = 30,
     labelColor = "#333",
     labelOpacity = 1.0,
@@ -83,6 +81,7 @@
     highlightedTrajectoryOpacity = 1.0,
     dimmedTrajectoryOpacity = 0.15,
     maxUserTrajectories = 3,
+    numSteps = 200,
     onInitialized = undefined,
     backgroundVisible = true,
     children = undefined,
@@ -144,12 +143,12 @@
 
   // User trajectory state
   let userStartPoints: number[][] = $state([]);
-  let userFlowMatchingTrajectories: number[][][] = $state([]);
-  let userDiffusionTrajectories: number[][][] = $state([]);
+  let userDDPMTrajectories: number[][][] = $state([]);
+  let userDDIMTrajectories: number[][][] = $state([]);
   let hasUserTrajectory = $state(false);
   let isStreamingTrajectory = $state(false);
-  let activeFlowMatchingRequestId: string | null = null;
-  let activeDiffusionRequestId: string | null = null;
+  let activeDDPMRequestId: string | null = null;
+  let activeDDIMRequestId: string | null = null;
   let streamingCompleteCount = $state(0);
 
   // ----------------------------------------------------------------
@@ -346,7 +345,7 @@
       leftCtx,
       scaledLeftTrajectories,
       getCurrentState(),
-      userFlowMatchingTrajectories
+      userDDPMTrajectories
     );
   }
 
@@ -356,7 +355,7 @@
       rightCtx,
       scaledRightTrajectories,
       getCurrentState(),
-      userDiffusionTrajectories
+      userDDIMTrajectories
     );
   }
 
@@ -389,7 +388,7 @@
   }
 
   function handleCanvasClick(event: MouseEvent, side: "left" | "right") {
-    if (!flowMatchingClient || !diffusionClient) return;
+    if (!diffusionClient) return;
 
     const canvas = side === "left" ? leftCanvas : rightCanvas;
     if (!canvas) return;
@@ -408,16 +407,16 @@
   }
 
   function sampleFromPoint(point: number[]) {
-    if (!flowMatchingClient || !diffusionClient || !xScale || !yScale) return;
+    if (!diffusionClient || !xScale || !yScale) return;
 
     // Cancel any in-flight requests
-    if (activeFlowMatchingRequestId) {
-      flowMatchingClient.stopRequest(activeFlowMatchingRequestId);
-      activeFlowMatchingRequestId = null;
+    if (activeDDPMRequestId) {
+      diffusionClient.stopRequest(activeDDPMRequestId);
+      activeDDPMRequestId = null;
     }
-    if (activeDiffusionRequestId) {
-      diffusionClient.stopRequest(activeDiffusionRequestId);
-      activeDiffusionRequestId = null;
+    if (activeDDIMRequestId) {
+      diffusionClient.stopRequest(activeDDIMRequestId);
+      activeDDIMRequestId = null;
     }
 
     userStartPoints = [...userStartPoints, point];
@@ -431,10 +430,10 @@
     streamingCompleteCount = 0;
 
     // Initialize with starting points
-    userFlowMatchingTrajectories = userStartPoints.map((p) => [
+    userDDPMTrajectories = userStartPoints.map((p) => [
       [xScale!(p[0]), yScale!(p[1])],
     ]);
-    userDiffusionTrajectories = userStartPoints.map((p) => [
+    userDDIMTrajectories = userStartPoints.map((p) => [
       [xScale!(p[0]), yScale!(p[1])],
     ]);
 
@@ -448,33 +447,33 @@
       }
     }
 
-    // Sample from Flow Matching model
-    const fmResult = flowMatchingClient.sampleFromInitialPoints(
+    // Sample with DDPM scheduler (left panel)
+    const ddpmResult = diffusionClient.sampleFromInitialPoints(
       userStartPoints,
-      numTimeSteps,
-      {},
+      numSteps,
+      { scheduler: 'ddpm' },
       (_step: number, x_t: number[][]) => {
-        userFlowMatchingTrajectories = userFlowMatchingTrajectories.map(
+        userDDPMTrajectories = userDDPMTrajectories.map(
           (traj, i) => [...traj, [xScale!(x_t[i][0]), yScale!(x_t[i][1])]]
         );
       }
     );
-    activeFlowMatchingRequestId = fmResult.requestId;
-    fmResult.promise.then(checkComplete);
+    activeDDPMRequestId = ddpmResult.requestId;
+    ddpmResult.promise.then(checkComplete);
 
-    // Sample from Diffusion model
-    const diffResult = diffusionClient.sampleFromInitialPoints(
+    // Sample with DDIM scheduler (right panel)
+    const ddimResult = diffusionClient.sampleFromInitialPoints(
       userStartPoints,
-      numTimeSteps,
-      {},
+      numSteps,
+      { scheduler: 'ddim' },
       (_step: number, x_t: number[][]) => {
-        userDiffusionTrajectories = userDiffusionTrajectories.map(
+        userDDIMTrajectories = userDDIMTrajectories.map(
           (traj, i) => [...traj, [xScale!(x_t[i][0]), yScale!(x_t[i][1])]]
         );
       }
     );
-    activeDiffusionRequestId = diffResult.requestId;
-    diffResult.promise.then(checkComplete);
+    activeDDIMRequestId = ddimResult.requestId;
+    ddimResult.promise.then(checkComplete);
   }
 
   // ----------------------------------------------------------------
@@ -484,11 +483,11 @@
   onDestroy(() => {
     timeline?.dispose();
 
-    if (activeFlowMatchingRequestId && flowMatchingClient) {
-      flowMatchingClient.stopRequest(activeFlowMatchingRequestId);
+    if (activeDDPMRequestId && diffusionClient) {
+      diffusionClient.stopRequest(activeDDPMRequestId);
     }
-    if (activeDiffusionRequestId && diffusionClient) {
-      diffusionClient.stopRequest(activeDiffusionRequestId);
+    if (activeDDIMRequestId && diffusionClient) {
+      diffusionClient.stopRequest(activeDDIMRequestId);
     }
   });
 

@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import * as d3 from 'd3';
-  import { DoubleFigure, TimeSlider, drawVectorField, Timeline, useCanvas2D } from '@diffusion-explorer/ui';
+  import { DoubleFigure, TimeSlider, drawVectorField, Timeline, useCanvas2D, useVisibilityHandler } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
 
   // ----------------------------------------------------------------
@@ -85,7 +85,7 @@
 
   // Visibility
   let figureIsActive;
-  let wasPlayingBeforeHidden = false;
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -223,21 +223,6 @@
       rectifiedFlowVectorField.velocities[rightTimeIndex],
       style
     );
-  }
-
-  // ----------------------------------------------------------------
-  // Event Handlers
-  // ----------------------------------------------------------------
-
-  function handleVisibilityChange(isActive) {
-    if (!timeline) return;
-    if (!isActive && timeline.isPlaying) {
-      wasPlayingBeforeHidden = true;
-      stopAnimation();
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      startAnimation();
-    }
   }
 
   // ----------------------------------------------------------------

@@ -9,6 +9,7 @@
     createSourceTargetScales,
     Timeline,
     useCanvas2D,
+    useVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -88,7 +89,7 @@
 
   // Visibility tracking
   let figureIsActive;
-  let wasPlayingBeforeHidden = false;
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -468,17 +469,6 @@
       clickedTrajectory = null;
       isStreamingTrajectory = false;
     });
-  }
-
-  function handleVisibilityChange(isActive) {
-    if (!timeline) return;
-    if (!isActive && timeline.isPlaying) {
-      wasPlayingBeforeHidden = true;
-      stopAnimation();
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      startAnimation();
-    }
   }
 
   // ----------------------------------------------------------------

@@ -211,17 +211,17 @@ function handleRestart() {
 
 ## Visibility Handling
 
-Use the `createVisibilityHandler` utility for consistent pause/resume when figures scroll in/out of view:
+Use the `useVisibilityHandler` hook for consistent pause/resume when figures scroll in/out of view:
 
 ```svelte
 <script lang="ts">
-  import { createVisibilityHandler, Timeline } from '@diffusion-explorer/ui';
+  import { useVisibilityHandler, Timeline } from '@diffusion-explorer/ui';
 
   let timeline: Timeline<AnimationState> | null = null;
   let figureIsActive;
   let isInitialized = false;
 
-  const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   $: if (figureIsActive !== undefined && isInitialized) {
     handleVisibilityChange($figureIsActive);

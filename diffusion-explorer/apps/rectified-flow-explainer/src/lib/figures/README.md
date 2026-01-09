@@ -112,13 +112,13 @@ The state should contain derived values computed from time (e.g., `segmentIndex`
 
 All animated figures **MUST** handle visibility to prevent background CPU usage when scrolled off-screen.
 
-Use the `createVisibilityHandler` utility:
+Use the `useVisibilityHandler` hook:
 
 ```typescript
-import { createVisibilityHandler } from '@diffusion-explorer/ui';
+import { useVisibilityHandler } from '@diffusion-explorer/ui';
 
 let figureIsActive;
-const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
+const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
 // In reactive blocks section:
 $: if (figureIsActive !== undefined && isInitialized) {

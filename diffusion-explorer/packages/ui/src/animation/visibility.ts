@@ -5,18 +5,18 @@ export type VisibilityState = {
 };
 
 /**
- * Creates a visibility handler for a Timeline.
+ * Hook for handling Timeline visibility changes.
  * Pauses animation when figure becomes invisible, resumes when visible again.
  *
  * Usage in Svelte component:
  * ```svelte
  * <script lang="ts">
- *   import { createVisibilityHandler } from '@diffusion-explorer/ui';
+ *   import { useVisibilityHandler } from '@diffusion-explorer/ui';
  *
  *   let timeline: Timeline<AnimationState> | null = null;
  *   let figureIsActive;
  *
- *   const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
+ *   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
  *
  *   $: if (figureIsActive !== undefined && isInitialized) {
  *     handleVisibilityChange($figureIsActive);
@@ -31,7 +31,7 @@ export type VisibilityState = {
  * @param getTimeline - Function that returns the timeline instance (or null if not yet created)
  * @returns Object containing visibility state and handler function
  */
-export function createVisibilityHandler<TState>(
+export function useVisibilityHandler<TState>(
   getTimeline: () => Timeline<TState> | null
 ): {
   state: VisibilityState;

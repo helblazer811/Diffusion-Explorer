@@ -12,7 +12,7 @@
     Timeline,
     FigureLegend,
     useCanvas2D,
-    createVisibilityHandler,
+    useVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -132,7 +132,7 @@
 
   // Visibility
   let figureIsActive;
-  const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Animation state type
   type AnimationState = {

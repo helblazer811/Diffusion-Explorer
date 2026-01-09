@@ -10,7 +10,7 @@
     plotContours,
     Timeline,
     useCanvas2D,
-    createVisibilityHandler,
+    useVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -150,7 +150,7 @@
 
   // Visibility
   let figureIsActive;
-  const { handleVisibilityChange } = createVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // User-defined trajectory state (supports multiple trajectories)
   let userStartPoints = []; // Array of [x, y] domain coordinates
