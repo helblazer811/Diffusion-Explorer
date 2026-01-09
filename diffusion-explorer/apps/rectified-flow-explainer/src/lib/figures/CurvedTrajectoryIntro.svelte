@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, PathlineAnimation, type PathlineAnimationState } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -46,17 +46,15 @@
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
-  // Animation state type
-  type AnimationState = {
-    segmentIndex: number;
-  };
+  // Animation state type - extends PathlineAnimationState
+  type AnimationState = PathlineAnimationState;
 
   // Animation state - Timeline system (Timeline owns Clock internally)
   let initialized = false;
   let timeline: Timeline<AnimationState> | null = null;
 
-  // Cached numSegments for clip closure
-  let cachedNumSegments = 0;
+  // PathlineAnimation instance for clip generation
+  let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Visibility tracking
   let figureIsActive;
@@ -64,18 +62,17 @@
 
   // Pre-computed data (computed once on mount/data change)
   let scales = null;
-  let transformedTrajectories = []; // [trajectory][timestep][x,y in pixels]
+  let regularTrajectories = []; // [trajectory][timestep][x,y in pixels] - fixed pre-computed
   let sourcePixelCoords = []; // [point][x,y] in pixel space
   let targetPixelCoords = []; // [point][x,y] in pixel space
   let selectedTrajectoryIndices = [];
   let combinedMeanX = 0;
 
-  // User-defined trajectory state (matches CrownJewel naming)
+  // User-defined trajectory state
   let userStartPoints = []; // Array of [x, y] domain coordinates
-  let userTrajectories = []; // [trajectory][timestep][x,y] in pixel coordinates
+  let inProgressUserTrajectories = []; // Currently streaming [trajectory][timestep][x,y]
+  let completedUserTrajectories = []; // Completed user trajectories (capped at maxUserTrajectories)
   let activeRequestId = null;
-  let mostRecentTrajectoryIndices = []; // Indices of the most recently added trajectories
-  let hasUserTrajectory = false; // Track if user has clicked at all
 
   // Derived values
   $: numTimeSteps = allTimeSamples?.length || 1;
@@ -121,7 +118,7 @@
     ];
     combinedMeanX = allX.reduce((a, b) => a + b, 0) / allX.length;
 
-    transformedTrajectories = selectedTrajectoryIndices.map((sampleIdx) => {
+    regularTrajectories = selectedTrajectoryIndices.map((sampleIdx) => {
       return allTimeSamples.map((timestep, tIdx) => {
         const point = timestep[sampleIdx];
         const t = tIdx / (allTimeSamples.length - 1);
@@ -182,8 +179,15 @@
   // ----------------------------------------------------------------
 
   function setupTimeline() {
-    // Cache numSegments for clip closure
-    cachedNumSegments = numSegments;
+    // Create PathlineAnimation for regular trajectories with settings-based style
+    pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(regularTrajectories, {
+      style: {
+        color: settings.stylingSettings.trajectory.color,
+        strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+        pointRadius: settings.stylingSettings.trajectory.endpointRadius,
+        progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+      }
+    });
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { segmentIndex: 0 };
@@ -193,18 +197,8 @@
     timeline.looping = true;
     timeline.endPauseDuration = pauseBeforeRestart / 1000;
 
-    // Main animation clip - computes segmentIndex from normalized time
-    const mainClip = {
-      name: "Animation",
-      duration: 1,
-      reduce(t: number) {
-        return {
-          segmentIndex: Math.floor(t * cachedNumSegments)
-        };
-      }
-    };
-
-    timeline.add(mainClip, 0);
+    // Use the clip from PathlineAnimation
+    timeline.add(pathlineAnimation.clip, 0);
 
     // Register tick callback
     timeline.onTick((_, state) => draw(state));
@@ -215,7 +209,7 @@
   // ----------------------------------------------------------------
 
   function draw(state: AnimationState) {
-    if (!ctx || !initialized) return;
+    if (!ctx || !initialized || !pathlineAnimation) return;
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -248,76 +242,24 @@
     drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont, opacity: labelOpacity });
 
     // --- Dynamic Foreground ---
-    const { segmentIndex } = state;
-
-    // Trajectory styling from settings
-    const trajectoryColor = settings.stylingSettings.trajectory.color;
-    const trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-    const trajectoryEndpointRadius = settings.stylingSettings.trajectory.endpointRadius;
     const normalOpacity = settings.stylingSettings.trajectory.progressOpacity;
-    const dimmedOpacity = 0.15; // Dimmed opacity when user has clicked (matches CurvedTrajectorySuperimposed)
-    const highlightOpacity = 1.0; // Full opacity for user-defined trajectories
+    const dimmedOpacity = 0.15;
 
-    // Before user clicks: draw all trajectories with normal opacity
-    // After user clicks (or during streaming): dim non-highlighted trajectories, highlight user-defined ones
-    // Dim immediately when streaming starts (userTrajectories.length > 0)
-    const shouldDimExisting = hasUserTrajectory || userTrajectories.length > 0;
+    // Combine completed and in-progress user trajectories
+    const validInProgress = inProgressUserTrajectories.filter(t => t && t.length >= 2);
+    const allUserTrajectories = [...completedUserTrajectories, ...validInProgress];
+    const hasUserTrajectories = allUserTrajectories.length > 0;
 
-    if (transformedTrajectories.length > 0) {
-      if (shouldDimExisting) {
-        // Separate trajectories into highlighted and non-highlighted
-        const nonHighlightedTrajectories = [];
-        const highlightedTrajectories = [];
+    // Draw regular trajectories (dimmed if user has clicked)
+    pathlineAnimation.draw(ctx, state, {
+      progressOpacity: hasUserTrajectories ? dimmedOpacity : normalOpacity,
+    });
 
-        transformedTrajectories.forEach((traj, idx) => {
-          if (mostRecentTrajectoryIndices.includes(idx)) {
-            highlightedTrajectories.push(traj);
-          } else {
-            nonHighlightedTrajectories.push(traj);
-          }
-        });
-
-        // Draw non-highlighted trajectories with dimmed opacity
-        if (nonHighlightedTrajectories.length > 0) {
-          drawTrajectories(ctx, nonHighlightedTrajectories, segmentIndex, {
-            strokeWidth: trajectoryStrokeWidth,
-            color: trajectoryColor,
-            progressOpacity: dimmedOpacity,
-            pointRadius: trajectoryEndpointRadius,
-          });
-        }
-
-        // Draw highlighted (user-defined) trajectories with full opacity
-        if (highlightedTrajectories.length > 0) {
-          drawTrajectories(ctx, highlightedTrajectories, segmentIndex, {
-            strokeWidth: trajectoryStrokeWidth,
-            color: trajectoryColor,
-            progressOpacity: highlightOpacity,
-            pointRadius: trajectoryEndpointRadius,
-          });
-        }
-      } else {
-        // No user trajectories yet, draw all with normal opacity
-        drawTrajectories(ctx, transformedTrajectories, segmentIndex, {
-          strokeWidth: trajectoryStrokeWidth,
-          color: trajectoryColor,
-          progressOpacity: normalOpacity,
-          pointRadius: trajectoryEndpointRadius,
-        });
-      }
-    }
-
-    // Draw in-progress user trajectories (full opacity, synced with animation time)
-    if (userTrajectories.length > 0) {
-      const validUserTrajectories = userTrajectories.filter(t => t && t.length >= 2);
-      if (validUserTrajectories.length > 0) {
-        drawTrajectories(ctx, validUserTrajectories, segmentIndex, {
-          strokeWidth: trajectoryStrokeWidth,
-          color: trajectoryColor,
-          progressOpacity: 1.0,
-          pointRadius: trajectoryEndpointRadius,
-        });
-      }
+    // Draw user trajectories (full opacity)
+    if (hasUserTrajectories) {
+      pathlineAnimation.draw(ctx, { ...state, pathlines: allUserTrajectories }, {
+        progressOpacity: 1.0,
+      });
     }
   }
 
@@ -367,10 +309,8 @@
   function sampleFromUserPoints() {
     if (userStartPoints.length === 0) return;
 
-    hasUserTrajectory = true;
-
-    // Initialize trajectories for each user point at t=0 position
-    userTrajectories = userStartPoints.map(point => {
+    // Initialize in-progress trajectories for each user point at t=0 position
+    inProgressUserTrajectories = userStartPoints.map(point => {
       const initialPixelX = getPixelX(point[0], combinedMeanX, 0);
       const initialPixelY = scales.yScale(point[1]);
       return [[initialPixelX, initialPixelY]];
@@ -390,7 +330,7 @@
       // onStep - append each new point for all trajectories, transformed to pixel space
       (step, x_t) => {
         const t = (step + 1) / numTimeSteps;
-        userTrajectories = userTrajectories.map((traj, sampleIdx) => {
+        inProgressUserTrajectories = inProgressUserTrajectories.map((traj, sampleIdx) => {
           if (sampleIdx < x_t.length) {
             const pixelX = getPixelX(x_t[sampleIdx][0], combinedMeanX, t);
             const pixelY = scales.yScale(x_t[sampleIdx][1]);
@@ -402,30 +342,17 @@
     );
     activeRequestId = result.requestId;
     result.promise.then(() => {
-      // Add all completed trajectories that have enough points
-      const validTrajectories = userTrajectories.filter(t => t && t.length > 1);
+      // Move completed trajectories to completedUserTrajectories
+      const validTrajectories = inProgressUserTrajectories.filter(t => t && t.length > 1);
       if (validTrajectories.length > 0) {
-        // Track where the new trajectories will be added
-        const startIdx = transformedTrajectories.length;
-        transformedTrajectories = [...transformedTrajectories, ...validTrajectories];
-        mostRecentTrajectoryIndices = validTrajectories.map((_, i) => startIdx + i);
+        completedUserTrajectories = [...completedUserTrajectories, ...validTrajectories];
 
-        // Remove random trajectories if over cap (but not the most recent ones)
-        while (transformedTrajectories.length > maxTrajectories) {
-          // Pick random index excluding the most recent trajectories
-          let randomIdx;
-          do {
-            randomIdx = Math.floor(Math.random() * transformedTrajectories.length);
-          } while (mostRecentTrajectoryIndices.includes(randomIdx));
-
-          transformedTrajectories = transformedTrajectories.filter((_, i) => i !== randomIdx);
-          // Adjust mostRecentTrajectoryIndices
-          mostRecentTrajectoryIndices = mostRecentTrajectoryIndices.map(idx =>
-            randomIdx < idx ? idx - 1 : idx
-          );
+        // Cap at maxUserTrajectories (remove oldest)
+        if (completedUserTrajectories.length > maxUserTrajectories) {
+          completedUserTrajectories = completedUserTrajectories.slice(-maxUserTrajectories);
         }
       }
-      userTrajectories = [];
+      inProgressUserTrajectories = [];
       userStartPoints = [];
       activeRequestId = null;
     });

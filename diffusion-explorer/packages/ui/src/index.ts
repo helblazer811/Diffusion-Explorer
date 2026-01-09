@@ -90,3 +90,11 @@ export {
   type StreamlineData,
   type StreamlineDomain,
 } from './animation/streamline-animation';
+
+export {
+  PathlineAnimation,
+  type PathlineAnimationState,
+  type PathlineAnimationOptions,
+  type PathlineData,
+} from './animation/pathline-animation';
+
