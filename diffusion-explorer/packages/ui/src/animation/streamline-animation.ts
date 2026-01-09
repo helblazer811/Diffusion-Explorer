@@ -9,7 +9,13 @@
 
 import type { Clip } from './timeline';
 import type { AnimationWithData } from './animation';
-import { generateStreamlines, computeAlphaTrail, type VectorFieldFn } from '../plotting/streamlines';
+import {
+  generateStreamlines,
+  computeAlphaTrail,
+  computeAlphaTrailPixelBased,
+  computeStreamlineLengths,
+  type VectorFieldFn
+} from '../plotting/streamlines';
 import { drawTrajectories } from '../plotting/trajectories';
 
 // ===== Types =====
@@ -52,12 +58,19 @@ export type StreamlineAnimationOptions = {
   segmentLength?: number;
   integrationDirection?: 'forward' | 'backward' | 'both';
   startPoints?: [number, number][];  // Custom seed points for streamlines
+  subdivisionFactor?: number;  // Subdivide each segment into N pieces (default: 1 = no subdivision)
 
-  // Animation (optional)
+  // Animation - normalized mode (legacy, optional)
   pulseWidth?: number;
   pulsePauseWidth?: number;
   baseOpacity?: number;
   offsets?: 'random' | 'synchronized';
+
+  // Animation - pixel-based mode (optional)
+  // When set, these override the normalized pulseWidth/pulsePauseWidth
+  pulseWidthPixels?: number;      // Pulse width in pixels
+  pulsePauseWidthPixels?: number; // Gap between pulses in pixels
+  travelDistance?: number;        // Distance pulses travel per cycle (auto-computed if not set)
 
   // Clip options (optional)
   clipDuration?: number;
@@ -70,6 +83,14 @@ export type StreamlineAnimationOptions = {
 };
 
 /**
+ * Per-streamline length data for pixel-based animation.
+ */
+export type StreamlineLengthData = {
+  cumulativeLengths: number[];
+  totalLength: number;
+};
+
+/**
  * Data exposed by StreamlineAnimation.
  */
 export type StreamlineData = {
@@ -77,7 +98,43 @@ export type StreamlineData = {
   streamlines: number[][][];
   /** Per-streamline animation offsets */
   offsets: number[];
+  /** Per-streamline length data (for pixel-based animation) */
+  lengthData: StreamlineLengthData[];
+  /** Maximum streamline length across all streamlines */
+  maxLength: number;
 };
+
+// ===== Helper Functions =====
+
+/**
+ * Subdivide each segment of a streamline into smaller pieces.
+ * Preserves relative segment lengths (longer segments remain proportionally longer).
+ *
+ * @param points - Array of [x, y] points
+ * @param factor - Number of pieces to split each segment into (1 = no subdivision)
+ * @returns New array with interpolated points
+ */
+function subdivideStreamline(points: number[][], factor: number): number[][] {
+  if (factor <= 1 || points.length < 2) return points;
+
+  const result: number[][] = [points[0]];
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[i + 1];
+
+    // Add intermediate points
+    for (let k = 1; k <= factor; k++) {
+      const t = k / factor;
+      result.push([
+        x1 + (x2 - x1) * t,
+        y1 + (y2 - y1) * t
+      ]);
+    }
+  }
+
+  return result;
+}
 
 // ===== Class Implementation =====
 
@@ -110,12 +167,20 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
   readonly data: StreamlineData;
 
   // Style options (stored for draw)
-  private readonly pulseWidth: number;
-  private readonly pulsePauseWidth: number;
   private readonly baseOpacity: number;
   private readonly color: string;
   private readonly strokeWidth: number;
   private readonly gradientSubdivisions: number;
+
+  // Normalized mode (legacy)
+  private readonly pulseWidth: number;
+  private readonly pulsePauseWidth: number;
+
+  // Pixel-based mode
+  private readonly usePixelBased: boolean;
+  private readonly pulseWidthPixels: number;
+  private readonly pulsePauseWidthPixels: number;
+  private readonly travelDistance: number;
 
   private constructor(options: StreamlineAnimationOptions) {
     const {
@@ -125,14 +190,19 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       // Generation defaults
       density = 1.0,
       minPathLength = 2.0,
-      segmentLength = 0.01,
+      segmentLength,
       integrationDirection = 'both',
       startPoints,
-      // Animation defaults
+      subdivisionFactor = 1,
+      // Animation - normalized mode defaults
       pulseWidth = 0.2,
       pulsePauseWidth = 0.05,
       baseOpacity = 0.8,
       offsets: offsetMode = 'synchronized',
+      // Animation - pixel-based mode
+      pulseWidthPixels,
+      pulsePauseWidthPixels,
+      travelDistance: travelDistanceOption,
       // Clip defaults
       clipDuration = 1,
       loopMultiplier = 1,
@@ -142,13 +212,18 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       gradientSubdivisions = 12,
     } = options;
 
+    // Determine if pixel-based mode is enabled
+    this.usePixelBased = pulseWidthPixels !== undefined;
+
     // Store style options
-    this.pulseWidth = pulseWidth;
-    this.pulsePauseWidth = pulsePauseWidth;
     this.baseOpacity = baseOpacity;
     this.color = color;
     this.strokeWidth = strokeWidth;
     this.gradientSubdivisions = gradientSubdivisions;
+
+    // Store normalized mode options (legacy)
+    this.pulseWidth = pulseWidth;
+    this.pulsePauseWidth = pulsePauseWidth;
 
     // Generate streamlines in domain coordinates
     const rawStreamlines = generateStreamlines(vectorFieldFn, {
@@ -161,10 +236,20 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       startPoints,
     });
 
-    // Convert to pixel coordinates
-    const streamlines = rawStreamlines.map((streamline) =>
-      streamline.map((point) => toPixel(point as [number, number]))
-    );
+    // Convert to pixel coordinates and apply subdivision
+    const streamlines = rawStreamlines.map((streamline) => {
+      const pixelPoints = streamline.map((point) => toPixel(point as [number, number]));
+      return subdivideStreamline(pixelPoints, subdivisionFactor);
+    });
+
+    // Compute cumulative lengths for each streamline (in pixel space)
+    const lengthData = streamlines.map((streamline) => {
+      const { cumulativeLengths, totalLength } = computeStreamlineLengths(streamline);
+      return { cumulativeLengths, totalLength };
+    });
+
+    // Find max length across all streamlines
+    const maxLength = Math.max(...lengthData.map((d) => d.totalLength), 0);
 
     // Generate offsets
     const offsets =
@@ -173,7 +258,13 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
         : streamlines.map(() => 0);
 
     // Store data
-    this.data = { streamlines, offsets };
+    this.data = { streamlines, offsets, lengthData, maxLength };
+
+    // Store pixel-based options (with defaults based on max length)
+    this.pulseWidthPixels = pulseWidthPixels ?? 30;
+    this.pulsePauseWidthPixels = pulsePauseWidthPixels ?? 50;
+    // Default travel distance: max length + extra spacing so pulses fully exit
+    this.travelDistance = travelDistanceOption ?? (maxLength + this.pulseWidthPixels + this.pulsePauseWidthPixels);
 
     // Create the clip
     this.clip = {
@@ -192,24 +283,45 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
    * @param state - Current animation state (uses streamlinePhase)
    */
   draw(ctx: CanvasRenderingContext2D, state: TState): void {
-    const { streamlines, offsets } = this.data;
+    const { streamlines, offsets, lengthData } = this.data;
     if (streamlines.length === 0) return;
 
     const phase = state.streamlinePhase;
 
     // Compute per-segment alphas for pulse animation
-    const perSegmentAlphas: number[][] = streamlines.map((streamline, i) => {
-      const numSegments = streamline.length - 1;
-      const offset = offsets[i] ?? 0;
-      return computeAlphaTrail(
-        numSegments,
-        phase,
-        offset,
-        this.pulseWidth,
-        this.pulsePauseWidth,
-        this.baseOpacity
-      );
-    });
+    let perSegmentAlphas: number[][];
+
+    if (this.usePixelBased) {
+      // Pixel-based mode: use actual pixel distances for consistent pulse speed
+      perSegmentAlphas = streamlines.map((streamline, i) => {
+        const { cumulativeLengths, totalLength } = lengthData[i];
+        const offset = offsets[i] ?? 0;
+        return computeAlphaTrailPixelBased(
+          cumulativeLengths,
+          totalLength,
+          phase,
+          offset,
+          this.pulseWidthPixels,
+          this.pulsePauseWidthPixels,
+          this.travelDistance,
+          this.baseOpacity
+        );
+      });
+    } else {
+      // Normalized mode (legacy): pulses at same fraction of each streamline
+      perSegmentAlphas = streamlines.map((streamline, i) => {
+        const numSegments = streamline.length - 1;
+        const offset = offsets[i] ?? 0;
+        return computeAlphaTrail(
+          numSegments,
+          phase,
+          offset,
+          this.pulseWidth,
+          this.pulsePauseWidth,
+          this.baseOpacity
+        );
+      });
+    }
 
     // Draw all streamlines
     drawTrajectories(ctx, streamlines, 0, {
