@@ -7,7 +7,6 @@
   import Diffeomorphism from "$lib/figures/Diffeomorphism.svelte";
   import ConditionalProbabilityPath from "$lib/figures/ConditionalProbabilityPath.svelte";
   import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
-  import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
   import { Katex } from "@diffusion-explorer/ui";
   // Distribution samples
   let sourceDistributionSamples = [];
@@ -149,22 +148,6 @@
     Starting from points in the target distribution (right), the model traces paths
     back to the source distribution (left).
   </ReverseSampling>
-</section>
-
-<hr class="section-divider" />
-
-<section id="divergence">
-  <h2 class="section-heading">Divergence</h2>
-  <DivergenceIntro>
-    <!-- <span class="figure-number">Figure:</span> -->
-    <strong>Three types of vector field divergence.</strong>
-    The divergence of a vector field <Katex math="F"/> is often denoted
-    as <Katex math="\nabla \cdot F"/> and describes the rate at which
-    "density" expands or contracts at a point.
-    <em>Left:</em> A converging field (sink) compresses volume over time and has negative divergence. 
-    <em>Center:</em> A diverging field (source) expands volume over time and has positive divergence.
-    <em>Right:</em> An incompressible field has zero divergence and neither expands nor collapses volume. 
-  </DivergenceIntro>
 </section>
 
 <hr class="section-divider" />
