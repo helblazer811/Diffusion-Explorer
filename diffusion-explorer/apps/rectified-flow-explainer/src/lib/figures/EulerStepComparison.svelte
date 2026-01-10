@@ -152,11 +152,10 @@
   let prevRightInEndPause = false;
 
   // Create segment clip for left side
-  function createLeftSegmentClip(numSegments: number, segmentPhaseMs: number, segmentPhaseNormalized: number) {
+  function createLeftSegmentClip(numSegments: number, segmentPhaseMs: number) {
     const cycleTime = segmentDuration + segmentPauseDuration;
     return {
       name: "LeftSegments",
-      duration: segmentPhaseNormalized,
       reduce(t: number) {
         const absoluteTime = t * segmentPhaseMs;
         const segmentIdx = Math.floor(absoluteTime / cycleTime);
@@ -177,11 +176,10 @@
   }
 
   // Create segment clip for right side
-  function createRightSegmentClip(numSegments: number, segmentPhaseMs: number, segmentPhaseNormalized: number) {
+  function createRightSegmentClip(numSegments: number, segmentPhaseMs: number) {
     const cycleTime = segmentDuration + segmentPauseDuration;
     return {
       name: "RightSegments",
-      duration: segmentPhaseNormalized,
       reduce(t: number) {
         const absoluteTime = t * segmentPhaseMs;
         const segmentIdx = Math.floor(absoluteTime / cycleTime);
@@ -202,10 +200,9 @@
   }
 
   // Create end pause clip for left side
-  function createLeftEndPauseClip(duration: number, numSegments: number) {
+  function createLeftEndPauseClip(numSegments: number) {
     return {
       name: "LeftEndPause",
-      duration,
       reduce() {
         return {
           leftInEndPause: true,
@@ -217,10 +214,9 @@
   }
 
   // Create end pause clip for right side
-  function createRightEndPauseClip(duration: number, numSegments: number) {
+  function createRightEndPauseClip(numSegments: number) {
     return {
       name: "RightEndPause",
-      duration,
       reduce() {
         return {
           rightInEndPause: true,
@@ -640,10 +636,10 @@
     };
 
     // Add clips for both sides
-    timeline.add(createLeftSegmentClip(currentSteps, segmentPhaseMs, segmentPhaseNormalized), 0);
-    timeline.add(createRightSegmentClip(currentSteps, segmentPhaseMs, segmentPhaseNormalized), 0);
-    timeline.add(createLeftEndPauseClip(endPauseNormalized, currentSteps), segmentPhaseNormalized);
-    timeline.add(createRightEndPauseClip(endPauseNormalized, currentSteps), segmentPhaseNormalized);
+    timeline.add(createLeftSegmentClip(currentSteps, segmentPhaseMs), { start: 0, end: segmentPhaseNormalized });
+    timeline.add(createRightSegmentClip(currentSteps, segmentPhaseMs), { start: 0, end: segmentPhaseNormalized });
+    timeline.add(createLeftEndPauseClip(currentSteps), { start: segmentPhaseNormalized, end: 1 });
+    timeline.add(createRightEndPauseClip(currentSteps), { start: segmentPhaseNormalized, end: 1 });
 
     // Set timeline duration in seconds
     timeline.duration = totalMs / 1000;
