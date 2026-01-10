@@ -60,6 +60,7 @@ export * from './plotting/mathjax';
 export * from './plotting/pathlines';
 export * from './plotting/streamlines';
 export * from './plotting/mesh_grid';
+export * from './plotting/heatmap';
 export { useCanvas2D } from './plotting/canvas';
 export * from './plotting/utils';
 
