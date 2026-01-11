@@ -6,10 +6,12 @@
     DoubleFigure,
     TimeSlider,
     drawScatterPlot,
-    drawTrajectories,
     Timeline,
     useCanvas2D,
     useVisibilityHandler,
+    createPauseClip,
+    PathlineAnimation,
+    type PathlineAnimationState,
   } from "@diffusion-explorer/ui";
   import type { DiffusionModelClient } from "@diffusion-explorer/diffusion";
 
@@ -42,6 +44,7 @@
     trajectoryProgressOpacity?: number;
     trajectoryPreviewOpacity?: number;
     animationDuration?: number;
+    timing?: { pauseStart: number };
     playingByDefault?: boolean;
     highlightedTrajectoryOpacity?: number;
     dimmedTrajectoryOpacity?: number;
@@ -76,7 +79,8 @@
     trajectoryPointRadius = 4,
     trajectoryProgressOpacity = 0.8,
     trajectoryPreviewOpacity = 0.15,
-    animationDuration = 10000,
+    animationDuration = 11500, // Total cycle duration in ms
+    timing = { pauseStart: 0.870 }, // Animation runs 0→0.870, pause 0.870→1.0
     playingByDefault = true,
     highlightedTrajectoryOpacity = 1.0,
     dimmedTrajectoryOpacity = 0.15,
@@ -112,21 +116,19 @@
   let xScale: d3.ScaleLinear<number, number> | undefined;
   let yScale: d3.ScaleLinear<number, number> | undefined;
 
-  // Animation state (single timeline, same speed both sides)
-  type AnimationState = {
-    time: number;
-    segmentIndex: number;
-  };
+  // Animation state type - extends PathlineAnimationState
+  type AnimationState = PathlineAnimationState & { time: number };
 
   let isPlaying = $state(playingByDefault);
   let currentTime = $state(0);
   let currentSegmentIndex = $state(0);
 
-  // Timing constants
-  const endPauseDurationMs = 1500;
-
   // Timeline
   let timeline: Timeline<AnimationState> | null = null;
+
+  // PathlineAnimation instances for left and right panels
+  let leftPathlineAnimation: PathlineAnimation<AnimationState> | null = null;
+  let rightPathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Initialization flags
   let isInitialized = $state(false);
@@ -192,17 +194,6 @@
     ]);
   }
 
-  function getTrajectoryStyle(opacity: number) {
-    return {
-      strokeWidth: trajectoryStrokeWidth,
-      color: trajectoryColor,
-      progressOpacity: opacity,
-      showPreview: true,
-      previewOpacity: trajectoryPreviewOpacity,
-      pointRadius: trajectoryPointRadius,
-    };
-  }
-
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
@@ -223,28 +214,50 @@
   // Animations
   // ----------------------------------------------------------------
 
-  const segmentClip = {
-    name: "Segments",
-    duration: 1,
-    reduce(t: number) {
-      return {
-        time: t,
-        segmentIndex: Math.floor(t * numSegments),
-      };
-    },
-  };
-
   function setupTimeline() {
+    // Create PathlineAnimation instances for both panels
+    const pathlineStyle = {
+      color: trajectoryColor,
+      strokeWidth: trajectoryStrokeWidth,
+      pointRadius: trajectoryPointRadius,
+      progressOpacity: trajectoryProgressOpacity,
+      showPreview: true,
+      previewOpacity: trajectoryPreviewOpacity,
+    };
+
+    leftPathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(
+      scaledLeftTrajectories,
+      { style: pathlineStyle }
+    );
+
+    rightPathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(
+      scaledRightTrajectories,
+      { style: pathlineStyle }
+    );
+
+    // Create a clip that includes both segmentIndex and time
+    const segmentClip = {
+      name: "Segments",
+      reduce(t: number) {
+        return {
+          time: t,
+          segmentIndex: Math.floor(t * (leftPathlineAnimation?.data.numSegments ?? numSegments)),
+        };
+      },
+    };
+
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
       time: 0,
       segmentIndex: 0,
     };
 
-    timeline.add(segmentClip, 0);
+    // Add clips using normalized timing
+    timeline.add(segmentClip, { start: 0, end: timing.pauseStart });
+    timeline.add(createPauseClip(), { start: timing.pauseStart, end: 1 });
 
-    timeline.duration = (animationDuration - endPauseDurationMs) / 1000;
-    timeline.setEndPause(endPauseDurationMs / 1000);
+    // Configure timeline
+    timeline.duration = animationDuration / 1000;
     timeline.looping = true;
 
     timeline.onTick((_t, state) => {
@@ -277,13 +290,13 @@
 
   function draw(
     ctx: CanvasRenderingContext2D,
-    scaledTrajectories: number[][][],
+    pathlineAnimation: PathlineAnimation<AnimationState>,
     state: AnimationState,
     userTrajectories: number[][][]
   ) {
-    if (!ctx) return;
+    if (!ctx || !pathlineAnimation) return;
 
-    const { segmentIndex, time: logicalTime } = state;
+    const { time: logicalTime } = state;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -301,31 +314,33 @@
     const defaultOpacity = hasUserTrajectory
       ? dimmedTrajectoryOpacity
       : trajectoryProgressOpacity;
-    drawTrajectories(
-      ctx,
-      scaledTrajectories,
-      segmentIndex,
-      getTrajectoryStyle(defaultOpacity)
-    );
+    pathlineAnimation.draw(ctx, state, { progressOpacity: defaultOpacity });
 
     // Draw user trajectories (highlighted)
-    for (const userTrajectory of userTrajectories) {
-      if (userTrajectory && userTrajectory.length > 1) {
-        const userNumSegments = userTrajectory.length - 1;
+    if (userTrajectories.length > 0) {
+      const validUserTrajectories = userTrajectories.filter(t => t && t.length >= 2);
+
+      if (validUserTrajectories.length > 0) {
+        const userNumSegments = validUserTrajectories[0].length - 1;
         const userSegmentIndex = Math.floor(logicalTime * userNumSegments);
-        drawTrajectories(
+
+        pathlineAnimation.draw(
           ctx,
-          [userTrajectory],
-          userSegmentIndex,
-          getTrajectoryStyle(highlightedTrajectoryOpacity)
+          { ...state, segmentIndex: userSegmentIndex, pathlines: validUserTrajectories },
+          { progressOpacity: highlightedTrajectoryOpacity }
         );
-      } else if (userTrajectory && userTrajectory.length === 1) {
-        const [x, y] = userTrajectory[0];
-        ctx.globalAlpha = highlightedTrajectoryOpacity;
-        ctx.beginPath();
-        ctx.arc(x, y, trajectoryPointRadius, 0, Math.PI * 2);
-        ctx.fillStyle = trajectoryColor;
-        ctx.fill();
+      }
+
+      // Draw starting points for trajectories with only 1 point
+      for (const userTrajectory of userTrajectories) {
+        if (userTrajectory && userTrajectory.length === 1) {
+          const [x, y] = userTrajectory[0];
+          ctx.globalAlpha = highlightedTrajectoryOpacity;
+          ctx.beginPath();
+          ctx.arc(x, y, trajectoryPointRadius, 0, Math.PI * 2);
+          ctx.fillStyle = trajectoryColor;
+          ctx.fill();
+        }
       }
     }
 
@@ -340,20 +355,20 @@
   }
 
   function updateLeftVisualization() {
-    if (!isDataValid || !leftCtx) return;
+    if (!isDataValid || !leftCtx || !leftPathlineAnimation) return;
     draw(
       leftCtx,
-      scaledLeftTrajectories,
+      leftPathlineAnimation,
       getCurrentState(),
       userDDPMTrajectories
     );
   }
 
   function updateRightVisualization() {
-    if (!isDataValid || !rightCtx) return;
+    if (!isDataValid || !rightCtx || !rightPathlineAnimation) return;
     draw(
       rightCtx,
-      scaledRightTrajectories,
+      rightPathlineAnimation,
       getCurrentState(),
       userDDIMTrajectories
     );

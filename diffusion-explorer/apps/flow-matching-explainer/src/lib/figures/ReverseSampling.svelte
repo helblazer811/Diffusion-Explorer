@@ -1,6 +1,6 @@
-<script>
+<script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
   import { base } from "$app/paths";
@@ -47,15 +47,21 @@
   const canvas2d = useCanvas2D(width, height);
   $: ctx = canvas && canvas2d.ctx;
 
+  // Animation state type - extends PathlineAnimationState
+  type AnimationState = PathlineAnimationState;
+
   // Animation state - Timeline system
   let initialized = false;
   let isLoading = true;
   let loadingMessage = "Loading...";
-  let timeline = null;
+  let timeline: Timeline<AnimationState> | null = null;
+
+  // PathlineAnimation instance
+  let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Visibility tracking
   let figureIsActive;
-  let wasPlayingBeforeHidden = false;
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Pre-computed data
   let scales = null;
@@ -255,27 +261,30 @@
   // Animations
   // ----------------------------------------------------------------
 
-  // Forward clip (0→1)
-  const forwardClip = {
-    name: "Forward",
-    duration: 1,
-    reduce(t) {
-      return { time: t };
-    }
-  };
-
   function setupTimeline() {
-    timeline = new Timeline();
-    timeline.initialState = { time: 0 };
+    // Create PathlineAnimation for trajectories
+    pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(
+      transformedTrajectories,
+      {
+        style: {
+          color: settings.stylingSettings.trajectory.color,
+          strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+          pointRadius: settings.stylingSettings.trajectory.endpointRadius ?? settings.stylingSettings.trajectory.pointRadius ?? 3,
+          progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+        }
+      }
+    );
+
+    timeline = new Timeline<AnimationState>();
+    timeline.initialState = { segmentIndex: 0 };
 
     // Total cycle: forward + pause (then loops back to start)
     const totalCycleDuration = animationDuration + pauseBeforeRestart;
-    const forwardDuration = animationDuration / totalCycleDuration;
-    const pauseNormalized = pauseBeforeRestart / totalCycleDuration;
+    const forwardNorm = animationDuration / totalCycleDuration;
 
-    // Add clips in sequence
-    timeline.add({ ...forwardClip, duration: forwardDuration }, 0);
-    timeline.add(createPauseClip(pauseNormalized), forwardDuration);
+    // Add clips in sequence with explicit start/end
+    timeline.add(pathlineAnimation.clip, { start: 0, end: forwardNorm });
+    timeline.add(createPauseClip(), { start: forwardNorm, end: 1 });
 
     // Set duration in seconds
     timeline.duration = totalCycleDuration / 1000;
@@ -287,22 +296,12 @@
     });
   }
 
-  function startAnimation() {
-    if (timeline) timeline.play();
-  }
-
-  function stopAnimation() {
-    if (timeline) timeline.pause();
-  }
-
   // ----------------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------------
 
-  function draw(state) {
-    if (!ctx || !initialized) return;
-
-    const time = state.time;
+  function draw(state: AnimationState) {
+    if (!ctx || !initialized || !pathlineAnimation) return;
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -335,38 +334,7 @@
     drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
 
     // --- Dynamic Foreground ---
-    // Calculate current segment index from normalized time
-    const segmentIndex = Math.floor(time * numSegments);
-
-    // Trajectory styling from settings
-    const trajectoryColor = settings.stylingSettings.trajectory.color;
-    const trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-    const trajectoryEndpointRadius = settings.stylingSettings.trajectory.endpointRadius ?? settings.stylingSettings.trajectory.pointRadius ?? 3;
-    const normalOpacity = settings.stylingSettings.trajectory.progressOpacity;
-
-    if (transformedTrajectories.length > 0) {
-      drawTrajectories(ctx, transformedTrajectories, segmentIndex, {
-        strokeWidth: trajectoryStrokeWidth,
-        color: trajectoryColor,
-        progressOpacity: normalOpacity,
-        pointRadius: trajectoryEndpointRadius,
-      });
-    }
-  }
-
-  // ----------------------------------------------------------------
-  // Event Handlers
-  // ----------------------------------------------------------------
-
-  function handleVisibilityChange(isActive) {
-    if (!timeline) return;
-    if (!isActive && timeline.isPlaying) {
-      wasPlayingBeforeHidden = true;
-      stopAnimation();
-    } else if (isActive && wasPlayingBeforeHidden) {
-      wasPlayingBeforeHidden = false;
-      startAnimation();
-    }
+    pathlineAnimation.draw(ctx, state);
   }
 
   // ----------------------------------------------------------------
@@ -394,7 +362,7 @@
     setupTimeline();
     initialized = true;
     draw(timeline.initialState);
-    if (playingByDefault) startAnimation();
+    if (playingByDefault) timeline!.play();
   }
 
   // Load trajectories when target distribution becomes available
