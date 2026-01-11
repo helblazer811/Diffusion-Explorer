@@ -7,10 +7,17 @@ export const Layer = {
 
 // ===== Clip =====
 // A clip maps local time (0..1) to partial state updates (reducer pattern)
+// Clips are timing-agnostic - they define behavior, not when they play.
+// Timing is provided when adding to a timeline via { start, end }.
 export type Clip<TState> = {
   name: string;
-  duration: number; // normalized 0..1, or 0 for instant clips
   reduce(t: number, current: Readonly<TState>): Partial<TState> | null;
+};
+
+// Timing info for scheduling a clip
+export type ClipTiming = {
+  start: number; // normalized 0..1
+  end: number;   // normalized 0..1 (use start === end for instant clips)
 };
 
 // ===== Clip Options =====
@@ -24,6 +31,7 @@ export type ClipOptions = {
 type ScheduledClip<TState> = {
   clip: Clip<TState>;
   start: number; // normalized start time on timeline
+  end: number;   // normalized end time on timeline
   options: Required<ClipOptions>;
   playCount: number; // for ephemeral clips
 };
@@ -88,18 +96,18 @@ export class Timeline<TState> {
 
   /**
    * Add a clip to the timeline.
-   * @param clip - The clip to add
-   * @param start - Start time (normalized 0-1), or 'now' for current time
+   * @param clip - The clip to add (timing-agnostic behavior)
+   * @param timing - When the clip plays: { start, end } in normalized 0-1 time
    * @param options - Layer, ephemeral flag, and optional ID
    * @returns Clip ID for later removal
    */
-  add(clip: Clip<TState>, start: number | 'now' = 0, options: ClipOptions = {}): string {
-    const normalizedStart = start === 'now' ? this._time / this.duration : start;
+  add(clip: Clip<TState>, timing: ClipTiming, options: ClipOptions = {}): string {
     const id = options.id ?? `clip-${this.nextClipId++}`;
 
     this.clips.push({
       clip,
-      start: normalizedStart,
+      start: timing.start,
+      end: timing.end,
       options: {
         layer: options.layer ?? 0,
         ephemeral: options.ephemeral ?? false,
@@ -138,25 +146,30 @@ export class Timeline<TState> {
 
   /**
    * Add an instant state change at the current time.
-   * Creates a duration=0 clip that applies the update immediately.
+   * Creates a start===end clip that applies the update immediately.
    */
   setState(name: string, update: Partial<TState>, options: ClipOptions = {}): string {
-    return this.add({
-      name,
-      duration: 0,
-      reduce: () => update,
-    }, 'now', options);
+    const currentT = this._time / this.duration;
+    return this.add(
+      { name, reduce: () => update },
+      { start: currentT, end: currentT },
+      options
+    );
   }
 
   /**
    * Play an ephemeral clip at the current time.
    * The clip will auto-remove after one complete play.
+   * @param clip - The clip behavior to play
+   * @param duration - How long the clip should play (normalized 0-1)
    */
   playClip(
     clip: Clip<TState>,
+    duration: number,
     options: Omit<ClipOptions, 'ephemeral'> = {}
   ): string {
-    return this.add(clip, 'now', { ...options, ephemeral: true });
+    const currentT = this._time / this.duration;
+    return this.add(clip, { start: currentT, end: currentT + duration }, { ...options, ephemeral: true });
   }
 
   /**
@@ -240,12 +253,12 @@ export class Timeline<TState> {
   /**
    * Replace all clips at once without recreating the timeline.
    * Useful when data changes and clips need to be updated.
-   * @param clips - Array of clips with their start times and options
+   * @param clips - Array of clips with their timing and options
    */
-  replaceClips(clips: Array<{ clip: Clip<TState>; start: number; options?: ClipOptions }>): void {
+  replaceClips(clips: Array<{ clip: Clip<TState>; timing: ClipTiming; options?: ClipOptions }>): void {
     this.clips = [];
     this._cachedState = null;
-    clips.forEach(({ clip, start, options }) => this.add(clip, start, options));
+    clips.forEach(({ clip, timing, options }) => this.add(clip, timing, options));
   }
 
   // ===== Events =====
@@ -312,13 +325,14 @@ export class Timeline<TState> {
     const clipsByLayer = new Map<number, ScheduledClip<TState>[]>();
 
     for (const scheduled of this.clips) {
-      const { clip, start, options } = scheduled;
-      const end = start + clip.duration;
+      const { clip, start, end, options } = scheduled;
+      const duration = end - start;
+      const isInstant = duration === 0;
 
       // Check if clip has started (clips contribute from start onwards, holding final state after end)
-      // For duration=0 (instant) clips, they're active only at their start time
+      // For instant clips (start === end), they're active only at their start time
       const normalizedTime = this._time / this.duration;
-      const hasStarted = clip.duration === 0
+      const hasStarted = isInstant
         ? Math.abs(normalizedTime - start) < 0.0001 // Instant clip at start time
         : normalizedTime >= start;
 
@@ -327,9 +341,9 @@ export class Timeline<TState> {
       // Compute local time within clip (0 to 1)
       // If clip has ended, use t=1 (final state) to persist its contribution
       const hasEnded = normalizedTime > end;
-      const localT = clip.duration === 0
+      const localT = isInstant
         ? 1 // Instant clips get t=1
-        : hasEnded ? 1 : Math.min(1, Math.max(0, (normalizedTime - start) / clip.duration));
+        : hasEnded ? 1 : Math.min(1, Math.max(0, (normalizedTime - start) / duration));
 
       // Track ephemeral completion
       if (localT >= 1 && options.ephemeral) {
@@ -352,13 +366,14 @@ export class Timeline<TState> {
 
       // Compute updates from all clips in this layer (last-wins for same keys)
       for (const scheduled of layerClips) {
-        const { clip, start } = scheduled;
-        const end = start + clip.duration;
+        const { clip, start, end } = scheduled;
+        const duration = end - start;
+        const isInstant = duration === 0;
         const normalizedTime = this._time / this.duration;
         const hasEnded = normalizedTime > end;
-        const localT = clip.duration === 0
+        const localT = isInstant
           ? 1
-          : hasEnded ? 1 : Math.min(1, Math.max(0, (normalizedTime - start) / clip.duration));
+          : hasEnded ? 1 : Math.min(1, Math.max(0, (normalizedTime - start) / duration));
 
         const update = clip.reduce(localT, result);
         if (update !== null) {
@@ -413,12 +428,14 @@ export class Clock {
 /**
  * Creates a pause clip that preserves the current state.
  * During its active window [start, end], it returns the current accumulated state unchanged.
- * @param duration - How long to pause (normalized 0-1)
+ * Use with timeline.add(createPauseClip(), { start, end }) to schedule it.
  */
-export function createPauseClip<TState>(duration: number): Clip<TState> {
+export function createPauseClip<TState>(): Clip<TState> {
   return {
     name: "Pause",
-    duration,
-    reduce: (_t, current) => ({ ...current }),
+    // Return null to make no state changes - previous clip's final state is preserved
+    // Note: returning { ...current } doesn't work because `current` is the pre-layer state,
+    // which would overwrite other clips' contributions in the same layer.
+    reduce: () => null,
   };
 }
