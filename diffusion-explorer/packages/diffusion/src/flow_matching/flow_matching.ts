@@ -361,10 +361,13 @@ export class FlowModel extends Model {
         const scheduler = options.scheduler ?? 'euler_midpoint';
         const reverse = options.reverse ?? false;
         const num_samples = initial_points.shape[0];
-        // Forward: t goes from 0 to 1, Reverse: t goes from 1 to 0
-        const t_steps = reverse
-            ? tf.linspace(1, 0, num_total_steps + 1)
-            : tf.linspace(0, 1, num_total_steps + 1);
+        // Support arbitrary time ranges via t_start/t_end options
+        // Default: Forward (0 to 1), Reverse (1 to 0)
+        const defaultStart = reverse ? 1 : 0;
+        const defaultEnd = reverse ? 0 : 1;
+        const t_start = options.t_start ?? defaultStart;
+        const t_end = options.t_end ?? defaultEnd;
+        const t_steps = tf.linspace(t_start, t_end, num_total_steps + 1);
 
         let x_t: tf.Tensor2D = initial_points;
         const all_step_data: tf.Tensor2D[] = [];

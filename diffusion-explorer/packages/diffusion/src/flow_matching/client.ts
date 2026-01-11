@@ -27,6 +27,8 @@ export interface SamplingOptions {
     return_guidance?: boolean;
     scheduler?: SchedulerType;
     reverse?: boolean;  // If true, sample in reverse time (1 to 0) for inverting the flow
+    t_start?: number;   // Start time for sampling (default: 0 for forward, 1 for reverse)
+    t_end?: number;     // End time for sampling (default: 1 for forward, 0 for reverse)
 }
 
 export interface DomainRange {
