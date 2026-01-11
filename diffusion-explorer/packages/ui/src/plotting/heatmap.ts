@@ -1,6 +1,82 @@
 import * as d3 from "d3";
 
 /**
+ * Compute heatmap density using separable Gaussian blur.
+ * More performant than d3 contour-based KDE.
+ */
+function computeHeatmapDensity(
+  points: number[][],
+  domain: [number, number, number, number],
+  resolution: number,
+  sigma: number
+): Float32Array {
+  const [xMin, xMax, yMin, yMax] = domain;
+
+  const w = resolution;
+  const h = resolution;
+  const grid = new Float32Array(w * h);
+
+  const xScale = (x: number) => ((x - xMin) / (xMax - xMin)) * (w - 1);
+  const yScale = (y: number) => ((y - yMin) / (yMax - yMin)) * (h - 1);
+
+  // ---- 1) Splat points into grid ----
+  for (const [x, y] of points) {
+    const gx = Math.round(xScale(x));
+    const gy = Math.round(yScale(y));
+    if (gx >= 0 && gx < w && gy >= 0 && gy < h) {
+      grid[gy * w + gx] += 1;
+    }
+  }
+
+  // ---- 2) Build 1D Gaussian kernel ----
+  const radius = Math.ceil(3 * sigma);
+  const size = radius * 2 + 1;
+  const kernel = new Float32Array(size);
+
+  let sum = 0;
+  for (let i = -radius; i <= radius; i++) {
+    const v = Math.exp(-(i * i) / (2 * sigma * sigma));
+    kernel[i + radius] = v;
+    sum += v;
+  }
+  for (let i = 0; i < size; i++) kernel[i] /= sum;
+
+  // ---- 3) Separable blur: horizontal ----
+  const temp = new Float32Array(w * h);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let acc = 0;
+      for (let k = -radius; k <= radius; k++) {
+        const xx = x + k;
+        if (xx >= 0 && xx < w) {
+          acc += grid[y * w + xx] * kernel[k + radius];
+        }
+      }
+      temp[y * w + x] = acc;
+    }
+  }
+
+  // ---- 4) Separable blur: vertical ----
+  const out = new Float32Array(w * h);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let acc = 0;
+      for (let k = -radius; k <= radius; k++) {
+        const yy = y + k;
+        if (yy >= 0 && yy < h) {
+          acc += temp[yy * w + x] * kernel[k + radius];
+        }
+      }
+      out[y * w + x] = acc;
+    }
+  }
+
+  return out;
+}
+
+/**
  * Pixel bounds for heatmap rendering
  */
 export interface HeatmapBounds {
@@ -86,62 +162,14 @@ export function drawHeatmap(
 
   const [xMin, xMax, yMin, yMax] = domain;
 
-  // Create scales to map data coords to grid coords
-  const xGridScale = d3.scaleLinear().domain([xMin, xMax]).range([0, resolution]);
-  const yGridScale = d3.scaleLinear().domain([yMin, yMax]).range([0, resolution]);
-
-  // Scale points to grid coordinates
-  const scaledPoints: [number, number][] = points.map((p) => [
-    xGridScale(p[0]),
-    yGridScale(p[1]),
-  ]);
-
-  // Create density estimator
-  const densityEstimator = d3
-    .contourDensity<[number, number]>()
-    .x((d) => d[0])
-    .y((d) => d[1])
-    .size([resolution, resolution])
-    .bandwidth(bandwidth)
-    .thresholds(resolution); // Use high threshold count for smooth sampling
-
-  // Compute contours to get density values
-  const contours = densityEstimator(scaledPoints);
-
-  // Build a density grid by sampling contour values
-  // For efficiency, we'll create a 2D array and fill based on contour membership
-  const densityGrid: number[][] = Array.from({ length: resolution }, () =>
-    Array(resolution).fill(0)
-  );
-
-  // For each contour level, mark cells that fall within it
-  // Process from lowest to highest value so higher values overwrite
-  const sortedContours = [...contours].sort((a, b) => a.value - b.value);
-
-  for (const contour of sortedContours) {
-    const value = contour.value;
-
-    // For each cell center, check if it's inside this contour
-    for (let gy = 0; gy < resolution; gy++) {
-      for (let gx = 0; gx < resolution; gx++) {
-        const cellCenterX = gx + 0.5;
-        const cellCenterY = gy + 0.5;
-
-        // Check if point is inside any polygon of this contour
-        if (pointInContour(cellCenterX, cellCenterY, contour)) {
-          densityGrid[gy][gx] = value;
-        }
-      }
-    }
-  }
+  // Compute density grid using separable Gaussian blur
+  const densityGrid = computeHeatmapDensity(points, domain, resolution, bandwidth);
 
   // Find max density for normalization
   let maxDensity = 0;
-  for (let gy = 0; gy < resolution; gy++) {
-    for (let gx = 0; gx < resolution; gx++) {
-      if (densityGrid[gy][gx] > maxDensity) {
-        maxDensity = densityGrid[gy][gx];
-      }
+  for (let i = 0; i < densityGrid.length; i++) {
+    if (densityGrid[i] > maxDensity) {
+      maxDensity = densityGrid[i];
     }
   }
 
@@ -178,7 +206,7 @@ export function drawHeatmap(
 
   for (let gy = 0; gy < resolution; gy++) {
     for (let gx = 0; gx < resolution; gx++) {
-      const density = densityGrid[gy][gx];
+      const density = densityGrid[gy * resolution + gx];
       const normalizedDensity = density / maxDensity;
 
       // Get color from color scale and parse RGBA
@@ -218,50 +246,4 @@ export function drawHeatmap(
   );
 
   ctx.restore();
-}
-
-/**
- * Check if a point is inside a contour's polygons using ray casting
- */
-function pointInContour(
-  x: number,
-  y: number,
-  contour: d3.ContourMultiPolygon
-): boolean {
-  for (const polygon of contour.coordinates) {
-    // Check outer ring (first ring)
-    const outerRing = polygon[0] as [number, number][];
-    if (pointInPolygon(x, y, outerRing)) {
-      // Check if point is in any hole (subsequent rings)
-      let inHole = false;
-      for (let i = 1; i < polygon.length; i++) {
-        if (pointInPolygon(x, y, polygon[i] as [number, number][])) {
-          inHole = true;
-          break;
-        }
-      }
-      if (!inHole) return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Ray casting algorithm for point-in-polygon test
- */
-function pointInPolygon(
-  x: number,
-  y: number,
-  ring: [number, number][]
-): boolean {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const xi = ring[i][0], yi = ring[i][1];
-    const xj = ring[j][0], yj = ring[j][1];
-
-    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
-  }
-  return inside;
 }
