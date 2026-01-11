@@ -1,6 +1,16 @@
 import * as d3 from "d3";
 
 /**
+ * Pixel bounds for heatmap rendering
+ */
+export interface HeatmapBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
  * Options for drawing a heatmap from scattered points
  */
 export interface HeatmapOptions {
@@ -16,10 +26,12 @@ export interface HeatmapOptions {
   opacity?: number;
   /** Canvas blend mode */
   blendMode?: GlobalCompositeOperation;
-  /** Scale function: data x -> pixel x */
-  xScale: (x: number) => number;
-  /** Scale function: data y -> pixel y */
-  yScale: (y: number) => number;
+  /** Pixel bounds {x, y, width, height}. If provided, xScale/yScale are optional */
+  bounds?: HeatmapBounds;
+  /** Scale function: data x -> pixel x. Required if bounds not provided */
+  xScale?: (x: number) => number;
+  /** Scale function: data y -> pixel y. Required if bounds not provided */
+  yScale?: (y: number) => number;
 }
 
 /**
@@ -52,8 +64,7 @@ export function drawHeatmap(
     colorScale = d3.interpolateViridis,
     opacity = 1,
     blendMode,
-    xScale,
-    yScale,
+    bounds,
   } = options;
 
   if (points.length === 0) return;
@@ -139,45 +150,72 @@ export function drawHeatmap(
   // Draw heatmap
   ctx.save();
   ctx.globalAlpha = opacity;
+  ctx.strokeStyle = "transparent";
+  ctx.lineWidth = 0;
+  ctx.imageSmoothingEnabled = false;
   if (blendMode) {
     ctx.globalCompositeOperation = blendMode;
   }
 
-  // Cell size in data coordinates
-  const cellWidth = (xMax - xMin) / resolution;
-  const cellHeight = (yMax - yMin) / resolution;
+  // Create pixel scale functions from bounds or use provided scales
+  let xScale: (x: number) => number;
+  let yScale: (y: number) => number;
+
+  if (bounds) {
+    // Create scales from bounds
+    xScale = d3.scaleLinear().domain([xMin, xMax]).range([bounds.x, bounds.x + bounds.width]);
+    yScale = d3.scaleLinear().domain([yMin, yMax]).range([bounds.y + bounds.height, bounds.y]);
+  } else if (options.xScale && options.yScale) {
+    xScale = options.xScale;
+    yScale = options.yScale;
+  } else {
+    throw new Error("drawHeatmap: Either bounds or xScale/yScale must be provided");
+  }
+
+  // Create ImageData at grid resolution to avoid cell boundary artifacts
+  const imageData = ctx.createImageData(resolution, resolution);
+  const data = imageData.data;
 
   for (let gy = 0; gy < resolution; gy++) {
     for (let gx = 0; gx < resolution; gx++) {
       const density = densityGrid[gy][gx];
-      if (density === 0) continue; // Skip empty cells
-
-      // Normalize density to [0, 1]
       const normalizedDensity = density / maxDensity;
 
-      // Get color from color scale
-      const color = colorScale(normalizedDensity);
+      // Get color from color scale and parse RGBA
+      const color = d3.color(colorScale(normalizedDensity));
+      const rgb = color?.rgb() ?? d3.rgb(0, 0, 0);
 
-      // Convert grid cell to data coordinates
-      const dataX = xMin + gx * cellWidth;
-      const dataY = yMin + gy * cellHeight;
-
-      // Convert to pixel coordinates
-      const pixelX = xScale(dataX);
-      const pixelY = yScale(dataY);
-      const pixelX2 = xScale(dataX + cellWidth);
-      const pixelY2 = yScale(dataY + cellHeight);
-
-      // Draw cell
-      ctx.fillStyle = color;
-      ctx.fillRect(
-        Math.min(pixelX, pixelX2),
-        Math.min(pixelY, pixelY2),
-        Math.abs(pixelX2 - pixelX),
-        Math.abs(pixelY2 - pixelY)
-      );
+      // ImageData y-axis is top-down, so flip the y coordinate
+      const pixelIndex = ((resolution - 1 - gy) * resolution + gx) * 4;
+      data[pixelIndex] = rgb.r;
+      data[pixelIndex + 1] = rgb.g;
+      data[pixelIndex + 2] = rgb.b;
+      data[pixelIndex + 3] = Math.round(255 * opacity);
     }
   }
+
+  // Draw ImageData to a temporary canvas, then scale to target bounds
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = resolution;
+  tempCanvas.height = resolution;
+  const tempCtx = tempCanvas.getContext("2d")!;
+  tempCtx.putImageData(imageData, 0, 0);
+
+  // Compute target bounds from scales
+  const targetX = xScale(xMin);
+  const targetY = yScale(yMax); // yScale typically inverts, so yMax -> top
+  const targetX2 = xScale(xMax);
+  const targetY2 = yScale(yMin);
+  const targetWidth = Math.abs(targetX2 - targetX);
+  const targetHeight = Math.abs(targetY2 - targetY);
+
+  ctx.drawImage(
+    tempCanvas,
+    Math.min(targetX, targetX2),
+    Math.min(targetY, targetY2),
+    targetWidth,
+    targetHeight
+  );
 
   ctx.restore();
 }

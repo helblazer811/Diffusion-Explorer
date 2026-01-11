@@ -71,6 +71,7 @@ export {
   Layer,
   createPauseClip,
   type Clip,
+  type ClipTiming,
   type ClipOptions,
 } from './animation/timeline';
 
