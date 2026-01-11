@@ -95,9 +95,10 @@ async function getReferenceViewBoxHeight(): Promise<number> {
 }
 
 // Auto-initialize MathJax when module is imported in browser
-if (typeof window !== 'undefined') {
-  getReferenceViewBoxHeight();
-}
+// Export promise so consumers can await initialization before drawing
+export const mathjaxInitialized: Promise<void> = typeof window !== 'undefined'
+  ? getReferenceViewBoxHeight().then(() => {})
+  : Promise.resolve();
 
 /**
  * Build cache key from latex string and styling options
@@ -245,6 +246,7 @@ export async function latexToSvgElement(latex: string, options: LatexToSvgOption
  * @param offsetX - Optional horizontal offset (default 0)
  * @param offsetY - Optional vertical offset (default 0)
  * @param options - Optional styling { color, stroke, strokeWidth, strokeOpacity }
+ * @param requestRedraw - Optional callback invoked when background rendering completes
  */
 export function drawMathjax(
   ctx: CanvasRenderingContext2D,
@@ -254,7 +256,8 @@ export function drawMathjax(
   fontSize: number,
   offsetX = 0,
   offsetY = 0,
-  options: MathjaxStyleOptions = {}
+  options: MathjaxStyleOptions = {},
+  requestRedraw?: () => void
 ): void {
   // If MathJax not ready yet, skip silently (it's loading)
   if (referenceViewBoxHeight === null) {
@@ -270,6 +273,7 @@ export function drawMathjax(
       pendingRenders.add(cacheKey);
       renderToCache(latex, options).then(() => {
         pendingRenders.delete(cacheKey);
+        if (requestRedraw) requestRedraw();
       });
     }
     return;

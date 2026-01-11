@@ -1,5 +1,5 @@
 <script>
-  import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, mathjaxInitialized } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -236,7 +236,7 @@
       const vtCenterY = (interpY + vtEndY) / 2;
       drawMathjax(
         ctx, "v_t(x_t|x_1)", vtCenterX, vtCenterY,
-        latexFontSize, 10, 45, { color: vectorColor }
+        latexFontSize, 10, 45, { color: vectorColor }, draw
       );
 
       // v_t^theta label near noisy vector
@@ -244,7 +244,7 @@
       const vtThetaCenterY = (interpY + vtThetaEndY) / 2;
       drawMathjax(
         ctx, "v_t^\\theta(x_t)", vtThetaCenterX, vtThetaCenterY,
-        latexFontSize, -10, -20, { color: noisyVectorColor }
+        latexFontSize, -10, -20, { color: noisyVectorColor }, draw
       );
     }
 
@@ -254,34 +254,32 @@
     // x_0 label above source point
     drawMathjax(
       ctx, "x_0", x0Pixel.x, x0Pixel.y,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
     );
 
     // x_1 label above target point
     drawMathjax(
       ctx, "x_1", x1Pixel.x, x1Pixel.y,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
     );
 
     // x label above intermediate point
     drawMathjax(
       ctx, "x", interpX, interpY,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
     );
 
-    // Distribution labels at top
-    const yDomain = scales.yScale.domain();
-    const yTop = yDomain[0];
-    const distributionLabelY = scales.yScale(yTop) - 5;
+    // Distribution labels at top (anchor is bottom-center, so offset down to keep visible)
+    const distributionLabelY = marginHeight;
 
     drawMathjax(
       ctx, "p_0", scales.sourceCenterPixelX, distributionLabelY,
-      latexFontSize, 0, 8, { color: latexColor }
+      latexFontSize, 0, 10, { color: latexColor }, draw
     );
 
     drawMathjax(
       ctx, "p_1", scales.targetCenterPixelX, distributionLabelY,
-      latexFontSize, 0, 8, { color: latexColor }
+      latexFontSize, 0, 10, { color: latexColor }, draw
     );
   }
 
@@ -298,6 +296,11 @@
     runInitialComputation();
     isInitialized = true;
     draw();
+  }
+
+  // Redraw when MathJax finishes initializing (for LaTeX labels)
+  $: if (isInitialized) {
+    mathjaxInitialized.then(() => draw());
   }
 </script>
 
