@@ -1,5 +1,5 @@
 <script>
-  import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, mathjaxInitialized } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -48,9 +48,6 @@
   export let vectorWidth = 4.5;
   export let vectorScale = 110;
   export let t = 0.4;
-
-  // Label styling
-  export let labelYShiftFactor = 0.5;
 
   // Background
   export let backgroundVisible = true;
@@ -306,30 +303,29 @@
     // Draw LaTeX labels directly on canvas
     const latexColor = settings.stylingSettings.figureLatex.color;
 
-    // p_0 and p_1 above distributions
-    const yDomain = scales.yScale.domain();
-    const distributionLabelY = scales.yScale(yDomain[0]) + labelYShiftFactor * 22;
+    // p_0 and p_1 above distributions (anchor is bottom-center, so offset down to keep visible)
+    const distributionLabelY = marginHeight;
 
     drawMathjax(
       ctx, "p_0", scales.sourceCenterPixelX, distributionLabelY,
-      latexFontSize, 0, 0, { color: latexColor }
+      latexFontSize, 0, 10, { color: latexColor }, draw
     );
 
     drawMathjax(
       ctx, "p_1", scales.targetCenterPixelX, distributionLabelY,
-      latexFontSize, 0, 0, { color: latexColor }
+      latexFontSize, 0, 10, { color: latexColor }, draw
     );
 
     // x_1 above selected target point
     drawMathjax(
       ctx, "x_1", targetX, targetY,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
     );
 
     // x above intermediate point
     drawMathjax(
       ctx, "x", interpPixel.x, interpPixel.y,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
     );
 
     // v_t(x|x_1) near vector
@@ -338,7 +334,7 @@
       const vectorCenterY = (interpPixel.y + vectorEndY) / 2;
       drawMathjax(
         ctx, "v_t(x|x_1)", vectorCenterX, vectorCenterY,
-        latexFontSize, 30, -20, { color: vectorColor }
+        latexFontSize, 30, -20, { color: vectorColor }, draw
       );
     }
   }
@@ -356,6 +352,11 @@
     runInitialComputation();
     isInitialized = true;
     draw();
+  }
+
+  // Redraw when MathJax finishes initializing (for LaTeX labels)
+  $: if (isInitialized) {
+    mathjaxInitialized.then(() => draw());
   }
 </script>
 
