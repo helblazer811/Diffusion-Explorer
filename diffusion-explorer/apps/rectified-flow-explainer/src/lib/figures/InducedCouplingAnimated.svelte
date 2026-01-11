@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, drawTrajectories, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler, PathlineAnimation, type PathlineAnimationState } from "@diffusion-explorer/ui";
   import { clipTrajectoriesToStartingRadius } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
 
@@ -74,12 +74,11 @@
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
-  // Animation state - computed by Timeline clips
-  type AnimationState = {
+  // Animation state - extends PathlineAnimationState with additional fields
+  type AnimationState = PathlineAnimationState & {
     stateIndex: number;              // 0, 1, or 2 for toggle button
     naiveCouplingProgress: number;   // 0 → 1 for naive coupling lines (left to right)
     naiveCouplingOpacity: number;    // 1 → 0 during fade
-    segmentIndex: number;            // For trajectory animation
     inducedCouplingProgress: number; // 0 → 1 for induced coupling lines
   };
 
@@ -99,11 +98,12 @@
 
   // Playback control
   let timeline: Timeline<AnimationState> | null = null;
+  let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
   let currentState: AnimationState = {
+    segmentIndex: 0,
     stateIndex: 0,
     naiveCouplingProgress: 0,
     naiveCouplingOpacity: 1,
-    segmentIndex: 0,
     inducedCouplingProgress: 0
   };
 
@@ -271,8 +271,21 @@
   let cachedNumSegments = 0;
 
   function setupTimeline() {
+    // Create PathlineAnimation for trajectory phase
+    pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(
+      transformedTrajectories,
+      {
+        style: {
+          color: settings.stylingSettings.trajectory.color,
+          strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+          pointRadius: settings.stylingSettings.trajectory.endpointRadius,
+          progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+        }
+      }
+    );
+
     // Cache values for closures
-    cachedNumSegments = numTimeSteps - 1;
+    cachedNumSegments = pathlineAnimation.data.numSegments;
 
     // Pre-compute normalized sub-phase boundaries within each clip
     const phase1Duration = timing.phase1End - timing.phase1Start;
@@ -287,10 +300,10 @@
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
+      segmentIndex: 0,
       stateIndex: 0,
       naiveCouplingProgress: 0,
       naiveCouplingOpacity: 1,
-      segmentIndex: 0,
       inducedCouplingProgress: 0
     };
 
@@ -439,13 +452,9 @@
     ctx.globalAlpha = 1;
   }
 
-  function drawAnimatedTrajectories(segmentIndex: number) {
-    drawTrajectories(ctx, transformedTrajectories, segmentIndex, {
-      strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
-      color: settings.stylingSettings.trajectory.color,
-      progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
-      pointRadius: settings.stylingSettings.trajectory.endpointRadius,
-    });
+  function drawAnimatedTrajectories(state: AnimationState) {
+    if (!pathlineAnimation) return;
+    pathlineAnimation.draw(ctx!, state);
   }
 
   function drawInducedCouplingLines(progress = 1) {
@@ -495,7 +504,7 @@
       drawNaiveCouplingLines(naiveCouplingProgress, naiveCouplingOpacity * couplingLineOpacity);
     } else if (stateIndex === 1) {
       // State 1: Draw animated trajectories
-      drawAnimatedTrajectories(segmentIndex);
+      drawAnimatedTrajectories(state);
     } else if (stateIndex === 2 && inducedCouplingProgress > 0) {
       // State 2: Draw induced coupling lines
       drawInducedCouplingLines(inducedCouplingProgress);

@@ -5,11 +5,12 @@
     TimeSlider,
     drawScatterPlot,
     drawMathjax,
-    drawTrajectories,
     createSourceTargetScales,
     Timeline,
     useCanvas2D,
     useVisibilityHandler,
+    PathlineAnimation,
+    type PathlineAnimationState,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -60,16 +61,18 @@
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
-  // Animation state type
-  type AnimationState = {
-    time: number; // WARNING: Using time in draw() is an antipattern. Prefer derived state.
-    segmentIndex: number; // For regular trajectories
+  // Animation state type - extends PathlineAnimationState with additional fields
+  type AnimationState = PathlineAnimationState & {
+    time: number; // For LaTeX label positioning
     clickedSegmentIndex: number; // For in-progress clicked trajectory
   };
 
   // Animation state - Timeline system
   let initialized = false;
   let timeline: Timeline<AnimationState> | null = null;
+
+  // PathlineAnimation instance
+  let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Cached values for clip closure
   let cachedNumTimesteps = 1;
@@ -216,6 +219,19 @@
     // Cache numTimesteps for clip closure
     cachedNumTimesteps = allTimeSamples?.length || 1;
 
+    // Create PathlineAnimation for regular trajectories
+    pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(
+      transformedTrajectories,
+      {
+        style: {
+          color: settings.stylingSettings.trajectory.color,
+          strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+          pointRadius: settings.stylingSettings.trajectory.endpointRadius,
+          progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+        }
+      }
+    );
+
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
       time: 0,
@@ -223,21 +239,20 @@
       clickedSegmentIndex: 0,
     };
 
-    // Main animation clip - computes both segment indices
+    // Main animation clip - combines PathlineAnimation's segmentIndex with time and clickedSegmentIndex
     const mainClip = {
       name: "Animation",
-      duration: 1,
       reduce(t: number) {
         return {
           time: t,
-          segmentIndex: Math.floor(t * (cachedNumTimesteps - 1)),
+          segmentIndex: Math.floor(t * (pathlineAnimation?.data.numSegments ?? cachedNumTimesteps - 1)),
           clickedSegmentIndex: Math.floor(t * (samplingSteps - 1)),
         };
       },
     };
 
     // Add main animation clip
-    timeline.add(mainClip, 0);
+    timeline.add(mainClip, { start: 0, end: 1 });
 
     // Set timeline duration and end pause
     timeline.duration = animationDuration / 1000;
@@ -264,7 +279,7 @@
   // ----------------------------------------------------------------
 
   function draw(state: AnimationState) {
-    if (!ctx || !initialized) return;
+    if (!ctx || !initialized || !pathlineAnimation) return;
 
     const t = state.time;
 
@@ -290,14 +305,7 @@
 
     // --- Dynamic Foreground ---
     // Draw the single trajectory (if exists)
-    if (transformedTrajectories.length > 0) {
-      drawTrajectories(ctx, transformedTrajectories, state.segmentIndex, {
-        strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
-        color: settings.stylingSettings.trajectory.color,
-        progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
-        pointRadius: settings.stylingSettings.trajectory.endpointRadius,
-      });
-    }
+    pathlineAnimation.draw(ctx, state);
 
     // Draw in-progress clicked trajectory
     if (clickedTrajectory && clickedTrajectory.length >= 1) {
