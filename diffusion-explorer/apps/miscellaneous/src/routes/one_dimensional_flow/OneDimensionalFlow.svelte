@@ -21,7 +21,7 @@
   // ----------------------------------------------------------------
 
   export let trajectories: number[][][] = []; // [step][sample][dim=1]
-  export let width = 900;
+  export let width = 1100;
   export let height = 250;
   export let numDisplayedPathlines = 30;
   export let heatmapResolution = 500;
@@ -512,7 +512,7 @@
     <div class="vertical-label right-label">Target Distribution</div>
   </div>
   <div class="slider-container">
-    <TimeSlider {timeline} color="#6A3779" />
+    <TimeSlider {timeline} color="#3B369F" />
   </div>
 </Figure>
 

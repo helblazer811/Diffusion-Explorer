@@ -51,7 +51,7 @@
 npm run sample:one-dimensional-flow</pre>
     </div>
   {:else}
-    <OneDimensionalFlow {trajectories} width={800} height={400} />
+    <OneDimensionalFlow {trajectories} width={900} height={350} />
     <p class="caption">
       <strong>Figure:</strong> Density evolution of a 1D flow model over time. The heatmap shows
       the probability density at each value (y-axis) as time progresses (x-axis). Pathlines
@@ -63,7 +63,7 @@ npm run sample:one-dimensional-flow</pre>
 
 <style>
   main {
-    max-width: 900px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 24px;
   }
