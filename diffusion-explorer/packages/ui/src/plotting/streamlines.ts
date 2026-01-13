@@ -984,3 +984,62 @@ export function drawStreamlines(
   );
 }
 
+/**
+ * Create a Path2D from streamlines for efficient repeated drawing.
+ *
+ * Pre-computing Path2D objects allows the browser to cache the path geometry,
+ * making repeated draws much faster than rebuilding paths with moveTo/lineTo.
+ *
+ * @param streamlines - Array of streamlines in pixel coordinates: [streamline][point][x,y]
+ * @returns A Path2D containing all streamlines
+ */
+export function generateStreamlinePath2D(streamlines: number[][][]): Path2D {
+  const path = new Path2D();
+  for (const streamline of streamlines) {
+    if (streamline.length < 2) continue;
+    path.moveTo(streamline[0][0], streamline[0][1]);
+    for (let i = 1; i < streamline.length; i++) {
+      path.lineTo(streamline[i][0], streamline[i][1]);
+    }
+  }
+  return path;
+}
+
+/**
+ * Options for drawing a pre-computed streamline Path2D.
+ */
+export interface DrawStreamlinePathOptions {
+  /** Stroke color */
+  color: string;
+  /** Stroke width in pixels */
+  strokeWidth: number;
+  /** Opacity (0-1, default: 1) */
+  opacity?: number;
+}
+
+/**
+ * Draw a pre-computed streamline Path2D.
+ *
+ * This is the fast path for rendering streamlines when geometry doesn't change.
+ * Use generateStreamlinePath2D() to create the path once, then call this repeatedly.
+ *
+ * @param ctx - Canvas 2D rendering context
+ * @param path - Pre-computed Path2D from generateStreamlinePath2D()
+ * @param options - Styling options
+ */
+export function drawStreamlinePath(
+  ctx: CanvasRenderingContext2D,
+  path: Path2D,
+  options: DrawStreamlinePathOptions
+): void {
+  const { color, strokeWidth, opacity = 1 } = options;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = strokeWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.globalAlpha = opacity;
+  ctx.stroke(path);
+  ctx.globalAlpha = 1;
+}
+
