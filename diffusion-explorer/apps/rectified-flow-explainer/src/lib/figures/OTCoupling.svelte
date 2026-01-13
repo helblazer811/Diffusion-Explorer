@@ -60,8 +60,6 @@
   // State
   // ----------------------------------------------------------------
 
-  $: caption = children;
-
   let svgElement;
   let scales = null;
   let isInitialized = false;
@@ -322,6 +320,8 @@
   // ----------------------------------------------------------------
   // Reactive Blocks
   // ----------------------------------------------------------------
+
+  $: caption = children;
 
   // Reactive initialization
   $: if (!isInitialized &&
