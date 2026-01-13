@@ -13,6 +13,14 @@ export interface RectifiedFlowData {
   modelPath: string;
 }
 
+export interface OTCouplingData {
+  sourcePoints: number[][];
+  targetPoints: number[][];
+  matching: number[]; // matching[i] = target index for source i
+  epsilon: number;
+  numSamples: number;
+}
+
 // ========== SETTINGS OBJECT ==========
 
 export const settings = {
@@ -28,6 +36,7 @@ export const settings = {
   cachedRectifiedFlowGridTrajectoriesPath: "cached_samples/rectified_flow_grid_trajectories.json" as string | null,
   cachedRectifiedFlowVectorFieldPath: "cached_samples/rectified_flow_vector_field.json" as string | null,
   cachedRecursiveRectifiedFlowTrajectoriesPath: null, //"cached_samples/recursive_rectified_flow_grid_trajectories.json" as string | null,
+  cachedOTCouplingPath: "cached_samples/ot_coupling.json" as string | null,
 
   // Worker URL (bundled to static/workers/ for production)
   // Note: These are relative paths. The page component prefixes with base when creating clients.
