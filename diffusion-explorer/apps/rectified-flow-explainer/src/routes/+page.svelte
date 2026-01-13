@@ -1277,9 +1277,10 @@
     </div>
   {/if}
   <h1 id="acknowledgements" class="section-heading">Acknowledgements</h1>
-  <div class="acknowledgements">
-    <p></p>
-  </div>
+  <p>I'd like to acknowledge my friend <a href="https://sebasguthdz.github.io/">Sebastián Gutiérrez Hernández</a> for his valuable feedback on this project, particularly on the 
+    formal explanations presented in this article. I would also like to thank <a href="https://bhoov.com/">Benjamin Hoover</a>, <a href="https://poloclub.github.io/">Polo Chau</a>, and <a href="https://the-vivek.netlify.app/">Vivek Anand</a> for their 
+    feedback on the visualizations and writing. 
+  </p>
 
   <h1 id="references" class="section-heading">References</h1>
   <Bibliography {citations} {bibEntries} />
