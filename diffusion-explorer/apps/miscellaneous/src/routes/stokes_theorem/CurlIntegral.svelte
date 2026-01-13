@@ -78,6 +78,11 @@
   // Label styling
   export let labelStrokeOpacity = 0.8;
 
+  // Progressive fill styling
+  export let fillColor = "rgba(249, 115, 22, 0.2)"; // Orange matching boundary, lower opacity
+  export let fillDuration = 0.5; // Fraction of total animation for fill (0 to 1)
+  export let cellSize = 0.3; // Grid cell size in domain units
+
   // Animation timing
   export let streamlineDuration = 8;
   export let rotationsPerCycle = 3; // Number of full curl arrow rotations per animation
@@ -101,12 +106,18 @@
   // Animation state
   type AnimationState = StreamlineAnimationState & {
     curlRotationAngle: number; // Rotation angle in radians
+    fillCellIndex: number; // 0 to totalGridCells, which cell we're filling
   };
 
   let timeline: Timeline<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
 
   let boundingBox: BoundingBox | null = null;
+
+  // Grid dimensions for progressive fill
+  let gridNumCols = 0;
+  let gridNumRows = 0;
+  let totalGridCells = 0;
 
   // Pre-computed curl points
   let curlPoints: Array<{
@@ -141,6 +152,12 @@
     // Compute bounding box from curve
     boundingBox = computeBoundingBox(curveFn);
 
+    // Compute grid dimensions for progressive fill
+    const { xMin, xMax, yMin, yMax } = boundingBox;
+    gridNumCols = Math.ceil((xMax - xMin) / cellSize);
+    gridNumRows = Math.ceil((yMax - yMin) / cellSize);
+    totalGridCells = gridNumCols * gridNumRows;
+
     // Convert circle radius from pixels to domain units
     const domainWidth = boundingBox.xMax - boundingBox.xMin + 2 * domainMargin;
     const circleRadiusDomain = (curlCircleRadius / width) * domainWidth;
@@ -152,7 +169,6 @@
     const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
     const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
 
-    const { xMin, xMax, yMin, yMax } = boundingBox;
     const placedPoints: Array<[number, number]> = [];
 
     // Generate uniform candidate points in bounding box
@@ -248,7 +264,7 @@
     if (!streamlineAnim) return;
 
     timeline = new Timeline<AnimationState>();
-    timeline.initialState = { streamlinePhase: 0, curlRotationAngle: 0 };
+    timeline.initialState = { streamlinePhase: 0, curlRotationAngle: 0, fillCellIndex: 0 };
     timeline.duration = streamlineDuration;
     timeline.looping = true;
 
@@ -264,6 +280,17 @@
         },
       },
       { start: 0, end: 1 }
+    );
+
+    // Progressive fill clip - animates cell index from 0 to totalGridCells
+    timeline.add(
+      {
+        name: "SurfaceFill",
+        reduce(t: number) {
+          return { fillCellIndex: t * totalGridCells };
+        },
+      },
+      { start: 0, end: fillDuration }
     );
 
     timeline.onTick((_t, state) => {
@@ -362,10 +389,69 @@
     ctx.fill();
   }
 
+  /**
+   * Draw progressive fill using grid-based approach.
+   * Fill order: top-down within each column, then left-to-right across columns.
+   * @param fillCellIndex - Linear index of current cell (col * numRows + row)
+   */
+  function drawProgressiveFill(fillCellIndex: number) {
+    if (!ctx || !boundingBox || fillCellIndex <= 0 || gridNumRows === 0) return;
+
+    const { xMin, yMin, yMax } = boundingBox;
+
+    // Save context for clipping
+    ctx.save();
+
+    // Create clip path from the surface curve
+    ctx.beginPath();
+    const numSamples = 200;
+    const step = (2 * Math.PI) / numSamples;
+    for (let i = 0; i <= numSamples; i++) {
+      const theta = i * step;
+      const point = curveFn(theta);
+      const [px, py] = toPixel(point);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.clip();
+
+    ctx.fillStyle = fillColor;
+
+    // Convert linear index to column/row
+    // Fill order: top-down in column, then next column (left to right)
+    // Cell index = col * numRows + row
+    const currentCol = Math.floor(fillCellIndex / gridNumRows);
+    const currentRow = fillCellIndex % gridNumRows;
+
+    // Draw all complete columns (0 to currentCol-1)
+    for (let col = 0; col < currentCol; col++) {
+      const cellXMin = xMin + col * cellSize;
+      const cellXMax = cellXMin + cellSize;
+      const [pxMin, pyBottom] = toPixel([cellXMin, yMin]);
+      const [pxMax, pyTop] = toPixel([cellXMax, yMax]);
+      ctx.fillRect(pxMin, pyTop, pxMax - pxMin, pyBottom - pyTop);
+    }
+
+    // Draw partial column (cells 0 to currentRow in currentCol)
+    if (currentCol < gridNumCols && currentRow > 0) {
+      const cellXMin = xMin + currentCol * cellSize;
+      const cellXMax = cellXMin + cellSize;
+      // Rows go from top (yMax) down to current row
+      // Row 0 is at top (yMax), row n is at bottom (yMin)
+      const fillYMin = yMax - currentRow * cellSize;
+      const [pxMin, pyBottom] = toPixel([cellXMin, fillYMin]);
+      const [pxMax, pyTop] = toPixel([cellXMax, yMax]);
+      ctx.fillRect(pxMin, pyTop, pxMax - pxMin, pyBottom - pyTop);
+    }
+
+    ctx.restore();
+  }
+
   function draw(state: AnimationState) {
     if (!ctx || !isInitialized || !streamlineAnim) return;
 
-    const { curlRotationAngle } = state;
+    const { curlRotationAngle, fillCellIndex } = state;
 
     ctx.clearRect(0, 0, width, height);
 
@@ -386,14 +472,17 @@
       strokeWidth: surfaceStrokeWidth,
     });
 
-    // 3. Draw curl arrows at each sampled point
+    // 4. Draw progressive fill (clipped to surface)
+    drawProgressiveFill(fillCellIndex);
+
+    // 5. Draw curl arrows at each sampled point
     for (const { pixelPos, curl } of curlPoints) {
       // Skip points with negligible curl
       if (Math.abs(curl) < 0.1) continue;
       drawCurlArrow(pixelPos, curl, curlRotationAngle);
     }
 
-    // 4. Surface label (S) - centered in the surface, shifted down slightly
+    // 6. Surface label (S) - centered in the surface, shifted down slightly
     if (showLabel && boundingBox) {
       const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
       const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
