@@ -45,22 +45,16 @@
   setContext("pageState", pageState);
 
   const {
+    modeState,
+    trainingState,
+    playbackState,
+    distributionData,
+    visibility,
+    config,
+    modelState,
+    datasetDict,
     isTraining,
     isEditing,
-    currentTime,
-    datasetName,
-    datasetDict,
-    usePretrained,
-    trainingObjective,
-    sourceDistributionSamples,
-    targetDistributionSamples,
-    currentDistributionSamples,
-    allTimeSamples,
-    allTimeGridSamples,
-    activePlotTypes,
-    distributionVisiblity,
-    intermediateTrainingSamples,
-    numberOfSteps,
     isPlaying,
   } = pageState;
   const state_handlers = createMainStateHandlers(pageState);
@@ -142,8 +136,16 @@
   }
 
   // Extract a random trajectory from cached samples (pixel coords with time offset -> domain coords)
-  function extractRandomTrajectoryFromCached(samples: number[][][]): number[][] | null {
-    if (!samples || samples.length === 0 || !samples[0] || samples[0].length === 0) return null;
+  function extractRandomTrajectoryFromCached(
+    samples: number[][][]
+  ): number[][] | null {
+    if (
+      !samples ||
+      samples.length === 0 ||
+      !samples[0] ||
+      samples[0].length === 0
+    )
+      return null;
 
     const numSamples = samples[0].length;
     const randomIdx = Math.floor(Math.random() * numSamples);
@@ -197,7 +199,12 @@
     gridSize: 100,
     bandwidth: contourBandwidth,
     thresholds: contourThresholds,
-    domain: [0, distWidth, yOffset, distHeight + yOffset] as [number, number, number, number],
+    domain: [0, distWidth, yOffset, distHeight + yOffset] as [
+      number,
+      number,
+      number,
+      number,
+    ],
   };
 
   // Target distribution domain: [800, 1300] x [yOffset, 500+yOffset]
@@ -205,12 +212,12 @@
     gridSize: 100,
     bandwidth: contourBandwidth,
     thresholds: contourThresholds,
-    domain: [targetXOffset, targetXOffset + distWidth, yOffset, distHeight + yOffset] as [
-      number,
-      number,
-      number,
-      number,
-    ],
+    domain: [
+      targetXOffset,
+      targetXOffset + distWidth,
+      yOffset,
+      distHeight + yOffset,
+    ] as [number, number, number, number],
   };
 
   // Function to get contour options for a given time (for animated distributions)
@@ -232,7 +239,6 @@
   // Forward playback clip - maps normalized time to animation state
   const forwardClip: Clip<AnimationState> = {
     name: "Forward",
-    duration: 1,
     reduce(t: number) {
       return { time: t };
     },
@@ -288,11 +294,11 @@
     timeline.initialState = { time: 0 };
     timeline.duration = 10; // 10 second animation cycle
     timeline.looping = true;
-    timeline.add(forwardClip, 0);
+    timeline.add(forwardClip, { start: 0, end: 1 });
 
-    // Sync timeline state to currentTime store and trigger redraw
+    // Sync timeline state to playbackState store and trigger redraw
     timeline.onTick((_t, state) => {
-      currentTime.set(state.time);
+      playbackState.update((p) => ({ ...p, time: state.time }));
       drawForeground(state);
     });
   }
@@ -308,7 +314,7 @@
     ctx.clearRect(0, 0, width, height);
 
     // Source distribution (contour at t=0)
-    if (sourceContours && $distributionVisiblity.source) {
+    if (sourceContours && $visibility.source) {
       plotContours(ctx, sourceContours, {
         xScale: identityScale,
         yScale: identityScale,
@@ -320,7 +326,7 @@
     }
 
     // Target distribution (contour at t=1)
-    if (targetContours && $distributionVisiblity.target) {
+    if (targetContours && $visibility.target) {
       plotContours(ctx, targetContours, {
         xScale: identityScale,
         yScale: identityScale,
@@ -347,9 +353,9 @@
     ctx.clearRect(0, 0, width, height);
 
     const time = state.time;
-    const currentData = $currentDistributionSamples;
-    const gridSamples = $allTimeGridSamples;
-    const plotTypes = $activePlotTypes;
+    const currentData = $distributionData.current;
+    const gridSamples = $distributionData.allTimeGrid;
+    const plotTypes = $config.activePlotTypes;
 
     // Get precomputed contour for current time
     const timeIndex =
@@ -362,7 +368,7 @@
     const currentContours = timeIndex >= 0 ? allTimeContours[timeIndex] : null;
 
     // Current distribution based on active plot types
-    if ($distributionVisiblity.current) {
+    if ($visibility.current) {
       if (plotTypes.includes("Contour") && currentContours) {
         plotContours(ctx, currentContours, {
           xScale: identityScale,
@@ -395,11 +401,15 @@
 
     // Training distribution (incremental contour)
     if (
-      $intermediateTrainingSamples &&
-      $intermediateTrainingSamples.length > 0 &&
-      $distributionVisiblity.training
+      $trainingState.intermediateSamples &&
+      $trainingState.intermediateSamples.length > 0 &&
+      $visibility.training
     ) {
-      drawDistributionContour(ctx, $intermediateTrainingSamples, trainingColor);
+      drawDistributionContour(
+        ctx,
+        $trainingState.intermediateSamples,
+        trainingColor
+      );
     }
   }
 
@@ -469,7 +479,7 @@
   ) {
     if (!ctx || !trajectory || trajectory.length === 0) return;
 
-    const numSteps = $numberOfSteps || 100;
+    const numSteps = $config.numberOfSteps || 100;
     const timeIndex = Math.floor(time * numSteps);
 
     // Trajectory is in DOMAIN coordinates (from model sampling), convert to pixel coords
@@ -584,7 +594,7 @@
     isStreaming = true;
     let tempTrajectory: number[][] = [[domainX, domainY]];
 
-    const numSteps = $numberOfSteps || 100;
+    const numSteps = $config.numberOfSteps || 100;
 
     const { requestId, promise } = pathClient.sampleFromInitialPoints(
       [[domainX, domainY]],
@@ -648,32 +658,36 @@
   }
 
   // Dataset "brush" toggles off usePretrained
-  $: if ($datasetName === "brush") {
-    usePretrained.set(false);
+  $: if ($config.datasetName === "brush") {
+    modelState.update((m) => ({ ...m, usePretrained: false }));
   } else {
-    usePretrained.set(true);
+    modelState.update((m) => ({ ...m, usePretrained: true }));
   }
 
   // Training start/stop
   $: if ($isTraining && !trainingInitiated) {
+    console.log("[+page] Training started, calling startTraining");
     trainingInitiated = true;
     if ($isEditing) {
-      isEditing.set(false);
+      modeState.set({ mode: "idle" });
     }
     state_handlers.startTraining();
   }
   $: if (!$isTraining && trainingInitiated) {
+    console.log(
+      "[+page] Training stopped via reactive block, calling stopTraining"
+    );
     trainingInitiated = false;
     state_handlers.stopTraining();
   }
 
   // Redraw when intermediate training samples update (timeline is stopped during training)
-  $: if ($intermediateTrainingSamples && timeline) {
+  $: if ($trainingState.intermediateSamples && timeline) {
     drawForeground(timeline.state);
   }
 
   // Trigger background redraw when visibility changes
-  $: if ($distributionVisiblity) {
+  $: if ($visibility) {
     bgNeedsRedraw = true;
     if (timeline) drawForeground(timeline.state);
   }
@@ -681,17 +695,18 @@
   // Editing start/stop
   $: if ($isEditing && !editingInitiated) {
     editingInitiated = true;
-    state_handlers.startEditing();
+    state_handlers.enterEditMode();
   }
-  $: if (!$isEditing && editingInitiated) {
+  // Don't exit edit mode if we're starting training (mode goes editing -> training)
+  $: if (!$isEditing && editingInitiated && !$isTraining) {
     editingInitiated = false;
-    state_handlers.stopEditing();
+    state_handlers.exitEditMode();
   }
 
   // Dataset change
   $: if (
-    $datasetName &&
-    $datasetDict[$datasetName] &&
+    $config.datasetName &&
+    $datasetDict[$config.datasetName] &&
     typeof window !== "undefined"
   ) {
     state_handlers.handleDatasetChange();
@@ -699,24 +714,24 @@
 
   // usePretrained change
   $: if (
-    $usePretrained &&
-    $datasetDict[$datasetName] &&
+    $modelState.usePretrained &&
+    $datasetDict[$config.datasetName] &&
     typeof window !== "undefined"
   ) {
     state_handlers.handleUsePretrained();
   }
   $: if (
-    !$usePretrained &&
-    $datasetDict[$datasetName] &&
+    !$modelState.usePretrained &&
+    $datasetDict[$config.datasetName] &&
     typeof window !== "undefined"
   ) {
-    isTraining.set(true);
+    modeState.set({ mode: "training" });
   }
 
   // Training objective change
   $: if (
-    $trainingObjective &&
-    $datasetDict[$datasetName] &&
+    $config.trainingObjective &&
+    $datasetDict[$config.datasetName] &&
     typeof window !== "undefined"
   ) {
     state_handlers.handleTrainingObjectiveChange();
@@ -724,39 +739,52 @@
 
   // Update current distribution samples when time changes
   $: if (
-    $currentTime !== undefined &&
-    $allTimeSamples &&
-    $allTimeSamples.length > 0
+    $playbackState.time !== undefined &&
+    $distributionData.allTime &&
+    $distributionData.allTime.length > 0
   ) {
-    let timeIndex = Math.floor($currentTime * ($allTimeSamples.length - 1));
-    timeIndex = Math.min(timeIndex, $allTimeSamples.length - 1);
-    const samples = $allTimeSamples[timeIndex];
-    currentDistributionSamples.set(samples);
+    let timeIndex = Math.floor(
+      $playbackState.time * ($distributionData.allTime.length - 1)
+    );
+    timeIndex = Math.min(timeIndex, $distributionData.allTime.length - 1);
+    const samples = $distributionData.allTime[timeIndex];
+    distributionData.update((d) => ({ ...d, current: samples }));
   }
 
   // Precompute source contours when source data changes
-  $: if ($sourceDistributionSamples) {
-    runInitialComputation({ source: $sourceDistributionSamples });
+  $: if ($distributionData.source) {
+    runInitialComputation({ source: $distributionData.source });
   }
 
   // Precompute target contours when target data changes
-  $: if ($targetDistributionSamples) {
-    runInitialComputation({ target: $targetDistributionSamples });
+  $: if ($distributionData.target) {
+    runInitialComputation({ target: $distributionData.target });
   }
 
   // Precompute contours for all time steps when samples change
-  $: if ($allTimeSamples && $allTimeSamples.length > 0) {
-    runInitialComputation({ allTime: $allTimeSamples });
+  $: if ($distributionData.allTime && $distributionData.allTime.length > 0) {
+    runInitialComputation({ allTime: $distributionData.allTime });
   }
 
   // Set default trajectory from cached samples when available (only if no trajectory yet and not dragging)
-  $: if ($allTimeSamples && $allTimeSamples.length > 0 && !streamedTrajectory && !isStreaming && !isDragging) {
-    const cachedTrajectory = extractRandomTrajectoryFromCached($allTimeSamples);
+  $: if (
+    $distributionData.allTime &&
+    $distributionData.allTime.length > 0 &&
+    !streamedTrajectory &&
+    !isStreaming &&
+    !isDragging
+  ) {
+    const cachedTrajectory = extractRandomTrajectoryFromCached(
+      $distributionData.allTime
+    );
     if (cachedTrajectory && cachedTrajectory.length > 0) {
       streamedTrajectory = cachedTrajectory;
       // Set handle position to starting point (convert domain to pixel)
       const startPoint = cachedTrajectory[0];
-      handlePosition = [domainToPixelX(startPoint[0]), domainToPixelY(startPoint[1])];
+      handlePosition = [
+        domainToPixelX(startPoint[0]),
+        domainToPixelY(startPoint[1]),
+      ];
     }
   }
 
@@ -767,56 +795,62 @@
     (sourceContours ||
       targetContours ||
       allTimeContours.length > 0 ||
-      $currentDistributionSamples)
+      $distributionData.current)
   ) {
     drawForeground(timeline.state);
   }
 
   // Create path client when model/objective changes
   $: {
-    const modelPath = pretrainedModelPaths[$trainingObjective]?.[$datasetName]
-      ? base + pretrainedModelPaths[$trainingObjective][$datasetName]
+    const modelPath = pretrainedModelPaths[$config.trainingObjective]?.[
+      $config.datasetName
+    ]
+      ? base +
+        pretrainedModelPaths[$config.trainingObjective][$config.datasetName]
       : "";
-    const modelConfig = trainingObjectiveToModelConfig[$trainingObjective] || {
+    const modelConfig = trainingObjectiveToModelConfig[
+      $config.trainingObjective
+    ] || {
       dim: 2,
       hidden: 64,
     };
 
     if (modelPath && typeof window !== "undefined") {
-      const workerUrl =
-        $trainingObjective === "Flow Matching"
-          ? "/workers/flow_model.worker.js"
-          : "/workers/diffusion_model.worker.js";
-
-      pathClient =
-        $trainingObjective === "Flow Matching"
-          ? new FlowModelClient(
-              workerUrl,
-              modelPath,
-              $trainingObjective,
-              modelConfig
-            )
-          : new DiffusionModelClient(workerUrl, modelPath, modelConfig);
-
+      if ($config.trainingObjective === "Flow Matching") {
+        pathClient = new FlowModelClient(
+          "/workers/flow_model.worker.js",
+          modelPath,
+          $config.trainingObjective,
+          modelConfig
+        );
+      } else if ($config.trainingObjective === "Diffusion") {
+        pathClient = new DiffusionModelClient(
+          "/workers/diffusion_model.worker.js",
+          modelPath,
+          modelConfig
+        );
+      } else {
+        throw new Error(
+          `Unknown training objective: ${$config.trainingObjective}`
+        );
+      }
       streamedTrajectory = null;
     }
   }
 
   // Show path handle when Path plot is active
   $: showPathHandle =
-    $activePlotTypes.includes("Path") && !$isTraining && !$isEditing;
+    $config.activePlotTypes.includes("Path") && !$isTraining && !$isEditing;
 </script>
 
 <div class="container">
   <TitleBar />
   <ControlBar />
-  <!-- Distribution titles (hidden during training) -->
-  {#if !$isTraining}
-    <div class="titles-row">
-      <h1 class="distribution-title source-title">Source Distribution</h1>
-      <h1 class="distribution-title target-title">Target Distribution</h1>
-    </div>
-  {/if}
+  <!-- Distribution titles (invisible during training to prevent layout jitter) -->
+  <div class="titles-row" class:invisible={$isTraining}>
+    <h1 class="distribution-title source-title">Source Distribution</h1>
+    <h1 class="distribution-title target-title">Target Distribution</h1>
+  </div>
   <div class="display-area">
     <!-- Background canvas: static source/target distributions -->
     <canvas use:bgCanvas2d.bindCanvas></canvas>
@@ -853,40 +887,3 @@
   </div>
   <div class="footer"></div>
 </div>
-
-<style>
-  .container {
-    position: relative;
-  }
-
-  .footer {
-    height: 10px;
-    position: relative;
-    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2);
-  }
-
-  .time-slider-wrapper {
-    width: 100%;
-    padding: 20px 0;
-    background-color: #ffffff;
-  }
-
-  .titles-row {
-    width: var(--display-area-width);
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    padding: 16px 0 8px 0;
-    background-color: white;
-  }
-
-  .distribution-title {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 500;
-    color: #555555;
-    font-family: 'Inter', sans-serif;
-    width: var(--distribution-width);
-    text-align: center;
-  }
-</style>

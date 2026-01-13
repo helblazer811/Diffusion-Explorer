@@ -78,3 +78,43 @@ body, html {
         aspect-ratio: calc(var(--display-area-width) / var(--display-area-height));
     }
 }
+
+/* Page layout */
+.container {
+    position: relative;
+}
+
+.footer {
+    height: 10px;
+    position: relative;
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.time-slider-wrapper {
+    width: 100%;
+    padding: 20px 0;
+    background-color: #ffffff;
+}
+
+.titles-row {
+    width: var(--display-area-width);
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    padding: 16px 0 8px 0;
+    background-color: white;
+}
+
+.distribution-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 500;
+    color: #555555;
+    font-family: 'Inter', sans-serif;
+    width: var(--distribution-width);
+    text-align: center;
+}
+
+.invisible {
+    visibility: hidden;
+}

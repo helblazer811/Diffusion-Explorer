@@ -7,19 +7,17 @@
     import MiniDistribution from '$lib/components/MiniDistribution.svelte';
     // Import settings
     import *  as settings from '$lib/settings';
-    
+
     const pageState = getContext("pageState");
-    const { 
-        trainingObjective, 
-        sampler, 
-        epochValue, 
-        isTraining,
-        activePlotTypes,
-        usePretrained,
-        datasetName,
+    const {
+        modeState,
+        trainingState,
+        config,
+        modelState,
         datasetDict,
+        isTraining,
     } = pageState;
-    
+
     const plotTypeIcons = {
         "Scatter": `${base}/icons/PointsIcon.svg`,
         "Contour": `${base}/icons/ContourIcon.svg`,
@@ -34,8 +32,8 @@
     }
 
     // Make a derived type for updating which plot types are enabled
-    const enabledPlotTypes = derived(trainingObjective, $trainingObjective =>
-        settings.trainingObjectiveToDisplayOptions[$trainingObjective]?.["Plot Types"] ?? []
+    const enabledPlotTypes = derived(config, $config =>
+        settings.trainingObjectiveToDisplayOptions[$config.trainingObjective]?.["Plot Types"] ?? []
     );
 
 </script>
@@ -229,7 +227,8 @@
             <h1 class="label">Training Objective</h1>
             <div class="menu-contents">
                 <DropDown
-                    bind:value={$trainingObjective}
+                    value={$config.trainingObjective}
+                    on:change={(e) => config.update(c => ({ ...c, trainingObjective: e.detail }))}
                     disabled={$isTraining}
                     options={settings.trainingObjectives}
                 />
@@ -239,9 +238,10 @@
             <h1 class="label">Sampler</h1>
             <div class="menu-contents">
                 <DropDown
-                    bind:value={$sampler}
+                    value={$config.sampler}
+                    on:change={(e) => config.update(c => ({ ...c, sampler: e.detail }))}
                     disabled={$isTraining}
-                    options={settings.trainingObjectiveToSamplers[$trainingObjective]}
+                    options={settings.trainingObjectiveToSamplers[$config.trainingObjective]}
                 />
             </div>
         </div>
@@ -257,16 +257,15 @@
                             || $isTraining
                         }
                         label={plotType}
-                        active={derived(activePlotTypes, $v => $v.includes(plotType))}
+                        active={derived(config, $c => $c.activePlotTypes.includes(plotType))}
                         toggle={() => {
-                            const nextActivePlotTypes = new Set($activePlotTypes);
+                            const nextActivePlotTypes = new Set($config.activePlotTypes);
                             if (nextActivePlotTypes.has(plotType)) {
                                 nextActivePlotTypes.delete(plotType);
                             } else {
                                 nextActivePlotTypes.add(plotType);
                             }
-                            // Update the actual store
-                            activePlotTypes.set(Array.from(nextActivePlotTypes));
+                            config.update(c => ({ ...c, activePlotTypes: Array.from(nextActivePlotTypes) }));
                         }}
                     />
                 {/each}
@@ -277,15 +276,15 @@
             <div class="menu-contents dataset-menu-container">
                 <div class="mini-distribution-container">
                     {#each Object.entries($datasetDict) as [name, data]}
-                        <MiniDistribution 
-                            data={data} 
-                            distributionId={name} 
+                        <MiniDistribution
+                            data={data}
+                            distributionId={name}
                             disabled={$isTraining}
                         />
                     {/each}
-                    <MiniDistribution 
-                        showBrush={true} 
-                        data={null} 
+                    <MiniDistribution
+                        showBrush={true}
+                        data={null}
                         distributionId="brush"
                         disabled={$isTraining}
                     />
@@ -296,8 +295,9 @@
                         id="scales"
                         class:disabled={$isTraining}
                         name="scales"
-                        style={$datasetName == "brush" ? "pointer-events: none; accent-color: lightgray; color: white;" : ""}
-                        bind:checked={$usePretrained}
+                        style={$config.datasetName == "brush" ? "pointer-events: none; accent-color: lightgray; color: white;" : ""}
+                        checked={$modelState.usePretrained}
+                        on:change={(e) => modelState.update(m => ({ ...m, usePretrained: e.target.checked }))}
                     />
                     Use pretrained
                 </span>
@@ -311,15 +311,21 @@
                         className="train-button"
                         label="Run Training"
                         activeLabel="Stop Training"
-                        active={derived(isTraining, $v => $v)}
-                        toggle={() => isTraining.update(v => !v)} 
+                        active={isTraining}
+                        toggle={() => {
+                            if ($isTraining) {
+                                modeState.set({ mode: 'idle' });
+                            } else {
+                                modeState.set({ mode: 'training' });
+                            }
+                        }}
                     />
                 </div>
             </div>
             <div class="menu epoch-counter">
                 <h1 class="label">Epoch</h1>
                 <div class="menu-contents">
-                    <p class="epoch-counter-value">{padEpochValue($epochValue)}</p>
+                    <p class="epoch-counter-value">{padEpochValue($trainingState.epoch)}</p>
                 </div>
             </div>
         </div>

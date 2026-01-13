@@ -6,7 +6,7 @@
 import * as settings from '$lib/settings';
 import { base } from '$app/paths';
 import { get } from 'svelte/store';
-import { downloadJSON } from '$lib/utils'; 
+import { downloadJSON } from '$lib/utils';
 import * as tf from '@tensorflow/tfjs';
 import { convertDataToDisplayCoordinateFrame, convertDisplayCoordinateFrameToData } from '$lib/utils';
 
@@ -17,44 +17,92 @@ import {
     type DomainRange
 } from '@diffusion-explorer/diffusion';
 
+import type { MainState } from './state';
+
 // Worker URLs (bundled to static/workers/ for production)
 const flowModelWorkerUrl = '/workers/flow_model.worker.js';
 const diffusionModelWorkerUrl = '/workers/diffusion_model.worker.js';
 
 /**
+ * Create the appropriate model client based on training objective.
+ */
+function createModelClient(
+    trainingObjective: string,
+    modelPath: string,
+    modelConfig: any
+): FlowModelClient | DiffusionModelClient {
+    if (trainingObjective === 'Flow Matching') {
+        return new FlowModelClient(flowModelWorkerUrl, modelPath, trainingObjective, modelConfig);
+    }
+    if (trainingObjective === 'Diffusion') {
+        return new DiffusionModelClient(diffusionModelWorkerUrl, modelPath, modelConfig);
+    }
+    throw new Error(`Unknown training objective: ${trainingObjective}`);
+}
+
+/**
  * Factory function that takes a MainState object and returns handlers bound to that state.
  */
-export function createMainStateHandlers(MainState: any) {
+export function createMainStateHandlers(state: MainState) {
     const {
+        modeState,
+        trainingState,
+        playbackState,
+        distributionData,
+        visibility,
+        config,
+        modelState,
         datasetDict,
-        datasetName,
-        numSamples,
-        sourceDistributionSamples,
-        currentDistributionSamples,
-        targetDistributionSamples,
-        intermediateTrainingSamples,
-        trainingObjective,
-        usePretrained,
-        distributionVisiblity,
-        isPlaying,
-        epochValue,
-        numberOfSteps,
-        allTimeSamples,
-        currentTime,
-        cachedModelPaths,
         isTraining,
-        sampler,
-        allTimeGridSamples
-    } = MainState;
+    } = state;
 
-    /* Load all datasets into the state */
+    // ============================================================================
+    // State Transition Functions
+    // ============================================================================
+
+    function enterTrainingMode() {
+        modeState.set({ mode: 'training' });
+        trainingState.set({ epoch: 0, intermediateSamples: undefined });
+        playbackState.update(p => ({ ...p, isPlaying: false }));
+        visibility.set({ source: false, target: true, current: false, training: true });
+        modelState.update(m => ({ ...m, usePretrained: false }));
+    }
+
+    function exitTrainingMode() {
+        modeState.set({ mode: 'idle' });
+        trainingState.set({ epoch: 0, intermediateSamples: undefined });
+        // Don't auto-start playback here - let caller decide based on whether samples are ready
+        playbackState.update(p => ({ ...p, time: 0, isPlaying: false }));
+        visibility.set({ source: true, target: true, current: true, training: false });
+    }
+
+    function enterEditMode() {
+        modeState.set({ mode: 'editing' });
+        playbackState.update(p => ({ ...p, isPlaying: false }));
+        visibility.set({ source: false, target: true, current: false, training: false });
+        trainingState.update(t => ({ ...t, epoch: 0 }));
+        // Clear all distribution data to prevent stale samples from previous dataset showing
+        distributionData.update(d => ({ ...d, target: [], allTime: undefined, allTimeGrid: undefined }));
+    }
+
+    function exitEditMode() {
+        modeState.set({ mode: 'idle' });
+    }
+
+    // ============================================================================
+    // Data Loading
+    // ============================================================================
+
     async function loadDatasets() {
+        console.log("[loadDatasets] Starting");
         const datasetNameToPath = settings.datasetNameToPath;
 
         async function loadDataset(path: string) {
             path = base + path;
+            console.log("[loadDatasets] Loading dataset from:", path);
             const response = await fetch(path);
             const data = await response.json();
+            console.log("[loadDatasets] Loaded", data.points?.length, "points");
             return data.points;
         }
 
@@ -62,24 +110,26 @@ export function createMainStateHandlers(MainState: any) {
         for (const [name, path] of Object.entries(datasetNameToPath)) {
             datasets[name] = await loadDataset(path);
         }
+        console.log("[loadDatasets] All datasets loaded:", Object.keys(datasets));
         datasetDict.set(datasets);
     }
 
-    /* Initialize distributions from the current dataset */
     async function initializeDistributions() {
+        console.log("[initializeDistributions] Starting");
         const datasetDictVal = get(datasetDict);
-        const datasetNameVal = get(datasetName);
-        const numSamplesVal = get(numSamples);
+        const configVal = get(config);
         const interfaceSettings = settings.interfaceSettings;
         const domainRange = settings.domainRange;
+        console.log("[initializeDistributions] datasetName:", configVal.datasetName, "numSamples:", configVal.numSamples);
 
-        if (!(datasetNameVal in datasetDictVal)) {
-            throw new Error(`Dataset name ${datasetNameVal} not found in dataset dictionary. Available keys: ${Object.keys(datasetDictVal).join(', ')}`);
+        if (!(configVal.datasetName in datasetDictVal)) {
+            throw new Error(`Dataset name ${configVal.datasetName} not found in dataset dictionary. Available keys: ${Object.keys(datasetDictVal).join(', ')}`);
         }
-        const pointData = datasetDictVal[datasetNameVal];
+        const pointData = datasetDictVal[configVal.datasetName];
         if (!pointData) {
-            throw new Error(`No data found for dataset ${datasetNameVal}`);
+            throw new Error(`No data found for dataset ${configVal.datasetName}`);
         }
+        console.log("[initializeDistributions] Raw target data sample (domain coords):", pointData.slice(0, 3));
         const translatedData = convertDataToDisplayCoordinateFrame(
             pointData,
             1.0,
@@ -87,14 +137,16 @@ export function createMainStateHandlers(MainState: any) {
             interfaceSettings.displayAreaWidth,
             domainRange
         );
-        targetDistributionSamples.set(translatedData);
+        console.log("[initializeDistributions] Translated target data sample (pixel coords):", translatedData.slice(0, 3));
+        distributionData.update(d => ({ ...d, target: translatedData }));
 
         const multivariateNormalSamples = sampleMultivariateNormal(
             [0, 0],
             [[1, 0], [0, 1]],
-            numSamplesVal
+            configVal.numSamples
         );
         const multivariateNormalSamplesArray = multivariateNormalSamples.arraySync() as number[][];
+        console.log("[initializeDistributions] Raw source data sample (domain coords):", multivariateNormalSamplesArray.slice(0, 3));
         const translatedSamples = convertDataToDisplayCoordinateFrame(
             multivariateNormalSamplesArray,
             0.0,
@@ -102,36 +154,41 @@ export function createMainStateHandlers(MainState: any) {
             interfaceSettings.displayAreaWidth,
             domainRange
         );
-        sourceDistributionSamples.set(translatedSamples);
+        console.log("[initializeDistributions] Translated source data sample (pixel coords):", translatedSamples.slice(0, 3));
+        distributionData.update(d => ({ ...d, source: translatedSamples }));
+        console.log("[initializeDistributions] Done");
     }
 
-    /* Handle dataset change */
+    // ============================================================================
+    // Dataset & Config Change Handlers
+    // ============================================================================
+
     async function handleDatasetChange() {
-        const trainingObjectiveVal = get(trainingObjective);
-        const datasetNameVal = get(datasetName);
+        const configVal = get(config);
         const datasetDictVal = get(datasetDict);
-        const samplerVal = get(sampler);
-        const numberOfStepsVal = get(numberOfSteps);
         const gridResolution = settings.meshPlotSettings.gridResolution;
 
-        isPlaying.set(false);
-        epochValue.set(0);
-        if (get(isTraining)) isTraining.set(false);
+        playbackState.update(p => ({ ...p, isPlaying: false }));
+        trainingState.update(t => ({ ...t, epoch: 0 }));
+        if (get(isTraining)) modeState.set({ mode: 'idle' });
 
-        if (!settings.pretrainedModelPaths[trainingObjectiveVal]?.[datasetNameVal]) {
-            usePretrained.set(false);
+        if (!settings.pretrainedModelPaths[configVal.trainingObjective]?.[configVal.datasetName]) {
+            modelState.update(m => ({ ...m, usePretrained: false }));
         }
 
-        if (!settings.trainingObjectiveToSamplers[trainingObjectiveVal].includes(samplerVal)) {
-            sampler.set(settings.trainingObjectiveToSamplers[trainingObjectiveVal][0]);
+        if (!settings.trainingObjectiveToSamplers[configVal.trainingObjective].includes(configVal.sampler)) {
+            config.update(c => ({
+                ...c,
+                sampler: settings.trainingObjectiveToSamplers[configVal.trainingObjective][0]
+            }));
         }
         if (!datasetDictVal) {
             throw new Error('Dataset dictionary is undefined');
         }
-        if (!(datasetNameVal in datasetDictVal)) {
-            throw new Error(`Dataset name ${datasetNameVal} not found in dataset dictionary. Available keys: ${Object.keys(datasetDictVal).join(', ')}`);
+        if (!(configVal.datasetName in datasetDictVal)) {
+            throw new Error(`Dataset name ${configVal.datasetName} not found in dataset dictionary. Available keys: ${Object.keys(datasetDictVal).join(', ')}`);
         }
-        const pointsData = datasetDictVal[datasetNameVal];
+        const pointsData = datasetDictVal[configVal.datasetName];
         const translatedData = convertDataToDisplayCoordinateFrame(
             pointsData,
             1.0,
@@ -139,18 +196,17 @@ export function createMainStateHandlers(MainState: any) {
             settings.interfaceSettings.displayAreaWidth,
             settings.domainRange
         );
-        targetDistributionSamples.set(translatedData);
-        currentDistributionSamples.set([[]]);
+        distributionData.update(d => ({ ...d, target: translatedData, current: [[]] }));
 
         // Load cached samples if they exist
-        const cachedSamplesPath = settings.cachedSamplesPaths?.[trainingObjectiveVal]?.[datasetNameVal];
-        const cachedGridSamplesPath = settings.cachedGridSamplesPaths?.[trainingObjectiveVal]?.[datasetNameVal];
+        const cachedSamplesPath = settings.cachedSamplesPaths?.[configVal.trainingObjective]?.[configVal.datasetName];
+        const cachedGridSamplesPath = settings.cachedGridSamplesPaths?.[configVal.trainingObjective]?.[configVal.datasetName];
 
         if (cachedSamplesPath && cachedGridSamplesPath) {
             // Load and convert cached samples from domain coords to display coords
             const allSamples = await fetch(base + cachedSamplesPath).then(r => r.json());
             const convertedSamples = allSamples.map((samples: number[][], timeIdx: number) => {
-                const t = timeIdx / (allSamples.length - 1); // Normalize time to [0, 1]
+                const t = timeIdx / (allSamples.length - 1);
                 return convertDataToDisplayCoordinateFrame(
                     samples,
                     t,
@@ -159,16 +215,15 @@ export function createMainStateHandlers(MainState: any) {
                     settings.domainRange
                 );
             });
-            allTimeSamples.set(convertedSamples);
+            distributionData.update(d => ({ ...d, allTime: convertedSamples }));
 
             // Load grid samples, convert to display coords, and reshape from [time, N, 2] to [time, x, y, 2]
             const gridSamplesFlat = await fetch(base + cachedGridSamplesPath).then(r => r.json());
-            const gridRes = settings.meshPlotSettings.gridResolution; // e.g., 15
+            const gridRes = settings.meshPlotSettings.gridResolution;
 
             // Convert and reshape grid samples
             const reshapedGrid = gridSamplesFlat.map((timestep: number[][], timeIdx: number) => {
                 const t = timeIdx / (gridSamplesFlat.length - 1);
-                // Convert flat points to display coordinates
                 const convertedPoints = convertDataToDisplayCoordinateFrame(
                     timestep,
                     t,
@@ -187,22 +242,17 @@ export function createMainStateHandlers(MainState: any) {
                 }
                 return result;
             });
-            allTimeGridSamples.set(reshapedGrid);
-            if (!get(isTraining)) isPlaying.set(true);
+            distributionData.update(d => ({ ...d, allTimeGrid: reshapedGrid }));
+            if (!get(isTraining)) playbackState.update(p => ({ ...p, isPlaying: true }));
         } else {
             console.log("No cached samples found.");
             // Regenerate samples using client-based API
-            const defaultModelPath = base + settings.pretrainedModelPaths[trainingObjectiveVal][datasetNameVal];
-            const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
-
-            // Select appropriate client based on training objective
-            const workerUrl = trainingObjectiveVal === 'Flow Matching' ? flowModelWorkerUrl : diffusionModelWorkerUrl;
-            const client = trainingObjectiveVal === 'Flow Matching'
-                ? new FlowModelClient(workerUrl, defaultModelPath, trainingObjectiveVal, modelConfig)
-                : new DiffusionModelClient(workerUrl, defaultModelPath, modelConfig);
+            const defaultModelPath = base + settings.pretrainedModelPaths[configVal.trainingObjective][configVal.datasetName];
+            const modelConfig = settings.trainingObjectiveToModelConfig[configVal.trainingObjective];
+            const client = createModelClient(configVal.trainingObjective, defaultModelPath, modelConfig);
 
             // Sample trajectories
-            const { promise: samplePromise } = client.sample(get(numSamples), get(numberOfSteps));
+            const { promise: samplePromise } = client.sample(configVal.numSamples, configVal.numberOfSteps);
             samplePromise.then((allSamples: number[][][]) => {
                 // Convert from domain coords to display coords
                 const convertedSamples = allSamples.map((samples: number[][], timeIdx: number) => {
@@ -215,17 +265,17 @@ export function createMainStateHandlers(MainState: any) {
                         settings.domainRange
                     );
                 });
-                allTimeSamples.set(convertedSamples);
-                if (!get(isTraining)) isPlaying.set(true);
+                distributionData.update(d => ({ ...d, allTime: convertedSamples }));
+                if (!get(isTraining)) playbackState.update(p => ({ ...p, isPlaying: true }));
                 if (settings.downloadSamplesIfNotCached) {
-                    downloadJSON(allSamples, `${datasetNameVal}_${trainingObjectiveVal}_samples.json`);
+                    downloadJSON(allSamples, `${configVal.datasetName}_${configVal.trainingObjective}_samples.json`);
                 }
             });
 
             // Sample grid trajectories
-            const { promise: gridPromise } = trainingObjectiveVal === 'Flow Matching'
-                ? (client as FlowModelClient).sampleGrid(gridResolution, settings.domainRange as DomainRange, numberOfStepsVal)
-                : (client as DiffusionModelClient).sampleGrid(gridResolution, settings.domainRange as DomainRange, numberOfStepsVal);
+            const { promise: gridPromise } = configVal.trainingObjective === 'Flow Matching'
+                ? (client as FlowModelClient).sampleGrid(gridResolution, settings.domainRange as DomainRange, configVal.numberOfSteps)
+                : (client as DiffusionModelClient).sampleGrid(gridResolution, settings.domainRange as DomainRange, configVal.numberOfSteps);
 
             gridPromise.then((gridSamples: number[][][]) => {
                 // Convert from domain coords to display coords and reshape
@@ -249,45 +299,43 @@ export function createMainStateHandlers(MainState: any) {
                     }
                     return result;
                 });
-                allTimeGridSamples.set(reshapedGrid);
+                distributionData.update(d => ({ ...d, allTimeGrid: reshapedGrid }));
                 if (settings.downloadSamplesIfNotCached) {
-                    downloadJSON(gridSamples, `${datasetNameVal}_${trainingObjectiveVal}_grid.json`);
+                    downloadJSON(gridSamples, `${configVal.datasetName}_${configVal.trainingObjective}_grid.json`);
                 }
             });
         }
     }
 
     function handleTrainingObjectiveChange() {
-        const trainingObjectiveVal = get(trainingObjective);
-        sampler.set(settings.trainingObjectiveToSamplers[trainingObjectiveVal][0]);
+        const configVal = get(config);
+        config.update(c => ({
+            ...c,
+            sampler: settings.trainingObjectiveToSamplers[configVal.trainingObjective][0]
+        }));
         handleDatasetChange();
     }
 
-    async function finishTraining(
-        tfModelPath: string,
-        trainingObjectiveVal: string,
-        datasetNameVal: string,
-        modelConfig: any,
+    // ============================================================================
+    // Training
+    // ============================================================================
+
+    /**
+     * Sample from the trained model and transition to playback mode.
+     * Called after training completes (naturally or stopped early).
+     */
+    function finishTrainingAndSample(
+        client: FlowModelClient | DiffusionModelClient,
+        configVal: { numSamples: number; numberOfSteps: number; trainingObjective: string },
         jsonURL: string | null = null
     ) {
+        console.log('[finishTrainingAndSample] Starting sampling from trained model');
         if (jsonURL) URL.revokeObjectURL(jsonURL);
-        cachedModelPaths.update((cache) => ({
-            ...cache,
-            [trainingObjectiveVal]: {
-                ...cache[trainingObjectiveVal],
-                [datasetNameVal]: tfModelPath
-            }
-        }));
 
-        // Select appropriate client based on training objective
-        const workerUrl = trainingObjectiveVal === 'Flow Matching' ? flowModelWorkerUrl : diffusionModelWorkerUrl;
-        const client = trainingObjectiveVal === 'Flow Matching'
-            ? new FlowModelClient(workerUrl, tfModelPath, trainingObjectiveVal, modelConfig)
-            : new DiffusionModelClient(workerUrl, tfModelPath, modelConfig);
-
-        // Sample trajectories
-        const { promise: samplePromise } = client.sample(get(numSamples), get(numberOfSteps));
+        // Sample trajectories from the trained model
+        const { promise: samplePromise } = client.sample(configVal.numSamples, configVal.numberOfSteps);
         samplePromise.then((allSamples: number[][][]) => {
+            console.log('[finishTrainingAndSample] Samples received:', allSamples.length, 'timesteps');
             // Convert from domain coords to display coords
             const convertedSamples = allSamples.map((samples: number[][], timeIdx: number) => {
                 const t = timeIdx / (allSamples.length - 1);
@@ -299,26 +347,29 @@ export function createMainStateHandlers(MainState: any) {
                     settings.domainRange
                 );
             });
-            allTimeSamples.set(convertedSamples);
-            distributionVisiblity.set({ current: true, source: true, training: false, target: true });
-            isPlaying.set(true);
-            currentTime.set(0);
+            distributionData.update(d => ({ ...d, allTime: convertedSamples }));
+            exitTrainingMode();
+            // Start playback now that samples are ready
+            playbackState.update(p => ({ ...p, isPlaying: true }));
+            console.log('[finishTrainingAndSample] Playback started');
+        }).catch((err: Error) => {
+            console.error('[finishTrainingAndSample] Sampling failed:', err);
+            // Still exit training mode even if sampling fails
+            exitTrainingMode();
         });
 
+        // Sample grid trajectories
         const squashedDomainRange: DomainRange = {
             xMin: settings.domainRange.xMin + 0.6,
             xMax: settings.domainRange.xMax - 0.6,
             yMin: settings.domainRange.yMin + 0.6,
             yMax: settings.domainRange.yMax - 0.6
         };
-
         const gridResolution = settings.meshPlotSettings.gridResolution;
-        const numberOfStepsVal = get(numberOfSteps);
 
-        // Sample grid trajectories
-        const { promise: gridPromise } = trainingObjectiveVal === 'Flow Matching'
-            ? (client as FlowModelClient).sampleGrid(gridResolution, squashedDomainRange, numberOfStepsVal)
-            : (client as DiffusionModelClient).sampleGrid(gridResolution, squashedDomainRange, numberOfStepsVal);
+        const { promise: gridPromise } = configVal.trainingObjective === 'Flow Matching'
+            ? (client as FlowModelClient).sampleGrid(gridResolution, squashedDomainRange, configVal.numberOfSteps)
+            : (client as DiffusionModelClient).sampleGrid(gridResolution, squashedDomainRange, configVal.numberOfSteps);
 
         gridPromise.then((gridSamples: number[][][]) => {
             // Convert from domain coords to display coords and reshape
@@ -342,7 +393,9 @@ export function createMainStateHandlers(MainState: any) {
                 }
                 return result;
             });
-            allTimeGridSamples.set(reshapedGrid);
+            distributionData.update(d => ({ ...d, allTimeGrid: reshapedGrid }));
+        }).catch((err: Error) => {
+            console.error('[finishTrainingAndSample] Grid sampling failed:', err);
         });
     }
 
@@ -351,12 +404,11 @@ export function createMainStateHandlers(MainState: any) {
     let activeTrainingRequestId: string | null = null;
 
     function startTraining(): { requestId: string; client: FlowModelClient | DiffusionModelClient } {
-        if (get(usePretrained)) usePretrained.set(false);
-        distributionVisiblity.set({ current: false, source: false, training: true, target: true });
-        isPlaying.set(false);
-        epochValue.set(0);
+        enterTrainingMode();
 
-        const randomSamples = sampleMultivariateNormal([0, 0], [[1, 0], [0, 1]], get(numSamples));
+        const configVal = get(config);
+
+        const randomSamples = sampleMultivariateNormal([0, 0], [[1, 0], [0, 1]], configVal.numSamples);
         const translatedSamples = convertDataToDisplayCoordinateFrame(
             randomSamples.arraySync() as number[][],
             1.0,
@@ -364,38 +416,49 @@ export function createMainStateHandlers(MainState: any) {
             settings.interfaceSettings.displayAreaWidth,
             settings.domainRange
         );
-        intermediateTrainingSamples.set(translatedSamples);
+        trainingState.update(t => ({ ...t, intermediateSamples: translatedSamples }));
 
         let jsonURL: string | null = null;
-        const datasetNameVal = get(datasetName);
-        if (datasetNameVal === "brush") {
-            const brushSamples = convertDisplayCoordinateFrameToData(
-                get(targetDistributionSamples),
-                1.0,
-                settings.interfaceSettings.distributionWidth,
-                settings.interfaceSettings.displayAreaWidth,
-                settings.domainRange
-            );
-            jsonURL = URL.createObjectURL(new Blob([JSON.stringify({ points: brushSamples })], { type: 'application/json' }));
+        if (configVal.datasetName === "brush") {
+            const targetData = get(distributionData).target;
+            if (targetData) {
+                // Use time=0.0 because brush data is stored in local canvas coordinates (0-500),
+                // not display coordinates. No translation needed, just domain scaling.
+                const brushSamples = convertDisplayCoordinateFrameToData(
+                    targetData,
+                    0.0,
+                    settings.interfaceSettings.distributionWidth,
+                    settings.interfaceSettings.displayAreaWidth,
+                    settings.domainRange
+                );
+                jsonURL = URL.createObjectURL(new Blob([JSON.stringify({ points: brushSamples })], { type: 'application/json' }));
+            }
         }
 
-        const trainingObjectiveVal = get(trainingObjective);
-        const modelConfig = settings.trainingObjectiveToModelConfig[trainingObjectiveVal];
-        const datasetPath = jsonURL ?? base + settings.datasetNameToPath[datasetNameVal];
-
-        // Select appropriate client based on training objective
-        const workerUrl = trainingObjectiveVal === 'Flow Matching' ? flowModelWorkerUrl : diffusionModelWorkerUrl;
-        const client = trainingObjectiveVal === 'Flow Matching'
-            ? new FlowModelClient(workerUrl, '', trainingObjectiveVal, modelConfig)
-            : new DiffusionModelClient(workerUrl, '', modelConfig);
+        const modelConfig = settings.trainingObjectiveToModelConfig[configVal.trainingObjective];
+        const datasetPath = jsonURL ?? base + settings.datasetNameToPath[configVal.datasetName];
+        const client = createModelClient(configVal.trainingObjective, '', modelConfig);
 
         // Start training
         const { requestId, promise } = client.train(
             datasetPath,
             settings.trainingConfig,
             (epoch: number, intermediateSamples: number[][] | null, loss: number) => {
-                epochValue.set(epoch);
-                if (intermediateSamples) {
+                trainingState.update(t => ({ ...t, epoch }));
+
+                // DIAGNOSTIC: Check for NaN/explosion
+                console.log(`[Training] Epoch ${epoch}, Loss: ${loss}`);
+
+                if (intermediateSamples && intermediateSamples.length > 0) {
+                    const hasNaN = intermediateSamples.some(s => s.some(v => !isFinite(v)));
+                    const sample = intermediateSamples[0];
+                    console.log(`[Training] Sample[0]: [${sample[0]?.toFixed(2)}, ${sample[1]?.toFixed(2)}], hasNaN: ${hasNaN}, count: ${intermediateSamples.length}`);
+
+                    if (hasNaN) {
+                        console.error('[Training] WARNING: Samples contain NaN/Infinity - model may have exploded');
+                        return; // Skip update if samples are invalid
+                    }
+
                     const convertedSamples = convertDataToDisplayCoordinateFrame(
                         intermediateSamples,
                         1.0,
@@ -403,18 +466,38 @@ export function createMainStateHandlers(MainState: any) {
                         settings.interfaceSettings.displayAreaWidth,
                         settings.domainRange
                     );
-                    intermediateTrainingSamples.set(convertedSamples);
+                    trainingState.update(t => ({ ...t, intermediateSamples: convertedSamples }));
                 }
             }
         );
 
-        // Handle training completion
+        // Handle training completion (natural or stopped)
+        console.log('[startTraining] Setting up promise handlers for requestId:', requestId);
         promise.then((result: { tfModelPath: string }) => {
-            finishTraining(result.tfModelPath, trainingObjectiveVal, datasetNameVal, modelConfig, jsonURL);
-            activeTrainingClient = null;
-            activeTrainingRequestId = null;
+            console.log('[startTraining] Promise RESOLVED - Training completed naturally');
+            console.log('[startTraining] Model path:', result.tfModelPath);
+            // Cache the model path for future use
+            modelState.update(m => ({
+                ...m,
+                cachedPaths: {
+                    ...m.cachedPaths,
+                    [configVal.trainingObjective]: {
+                        ...m.cachedPaths[configVal.trainingObjective],
+                        [configVal.datasetName]: result.tfModelPath
+                    }
+                }
+            }));
         }).catch((error: Error) => {
-            console.log('Training stopped or failed:', error.message);
+            console.log('[startTraining] Promise REJECTED - Training stopped:', error.message);
+        }).finally(() => {
+            // Whether completed or stopped, sample from the trained model and play animation
+            console.log('[startTraining] Promise FINALLY - sampling from model');
+            if (activeTrainingClient) {
+                finishTrainingAndSample(activeTrainingClient, configVal, jsonURL);
+            } else {
+                console.error('[startTraining] No active client to sample from!');
+                exitTrainingMode();
+            }
             activeTrainingClient = null;
             activeTrainingRequestId = null;
         });
@@ -427,22 +510,21 @@ export function createMainStateHandlers(MainState: any) {
     }
 
     async function stopTraining() {
+        console.log('[stopTraining] Called, activeClient:', !!activeTrainingClient);
         if (activeTrainingClient && activeTrainingRequestId) {
+            console.log('[stopTraining] Sending stop request and finishing training');
+            // Send stop request to the worker
             activeTrainingClient.stopRequest(activeTrainingRequestId);
+            // The promise doesn't settle when stopped, so we handle finish directly here
+            const client = activeTrainingClient;
+            const configVal = get(config);
             activeTrainingClient = null;
             activeTrainingRequestId = null;
+            // Sample from whatever state the model is in and play animation
+            finishTrainingAndSample(client, configVal, null);
+        } else {
+            console.log('[stopTraining] No active training to stop');
         }
-    }
-
-    function startEditing() {
-        distributionVisiblity.set({ current: false, source: false, training: false, target: true });
-        isPlaying.set(false);
-        epochValue.set(0);
-        targetDistributionSamples.set([]);
-    }
-
-    function stopEditing() {
-        // No-op for now
     }
 
     function handleUsePretrained() {
@@ -450,15 +532,21 @@ export function createMainStateHandlers(MainState: any) {
     }
 
     return {
+        // Data loading
         loadDatasets,
         initializeDistributions,
+
+        // Change handlers
         handleDatasetChange,
         handleTrainingObjectiveChange,
+        handleUsePretrained,
+
+        // Training
         startTraining,
         stopTraining,
-        finishTraining,
-        startEditing,
-        stopEditing,
-        handleUsePretrained
+
+        // Editing (called directly by MiniDistribution)
+        enterEditMode,
+        exitEditMode,
     };
 }
