@@ -12,8 +12,11 @@
     Timeline,
     StreamlineAnimation,
     Katex,
+    computeContours,
+    plotContours,
     type VectorFieldFn,
     type StreamlineAnimationState,
+    type ComputedContours,
   } from "@diffusion-explorer/ui";
   import {
     createClosedCurve,
@@ -62,31 +65,46 @@
   export let playingByDefault = true;
 
   // Left canvas styling (Volume)
-  export let volumeFillColor = "#fff7ed"; // Light orange tint
-  export let volumeFillOpacity = 0.7;
   export let volumeStrokeColor = "#f97316"; // Orange
   export let volumeStrokeWidth = 3;
   export let volumeLabelText = "V";
   export let volumeLabelFontSize = 32;
   export let volumeLabelColor = "#f97316"; // Orange to match boundary
-  export let volumeLabelStrokeColor = "white";
-  export let volumeLabelStrokeWidth = 12;
 
-  // Volume pulsing animation (represents ∂/∂t)
-  export let volumeScaleMin = 0.8;
-  export let volumeScaleMax = 1.0;
-  export let volumeScaleDuration = 4; // seconds for one pulse cycle
+  // Density label (ρ above surface)
+  export let densityLabelText = "\\rho";
+  export let densityLabelFontSize = 28;
+  export let densityLabelColor = "#3b82f6"; // Blue to match contours
+  export let densityLabelYOffset = -0.7; // Fraction of bounding box height from center
 
-  // Volume normal arrows (show surface stretching)
-  export let volumeNumArrows = 16;
-  export let volumeArrowLength = 0.15;
-  export let volumeArrowWidth = 2;
-  export let volumeArrowHeadSize = 6;
-  export let volumeArrowColor = "#f97316"; // Orange
+  // Gaussian mixture for left side contour plot
+  export let gaussianMixture: Array<{
+    mean: [number, number];
+    cov: [[number, number], [number, number]];
+    weight: number;
+  }> = [
+    { mean: [-0.7, 0.55], cov: [[0.12, 0.04], [0.04, 0.05]], weight: 0.35 },
+    { mean: [0.7, 0.5], cov: [[0.04, -0.02], [-0.02, 0.15]], weight: 0.35 },
+    { mean: [0.0, -0.75], cov: [[0.18, 0.05], [0.05, 0.06]], weight: 0.30 },
+  ];
+  export let gaussianNumSamples = 3000;
+  export let gaussianContourBandwidth = 10;
+  export let gaussianGridSize = 400;
+  export let gaussianContourThresholds = 8;
+  export let gaussianContourOpacity = 0.4;
+  export let gaussianContourColor = "#3b82f6"; // Blue
+
+  // Contour animation
+  export let contourAnimationSteps = 50;
+  export let contourStepSize = 0.005;
+  export let contourAnimationDuration = 4;
+
+  // Mask outside surface
+  export let outsideMaskOpacity = 0.7;
 
   // Right canvas styling (Surface with rotating vectors)
   export let surfaceFillColor = "#fff7ed"; // Light orange tint
-  export let surfaceFillOpacity = 0.7; // Match left side
+  export let surfaceFillOpacity = 0.9;
   export let surfaceStrokeColor = "#f97316"; // Orange
   export let surfaceStrokeWidth = 3;
 
@@ -106,7 +124,7 @@
   export let vectorScale = 1.2;
   export let vectorWidth = 3;
   export let arrowHeadSize = 8;
-  export let normalColor = "#f97316"; // Orange
+  export let normalColor = "#555555"; // Dark gray
   export let fieldColor = "#3b82f6"; // Blue
   export let dotColor = "#f97316"; // Orange
   export let dotRadius = 4;
@@ -144,15 +162,16 @@
   // Initialization flag
   let isInitialized = false;
 
-  // Animation state type (extends StreamlineAnimationState with rotation and volume scale)
+  // Animation state type (extends StreamlineAnimationState with rotation and contour frame)
   type AnimationState = StreamlineAnimationState & {
-    theta: number; // 0-2π for rotation around surface
-    volumeScale: number; // Scale factor for volume (0.8-1.0 for pulsing)
+    theta: number; // 0-2π for rotation around surface (right side only)
+    contourFrame: number; // 0 to (contourAnimationSteps-1) for left side contour animation
   };
 
   // Animation objects
   let timeline: Timeline<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
+  let gaussianContourFrames: ComputedContours[] = [];
 
   // Visibility handler
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
@@ -203,6 +222,80 @@
     return { xMin, xMax, yMin, yMax };
   }
 
+  function boxMullerTransform(): [number, number] {
+    const u1 = Math.random();
+    const u2 = Math.random();
+    const r = Math.sqrt(-2 * Math.log(u1));
+    const theta = 2 * Math.PI * u2;
+    return [r * Math.cos(theta), r * Math.sin(theta)];
+  }
+
+  function sampleGaussianMixture(
+    numSamples: number,
+    gaussians: typeof gaussianMixture
+  ): [number, number][] {
+    const samples: [number, number][] = [];
+    for (let i = 0; i < numSamples; i++) {
+      // Pick component by weight
+      const r = Math.random();
+      let cumWeight = 0;
+      let selected = gaussians[0];
+      for (const g of gaussians) {
+        cumWeight += g.weight;
+        if (r <= cumWeight) {
+          selected = g;
+          break;
+        }
+      }
+      // Cholesky decomposition of 2x2 covariance
+      const { mean, cov } = selected;
+      const [z1, z2] = boxMullerTransform();
+      const a = Math.sqrt(cov[0][0]);
+      const b = cov[1][0] / a;
+      const c = Math.sqrt(cov[1][1] - b * b);
+      samples.push([mean[0] + a * z1, mean[1] + b * z1 + c * z2]);
+    }
+    return samples;
+  }
+
+  function drawOutsideMask(
+    ctx: CanvasRenderingContext2D,
+    curveFn: CurveFn,
+    toPixelFn: (p: [number, number]) => [number, number],
+    cWidth: number,
+    cHeight: number,
+    opacity: number
+  ) {
+    ctx.save();
+    ctx.beginPath();
+    // Outer rectangle (clockwise)
+    ctx.rect(0, 0, cWidth, cHeight);
+    // Inner curve (counter-clockwise for even-odd)
+    const numSamples = 200;
+    for (let i = 0; i <= numSamples; i++) {
+      const theta = (i / numSamples) * 2 * Math.PI;
+      const [px, py] = toPixelFn(curveFn(theta));
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "white";
+    ctx.globalAlpha = opacity;
+    ctx.fill("evenodd");
+    ctx.restore();
+  }
+
+  function eulerIntegrate(
+    samples: [number, number][],
+    vectorField: (x: number, y: number) => [number, number],
+    dt: number
+  ): [number, number][] {
+    return samples.map(([x, y]) => {
+      const [vx, vy] = vectorField(x, y);
+      return [x + vx * dt, y + vy * dt];
+    });
+  }
+
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
@@ -218,7 +311,7 @@
     // Create toPixel function bound to current canvas dimensions
     const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
 
-    // Create streamline animation
+    // Create streamline animation (for right side only)
     streamlineAnim = StreamlineAnimation.create<StreamlineAnimationState>({
       vectorFieldFn: vectorField as VectorFieldFn,
       domain: {
@@ -239,6 +332,29 @@
       offsets: "synchronized",
       loopMultiplier: 1,
     });
+
+    // Generate gaussian samples and compute contours for all animation frames
+    let samples = sampleGaussianMixture(gaussianNumSamples, gaussianMixture);
+    const contourDomain: [number, number, number, number] = [
+      boundingBox.xMin - domainMargin,
+      boundingBox.xMax + domainMargin,
+      boundingBox.yMin - domainMargin,
+      boundingBox.yMax + domainMargin,
+    ];
+
+    gaussianContourFrames = [];
+    for (let i = 0; i < contourAnimationSteps; i++) {
+      gaussianContourFrames.push(
+        computeContours(samples, {
+          bandwidth: gaussianContourBandwidth,
+          gridSize: gaussianGridSize,
+          thresholds: gaussianContourThresholds,
+          domain: contourDomain,
+        })
+      );
+      // Euler integrate samples to next frame
+      samples = eulerIntegrate(samples, vectorField, contourStepSize);
+    }
   }
 
   // ----------------------------------------------------------------
@@ -253,14 +369,14 @@
   ) {
     if (!streamlineAnim) return;
 
-    const totalDuration = Math.max(streamlineDuration, rotationDuration, volumeScaleDuration);
+    const totalDuration = Math.max(streamlineDuration, rotationDuration, contourAnimationDuration);
 
     timeline = new Timeline<AnimationState>();
-    timeline.initialState = { streamlinePhase: 0, theta: 0, volumeScale: volumeScaleMin };
+    timeline.initialState = { streamlinePhase: 0, theta: 0, contourFrame: 0 };
     timeline.duration = totalDuration;
     timeline.looping = true;
 
-    // Add streamline clip from the animation
+    // Add streamline clip from the animation (for right side)
     timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
 
     // Add rotation clip for the surface vectors (runs full duration, loops internally)
@@ -275,16 +391,15 @@
       { start: 0, end: 1 }
     );
 
-    // Add volume scale clip (pulsing from min to max using sine wave, runs full duration)
+    // Add contour animation clip (cycles through frames for left side)
     timeline.add(
       {
-        name: "VolumeScale",
+        name: "ContourAnimation",
         reduce(t: number) {
-          const loops = totalDuration / volumeScaleDuration;
-          const phase = t * loops * 2 * Math.PI;
-          // Use sine wave: starts at min, goes to max, back to min
-          const normalized = (1 - Math.cos(phase)) / 2; // 0 to 1 to 0
-          return { volumeScale: volumeScaleMin + normalized * (volumeScaleMax - volumeScaleMin) };
+          const loops = totalDuration / contourAnimationDuration;
+          const frameProgress = (t * loops) % 1;
+          const contourFrame = Math.floor(frameProgress * contourAnimationSteps);
+          return { contourFrame: Math.min(contourFrame, contourAnimationSteps - 1) };
         },
       },
       { start: 0, end: 1 }
@@ -304,53 +419,40 @@
     state: AnimationState,
     cWidth: number,
     cHeight: number,
-    curve?: (theta: number) => [number, number]
+    curve?: CurveFn
   ) {
     const ctx = leftCanvas2d.ctx;
-    if (!ctx || !boundingBox || !streamlineAnim || !curve) return;
-
-    const { volumeScale } = state;
+    const { contourFrame } = state;
+    const currentContours = gaussianContourFrames[contourFrame];
+    if (!ctx || !boundingBox || !curve || !currentContours) return;
 
     ctx.clearRect(0, 0, cWidth, cHeight);
 
     // Create toPixel function bound to current canvas dimensions
     const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
 
-    // Draw streamlines first (behind)
-    streamlineAnim.draw(ctx, state);
+    // 1. Draw gaussian contour plot (animated frame)
+    plotContours(ctx, currentContours, {
+      xScale: (x) => toPixelBound([x, 0])[0],
+      yScale: (y) => toPixelBound([0, y])[1],
+      fillColor: gaussianContourColor,
+      opacity: gaussianContourOpacity,
+      fill: true,
+      stroke: false,
+    });
 
-    // Create scaled curve function for pulsing volume
-    const scaledCurveFn = (theta: number): [number, number] => {
-      const [x, y] = curve(theta);
-      return [x * volumeScale, y * volumeScale];
-    };
+    // 2. Draw white mask outside surface
+    drawOutsideMask(ctx, curve, toPixelBound, cWidth, cHeight, outsideMaskOpacity);
 
-    // Draw filled surface on top (scaled)
-    drawClosedCurve(ctx, scaledCurveFn, toPixelBound, {
-      fillColor: volumeFillColor,
-      fillOpacity: volumeFillOpacity,
+    // 3. Draw surface boundary (static, no fill)
+    drawClosedCurve(ctx, curve, toPixelBound, {
+      fillColor: "transparent",
+      fillOpacity: 0,
       strokeColor: volumeStrokeColor,
       strokeWidth: volumeStrokeWidth,
     });
 
-    // Draw normal arrows around the perimeter (showing surface stretching)
-    const arrowPixelLength = scaleLength(volumeArrowLength, cWidth);
-    for (let i = 0; i < volumeNumArrows; i++) {
-      const theta = (i / volumeNumArrows) * 2 * Math.PI;
-      const { position, normal } = getTangentAndNormal(scaledCurveFn, theta);
-      const [px, py] = toPixelBound(position);
-
-      // Arrow end point (normal points outward)
-      const endX = px + normal[0] * arrowPixelLength;
-      const endY = py - normal[1] * arrowPixelLength; // Flip y for canvas coords
-
-      ctx.strokeStyle = volumeArrowColor;
-      ctx.fillStyle = volumeArrowColor;
-      ctx.lineWidth = volumeArrowWidth;
-      drawArrow(ctx, px, py, endX, endY, volumeArrowHeadSize);
-    }
-
-    // Draw "V" label in center
+    // 4. Draw "V" label in center
     const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
     const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
     const [px, py] = toPixelBound([centerX, centerY]);
@@ -359,15 +461,30 @@
       ctx,
       volumeLabelText,
       px,
-      py + volumeLabelFontSize / 3, // Adjust for vertical centering
+      py + volumeLabelFontSize / 3,
       volumeLabelFontSize,
       0,
       0,
       {
         color: volumeLabelColor,
-        stroke: volumeLabelStrokeColor,
-        strokeWidth: volumeLabelStrokeWidth,
-        strokeOpacity: 0.8,
+      }
+    );
+
+    // 5. Draw "ρ" label above the surface
+    const bbHeight = boundingBox.yMax - boundingBox.yMin;
+    const rhoLabelY = centerY - densityLabelYOffset * bbHeight;
+    const [rlx, rly] = toPixelBound([centerX, rhoLabelY]);
+
+    drawMathjax(
+      ctx,
+      densityLabelText,
+      rlx,
+      rly + densityLabelFontSize / 2,
+      densityLabelFontSize,
+      0,
+      0,
+      {
+        color: densityLabelColor,
       }
     );
   }
@@ -563,18 +680,18 @@
 <div class="mass-conservation-equation">
   <div class="equation-container">
     <div class="equation-side">
-      <div class="equation-label">The change in probability density <Katex math={"\\rho"}/> in a volume <Katex math={"V"}/> over time.</div>
+      <div class="equation-label">The change in probability density <Katex math={"\\color{#3b82f6}{\\rho}"}/> in a volume <Katex math={"\\color{#f97316}{V}"}/> over time.</div>
       <div class="equation-math">
-        <Katex math={"\\frac{\\partial}{\\partial t} \\int_V \\rho \\, dV"} displayMode={true} />
+        <Katex math={"\\frac{\\partial}{\\partial t} \\int_{\\color{#f97316}{V}} \\color{#3b82f6}{\\rho} \\, \\color{#f97316}{dV}"} displayMode={true} />
       </div>
     </div>
     <div class="equation-equals">
       <Katex math={"="} displayMode={true} />
     </div>
     <div class="equation-side">
-      <div class="equation-label">The probability flux <Katex math={"\\rho \\mathbf{v}"}/> through a surface <Katex math={"S"}/>.</div>
+      <div class="equation-label">The probability flux <Katex math={"\\color{#3b82f6}{\\rho \\mathbf{v}} \\color{#374151}{\\cdot \\hat{n}}"}/> through a surface <Katex math={"\\color{#f97316}{S}"}/>.</div>
       <div class="equation-math">
-        <Katex math={"-\\oint_S \\rho \\mathbf{v} \\cdot \\hat{n} \\, dS"} displayMode={true} />
+        <Katex math={"-\\oint_{\\color{#f97316}{S}} \\color{#3b82f6}{\\rho \\mathbf{v}} \\color{#374151}{\\cdot \\hat{n}} \\, \\color{#f97316}{dS}"} displayMode={true} />
       </div>
     </div>
   </div>
@@ -613,7 +730,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 1rem;
+    gap: 0.5rem;
   }
 
   .equation-side {
@@ -621,12 +738,11 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    flex: 1;
     max-width: 350px;
   }
 
   .equation-label {
-    font-size: 1.1rem;
+    font-size: 1.5rem;
     color: #666;
     margin-bottom: 0.5rem;
     text-align: center;
@@ -637,11 +753,14 @@
     min-height: 3rem;
     display: flex;
     align-items: center;
+    font-size: 1.4rem;
   }
 
   .equation-equals {
     display: flex;
     align-items: center;
+    align-self: flex-end;
+    padding-bottom: 0.5rem;
   }
 
   /* Remove top margin from DoubleFigure */
