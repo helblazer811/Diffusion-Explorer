@@ -16,21 +16,22 @@
   export let numSteps = 200;
 
   // Animation parameters
-  export let numPoints = 50;  // Number of source points to flow
-  export let numLinesToDraw = 50;
-  export let numTrajectoriesToShow = 15;
+  export let numPoints = 80;  // Number of source points to flow
+  export let numLinesToDraw = 80;
+  export let numTrajectoriesToShow = 20;
 
   // Animation timing (normalized 0-1, scaled by animationDuration)
   export let animationDuration = 12000; // Total animation duration in ms
   export let timing = {
     // Phase 1: Independent Coupling
     phase1Start: 0,
-    phase1CouplingLinesEnd: 0.15,    // Lines animate from 0 to here (same duration as phase 3)
-    phase1FadeStart: 0.15,           // Start fading immediately after animation
-    phase1End: 0.20,
+    phase1CouplingLinesEnd: 0.12,    // Lines animate from 0 to here
+    phase1FadeStart: 0.18,           // Hold, then start fading
+    phase1FadeEnd: 0.22,             // Fade completes here
+    phase1End: 0.27,                 // Pause until phase ends
 
     // Phase 2: Simulate Flow
-    phase2Start: 0.20,
+    phase2Start: 0.27,
     phase2TrajectoryEnd: 0.60,       // Trajectories animate until here
     phase2End: 0.70,                 // Pause after trajectories
 
@@ -291,6 +292,7 @@
     const phase1Duration = timing.phase1End - timing.phase1Start;
     const c1_couplingEnd = (timing.phase1CouplingLinesEnd - timing.phase1Start) / phase1Duration;
     const c1_fadeStart = (timing.phase1FadeStart - timing.phase1Start) / phase1Duration;
+    const c1_fadeEnd = (timing.phase1FadeEnd - timing.phase1Start) / phase1Duration;
 
     const phase2Duration = timing.phase2End - timing.phase2Start;
     const c2_trajectoryEnd = (timing.phase2TrajectoryEnd - timing.phase2Start) / phase2Duration;
@@ -319,11 +321,14 @@
           } else if (t < c1_fadeStart) {
             // Lines fully drawn, holding
             return { stateIndex: 0, naiveCouplingProgress: 1, naiveCouplingOpacity: 1, segmentIndex: 0, inducedCouplingProgress: 0 };
-          } else {
+          } else if (t < c1_fadeEnd) {
             // Fade out
-            const fadeProgress = (t - c1_fadeStart) / (1 - c1_fadeStart);
+            const fadeProgress = (t - c1_fadeStart) / (c1_fadeEnd - c1_fadeStart);
             const opacity = Math.max(0, 1 - fadeProgress);
             return { stateIndex: 0, naiveCouplingProgress: 1, naiveCouplingOpacity: opacity, segmentIndex: 0, inducedCouplingProgress: 0 };
+          } else {
+            // Pause after fade (hold at opacity 0)
+            return { stateIndex: 0, naiveCouplingProgress: 1, naiveCouplingOpacity: 0, segmentIndex: 0, inducedCouplingProgress: 0 };
           }
         }
       },
