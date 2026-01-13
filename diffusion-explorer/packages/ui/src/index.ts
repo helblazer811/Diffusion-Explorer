@@ -100,3 +100,19 @@ export {
   type PathlineData,
 } from './animation/pathline-animation';
 
+export {
+  propagateStreamlines,
+  generateDiscreteStreamlines,
+  interpolateCurves,
+  getDiscreteSnapshot,
+  sampleStreamlineUniformly,
+  precomputePropagatedPaths,
+  precomputeDiscretePaths,
+  getPropagatedPathIndex,
+  getDiscretePathIndex,
+  type PropagatedStreamlineData,
+  type DiscreteStreamlineData,
+  type PropagateOptions,
+  type TimeVaryingVectorFieldFn,
+} from './animation/streamline-propagation';
+
