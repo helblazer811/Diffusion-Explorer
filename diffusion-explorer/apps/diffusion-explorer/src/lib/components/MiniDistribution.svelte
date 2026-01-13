@@ -1,23 +1,22 @@
 
-<script lang="ts"> 
+<script lang="ts">
     import * as d3 from 'd3';
-    import * as tf from '@tensorflow/tfjs';
     import { base } from '$app/paths';
     import { getContext } from 'svelte';
-    
-    const pageState = getContext("pageState");
+    import type { MainState, ModeState, PlaybackState, DistributionData, Config } from '$lib/state/main/state';
+
+    const pageState = getContext<MainState>("pageState");
     const {
-        datasetName, 
-        currentDistributionSamples, 
-        allTimeSamples,
-        currentTime,
-        isPlaying,
-        isEditing
+        modeState,
+        playbackState,
+        distributionData,
+        config,
+        isEditing,
     } = pageState;
 
     import { miniDistributionSettings } from '$lib/settings';
 
-    export let data; // Data to plot
+    export let data: number[][] | null = null; // Data to plot
     export let showBrush = false; // Whether to show the brush
     export let distributionId = "target"; // ID for the distribution canvas
     export let disabled = false; // Whether the distribution is disabled
@@ -25,7 +24,7 @@
     let svgElement: SVGSVGElement; // Create a separate SVG element for each distribution
 
     function handleClick(){
-        if (distributionId === $datasetName) {
+        if (distributionId === $config.datasetName) {
             return; // Don't do anything if the same dataset is clicked
         }
         if (disabled) {
@@ -34,30 +33,27 @@
         // Handle if it was the brush that was clicked
         if (showBrush) {
             // Change the dataset name to be the current one
-            datasetName.set(distributionId);
+            config.update((c: Config) => ({ ...c, datasetName: distributionId }));
             // Pause the animation from playing
-            isPlaying.set(false);
+            playbackState.update((p: PlaybackState) => ({ ...p, isPlaying: false }));
             // Turn on the editing mode
-            isEditing.set(true);
+            modeState.set({ mode: 'editing' });
         } else {
             if ($isEditing) {
                 // If the brush was not clicked, then turn off the editing mode
-                isEditing.set(false);
+                modeState.set({ mode: 'idle' });
             }
             // Change this dataset to be the current one
-            datasetName.set(distributionId);
+            config.update((c: Config) => ({ ...c, datasetName: distributionId }));
             // Empty out the current Distribution samples and the all time samples
-            currentDistributionSamples.set(tf.tensor([]));
-            allTimeSamples.set(tf.tensor([]));
-            // Set time to zero 
-            currentTime.set(0);
-            // Pause the animation
-            isPlaying.set(false);
+            distributionData.update((d: DistributionData) => ({ ...d, current: undefined, allTime: undefined }));
+            // Set time to zero
+            playbackState.update((p: PlaybackState) => ({ ...p, time: 0, isPlaying: false }));
         }
     }
 
     async function plotPoints(
-        data: tf.Tensor, // Data to plot
+        data: number[][], // Data to plot
         distributionId: string = "target", // ID for the distribution canvas
     ){
         // Replace distributionId spaces with underscores
@@ -145,8 +141,8 @@
 
 </style>
 
-<div 
-    class={distributionId === $datasetName ? "mini-distribution active-dataset" : "mini-distribution inactive-dataset"}
+<div
+    class={distributionId === $config.datasetName ? "mini-distribution active-dataset" : "mini-distribution inactive-dataset"}
     class:disabled={disabled}
     on:click={handleClick}
 >

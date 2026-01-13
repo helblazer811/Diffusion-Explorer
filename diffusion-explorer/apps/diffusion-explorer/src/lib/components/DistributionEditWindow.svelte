@@ -4,7 +4,7 @@
     import { computeContours, plotContours, drawScatterPlot } from '@diffusion-explorer/ui';
 
     const pageState = getContext<any>("pageState");
-    const { targetDistributionSamples, isEditing } = pageState;
+    const { distributionData, isEditing } = pageState;
 
     export let drawTimeout: number = 50;
     export let showScatter: boolean = true;
@@ -54,12 +54,12 @@
     }
 
     // Redraw when samples or toggle states change
-    $: if (ctx && $targetDistributionSamples && $targetDistributionSamples.length > 0) {
-        draw($targetDistributionSamples, showScatter, showContour);
+    $: if (ctx && $distributionData.target && $distributionData.target.length > 0) {
+        draw($distributionData.target, showScatter, showContour);
     }
 
     // Clear canvas when samples are empty
-    $: if (ctx && (!$targetDistributionSamples || $targetDistributionSamples.length === 0)) {
+    $: if (ctx && (!$distributionData.target || $distributionData.target.length === 0)) {
         ctx.clearRect(0, 0, width, height);
     }
 
@@ -123,7 +123,7 @@
                         ];
                         newSamples.push(clippedSample);
                     }
-                    targetDistributionSamples.update((samples: number[][]) => [...samples, ...newSamples]);
+                    distributionData.update((d: any) => ({ ...d, target: [...(d.target || []), ...newSamples] }));
                 }
             }, drawTimeout);
         }

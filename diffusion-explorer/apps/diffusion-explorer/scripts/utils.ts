@@ -68,8 +68,8 @@ export interface SamplingConfig {
 }
 
 export const SAMPLING_CONFIG: SamplingConfig = {
-    numSamples: 500,
-    numSteps: 100,
+    numSamples: 300,
+    numSteps: 200,
     gridResolution: 15,
 };
 
