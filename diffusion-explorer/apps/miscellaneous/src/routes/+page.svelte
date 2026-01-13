@@ -13,5 +13,34 @@
 
 <section id="experiments">
 	<h2 class="section-heading">Experiments</h2>
-	<p>Content coming soon...</p>
+	<ul class="experiment-list">
+		<li><a href="/divergence_and_curl">Divergence and Curl</a></li>
+		<li><a href="/diffusion_horizontal">Diffusion Horizontal</a></li>
+		<li><a href="/diffusion_vs_ddim">Diffusion vs DDIM</a></li>
+		<li><a href="/pull_toward_mean">Pull Toward Mean</a></li>
+		<li><a href="/one_dimensional_flow">One-Dimensional Flow</a></li>
+		<li><a href="/stokes_theorem">Stokes' Theorem</a></li>
+	</ul>
 </section>
+
+<style>
+	.experiment-list {
+		list-style: none;
+		padding: 0;
+		margin: 1rem 0;
+	}
+
+	.experiment-list li {
+		margin: 0.75rem 0;
+	}
+
+	.experiment-list a {
+		color: #3b82f6;
+		text-decoration: none;
+		font-size: 1.1rem;
+	}
+
+	.experiment-list a:hover {
+		text-decoration: underline;
+	}
+</style>
