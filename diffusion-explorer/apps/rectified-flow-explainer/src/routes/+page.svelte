@@ -292,7 +292,7 @@
     title="A Visual Introduction to Rectified Flows"
     author="Alec Helbling"
     authorLink="https://alechelbling.com"
-    date="December 24, 2025"
+    date="January 13, 2026"
   />
 
   <CrownJewel
