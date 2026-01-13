@@ -10,6 +10,7 @@
     settings,
     type VectorFieldData,
     type RectifiedFlowData,
+    type OTCouplingData,
   } from "$lib/settings";
   import * as sample from "$lib/flow_matching/sample";
   import {
@@ -20,6 +21,7 @@
   } from "@diffusion-explorer/ui";
 
   import IndependentCoupling from "$lib/figures/IndependentCoupling.svelte";
+  import OTCoupling from "$lib/figures/OTCoupling.svelte";
   import ProbabilityPath from "$lib/figures/ProbabilityPath.svelte";
   import HighlightTrajectory from "$lib/figures/HighlightTrajectory.svelte";
   import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
@@ -60,6 +62,9 @@
     writable(null);
   const rectifiedFlowGridTrajectories: Writable<number[][][][] | null> =
     writable(null);
+
+  // OT coupling data store
+  const otCouplingData: Writable<OTCouplingData | null> = writable(null);
 
   // Defer other figures until first frame renders
   let showOtherFigures = false;
@@ -192,6 +197,22 @@
     }
   }
 
+  async function loadCachedOTCoupling(path: string) {
+    try {
+      const response = await fetch(path);
+      if (!response.ok) {
+        console.error(`Failed to load OT coupling from ${path}: ${response.status}`);
+        return false;
+      }
+      const data: OTCouplingData = await response.json();
+      otCouplingData.set(data);
+      return true;
+    } catch (error) {
+      console.error(`Error loading OT coupling from ${path}:`, error);
+      return false;
+    }
+  }
+
 
   // ========== LIFECYCLE ==========
 
@@ -239,6 +260,10 @@
 
     if (settings.cachedRectifiedFlowVectorFieldPath) {
       await loadCachedRectifiedFlowVectorField(`${base}/${settings.cachedRectifiedFlowVectorFieldPath}`);
+    }
+
+    if (settings.cachedOTCouplingPath) {
+      await loadCachedOTCoupling(`${base}/${settings.cachedOTCouplingPath}`);
     }
 
     // Load bibliography (citations will be collected after showOtherFigures becomes true)
@@ -326,8 +351,9 @@
     from training data.  -->
     The success of flow models is in part due to the introduction of flow matching
     <HoverableReference id="lipman2022" {bibEntries} {citations} />, which
-    enables the training of flow models without computationally expensive
-    simulation. However, a practical barrier to deploying flow models at scale
+    enables training without computationally expensive
+    simulation and allows the use of arbitrary noise distributions. 
+    However, a practical barrier to deploying flow models at scale
     is the need to run large neural networks—often with billions of
     parameters—many times to generate high-quality samples. This incurs not just
     high computational cost but also high latency; in some cases it can take
@@ -462,12 +488,12 @@
     between our simple source distribution <Katex math={"p_0"} /> and our data distribution
     <Katex math={"p_1 = q"} /> (see
     <a href="#figure-3" class="internal-link">Figure 3</a>). We index this path
-    by an abstract time variable <Katex math={"t \\in [0, 1]"} />, where
+    by a time variable <Katex math={"t \\in [0, 1]"} />, where
     <Katex math={"t=0"} /> corresponds to the source distribution and <Katex
       math={"t=1"}
     /> corresponds to the target distribution. By drawing samples from <Katex
       math={"p_0"}
-    /> and transforming them according to our probability path we can produce samples
+    /> and transforming them over time we can produce samples
     distributed according to our data distribution <Katex math={"p_1 = q"} />.
   </p>
 
@@ -507,9 +533,12 @@
     of points over time; when applied to our samples <Katex
       math={"X_0 \\sim p_0"}
     /> it transports them from the source distribution to the target distribution
-    <Katex math={"X_1 \\sim p_1 = q"} />. The intermediate samples produced by
-    our flow <Katex math={"X_t = \\psi_t(X_0)"} /> are distributed according to our
-    probability path <Katex math={"X_t \\sim p_t"} />. If we can somehow learn
+    <Katex math={"X_1 \\sim p_1 = q"} />. The objective of flow based models is to learn a flow, 
+    such that for each time <Katex math={"t \\in [0, 1]"} />, the points
+    transformed by the flow <Katex math={"X_t = \\psi_t(X_0)"} /> are
+    distributed according to the corresponding distribution in our probability
+    path <Katex math={"X_t \\sim p_t"} />.
+    If we can somehow learn
     to model this flow, then we can draw samples from our simple source
     distribution <Katex math={"p_0"} /> and transform them to realistic approximations
     of real world data with distribution <Katex math="q" />.
@@ -610,7 +639,7 @@
   <p>
     Now that we are equipped with some background knowledge on flow-based
     generative models, we can discuss flow matching. I will only give a high
-    level overview of some of the concepts relevant to rectifed flows. Please
+    level overview of some of the concepts relevant to rectified flows. Please
     check out
     <HoverableReference
       id="lipman2024flowmatchingguidecode"
@@ -961,6 +990,37 @@
     </div>
   {/if}
 
+  <p>
+    An alternative to the independent coupling is an
+    <em>optimal transport coupling</em>
+    (see <a href="#figure-12" class="internal-link">Figure 12</a>), which
+    connects source and target points in a way that minimizes the overall cost
+    of transporting mass from the source to the target distribution. This
+    coupling tends to produce fewer crossing paths, which leads to straighter
+    trajectories. However, optimal transport couplings are more challenging to
+    compute, especially in high dimensions, and so they are less commonly used
+    in practice.
+  </p>
+
+  {#if showOtherFigures && $otCouplingData}
+    <div id="figure-12">
+      <OTCoupling
+        width={figureWidth}
+        sourceDistributionSamples={$otCouplingData.sourcePoints}
+        targetDistributionSamples={$otCouplingData.targetPoints}
+        matching={$otCouplingData.matching}
+        backgroundVisible={false}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 12:</span>
+          Visualization of an <strong>optimal transport coupling</strong> computed via Sinkhorn algorithm.
+          Unlike the independent coupling, the OT coupling minimizes transport cost, resulting in
+          less tangled paths with fewer crossings.
+        </div>
+      </OTCoupling>
+    </div>
+  {/if}
+
   <h2 id="paths-crossing">Paths Crossed at the Wrong Time</h2>
 
   <p>
@@ -984,23 +1044,25 @@
   </p>
 
   {#if showOtherFigures}
-    <IntersectingPaths
-      width={figureWidth}
-      sourceDistributionSamples={$sourceDistributionSamples}
-      targetDistributionSamples={$targetDistributionSamples}
-      backgroundVisible={false}
-    >
-      <div class="caption">
-        <span class="figure-number">Figure 12:</span>
-        Two pairs <Katex math={"(x_0^a, x_1^a)"} /> and <Katex
-          math={"(x_0^b, x_1^b)"}
-        /> that intersect at a point <Katex math="x" /> at time <Katex
-          math="t"
-        />. The velocity field <Katex math={"v_t^\\theta(x)"} /> cannot accurately
-        predict both conflicting velocities—the best it can do is predict the conditional
-        expectation (green arrow).
-      </div>
-    </IntersectingPaths>
+    <div id="figure-13">
+      <IntersectingPaths
+        width={figureWidth}
+        sourceDistributionSamples={$sourceDistributionSamples}
+        targetDistributionSamples={$targetDistributionSamples}
+        backgroundVisible={false}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 13:</span>
+          Two pairs <Katex math={"(x_0^a, x_1^a)"} /> and <Katex
+            math={"(x_0^b, x_1^b)"}
+          /> that intersect at a point <Katex math="x" /> at time <Katex
+            math="t"
+          />. The velocity field <Katex math={"v_t^\\theta(x)"} /> cannot accurately
+          predict both conflicting velocities—the best it can do is predict the conditional
+          expectation (green arrow).
+        </div>
+      </IntersectingPaths>
+    </div>
   {/if}
   <p>
     Our learned velocity field <Katex math={"v_t^\\theta(x)"} /> cannot accurately
@@ -1085,7 +1147,7 @@
     points that caused curvature in the first place. 
   </p>
   {#if showOtherFigures}
-    <div id="figure-13">
+    <div id="figure-14">
       <InducedCouplingAnimated
         width={figureWidth}
         targetDistribution={$targetDistributionSamples}
@@ -1096,7 +1158,7 @@
         numTrajectoriesToShow={15}
       >
         <div class="caption">
-          <span class="figure-number">Figure 13:</span>
+          <span class="figure-number">Figure 14:</span>
           <strong>The coupling induced by the flow model produces less tangled paths.</strong>
           We start out with a naive independent coupling, where paths cross each other frequently. 
           If we produce an induced coupling by flowing source points through the learned flow model, we get a coupling with
@@ -1109,12 +1171,12 @@
   <p>
     We can also compare the trajectories learned by a standard flow matching
     model versus a rectified flow model (see
-    <a href="#figure-14" class="internal-link">Figure 14</a>
+    <a href="#figure-15" class="internal-link">Figure 15</a>
     ). The rectified flow model learns significantly straighter trajectories, which
     are easier to simulate with fewer steps.
   </p>
   {#if showOtherFigures}
-    <div id="figure-14">
+    <div id="figure-15">
       <RectifiedFlowSuperimposed
         width={figureWidth}
         {flowMatchingClient}
@@ -1131,7 +1193,7 @@
         backgroundVisible={false}
       >
         <div class="caption">
-          <span class="figure-number">Figure 14:</span>
+          <span class="figure-number">Figure 15:</span>
           <strong>
             A rectified flow model learns straighter <span
               style="color: #f17720;">sampling paths</span
@@ -1156,13 +1218,13 @@
     needed during sampling. We can observe this effect by comparing how well
     Euler's method approximates the "ground truth" trajectory (using many steps)
     with varying numbers of integration steps (see
-    <a href="#figure-15" class="internal-link">Figure 15</a>
+    <a href="#figure-16" class="internal-link">Figure 16</a>
     ). Notice how the rectified flow model produces accurate approximations even
     with very few steps, while the flow matching model's curved trajectories
     lead to significant deviation from the true path.
   </p>
   {#if showOtherFigures}
-    <div id="figure-15">
+    <div id="figure-16">
       <EulerStepComparison
         {flowMatchingClient}
         {rectifiedFlowClient}
@@ -1171,7 +1233,7 @@
         maxUserTrajectories={1}
       >
         <div class="caption">
-          <span class="figure-number">Figure 15:</span>
+          <span class="figure-number">Figure 16:</span>
           <strong>
             The straight trajectories of rectified flows enable accurate simulation with fewer Euler steps.
           </strong>
@@ -1190,12 +1252,12 @@
   <p>
     Finally, we can compare the vector fields learned by a standard flow
     matching model versus a rectified flow model (see
-    <a href="#figure-16" class="internal-link">Figure 16</a>
+    <a href="#figure-17" class="internal-link">Figure 17</a>
     ). The rectified flow model learns vector field that is more consistent over
     time, meaning the model has lower curvature in its trajectories.
   </p>
   {#if showOtherFigures}
-    <div id="figure-16">
+    <div id="figure-17">
       <VectorFieldCurvatureComparison
         flowMatchingVectorField={$vectorFieldData}
         rectifiedFlowVectorField={$rectifiedFlowVectorFieldData}
@@ -1206,7 +1268,7 @@
         animationDuration={4000}
       >
         <div class="caption">
-          <span class="figure-number">Figure 16:</span>
+          <span class="figure-number">Figure 17:</span>
           The curvature of a flow matching model can be seen through its rapidly
           changing vector field. In contrast, a rectified flow model learns a more
           consistent vector field over time, indicating straighter trajectories.
