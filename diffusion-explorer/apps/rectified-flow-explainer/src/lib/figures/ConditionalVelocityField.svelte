@@ -1,5 +1,6 @@
-<script>
-  import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, mathjaxInitialized } from "@diffusion-explorer/ui";
+<script lang="ts">
+  import { onDestroy } from "svelte";
+  import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, Timeline, createPauseClip, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -18,8 +19,8 @@
   export let height = 450;
   export let marginWidth = 50;
   export let marginHeight = 20;
-  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
-  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
+  export let sourceCenterX = 0.2;
+  export let targetCenterX = 0.8;
   export let yShiftFactor = -0.2;
 
   // Scatter plot styling
@@ -46,8 +47,15 @@
   export let vectorColor = "#f17720";
   export let vectorOpacity = 1.0;
   export let vectorWidth = 4.5;
-  export let vectorScale = 110;
-  export let t = 0.4;
+  export let vectorScale = 0.4; // Multiplier for vector magnitude
+
+  // Animation timing (normalized 0-1, scaled by animationDuration)
+  export let animationDuration = 8000;
+  export let timing = {
+    forwardEnd: 0.85,
+    // pauseEnd: 1.0 implied
+  };
+  export let playingByDefault = true;
 
   // Background
   export let backgroundVisible = true;
@@ -68,8 +76,20 @@
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
+  // Animation state type
+  type AnimationState = {
+    t: number;  // Progress along trajectory (0→1)
+  };
+
   let scales = null;
   let isInitialized = false;
+
+  // Animation state - Timeline system
+  let timeline: Timeline<AnimationState> | null = null;
+
+  // Visibility-based animation control
+  let figureIsActive;
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Pre-computed pixel coordinates
   let sourcePixelCoords = [];
@@ -184,6 +204,11 @@
     return { x: pixelX, y: pixelY };
   }
 
+  function selectNextSourcePath() {
+    // Cycle to next source path, wrapping around
+    selectedPathIndex = (selectedPathIndex + 1) % selectedSourceIndices.length;
+  }
+
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
@@ -217,11 +242,51 @@
   }
 
   // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  // Forward clip (0→1) - reducer pattern
+  const forwardClip = {
+    name: "Forward",
+    reduce(t: number) {
+      return { t };
+    }
+  };
+
+  // Track previous time to detect loop
+  let prevTime = 0;
+
+  function setupTimeline() {
+    timeline = new Timeline<AnimationState>();
+    timeline.initialState = { t: 0 };
+
+    // Add clips using normalized timing
+    timeline.add(forwardClip, { start: 0, end: timing.forwardEnd });
+    timeline.add(createPauseClip(), { start: timing.forwardEnd, end: 1 });
+
+    // Configure timeline
+    timeline.duration = animationDuration / 1000;
+    timeline.looping = true;
+
+    // Register tick callback - detect loop by time jumping backwards
+    timeline.onTick((time, state) => {
+      const duration = timeline!.duration;
+      // Detect loop: time jumped from near end back to start
+      if (prevTime > duration * 0.9 && time < duration * 0.1) {
+        selectNextSourcePath();
+      }
+      prevTime = time;
+      draw(state);
+    });
+  }
+
+  // ----------------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------------
 
-  function draw() {
+  function draw(state: AnimationState) {
     if (!ctx || !scales || !isInitialized) return;
+    if (selectedSourceIndices.length === 0) return;
     ctx.clearRect(0, 0, width, height);
 
     // Draw scatter plots (with lower opacity)
@@ -271,6 +336,7 @@
     // Draw intermediate point and vector
     const sourceIdx = selectedSourceIndices[selectedPathIndex];
     const sourcePoint = sourceDistributionSamples[sourceIdx];
+    const t = state.t;
     const interpDataX = (1 - t) * sourcePoint[0] + t * targetPoint[0];
     const interpDataY = (1 - t) * sourcePoint[1] + t * targetPoint[1];
     const interpPixel = interpDataToPixel(interpDataX, interpDataY, t, scales);
@@ -282,15 +348,16 @@
       intermediatePointColor
     );
 
-    // Draw velocity vector
+    // Draw velocity vector (magnitude scales with distance to target)
     const pixelDx = targetX - interpPixel.x;
     const pixelDy = targetY - interpPixel.y;
     const pixelMag = Math.sqrt(pixelDx * pixelDx + pixelDy * pixelDy);
 
     let vectorEndX, vectorEndY;
     if (pixelMag > 0.01) {
-      vectorEndX = interpPixel.x + (pixelDx / pixelMag) * vectorScale;
-      vectorEndY = interpPixel.y + (pixelDy / pixelMag) * vectorScale;
+      // Scale by magnitude (not normalized) with additional scale factor
+      vectorEndX = interpPixel.x + pixelDx * vectorScale;
+      vectorEndY = interpPixel.y + pixelDy * vectorScale;
       ctx.save();
       ctx.strokeStyle = vectorColor;
       ctx.fillStyle = vectorColor;
@@ -308,41 +375,48 @@
 
     drawMathjax(
       ctx, "p_0", scales.sourceCenterPixelX, distributionLabelY,
-      latexFontSize, 0, 10, { color: latexColor }, draw
+      latexFontSize, 0, 10, { color: latexColor }
     );
 
     drawMathjax(
       ctx, "p_1", scales.targetCenterPixelX, distributionLabelY,
-      latexFontSize, 0, 10, { color: latexColor }, draw
+      latexFontSize, 0, 10, { color: latexColor }
     );
 
     // x_1 above selected target point
     drawMathjax(
       ctx, "x_1", targetX, targetY,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
     // x above intermediate point
     drawMathjax(
       ctx, "x", interpPixel.x, interpPixel.y,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
     );
 
-    // v_t(x|x_1) near vector
+    // v_t(x|x_1) at vector head
     if (vectorEndX !== undefined && vectorEndY !== undefined) {
-      const vectorCenterX = (interpPixel.x + vectorEndX) / 2;
-      const vectorCenterY = (interpPixel.y + vectorEndY) / 2;
       drawMathjax(
-        ctx, "v_t(x|x_1)", vectorCenterX, vectorCenterY,
-        latexFontSize, 30, -20, { color: vectorColor }, draw
+        ctx, "v_t(x|x_1)", vectorEndX, vectorEndY,
+        latexFontSize, -5, -35, { color: vectorColor }
       );
     }
   }
 
   // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
+  onDestroy(() => {
+    if (timeline) timeline.pause();
+  });
+
+  // ----------------------------------------------------------------
   // Reactive Blocks
   // ----------------------------------------------------------------
 
+  // Reactive initialization
   $: if (
     !isInitialized &&
     sourceDistributionSamples.length > 0 &&
@@ -350,17 +424,19 @@
     canvas
   ) {
     runInitialComputation();
+    setupTimeline();
     isInitialized = true;
-    draw();
+    draw(timeline!.initialState);
+    if (playingByDefault) timeline?.play();
   }
 
-  // Redraw when MathJax finishes initializing (for LaTeX labels)
-  $: if (isInitialized) {
-    mathjaxInitialized.then(() => draw());
+  // Handle visibility changes (pause when off-screen, resume when back)
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
   }
 </script>
 
-<Figure {caption} {backgroundVisible}>
+<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="width: 100%; max-width: {width}px;">
       <canvas

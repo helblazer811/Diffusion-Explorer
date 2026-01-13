@@ -755,8 +755,8 @@
       <div class="caption">
         <span class="figure-number">Figure 7:</span>
         The conditional velocity field <Katex math={"v_t(x|x_1)"} /> for a specific
-        target point <Katex math={"x_1"} /> is a bunch of straight arrows pointing
-        from the source distribution to the target point.
+        target point <Katex math={"x_1"} /> can be represented by a bunch of straight arrows pointing
+        from the source distribution points to the target point.
       </div>
     </ConditionalVelocityField>
   {/if}
