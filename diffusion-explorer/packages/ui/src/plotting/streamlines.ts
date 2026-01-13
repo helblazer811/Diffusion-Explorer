@@ -687,74 +687,6 @@ function resampleStreamline(
 }
 
 /**
- * Compute per-segment alpha values for animated pulses along a streamline.
- *
- * Uses centered pulse blobs with smooth quadratic falloff.
- *
- * @param numSegments - Number of segments in the streamline
- * @param time - Spatial phase of wave train [0, 1)
- * @param offset - Random phase offset for this streamline (0-1)
- * @param pulseWidth - Fraction of streamline length each pulse occupies
- * @param pulsePauseWidth - Gap between pulses (fraction of streamline length)
- * @param baseOpacity - Maximum opacity at pulse center
- * @returns Array of alpha values for each segment
- */
-export function computeAlphaTrail(
-  numSegments: number,
-  time: number,
-  offset: number,
-  pulseWidth: number,
-  pulsePauseWidth: number,
-  baseOpacity: number
-): number[] {
-  const alphas = new Array(numSegments).fill(0);
-  if (numSegments === 0) return alphas;
-
-  const spacing = pulseWidth + pulsePauseWidth;
-  const posStep = 1 / numSegments;
-
-  const phase = (time + offset) % 1;
-  const pulseCount = spacing > 1e-5 ? Math.ceil(1 / spacing) : 1;
-
-  for (let p = 0; p < pulseCount; p++) {
-    // Front edge of this pulse (hard leading edge)
-    const front = (phase + p * spacing) % 1;
-    // Back edge trails behind by pulseWidth
-    const back = front - pulseWidth;
-
-    for (let i = 0; i < numSegments; i++) {
-      const pos = i * posStep;
-
-      // Check if position is within pulse (handling wrap-around)
-      let inPulse = false;
-      let distFromFront = 0;
-
-      if (back >= 0) {
-        // No wrap-around
-        inPulse = pos >= back && pos < front;
-        if (inPulse) distFromFront = front - pos;
-      } else {
-        // Pulse wraps around (back is negative)
-        inPulse = pos >= (back + 1) || pos < front;
-        if (inPulse) {
-          distFromFront = pos < front ? (front - pos) : (front + 1 - pos);
-        }
-      }
-
-      if (inPulse) {
-        // Fade from front (full opacity) to back (zero)
-        // distFromFront: 0 at front, pulseWidth at back
-        const u = distFromFront / pulseWidth;  // 0 at front → 1 at back
-        const alpha = baseOpacity * (1 - u);   // 1 at front → 0 at back
-        alphas[i] = Math.max(alphas[i], alpha);
-      }
-    }
-  }
-
-  return alphas;
-}
-
-/**
  * Compute cumulative lengths along a streamline (in pixel coordinates).
  *
  * @param streamline - Array of [x, y] points in pixel coordinates
@@ -782,60 +714,273 @@ export function computeStreamlineLengths(streamline: number[][]): {
 }
 
 /**
- * Compute per-segment alpha values using pixel-based distances.
+ * Create a lookup table for alpha values across one pulse period.
  *
- * Unlike computeAlphaTrail which uses normalized positions (0-1),
- * this function uses absolute pixel distances. This ensures:
- * - All streamlines have same pulse introduction rate regardless of length
- * - Without resampling, high-velocity regions (longer segments) show faster pulses
+ * The LUT covers positions from 0 to spacing, with alpha values
+ * that fade from 0 at front to baseOpacity at the back of the pulse.
  *
- * @param cumulativeLengths - Cumulative pixel length at each point [0, len1, len1+len2, ...]
- * @param totalLength - Total streamline length in pixels
- * @param phase - Animation phase [0, 1)
- * @param offset - Random phase offset for this streamline (0-1)
- * @param pulseWidth - Width of pulse in pixels
- * @param pulsePauseWidth - Gap between pulses in pixels
- * @param travelDistance - Total distance pulses travel per animation cycle (pixels)
- * @param baseOpacity - Maximum opacity at pulse front
- * @returns Array of alpha values for each segment
+ * @param pulseWidth - Width of the pulse in pixels
+ * @param spacing - Total period (pulseWidth + pulsePauseWidth) in pixels
+ * @param baseOpacity - Maximum opacity at pulse back
+ * @param resolution - Number of entries in the LUT (default 256)
+ * @returns Float32Array of alpha values
  */
-export function computeAlphaTrailPixelBased(
-  cumulativeLengths: number[],
-  totalLength: number,
-  phase: number,
-  offset: number,
+export function createAlphaLUT(
   pulseWidth: number,
-  pulsePauseWidth: number,
-  travelDistance: number,  // Kept for API compatibility, now ignored
-  baseOpacity: number
-): number[] {
+  spacing: number,
+  baseOpacity: number,
+  resolution: number = 256,
+  binary: boolean = false
+): Float32Array {
+  const lut = new Float32Array(resolution);
+  const invPulseWidth = 1 / pulseWidth;
+
+  for (let i = 0; i < resolution; i++) {
+    const posInPattern = (i / resolution) * spacing;
+    if (posInPattern < pulseWidth) {
+      if (binary) {
+        // Binary mode: full opacity, no gradient
+        lut[i] = baseOpacity;
+      } else {
+        // Gradient mode: fade from 0 at front to baseOpacity at back
+        const u = posInPattern * invPulseWidth; // 0 at front → 1 at back
+        lut[i] = baseOpacity * u;
+      }
+    }
+    // else lut[i] stays 0 (gap region)
+  }
+
+  return lut;
+}
+
+/**
+ * Precompute pattern positions for a streamline.
+ *
+ * Computes (pos % spacing) for each point, normalized to LUT indices.
+ * This allows fast lookup during animation.
+ *
+ * @param cumulativeLengths - Cumulative pixel length at each point
+ * @param spacing - Total period (pulseWidth + pulsePauseWidth) in pixels
+ * @param lutResolution - Resolution of the alpha LUT
+ * @returns Uint16Array of LUT indices for each point
+ */
+export function precomputePatternIndices(
+  cumulativeLengths: number[],
+  spacing: number,
+  lutResolution: number = 256
+): Uint16Array {
   const numPoints = cumulativeLengths.length;
-  // Return per-POINT alphas (not per-segment) so gradient interpolation works smoothly
-  const alphas = new Array(numPoints).fill(0);
-  if (numPoints === 0) return alphas;
-
-  const spacing = pulseWidth + pulsePauseWidth;
-  if (spacing <= 0) return alphas;
-
-  // Phase cycles the pattern by one full spacing per animation cycle
-  // This ensures seamless looping - pattern repeats exactly at phase=0 and phase=1
-  const patternOffset = ((phase + offset) % 1) * spacing;
+  const indices = new Uint16Array(numPoints);
+  const scale = lutResolution / spacing;
 
   for (let i = 0; i < numPoints; i++) {
     const pos = cumulativeLengths[i];
+    const posInPattern = pos % spacing;
+    indices[i] = Math.floor(posInPattern * scale) % lutResolution;
+  }
 
-    // Where is this point within the repeating pulse pattern?
-    // Use double-modulo to handle negative values correctly
-    const posInPattern = ((pos - patternOffset) % spacing + spacing) % spacing;
+  return indices;
+}
 
-    // Within pulse region (0 to pulseWidth)?
-    // Gap region is (pulseWidth to spacing)
-    if (posInPattern < pulseWidth) {
-      const u = posInPattern / pulseWidth; // 0 at front → 1 at back
-      alphas[i] = baseOpacity * u;         // Fades in at front, full at back (trail behind motion)
+/**
+ * Compute alpha values for animated pulses along a streamline.
+ *
+ * Uses precomputed pattern indices and LUT for efficient per-frame computation.
+ *
+ * @param patternIndices - Precomputed LUT indices for each point (from precomputePatternIndices)
+ * @param alphaLUT - Precomputed alpha lookup table (from createAlphaLUT)
+ * @param phase - Animation phase [0, 1)
+ * @param offset - Random phase offset for this streamline (0-1)
+ * @param outAlphas - Output buffer for alpha values (reused to avoid allocation)
+ */
+export function computeAlphaTrail(
+  patternIndices: Uint16Array,
+  alphaLUT: Float32Array,
+  phase: number,
+  offset: number,
+  outAlphas: Float32Array
+): void {
+  const numPoints = patternIndices.length;
+  const lutResolution = alphaLUT.length;
+
+  // Phase shift in LUT indices
+  const shiftAmount = Math.floor(((phase + offset) % 1) * lutResolution);
+
+  for (let i = 0; i < numPoints; i++) {
+    // Shift index and wrap around
+    let idx = patternIndices[i] - shiftAmount;
+    if (idx < 0) idx += lutResolution;
+    outAlphas[i] = alphaLUT[idx];
+  }
+}
+
+/**
+ * Chevron style options for direction indicators on streamlines.
+ */
+export interface ChevronStyle {
+  /** Distance between chevrons in pixels (default: 40) */
+  spacingPixels?: number;
+  /** Length of each chevron leg in pixels (default: 6) */
+  size?: number;
+  /** Angle from perpendicular in radians (default: Math.PI/6 = 30 degrees) */
+  angle?: number;
+  /** Stroke width ratio relative to streamline width (default: 0.6) */
+  strokeWidthRatio?: number;
+}
+
+/**
+ * Options for drawing streamlines.
+ */
+export interface DrawStreamlinesOptions {
+  /** Stroke color */
+  color: string;
+  /** Stroke width in pixels */
+  strokeWidth: number;
+  /** Opacity (0-1, default: 1) */
+  opacity?: number;
+  /** Optional chevron direction indicators */
+  chevron?: ChevronStyle;
+}
+
+/**
+ * Private helper to draw chevron direction indicators on streamlines.
+ * Batches all chevrons into a single path for efficient rendering.
+ */
+function _drawChevrons(
+  ctx: CanvasRenderingContext2D,
+  streamlines: number[][][],
+  options: DrawStreamlinesOptions
+): void {
+  const chevron = options.chevron!;
+  const spacingPixels = chevron.spacingPixels ?? 40;
+  const size = chevron.size ?? 6;
+  const angle = chevron.angle ?? Math.PI / 6; // 30 degrees from perpendicular
+  const strokeWidthRatio = chevron.strokeWidthRatio ?? 0.6;
+
+  // Precompute trig values
+  const cosAngle = Math.cos(angle);
+  const sinAngle = Math.sin(angle);
+
+  ctx.strokeStyle = options.color;
+  ctx.lineWidth = options.strokeWidth * strokeWidthRatio;
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = options.opacity ?? 1;
+
+  // Batch all chevrons into a single path
+  ctx.beginPath();
+
+  for (const streamline of streamlines) {
+    if (streamline.length < 2) continue;
+
+    // Compute cumulative arc length and place chevrons at fixed intervals
+    let cumulativeLength = 0;
+    let nextChevronPos = spacingPixels / 2; // Start at half spacing for centering
+
+    for (let i = 1; i < streamline.length; i++) {
+      const [x0, y0] = streamline[i - 1];
+      const [x1, y1] = streamline[i];
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+      if (segmentLength === 0) continue;
+
+      const startLength = cumulativeLength;
+      const endLength = cumulativeLength + segmentLength;
+
+      // Place chevrons within this segment
+      while (nextChevronPos <= endLength) {
+        // Interpolate position along segment
+        const t = (nextChevronPos - startLength) / segmentLength;
+        const cx = x0 + t * dx;
+        const cy = y0 + t * dy;
+
+        // Compute tangent direction (normalized)
+        const tx = dx / segmentLength;
+        const ty = dy / segmentLength;
+
+        // Perpendicular to tangent
+        const perpX = -ty;
+        const perpY = tx;
+
+        // Left leg: backward + angled left
+        const leftX = -tx * cosAngle + perpX * sinAngle;
+        const leftY = -ty * cosAngle + perpY * sinAngle;
+
+        // Right leg: backward + angled right
+        const rightX = -tx * cosAngle - perpX * sinAngle;
+        const rightY = -ty * cosAngle - perpY * sinAngle;
+
+        // Add chevron to path (moveTo breaks the subpath so each chevron is separate)
+        ctx.moveTo(cx + leftX * size, cy + leftY * size);
+        ctx.lineTo(cx, cy);
+        ctx.lineTo(cx + rightX * size, cy + rightY * size);
+
+        nextChevronPos += spacingPixels;
+      }
+
+      cumulativeLength = endLength;
     }
   }
 
-  return alphas;
+  // Single stroke call for all chevrons
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * Draw streamlines on a canvas context.
+ *
+ * @param ctx - Canvas 2D rendering context
+ * @param streamlines - Array of streamlines in pixel coords: [streamline][point][x,y]
+ * @param options - Styling options including optional chevron markers
+ */
+export function drawStreamlines(
+  ctx: CanvasRenderingContext2D,
+  streamlines: number[][][],
+  options: DrawStreamlinesOptions
+): void {
+  const startTime = performance.now();
+  const { color, strokeWidth, opacity = 1 } = options;
+
+  // Count total points for logging
+  let totalPoints = 0;
+  for (const s of streamlines) totalPoints += s.length;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = strokeWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.globalAlpha = opacity;
+
+  // Draw streamline curves - batched into single path
+  const curvesStart = performance.now();
+  ctx.beginPath();
+  for (const streamline of streamlines) {
+    if (streamline.length < 2) continue;
+
+    ctx.moveTo(streamline[0][0], streamline[0][1]);
+    for (let i = 1; i < streamline.length; i++) {
+      ctx.lineTo(streamline[i][0], streamline[i][1]);
+    }
+  }
+  ctx.stroke();
+  const curvesTime = performance.now() - curvesStart;
+
+  // Draw chevrons if specified
+  let chevronsTime = 0;
+  if (options.chevron) {
+    const chevronsStart = performance.now();
+    _drawChevrons(ctx, streamlines, options);
+    chevronsTime = performance.now() - chevronsStart;
+  }
+
+  ctx.globalAlpha = 1;
+
+  const totalTime = performance.now() - startTime;
+  console.log(
+    `[drawStreamlines] ${streamlines.length} streamlines, ${totalPoints} points | ` +
+    `curves: ${curvesTime.toFixed(2)}ms, chevrons: ${chevronsTime.toFixed(2)}ms, total: ${totalTime.toFixed(2)}ms`
+  );
 }
 
