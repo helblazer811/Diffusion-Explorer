@@ -104,7 +104,7 @@
 
     // Plot coupling edges first (so they're behind scatter points)
     // Note: we pass original target points, dataToPixelX handles the pixel positioning
-    const { shuffledTargets } = plotCoupling(sourceDistributionSamples, targetDistributionSamples);
+    const { shuffledTargets, shuffledSourceIndices } = plotCoupling(sourceDistributionSamples, targetDistributionSamples);
 
     // Plot scatter using d3_helpers
     plotSourceTargetScatter(svg, sourceDistributionSamples, targetDistributionSamples, scales, {
@@ -117,7 +117,7 @@
     // Add hover attributes and handlers
     addHoverAttributes(svg);
     plotLabels();
-    setupPointHoverHandlers(targetDistributionSamples, shuffledTargets);
+    setupPointHoverHandlers(targetDistributionSamples, shuffledTargets, shuffledSourceIndices);
     isInitialized = true;
   }
 
@@ -142,7 +142,7 @@
   }
 
   function plotCoupling(sourcePoints, targetPoints) {
-    if (!svgElement || !scales) return { couplingData: [], shuffledTargets: [] };
+    if (!svgElement || !scales) return { couplingData: [], shuffledTargets: [], shuffledSourceIndices: [] };
 
     const svg = d3.select(svgElement);
     const { yScale } = scales;
@@ -156,8 +156,9 @@
     // Use the minimum length to ensure valid pairings
     const numPairs = Math.min(sourcePoints.length, targetPoints.length);
 
-    // Shuffle both arrays and take numPairs from each
-    const shuffledSources = [...sourcePoints].sort(() => Math.random() - 0.5).slice(0, numPairs);
+    // Shuffle both arrays and take numPairs from each, tracking original indices
+    const shuffledSourceIndices = sourcePoints.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, numPairs);
+    const shuffledSources = shuffledSourceIndices.map(i => sourcePoints[i]);
     const shuffledTargets = [...targetPoints].sort(() => Math.random() - 0.5).slice(0, numPairs);
 
     // Create random pairings without replacement
@@ -207,7 +208,8 @@
 
         // Highlight both endpoints
         const targetPoint = shuffledTargets[index];
-        svg.select(`#sourceScatter circle[data-index="${index}"]`)
+        const originalSourceIndex = shuffledSourceIndices[index];
+        svg.select(`#sourceScatter circle[data-index="${originalSourceIndex}"]`)
           .attr('opacity', hoverPointOpacity);
         const targetIndex = targetIndexMap.get(targetPoint.toString());
         svg.select(`#targetScatter circle[data-index="${targetIndex}"]`)
@@ -224,21 +226,22 @@
 
         // Reset both endpoints
         const targetPoint = shuffledTargets[index];
-        const sourceCircle = svg.select(`#sourceScatter circle[data-index="${index}"]`);
+        const originalSourceIndex = shuffledSourceIndices[index];
+        const sourceCircle = svg.select(`#sourceScatter circle[data-index="${originalSourceIndex}"]`);
         sourceCircle.attr('opacity', sourceCircle.attr('data-original-opacity'));
         const targetIndex = targetIndexMap.get(targetPoint.toString());
         const targetCircle = svg.select(`#targetScatter circle[data-index="${targetIndex}"]`);
         targetCircle.attr('opacity', targetCircle.attr('data-original-opacity'));
       });
 
-    return { couplingData, shuffledTargets };
+    return { couplingData, shuffledTargets, shuffledSourceIndices };
   }
 
   // ----------------------------------------------------------------
   // Event Handlers
   // ----------------------------------------------------------------
 
-  function setupPointHoverHandlers(targetPoints, shuffledTargets) {
+  function setupPointHoverHandlers(targetPoints, shuffledTargets, shuffledSourceIndices) {
     if (!svgElement) return;
 
     const svg = d3.select(svgElement);
@@ -247,14 +250,19 @@
     // Create a mapping from target points to their indices
     const targetIndexMap = new Map(targetPoints.map((point, i) => [point.toString(), i]));
 
+    // Create a reverse mapping from original source index to coupling index
+    const sourceIndexToCouplingIndex = new Map(shuffledSourceIndices.map((originalIdx, couplingIdx) => [originalIdx, couplingIdx]));
+
     // Add hover handlers to source points
     svg.select('#sourceScatter').selectAll('circle')
       .on('mouseover', function() {
-        const sourceIndex = parseInt(d3.select(this).attr('data-index'));
-        const targetPoint = shuffledTargets[sourceIndex];
+        const originalSourceIndex = parseInt(d3.select(this).attr('data-index'));
+        const couplingIndex = sourceIndexToCouplingIndex.get(originalSourceIndex);
+        if (couplingIndex === undefined) return; // This source point isn't part of the coupling
+        const targetPoint = shuffledTargets[couplingIndex];
 
         // Highlight the edge
-        edgesGroup.select(`.edge-${sourceIndex}`)
+        edgesGroup.select(`.edge-${couplingIndex}`)
           .attr('stroke', hoverEdgeColor)
           .attr('stroke-width', hoverEdgeWidth)
           .attr('stroke-opacity', hoverEdgeOpacity);
@@ -266,11 +274,13 @@
           .attr('opacity', hoverPointOpacity);
       })
       .on('mouseout', function() {
-        const sourceIndex = parseInt(d3.select(this).attr('data-index'));
-        const targetPoint = shuffledTargets[sourceIndex];
+        const originalSourceIndex = parseInt(d3.select(this).attr('data-index'));
+        const couplingIndex = sourceIndexToCouplingIndex.get(originalSourceIndex);
+        if (couplingIndex === undefined) return;
+        const targetPoint = shuffledTargets[couplingIndex];
 
         // Reset the edge
-        edgesGroup.select(`.edge-${sourceIndex}`)
+        edgesGroup.select(`.edge-${couplingIndex}`)
           .attr('stroke', edgeColor)
           .attr('stroke-width', edgeWidth)
           .attr('stroke-opacity', edgeOpacity);
@@ -288,36 +298,44 @@
         const targetIndex = parseInt(d3.select(this).attr('data-index'));
         const targetPoint = targetPoints[targetIndex];
 
-        // Find which source point maps to this target
-        const sourceIndex = shuffledTargets.findIndex(t => t.toString() === targetPoint.toString());
+        // Find which coupling index maps to this target
+        const couplingIndex = shuffledTargets.findIndex(t => t.toString() === targetPoint.toString());
+        if (couplingIndex === -1) return; // This target point isn't part of the coupling
+
+        // Get the original source index from the coupling index
+        const originalSourceIndex = shuffledSourceIndices[couplingIndex];
 
         // Highlight the edge
-        edgesGroup.select(`.edge-${sourceIndex}`)
+        edgesGroup.select(`.edge-${couplingIndex}`)
           .attr('stroke', hoverEdgeColor)
           .attr('stroke-width', hoverEdgeWidth)
           .attr('stroke-opacity', hoverEdgeOpacity);
 
         // Highlight both endpoints
         d3.select(this).attr('opacity', hoverPointOpacity);
-        svg.select(`#sourceScatter circle[data-index="${sourceIndex}"]`)
+        svg.select(`#sourceScatter circle[data-index="${originalSourceIndex}"]`)
           .attr('opacity', hoverPointOpacity);
       })
       .on('mouseout', function() {
         const targetIndex = parseInt(d3.select(this).attr('data-index'));
         const targetPoint = targetPoints[targetIndex];
 
-        // Find which source point maps to this target
-        const sourceIndex = shuffledTargets.findIndex(t => t.toString() === targetPoint.toString());
+        // Find which coupling index maps to this target
+        const couplingIndex = shuffledTargets.findIndex(t => t.toString() === targetPoint.toString());
+        if (couplingIndex === -1) return;
+
+        // Get the original source index from the coupling index
+        const originalSourceIndex = shuffledSourceIndices[couplingIndex];
 
         // Reset the edge
-        edgesGroup.select(`.edge-${sourceIndex}`)
+        edgesGroup.select(`.edge-${couplingIndex}`)
           .attr('stroke', edgeColor)
           .attr('stroke-width', edgeWidth)
           .attr('stroke-opacity', edgeOpacity);
 
         // Reset both endpoints
         d3.select(this).attr('opacity', d3.select(this).attr('data-original-opacity'));
-        const sourceCircle = svg.select(`#sourceScatter circle[data-index="${sourceIndex}"]`);
+        const sourceCircle = svg.select(`#sourceScatter circle[data-index="${originalSourceIndex}"]`);
         sourceCircle.attr('opacity', sourceCircle.attr('data-original-opacity'));
       });
   }
