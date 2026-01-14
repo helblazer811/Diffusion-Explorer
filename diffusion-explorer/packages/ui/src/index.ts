@@ -116,3 +116,9 @@ export {
   type TimeVaryingVectorFieldFn,
 } from './animation/streamline-propagation';
 
+export {
+  TimelineBuilder,
+  type TimelineBuilderAddOptions,
+  type TimelineBuilderAddAtOptions,
+} from './animation/timeline-builder';
+
