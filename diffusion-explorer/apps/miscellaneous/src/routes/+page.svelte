@@ -20,6 +20,10 @@
 		<li><a href="/pull_toward_mean">Pull Toward Mean</a></li>
 		<li><a href="/one_dimensional_flow">One-Dimensional Flow</a></li>
 		<li><a href="/stokes_theorem">Stokes' Theorem</a></li>
+		<li><a href="/stokes_theorem_square">Stokes' Theorem (Square Grid)</a></li>
+		<li><a href="/path_independence">Path Independence</a></li>
+		<li><a href="/streamline_propagation">Streamline Propagation</a></li>
+		<li><a href="/streamline_generation">Streamline Generation</a></li>
 	</ul>
 </section>
 
