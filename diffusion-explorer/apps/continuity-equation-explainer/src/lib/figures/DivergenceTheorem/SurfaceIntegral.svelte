@@ -39,7 +39,7 @@
   export let surfaceLabelColor = "#f97316";
   export let surfaceLabelStrokeColor = "white";
   export let surfaceLabelStrokeWidth = 15;
-  export let surfaceLabelYOffset = -0.7; // Fraction of bounding box height from center
+  export let surfaceLabelYOffset = -0.55; // Fraction of bounding box height from center
 
   // Surface styling
   export let surfaceOpacity = 0.15;
@@ -57,9 +57,9 @@
   export let streamlineWidth = 2.5;
   export let gradientSubdivisions = 12;
 
-  // Animation pulse settings
-  export let pulseWidth = 0.2;
-  export let pulsePauseWidth = 0.05;
+  // Animation pulse settings (in pixels)
+  export let pulseWidthPixels = 30;
+  export let pulsePauseWidthPixels = 5;
 
   // Vector styling
   export let normalColor = "#f97316"; // Orange
@@ -187,10 +187,9 @@
       color: streamlineColor,
       strokeWidth: streamlineWidth,
       gradientSubdivisions,
-      pulseWidth,
-      pulsePauseWidth,
+      pulseWidthPixels,
+      pulsePauseWidthPixels,
       offsets: "synchronized",
-      clipDuration: streamlineDuration / totalDuration,
       loopMultiplier: totalDuration / streamlineDuration,
     });
   }
@@ -206,19 +205,19 @@
     timeline.looping = true;
 
     // Add streamline clip from the animation
-    timeline.add(streamlineAnim.clip, 0);
+    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
 
     // Rotation clip
+    const rotationEnd = rotationDuration / totalDuration;
     timeline.add(
       {
         name: "SurfaceRotation",
-        duration: rotationDuration / totalDuration,
         reduce(t: number) {
           const loops = totalDuration / rotationDuration;
           return { theta: ((t * loops) % 1) * 2 * Math.PI };
         },
       },
-      0
+      { start: 0, end: rotationEnd }
     );
 
     timeline.onTick((_t, state) => {
