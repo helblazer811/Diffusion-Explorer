@@ -1047,6 +1047,10 @@
     <div id="figure-13">
       <IntersectingPaths
         width={figureWidth}
+        height={400}
+        sourceCenterX={0.25}
+        targetCenterX={0.75}
+        latexFontSize={20}
         sourceDistributionSamples={$sourceDistributionSamples}
         targetDistributionSamples={$targetDistributionSamples}
         backgroundVisible={false}
