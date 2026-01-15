@@ -55,8 +55,8 @@
   export let streamlineColor = "#3b82f6";
   export let streamlineWidth = 2.5;
   export let streamlineDensity = 0.6;
-  export let pulseWidth = 0.10;
-  export let pulsePauseWidth = 0.08;
+  export let pulseWidthPixels = 30;
+  export let pulsePauseWidthPixels = 5;
   export let binaryPulse = false; // Alpha gradient enabled
 
   // Label settings
@@ -229,8 +229,8 @@
       subdivisionFactor: 8,
       color: streamlineColor,
       strokeWidth: streamlineWidth,
-      pulseWidth,
-      pulsePauseWidth,
+      pulseWidthPixels,
+      pulsePauseWidthPixels,
       binaryPulse,
       offsets: "random",
       loopMultiplier: 2,

@@ -59,9 +59,9 @@
   export let streamlineWidth = 2.5;
   export let gradientSubdivisions = 12;
 
-  // Animation pulse settings
-  export let pulseWidth = 0.2;
-  export let pulsePauseWidth = 0.05;
+  // Animation pulse settings (in pixels)
+  export let pulseWidthPixels = 30;
+  export let pulsePauseWidthPixels = 5;
 
   // Vector styling
   export let tangentColor = "#f97316"; // Orange for dr
@@ -160,8 +160,8 @@
       color: streamlineColor,
       strokeWidth: streamlineWidth,
       gradientSubdivisions,
-      pulseWidth,
-      pulsePauseWidth,
+      pulseWidthPixels,
+      pulsePauseWidthPixels,
       offsets: "synchronized",
       loopMultiplier: totalDuration / streamlineDuration,
     });

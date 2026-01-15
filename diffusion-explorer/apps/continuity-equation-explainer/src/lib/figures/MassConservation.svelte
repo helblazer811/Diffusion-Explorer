@@ -59,8 +59,8 @@
   export let streamlineColor = "#3b82f6"; // Blue
   export let streamlineWidth = 2.5;
   export let gradientSubdivisions = 12;
-  export let pulseWidth = 0.2;
-  export let pulsePauseWidth = 0.05;
+  export let pulseWidthPixels = 30;
+  export let pulsePauseWidthPixels = 5;
   export let streamlineDuration = 8;
   export let playingByDefault = true;
 
@@ -327,8 +327,8 @@
       color: streamlineColor,
       strokeWidth: streamlineWidth,
       gradientSubdivisions,
-      pulseWidth,
-      pulsePauseWidth,
+      pulseWidthPixels,
+      pulsePauseWidthPixels,
       offsets: "synchronized",
       loopMultiplier: 1,
     });

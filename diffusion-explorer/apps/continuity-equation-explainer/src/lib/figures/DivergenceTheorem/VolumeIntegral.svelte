@@ -18,6 +18,8 @@
     type SubdivideGridAnimationState,
     sampleSurfacePoints,
     computeBoundingBox,
+    isPointInside,
+    type SurfaceSamples,
   } from "./grid-animation";
   import {
     DivergenceArrowAnimation,
@@ -62,6 +64,13 @@
   export let arrowColor = "#f97316";  // Orange
   export let arrowPadding = 0.3;  // Fraction of cell to leave as padding
 
+  // Divergence label annotation
+  export let showDivergenceLabel = true;
+  export let divergenceLabelText = "\\nabla \\cdot \\mathbf{F}";
+  export let divergenceLabelFontSize = 18;
+  export let divergenceLabelColor = "#f97316";
+  export let annotationLineWidth = 1.5;
+
   // Streamline styling
   export let streamlineColor = "#3b82f6";
   export let streamlineWidth = 2.5;
@@ -71,12 +80,12 @@
   export let minPathLength = 1.5;
   export let segmentLength = 0.01;
 
-  // Animation pulse settings
-  export let pulseWidth = 0.20;
-  export let pulsePauseWidth = 0.05;
+  // Animation pulse settings (in pixels)
+  export let pulseWidthPixels = 30;
+  export let pulsePauseWidthPixels = 5;
 
   // Animation timing
-  export let animationDuration = 12;
+  export let animationDuration = 16;
   export let playingByDefault = true;
 
   // Visibility
@@ -105,11 +114,15 @@
   // Pre-computed data (only boundingBox needed for label positioning)
   let boundingBox: { xMin: number; xMax: number; yMin: number; yMax: number } | null = null;
 
+  // Target cell for divergence annotation (top-left cell with arrows)
+  let annotationTargetCell: { center: [number, number]; cellWidth: number; cellHeight: number } | null = null;
+
+  // Domain margin (matches SurfaceIntegral)
+  export let domainMargin = 0.3;
+
   // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
-
-  const domainMargin = 0.3;  // Zoomed in view
 
   function toPixel(p: [number, number]): [number, number] {
     if (!boundingBox) return [0, 0];
@@ -128,6 +141,52 @@
     if (!boundingBox) return 0;
     const domainWidth = (boundingBox.xMax - boundingBox.xMin) + 2 * domainMargin;
     return (domainLen / domainWidth) * width;
+  }
+
+  /**
+   * Find a valid (non-boundary) cell in the top-left region for annotation.
+   * Returns cell center and dimensions, or null if none found.
+   */
+  function findTopLeftValidCell(
+    surfaceSamples: SurfaceSamples,
+    bb: { xMin: number; xMax: number; yMin: number; yMax: number },
+    resolution: number
+  ): { center: [number, number]; cellWidth: number; cellHeight: number } | null {
+    const maxDim = Math.max(bb.xMax - bb.xMin, bb.yMax - bb.yMin);
+    const step = maxDim / resolution;
+
+    // Iterate from top-left (high y, low x) to find first valid cell
+    for (let row = resolution - 1; row >= 0; row--) {
+      for (let col = 0; col < resolution; col++) {
+        const cellXMin = bb.xMin + col * step;
+        const cellXMax = bb.xMin + (col + 1) * step;
+        const cellYMin = bb.yMin + row * step;
+        const cellYMax = bb.yMin + (row + 1) * step;
+        const center: [number, number] = [
+          (cellXMin + cellXMax) / 2,
+          (cellYMin + cellYMax) / 2,
+        ];
+
+        // Check if center is inside
+        if (!isPointInside(center, surfaceSamples)) continue;
+
+        // Check if all corners are inside (non-boundary cell)
+        const corners: [number, number][] = [
+          [cellXMin, cellYMin],
+          [cellXMax, cellYMin],
+          [cellXMin, cellYMax],
+          [cellXMax, cellYMax],
+        ];
+        const allCornersInside = corners.every((corner) =>
+          isPointInside(corner, surfaceSamples)
+        );
+
+        if (allCornersInside) {
+          return { center, cellWidth: step, cellHeight: step };
+        }
+      }
+    }
+    return null;
   }
 
   // ----------------------------------------------------------------
@@ -178,6 +237,39 @@
 
       drawMathjax(ctx, labelText, cx, cy + labelHeight / 2, volumeLabelFontSize, 0, 0, { color: volumeLabelColor, stroke: volumeLabelStrokeColor, strokeWidth: volumeLabelStrokeWidth });
     }
+
+    // 6. Draw divergence label annotation (line from top-right to a cell)
+    if (showDivergenceLabel && annotationTargetCell && state.arrowProgress > 0) {
+      const [cellPx, cellPy] = toPixel(annotationTargetCell.center);
+
+      // Label position (top-right area, but lower and more to the left)
+      const labelX = width - 70;
+      const labelY = 45;
+
+      // Line starts from center-bottom of the label
+      const lineStartX = labelX;
+      const lineStartY = labelY + 8;
+
+      // Draw the annotation line
+      ctx.strokeStyle = divergenceLabelColor;
+      ctx.lineWidth = annotationLineWidth;
+      ctx.beginPath();
+      ctx.moveTo(lineStartX, lineStartY);
+      ctx.lineTo(cellPx, cellPy);
+      ctx.stroke();
+
+      // Draw the label centered at labelX, labelY
+      drawMathjax(
+        ctx,
+        divergenceLabelText,
+        labelX,
+        labelY,
+        divergenceLabelFontSize,
+        0,
+        0,
+        { color: divergenceLabelColor }
+      );
+    }
   }
 
   // ----------------------------------------------------------------
@@ -190,6 +282,9 @@
     // Compute bounding box (needed for label positioning and streamlines)
     const surfaceSamples = sampleSurfacePoints(curveFn);
     boundingBox = computeBoundingBox(surfaceSamples.points);
+
+    // Find a top-left cell for the divergence annotation (at final resolution 2N)
+    annotationTargetCell = findTopLeftValidCell(surfaceSamples, boundingBox, gridResolution * 2);
 
     // Create streamline animation
     streamlineAnim = StreamlineAnimation.create<AnimationState>({
@@ -207,8 +302,8 @@
       color: streamlineColor,
       strokeWidth: streamlineWidth,
       gradientSubdivisions,
-      pulseWidth,
-      pulsePauseWidth,
+      pulseWidthPixels,
+      pulsePauseWidthPixels,
       baseOpacity: streamlineOpacity,
       offsets: "synchronized",
     });
@@ -220,7 +315,6 @@
       toPixel,
       color: gridColor,
       strokeWidth: gridWidth,
-      clipDuration: 0.25, // First quarter of animation
     });
 
     // Create subdivision animation (N → 2N)
@@ -230,7 +324,6 @@
       toPixel,
       color: gridColor,
       strokeWidth: gridWidth,
-      clipDuration: 0.25, // Second quarter of animation
     });
 
     // Create arrow animation (at final resolution 2N)
@@ -241,8 +334,8 @@
       scaleLength,
       color: arrowColor,
       padding: arrowPadding,
-      initialLengthFraction: 0.3, // Start arrows at 30% of max length
-      clipDuration: 0.5, // Second half of animation
+      initialLengthFraction: 0.5, // Start arrows at 50% of max length
+      repetitions: 3, // Repeat expansion animation 3 times
     });
   }
 
@@ -261,16 +354,16 @@
     timeline.endPauseDuration = 2; // 2 second pause at end before looping
 
     // Streamlines: full duration [0, 1]
-    timeline.add(streamlineAnim.clip, 0);
+    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
 
-    // CreateGrid: first quarter [0, 0.25]
-    timeline.add(createGridAnim.clip, 0);
+    // CreateGrid: [0, 0.12] (~2 seconds)
+    timeline.add(createGridAnim.clip, { start: 0, end: 0.12 });
 
-    // Subdivide: second quarter [0.25, 0.5]
-    timeline.add(subdivideGridAnim.clip, 0.25);
+    // Subdivide: [0.12, 0.22] (~1.5 seconds)
+    timeline.add(subdivideGridAnim.clip, { start: 0.12, end: 0.22 });
 
-    // Arrows: second half [0.5, 1.0]
-    timeline.add(arrowAnim.clip, 0.5);
+    // Arrows: [0.22, 1.0] (~12.5 seconds, ~4 seconds per repetition)
+    timeline.add(arrowAnim.clip, { start: 0.22, end: 1 });
 
     timeline.onTick((_t, state) => {
       draw(state);

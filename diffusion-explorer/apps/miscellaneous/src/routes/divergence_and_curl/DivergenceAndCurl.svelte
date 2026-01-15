@@ -36,10 +36,9 @@
   export let streamlineWidth = 3.0;
   export let gradientSubdivisions = 5;
 
-  // Animation pulse settings
-  export let pulseWidth = 0.20;
-  export let pulsePauseWidth = 0.05;
-  export let pulseFrequency = 0.8;
+  // Animation pulse settings (in pixels)
+  export let pulseWidthPixels = 30;
+  export let pulsePauseWidthPixels = 5;
 
   // ----------------------------------------------------------------
   // State
@@ -170,8 +169,8 @@
       color: streamlineColor,
       strokeWidth: streamlineWidth,
       gradientSubdivisions,
-      pulseWidth,
-      pulsePauseWidth,
+      pulseWidthPixels,
+      pulsePauseWidthPixels,
       offsets: 'random' as const,
     };
 
@@ -198,9 +197,8 @@
   function setupTimeline() {
     if (!anim1) return;
 
-    // Compute animation duration from pulse settings
-    const spacing = pulseWidth + pulsePauseWidth;
-    const animationDuration = pulseFrequency * 10;
+    // Animation duration in seconds
+    const animationDuration = 8;
 
     timeline = new Timeline<StreamlineAnimationState>();
     timeline.initialState = { streamlinePhase: 0 };
@@ -208,11 +206,11 @@
     timeline.looping = true;
 
     // Add the streamline phase clip (all animations share the same phase)
-    timeline.add(anim1.clip, 0);
+    timeline.add(anim1.clip, { start: 0, end: 1 });
 
     // Register draw callback
     timeline.onTick((_t, state) => {
-      draw(state);
+      draw(state)
     });
   }
 
