@@ -39,7 +39,7 @@
 
   // Trajectory settings
   export let numTrajectoriesToShow = 1;
-  export let samplingSteps = 200;
+  export let samplingSteps = 400;
 
   // LaTeX label styling
   export let latexLabelOffsetY =
@@ -279,7 +279,7 @@
   // ----------------------------------------------------------------
 
   function draw(state: AnimationState) {
-    if (!ctx || !initialized || !pathlineAnimation) return;
+    if (!ctx || !initialized) return;
 
     const t = state.time;
 
@@ -305,7 +305,9 @@
 
     // --- Dynamic Foreground ---
     // Draw the single trajectory (if exists)
-    pathlineAnimation.draw(ctx, state);
+    if (pathlineAnimation) {
+      pathlineAnimation.draw(ctx, state);
+    }
 
     // Draw in-progress clicked trajectory
     if (clickedTrajectory && clickedTrajectory.length >= 1) {
@@ -451,6 +453,7 @@
 
     // Clear existing trajectories - will be replaced by user's trajectory
     transformedTrajectories = [];
+    pathlineAnimation = null; // Stop drawing old trajectory
 
     // Reset animation state and start
     if (timeline) timeline.reset();
@@ -473,6 +476,18 @@
       if (clickedTrajectory && clickedTrajectory.length > 1) {
         // Replace with user's trajectory
         transformedTrajectories = [clickedTrajectory];
+        // Recreate pathlineAnimation with new trajectory
+        pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(
+          transformedTrajectories,
+          {
+            style: {
+              color: settings.stylingSettings.trajectory.color,
+              strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
+              pointRadius: settings.stylingSettings.trajectory.endpointRadius,
+              progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+            }
+          }
+        );
       }
       clickedTrajectory = null;
       isStreamingTrajectory = false;
