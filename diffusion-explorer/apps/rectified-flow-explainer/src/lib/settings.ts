@@ -93,8 +93,8 @@ export const settings = {
     },
     // Layout for source/target distribution positioning
     layout: {
-      sourceCenterX: 0.25,  // Source distribution centered at 25% of width
-      targetCenterX: 0.75   // Target distribution centered at 75% of width
+      sourceCenterX: 0.2,   // Source distribution centered at 20% of width
+      targetCenterX: 0.8    // Target distribution centered at 80% of width
     },
     // Label styling
     label: {
@@ -122,7 +122,7 @@ export const settings = {
       outlineColor: '#fff',
       outlineWidth: 3,
       outlineOpacity: 0.5,
-      fontSize: 20,
+      fontSize: 24,
       latexLabelOffsetY: -10
     },
     // Trajectory styling

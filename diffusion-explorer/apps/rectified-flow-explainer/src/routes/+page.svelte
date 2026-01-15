@@ -1153,9 +1153,9 @@
         targetDistribution={$targetDistributionSamples}
         {flowMatchingClient}
         numSteps={settings.samplingSettings.numSteps}
-        numPoints={50}
-        numLinesToDraw={50}
-        numTrajectoriesToShow={15}
+        numPoints={100}
+        numLinesToDraw={100}
+        numTrajectoriesToShow={30}
       >
         <div class="caption">
           <span class="figure-number">Figure 14:</span>
