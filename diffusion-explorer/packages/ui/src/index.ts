@@ -63,6 +63,8 @@ export * from './plotting/mesh_grid';
 export * from './plotting/heatmap';
 export { useCanvas2D } from './plotting/canvas';
 export * from './plotting/utils';
+export * from './plotting/surface';
+export * from './plotting/line-integral-convolution';
 
 // Animation utilities
 export {
