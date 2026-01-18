@@ -5,7 +5,6 @@
   import {
     DoubleFigure,
     Katex,
-    useCanvas2D,
     isWebGPUAvailable,
     computeLIC,
     viridis,
@@ -34,14 +33,14 @@
 
   // LIC parameters
   export let domainRange: LICDomain = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
-  export let integrationSteps = 50;
-  export let stepSize = 0.5;
-  export let contrast = 2.5;
+  export let integrationSteps = 128;
+  export let stepSize = 1.0;
+  export let contrast = 5.0;
   export let seed = 12345;
 
   // Color options
   /** Color palette for magnitude coloring. Set to null for grayscale. */
-  export let colorPalette: ColorPalette | PaletteName | null = "plasma";
+  export let colorPalette: ColorPalette | PaletteName | null = "inferno";
 
   // Resolve palette from name or function
   $: resolvedPalette =
@@ -55,23 +54,34 @@
   // State
   // ----------------------------------------------------------------
 
-  // Compute canvas dimensions
-  const initialCanvasWidth = Math.floor((width - gap) / 2);
-  const initialCanvasHeight = height;
+  // Target 300 DPI (standard screen is 96 DPI)
+  const dpr = 300 / 96;
+
+  // Compute canvas dimensions (CSS pixels)
   $: canvasWidth = Math.floor((width - gap) / 2);
   $: canvasHeight = height;
+
+  // Physical pixel dimensions for maximum DPI
+  $: physicalWidth = Math.floor(canvasWidth * dpr);
+  $: physicalHeight = Math.floor(canvasHeight * dpr);
 
   // Two canvases
   let canvas1: HTMLCanvasElement | null = null;
   let canvas2: HTMLCanvasElement | null = null;
-  const canvas2d1 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
-  const canvas2d2 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
-  $: ctx1 = canvas1 && canvas2d1.ctx;
-  $: ctx2 = canvas2 && canvas2d2.ctx;
+  let ctx1: CanvasRenderingContext2D | null = null;
+  let ctx2: CanvasRenderingContext2D | null = null;
 
   // Loading/error state
   let isLoading = true;
   let errorMessage: string | null = null;
+
+  // Setup canvas with maximum DPI
+  function setupCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
+    canvas.width = physicalWidth;
+    canvas.height = physicalHeight;
+    const ctx = canvas.getContext("2d");
+    return ctx;
+  }
 
   // ----------------------------------------------------------------
   // Vector Field Functions
@@ -94,22 +104,10 @@
   // ----------------------------------------------------------------
 
   /**
-   * Draw LIC result to canvas using drawImage for proper scaling.
-   * This computes at CSS dimensions and scales up, giving a coarser texture.
+   * Draw LIC result directly to canvas at full resolution.
    */
   function drawLICResult(ctx: CanvasRenderingContext2D, imageData: ImageData) {
-    // Create offscreen canvas at LIC resolution
-    const offscreen = document.createElement("canvas");
-    offscreen.width = imageData.width;
-    offscreen.height = imageData.height;
-    const offCtx = offscreen.getContext("2d");
-    if (!offCtx) return;
-
-    // Put ImageData on offscreen canvas
-    offCtx.putImageData(imageData, 0, 0);
-
-    // Draw scaled to main canvas (respects the DPR transform)
-    ctx.drawImage(offscreen, 0, 0, canvasWidth, canvasHeight);
+    ctx.putImageData(imageData, 0, 0);
   }
 
   async function computeAllLIC() {
@@ -123,16 +121,20 @@
       return;
     }
 
-    // Compute at CSS dimensions for coarser, more visible texture
+    // Compute at full physical resolution for maximum DPI
     const commonOptions = {
       domain: domainRange,
-      width: canvasWidth,
-      height: canvasHeight,
+      width: physicalWidth,
+      height: physicalHeight,
       integrationSteps,
       stepSize,
       contrast,
       seed,
-      noiseScale: 4, // Wider streaks via low-frequency noise
+      noiseScale: 2 * dpr, // Scale noise with DPR to maintain visual streak width
+      nearestNeighborVelocity: true,
+      maxArcLength: 80.0,
+      useEuler: true,
+      velocityScale: 0.1,
     };
 
     try {
@@ -142,9 +144,12 @@
         computeLIC({ vectorField: saddleField, ...commonOptions }),
       ]);
 
-      // Draw results with scaling (colored or grayscale)
+      // Draw results directly at full resolution
       if (resolvedPalette) {
-        const colorOptions = { palette: resolvedPalette };
+        const colorOptions = {
+          palette: resolvedPalette,
+          backgroundColor: [255, 255, 255] as [number, number, number],
+        };
         drawLICResult(ctx1, result1.toColoredImageData(colorOptions));
         drawLICResult(ctx2, result2.toColoredImageData(colorOptions));
       } else {
@@ -164,16 +169,15 @@
   // ----------------------------------------------------------------
 
   onMount(() => {
-    // Wait for next tick to ensure canvases are bound
-    setTimeout(() => {
-      computeAllLIC();
-    }, 0);
-  });
+    // Setup canvases with maximum DPI
+    if (canvas1) ctx1 = setupCanvas(canvas1);
+    if (canvas2) ctx2 = setupCanvas(canvas2);
 
-  // Re-compute if contexts become available
-  $: if (ctx1 && ctx2 && isLoading && !errorMessage) {
-    computeAllLIC();
-  }
+    // Compute LIC after canvas setup
+    if (ctx1 && ctx2) {
+      computeAllLIC();
+    }
+  });
 </script>
 
 <div style="width: {width}px;">
@@ -185,8 +189,9 @@
       <div class="canvas-container" style="aspect-ratio: {canvasWidth}/{canvasHeight};">
         <canvas
           bind:this={canvas1}
-          use:canvas2d1.bindCanvas
-          style="width: 100%; height: 100%;"
+          width={physicalWidth}
+          height={physicalHeight}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
         ></canvas>
         {#if isLoading}
           <div class="loading-overlay">Computing LIC...</div>
@@ -207,8 +212,9 @@
       <div class="canvas-container" style="aspect-ratio: {canvasWidth}/{canvasHeight};">
         <canvas
           bind:this={canvas2}
-          use:canvas2d2.bindCanvas
-          style="width: 100%; height: 100%;"
+          width={physicalWidth}
+          height={physicalHeight}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
         ></canvas>
         {#if isLoading}
           <div class="loading-overlay">Computing LIC...</div>
