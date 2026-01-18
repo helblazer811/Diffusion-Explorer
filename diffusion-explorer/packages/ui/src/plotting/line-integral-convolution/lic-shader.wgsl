@@ -4,16 +4,18 @@
 struct Uniforms {
   width: u32,
   height: u32,
-  integrationSteps: u32,
+  maxIterations: u32,            // Safety limit (was integrationSteps)
   stepSize: f32,
   xMin: f32,
   xMax: f32,
   yMin: f32,
   yMax: f32,
   contrast: f32,
-  _padding1: f32,  // Padding for 16-byte alignment
-  _padding2: f32,
-  _padding3: f32,
+  nearestNeighborVelocity: u32,  // 0 = bilinear, 1 = nearest neighbor
+  maxArcLength: f32,             // Fixed window in pixels
+  useEuler: u32,                 // 0 = RK4, 1 = Euler
+  velocityWidth: u32,            // Velocity grid width (may differ from output)
+  velocityHeight: u32,           // Velocity grid height
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -22,29 +24,49 @@ struct Uniforms {
 @group(0) @binding(3) var<storage, read_write> output: array<f32>;
 @group(0) @binding(4) var<storage, read_write> magnitudeOut: array<f32>;
 
-// Bilinear interpolation to sample from pre-computed vector field buffer
-fn sampleVelocity(px: f32, py: f32) -> vec2<f32> {
-  let w = f32(uniforms.width);
-  let h = f32(uniforms.height);
+// Map output pixel coordinates to velocity grid coordinates
+fn toVelocityCoords(px: f32, py: f32) -> vec2<f32> {
+  let scaleX = f32(uniforms.velocityWidth) / f32(uniforms.width);
+  let scaleY = f32(uniforms.velocityHeight) / f32(uniforms.height);
+  return vec2<f32>(px * scaleX, py * scaleY);
+}
 
-  // Clamp to valid pixel coordinates
-  let x = clamp(px, 0.0, w - 1.001);
-  let y = clamp(py, 0.0, h - 1.001);
+// Nearest neighbor sampling for velocity field
+fn sampleVelocityNearest(px: f32, py: f32) -> vec2<f32> {
+  let vc = toVelocityCoords(px, py);
+  let vw = f32(uniforms.velocityWidth);
+  let vh = f32(uniforms.velocityHeight);
+
+  let x = clamp(round(vc.x), 0.0, vw - 1.0);
+  let y = clamp(round(vc.y), 0.0, vh - 1.0);
+
+  return vectorField[u32(y) * uniforms.velocityWidth + u32(x)];
+}
+
+// Bilinear interpolation to sample from pre-computed vector field buffer
+fn sampleVelocityBilinear(px: f32, py: f32) -> vec2<f32> {
+  let vc = toVelocityCoords(px, py);
+  let vw = f32(uniforms.velocityWidth);
+  let vh = f32(uniforms.velocityHeight);
+
+  // Clamp to valid velocity grid coordinates
+  let x = clamp(vc.x, 0.0, vw - 1.001);
+  let y = clamp(vc.y, 0.0, vh - 1.001);
 
   // Get integer coordinates and fractional parts
   let x0 = u32(floor(x));
   let y0 = u32(floor(y));
-  let x1 = min(x0 + 1u, uniforms.width - 1u);
-  let y1 = min(y0 + 1u, uniforms.height - 1u);
+  let x1 = min(x0 + 1u, uniforms.velocityWidth - 1u);
+  let y1 = min(y0 + 1u, uniforms.velocityHeight - 1u);
 
   let fx = x - floor(x);
   let fy = y - floor(y);
 
   // Sample four corners
-  let v00 = vectorField[y0 * uniforms.width + x0];
-  let v10 = vectorField[y0 * uniforms.width + x1];
-  let v01 = vectorField[y1 * uniforms.width + x0];
-  let v11 = vectorField[y1 * uniforms.width + x1];
+  let v00 = vectorField[y0 * uniforms.velocityWidth + x0];
+  let v10 = vectorField[y0 * uniforms.velocityWidth + x1];
+  let v01 = vectorField[y1 * uniforms.velocityWidth + x0];
+  let v11 = vectorField[y1 * uniforms.velocityWidth + x1];
 
   // Bilinear interpolation
   let v0 = mix(v00, v10, fx);
@@ -52,15 +74,19 @@ fn sampleVelocity(px: f32, py: f32) -> vec2<f32> {
   return mix(v0, v1, fy);
 }
 
-// Nearest-neighbor sampling for noise (preserves sharp edges)
+// Sample velocity using configured interpolation method
+fn sampleVelocity(px: f32, py: f32) -> vec2<f32> {
+  if (uniforms.nearestNeighborVelocity != 0u) {
+    return sampleVelocityNearest(px, py);
+  }
+  return sampleVelocityBilinear(px, py);
+}
+
+// Nearest-neighbor sampling for noise (truly discrete)
 fn sampleNoise(px: f32, py: f32) -> f32 {
-  let w = f32(uniforms.width);
-  let h = f32(uniforms.height);
-
-  let x = clamp(round(px), 0.0, w - 1.0);
-  let y = clamp(round(py), 0.0, h - 1.0);
-
-  return noise[u32(y) * uniforms.width + u32(x)];
+  let x = u32(clamp(floor(px), 0.0, f32(uniforms.width) - 1.0));
+  let y = u32(clamp(floor(py), 0.0, f32(uniforms.height) - 1.0));
+  return noise[y * uniforms.width + x];
 }
 
 // Check if position is within bounds (with small margin)
@@ -80,25 +106,7 @@ fn getDirection(px: f32, py: f32) -> vec2<f32> {
   return v / mag;
 }
 
-// 4th-order Runge-Kutta integration step
-fn rk4Step(pos: vec2<f32>, direction: f32) -> vec2<f32> {
-  let h = uniforms.stepSize * direction;
-
-  // RK4 stages
-  let k1 = getDirection(pos.x, pos.y);
-  let k2 = getDirection(pos.x + 0.5 * h * k1.x, pos.y + 0.5 * h * k1.y);
-  let k3 = getDirection(pos.x + 0.5 * h * k2.x, pos.y + 0.5 * h * k2.y);
-  let k4 = getDirection(pos.x + h * k3.x, pos.y + h * k3.y);
-
-  // Weighted sum
-  return pos + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
-}
-
-// Hann window function for smooth kernel weighting
-fn hannWindow(t: f32) -> f32 {
-  // t should be in [0, 1], representing position along the streamline
-  return 0.5 * (1.0 - cos(3.14159265359 * 2.0 * t));
-}
+// Integration functions are defined in integration.wgsl and concatenated at build time
 
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
@@ -115,43 +123,55 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
 
   var sum = 0.0;
   var weightSum = 0.0;
-  let totalSteps = f32(uniforms.integrationSteps * 2u);
 
-  // Integrate forward along streamline
+  // Gaussian decay parameter (controls sharpness, higher = tighter)
+  let alpha = 9.0;
+
+  // Forward integration with arc-length parameterization
   var pos = startPos;
-  for (var i = 0u; i < uniforms.integrationSteps; i++) {
+  var arcLength = 0.0;
+  var i = 0u;
+
+  while (arcLength < uniforms.maxArcLength && i < uniforms.maxIterations) {
     if (!isInBounds(pos.x, pos.y)) {
       break;
     }
 
-    // Hann window weight based on position along streamline
-    let t = (f32(i) + f32(uniforms.integrationSteps)) / totalSteps;
-    let weight = hannWindow(t);
+    // Gaussian weight: peaks at center, decays with arc length
+    let t = arcLength / uniforms.maxArcLength;
+    let w = exp(-alpha * t * t);
+    sum += w * sampleNoise(pos.x, pos.y);
+    weightSum += w;
 
-    sum += sampleNoise(pos.x, pos.y) * weight;
-    weightSum += weight;
-
-    pos = rk4Step(pos, 1.0); // Forward direction
+    let prevPos = pos;
+    pos = integrationStep(pos, 1.0);  // Forward direction
+    arcLength += length(pos - prevPos);
+    i += 1u;
   }
 
-  // Integrate backward along streamline
+  // Backward integration with arc-length parameterization
   pos = startPos;
-  for (var i = 0u; i < uniforms.integrationSteps; i++) {
+  arcLength = 0.0;
+  i = 0u;
+
+  while (arcLength < uniforms.maxArcLength && i < uniforms.maxIterations) {
     if (!isInBounds(pos.x, pos.y)) {
       break;
     }
-
-    // Hann window weight based on position along streamline
-    let t = (f32(uniforms.integrationSteps) - f32(i) - 1.0) / totalSteps;
-    let weight = hannWindow(t);
 
     // Skip center pixel (already counted in forward pass at i=0)
     if (i > 0u) {
-      sum += sampleNoise(pos.x, pos.y) * weight;
-      weightSum += weight;
+      // Gaussian weight: peaks at center, decays with arc length
+      let t = arcLength / uniforms.maxArcLength;
+      let w = exp(-alpha * t * t);
+      sum += w * sampleNoise(pos.x, pos.y);
+      weightSum += w;
     }
 
-    pos = rk4Step(pos, -1.0); // Backward direction
+    let prevPos = pos;
+    pos = integrationStep(pos, -1.0);  // Backward direction
+    arcLength += length(pos - prevPos);
+    i += 1u;
   }
 
   // Normalize and apply contrast

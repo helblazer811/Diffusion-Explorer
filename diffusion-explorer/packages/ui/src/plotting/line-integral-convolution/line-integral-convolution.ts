@@ -5,14 +5,143 @@
  * along streamlines, producing a texture that shows flow direction and structure.
  */
 
-import type { LICOptions, LICResult, WebGPUContext, VectorFieldFn } from './types';
-import { generateWhiteNoise } from './noise';
-import licShaderSource from './lic-shader.wgsl?raw';
+import type { LICOptions, LICResult, WebGPUContext, VectorFieldFn, LICColorOptions, ColorPalette, RGBColor } from './types';
+import { generateScaledNoise } from './noise';
+import licShaderBase from './lic-shader.wgsl?raw';
+import integrationShader from './integration.wgsl?raw';
+
+// Concatenate shader sources: base shader + integration functions
+// Integration functions must come after getDirection() but before main()
+const licShaderSource = licShaderBase.replace(
+  '// Integration functions are defined in integration.wgsl and concatenated at build time',
+  integrationShader
+);
 
 // Default LIC parameters
 const DEFAULT_INTEGRATION_STEPS = 20;
 const DEFAULT_STEP_SIZE = 0.5;
-const DEFAULT_CONTRAST = 1.0;
+const DEFAULT_CONTRAST = 2.0;
+const DEFAULT_NOISE_SCALE = 1.0;
+const DEFAULT_MAX_ARC_LENGTH = 20.0;
+
+// ============================================================================
+// Color Palettes
+// ============================================================================
+
+/**
+ * Interpolate between colors in a palette.
+ */
+function interpolatePalette(colors: RGBColor[], t: number): RGBColor {
+  const clampedT = Math.max(0, Math.min(1, t));
+  const n = colors.length - 1;
+  const i = Math.min(Math.floor(clampedT * n), n - 1);
+  const f = clampedT * n - i;
+
+  const c0 = colors[i];
+  const c1 = colors[i + 1];
+
+  return [
+    Math.round(c0[0] + f * (c1[0] - c0[0])),
+    Math.round(c0[1] + f * (c1[1] - c0[1])),
+    Math.round(c0[2] + f * (c1[2] - c0[2])),
+  ];
+}
+
+/**
+ * Viridis color palette (perceptually uniform, colorblind-friendly).
+ */
+export const viridis: ColorPalette = (t) =>
+  interpolatePalette(
+    [
+      [68, 1, 84],
+      [72, 40, 120],
+      [62, 73, 137],
+      [49, 104, 142],
+      [38, 130, 142],
+      [31, 158, 137],
+      [53, 183, 121],
+      [109, 205, 89],
+      [180, 222, 44],
+      [253, 231, 37],
+    ],
+    t
+  );
+
+/**
+ * Plasma color palette (perceptually uniform).
+ */
+export const plasma: ColorPalette = (t) =>
+  interpolatePalette(
+    [
+      [13, 8, 135],
+      [75, 3, 161],
+      [125, 3, 168],
+      [168, 34, 150],
+      [203, 70, 121],
+      [229, 107, 93],
+      [248, 148, 65],
+      [253, 195, 40],
+      [240, 249, 33],
+    ],
+    t
+  );
+
+/**
+ * Inferno color palette (perceptually uniform).
+ */
+export const inferno: ColorPalette = (t) =>
+  interpolatePalette(
+    [
+      [0, 0, 4],
+      [40, 11, 84],
+      [101, 21, 110],
+      [159, 42, 99],
+      [212, 72, 66],
+      [245, 125, 21],
+      [250, 193, 39],
+      [252, 255, 164],
+    ],
+    t
+  );
+
+/**
+ * Cool-warm diverging palette (blue to red).
+ */
+export const coolwarm: ColorPalette = (t) =>
+  interpolatePalette(
+    [
+      [59, 76, 192],
+      [98, 130, 234],
+      [141, 176, 254],
+      [184, 208, 249],
+      [221, 221, 221],
+      [245, 196, 173],
+      [244, 154, 123],
+      [222, 96, 77],
+      [180, 4, 38],
+    ],
+    t
+  );
+
+/**
+ * Turbo color palette (rainbow-like but perceptually improved).
+ */
+export const turbo: ColorPalette = (t) =>
+  interpolatePalette(
+    [
+      [48, 18, 59],
+      [69, 91, 205],
+      [40, 165, 225],
+      [32, 217, 162],
+      [121, 245, 79],
+      [212, 238, 58],
+      [253, 180, 47],
+      [248, 102, 36],
+      [221, 38, 30],
+      [122, 4, 3],
+    ],
+    t
+  );
 
 /**
  * Check if WebGPU is available in the current environment.
@@ -96,9 +225,15 @@ function evaluateVectorFieldToBuffer(
 /**
  * Create an LICResult object from raw output data.
  */
-function createLICResult(data: Float32Array, width: number, height: number): LICResult {
+function createLICResult(
+  data: Float32Array,
+  magnitude: Float32Array,
+  width: number,
+  height: number
+): LICResult {
   return {
     data,
+    magnitude,
     width,
     height,
 
@@ -113,6 +248,51 @@ function createLICResult(data: Float32Array, width: number, height: number): LIC
         pixels[pixelIdx + 1] = value; // G
         pixels[pixelIdx + 2] = value; // B
         pixels[pixelIdx + 3] = 255;   // A
+      }
+
+      return imageData;
+    },
+
+    toColoredImageData(options: LICColorOptions): ImageData {
+      const { palette, minMagnitude, maxMagnitude, backgroundColor = [0, 0, 0] } = options;
+      const [bgR, bgG, bgB] = backgroundColor;
+
+      // Find magnitude range if not provided
+      let minMag = minMagnitude;
+      let maxMag = maxMagnitude;
+
+      if (minMag === undefined || maxMag === undefined) {
+        let dataMin = Infinity;
+        let dataMax = -Infinity;
+        for (let i = 0; i < magnitude.length; i++) {
+          const m = magnitude[i];
+          if (m < dataMin) dataMin = m;
+          if (m > dataMax) dataMax = m;
+        }
+        minMag = minMag ?? dataMin;
+        maxMag = maxMag ?? dataMax;
+      }
+
+      const magRange = maxMag - minMag;
+      const imageData = new ImageData(width, height);
+      const pixels = imageData.data;
+
+      for (let i = 0; i < data.length; i++) {
+        const intensity = data[i];
+        const mag = magnitude[i];
+
+        // Normalize magnitude to [0, 1]
+        const normalizedMag = magRange > 0 ? (mag - minMag) / magRange : 0.5;
+
+        // Get color from palette
+        const [r, g, b] = palette(normalizedMag);
+
+        // Blend between background color and palette color based on intensity
+        const pixelIdx = i * 4;
+        pixels[pixelIdx] = Math.round(bgR + (r - bgR) * intensity);     // R
+        pixels[pixelIdx + 1] = Math.round(bgG + (g - bgG) * intensity); // G
+        pixels[pixelIdx + 2] = Math.round(bgB + (b - bgB) * intensity); // B
+        pixels[pixelIdx + 3] = 255;                                     // A
       }
 
       return imageData;
@@ -157,8 +337,17 @@ export async function computeLIC(
     integrationSteps = DEFAULT_INTEGRATION_STEPS,
     stepSize = DEFAULT_STEP_SIZE,
     seed,
-    contrast = DEFAULT_CONTRAST
+    contrast = DEFAULT_CONTRAST,
+    noiseScale = DEFAULT_NOISE_SCALE,
+    nearestNeighborVelocity = false,
+    maxArcLength = DEFAULT_MAX_ARC_LENGTH,
+    useEuler = false,
+    velocityScale = 1.0
   } = options;
+
+  // Compute velocity grid dimensions
+  const velocityWidth = Math.max(1, Math.round(width * velocityScale));
+  const velocityHeight = Math.max(1, Math.round(height * velocityScale));
 
   // Get or create WebGPU context
   const ownContext = !context;
@@ -172,8 +361,8 @@ export async function computeLIC(
       code: licShaderSource
     });
 
-    // Create uniform buffer
-    const uniformData = new ArrayBuffer(40); // 10 x 4 bytes
+    // Create uniform buffer (56 bytes: 14 fields, 16-byte aligned)
+    const uniformData = new ArrayBuffer(56);
     const uniformView = new DataView(uniformData);
     uniformView.setUint32(0, width, true);          // width
     uniformView.setUint32(4, height, true);         // height
@@ -184,7 +373,11 @@ export async function computeLIC(
     uniformView.setFloat32(24, domain.yMin, true);  // yMin
     uniformView.setFloat32(28, domain.yMax, true);  // yMax
     uniformView.setFloat32(32, contrast, true);     // contrast
-    uniformView.setFloat32(36, 0, true);            // padding
+    uniformView.setUint32(36, nearestNeighborVelocity ? 1 : 0, true); // nearestNeighborVelocity
+    uniformView.setFloat32(40, maxArcLength, true); // maxArcLength
+    uniformView.setUint32(44, useEuler ? 1 : 0, true); // useEuler
+    uniformView.setUint32(48, velocityWidth, true); // velocityWidth
+    uniformView.setUint32(52, velocityHeight, true); // velocityHeight
 
     const uniformBuffer = device.createBuffer({
       label: 'LIC Uniforms',
@@ -193,8 +386,8 @@ export async function computeLIC(
     });
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
-    // Pre-compute vector field on CPU grid (GPU shader will interpolate from this)
-    const vectorFieldData = evaluateVectorFieldToBuffer(vectorField, width, height, domain);
+    // Pre-compute vector field on CPU grid (may be lower resolution than output)
+    const vectorFieldData = evaluateVectorFieldToBuffer(vectorField, velocityWidth, velocityHeight, domain);
     const vectorFieldBuffer = device.createBuffer({
       label: 'Vector Field',
       size: vectorFieldData.byteLength,
@@ -202,8 +395,8 @@ export async function computeLIC(
     });
     device.queue.writeBuffer(vectorFieldBuffer, 0, vectorFieldData.buffer);
 
-    // Generate and upload noise texture
-    const noiseData = generateWhiteNoise(width, height, seed);
+    // Generate and upload noise texture (scaled for wider streaks)
+    const noiseData = generateScaledNoise(width, height, noiseScale, seed);
     const noiseBuffer = device.createBuffer({
       label: 'Noise Texture',
       size: noiseData.byteLength,
@@ -211,7 +404,7 @@ export async function computeLIC(
     });
     device.queue.writeBuffer(noiseBuffer, 0, noiseData.buffer);
 
-    // Create output buffer
+    // Create output buffer for LIC intensity
     const outputSize = width * height * 4; // Float32
     const outputBuffer = device.createBuffer({
       label: 'LIC Output',
@@ -219,9 +412,22 @@ export async function computeLIC(
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     });
 
-    // Create staging buffer for readback
+    // Create output buffer for magnitude
+    const magnitudeBuffer = device.createBuffer({
+      label: 'Magnitude Output',
+      size: outputSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+    });
+
+    // Create staging buffers for readback
     const stagingBuffer = device.createBuffer({
       label: 'Staging Buffer',
+      size: outputSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
+    });
+
+    const magnitudeStagingBuffer = device.createBuffer({
+      label: 'Magnitude Staging Buffer',
       size: outputSize,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     });
@@ -249,6 +455,11 @@ export async function computeLIC(
           binding: 3,
           visibility: GPUShaderStage.COMPUTE,
           buffer: { type: 'storage' }
+        },
+        {
+          binding: 4,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'storage' }
         }
       ]
     });
@@ -261,7 +472,8 @@ export async function computeLIC(
         { binding: 0, resource: { buffer: uniformBuffer } },
         { binding: 1, resource: { buffer: vectorFieldBuffer } },
         { binding: 2, resource: { buffer: noiseBuffer } },
-        { binding: 3, resource: { buffer: outputBuffer } }
+        { binding: 3, resource: { buffer: outputBuffer } },
+        { binding: 4, resource: { buffer: magnitudeBuffer } }
       ]
     });
 
@@ -292,25 +504,35 @@ export async function computeLIC(
     computePass.dispatchWorkgroups(workgroupsX, workgroupsY);
     computePass.end();
 
-    // Copy output to staging buffer
+    // Copy outputs to staging buffers
     commandEncoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputSize);
+    commandEncoder.copyBufferToBuffer(magnitudeBuffer, 0, magnitudeStagingBuffer, 0, outputSize);
 
     // Submit commands
     device.queue.submit([commandEncoder.finish()]);
 
     // Read back results
-    await stagingBuffer.mapAsync(GPUMapMode.READ);
+    await Promise.all([
+      stagingBuffer.mapAsync(GPUMapMode.READ),
+      magnitudeStagingBuffer.mapAsync(GPUMapMode.READ)
+    ]);
+
     const resultData = new Float32Array(stagingBuffer.getMappedRange().slice(0));
+    const magnitudeData = new Float32Array(magnitudeStagingBuffer.getMappedRange().slice(0));
+
     stagingBuffer.unmap();
+    magnitudeStagingBuffer.unmap();
 
     // Clean up buffers
     uniformBuffer.destroy();
     vectorFieldBuffer.destroy();
     noiseBuffer.destroy();
     outputBuffer.destroy();
+    magnitudeBuffer.destroy();
     stagingBuffer.destroy();
+    magnitudeStagingBuffer.destroy();
 
-    return createLICResult(resultData, width, height);
+    return createLICResult(resultData, magnitudeData, width, height);
   } finally {
     // Destroy context if we created it
     if (ownContext) {
