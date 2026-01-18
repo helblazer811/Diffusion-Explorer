@@ -11,13 +11,16 @@ struct Uniforms {
   yMin: f32,
   yMax: f32,
   contrast: f32,
-  _padding: f32, // Padding for alignment
+  _padding1: f32,  // Padding for 16-byte alignment
+  _padding2: f32,
+  _padding3: f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage, read> vectorField: array<vec2<f32>>;
 @group(0) @binding(2) var<storage, read> noise: array<f32>;
 @group(0) @binding(3) var<storage, read_write> output: array<f32>;
+@group(0) @binding(4) var<storage, read_write> magnitudeOut: array<f32>;
 
 // Bilinear interpolation to sample from pre-computed vector field buffer
 fn sampleVelocity(px: f32, py: f32) -> vec2<f32> {
@@ -49,34 +52,15 @@ fn sampleVelocity(px: f32, py: f32) -> vec2<f32> {
   return mix(v0, v1, fy);
 }
 
-// Bilinear interpolation for noise sampling
+// Nearest-neighbor sampling for noise (preserves sharp edges)
 fn sampleNoise(px: f32, py: f32) -> f32 {
   let w = f32(uniforms.width);
   let h = f32(uniforms.height);
 
-  // Clamp to valid pixel coordinates
-  let x = clamp(px, 0.0, w - 1.001);
-  let y = clamp(py, 0.0, h - 1.001);
+  let x = clamp(round(px), 0.0, w - 1.0);
+  let y = clamp(round(py), 0.0, h - 1.0);
 
-  // Get integer coordinates and fractional parts
-  let x0 = u32(floor(x));
-  let y0 = u32(floor(y));
-  let x1 = min(x0 + 1u, uniforms.width - 1u);
-  let y1 = min(y0 + 1u, uniforms.height - 1u);
-
-  let fx = x - floor(x);
-  let fy = y - floor(y);
-
-  // Sample four corners
-  let n00 = noise[y0 * uniforms.width + x0];
-  let n10 = noise[y0 * uniforms.width + x1];
-  let n01 = noise[y1 * uniforms.width + x0];
-  let n11 = noise[y1 * uniforms.width + x1];
-
-  // Bilinear interpolation
-  let n0 = mix(n00, n10, fx);
-  let n1 = mix(n01, n11, fx);
-  return mix(n0, n1, fy);
+  return noise[u32(y) * uniforms.width + u32(x)];
 }
 
 // Check if position is within bounds (with small margin)
@@ -180,4 +164,8 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   }
 
   output[pixelIndex] = result;
+
+  // Store magnitude at this pixel (in pixel-space units)
+  let velocity = sampleVelocity(startPos.x, startPos.y);
+  magnitudeOut[pixelIndex] = length(velocity);
 }
