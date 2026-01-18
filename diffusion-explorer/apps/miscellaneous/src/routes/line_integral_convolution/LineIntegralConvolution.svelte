@@ -3,14 +3,24 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    TripleFigure,
+    DoubleFigure,
     Katex,
     useCanvas2D,
     isWebGPUAvailable,
     computeLIC,
+    viridis,
+    plasma,
+    inferno,
+    coolwarm,
+    turbo,
     type VectorFieldFn,
     type LICDomain,
+    type ColorPalette,
   } from "@diffusion-explorer/ui";
+
+  // Available palette presets
+  const PALETTES = { viridis, plasma, inferno, coolwarm, turbo } as const;
+  type PaletteName = keyof typeof PALETTES;
 
   // ----------------------------------------------------------------
   // Props
@@ -18,37 +28,46 @@
 
   // Layout
   export let width = 900;
-  export let height = 300;
+  export let height = 450;
   export let gap = 20;
-  export let backgroundVisible = true;
+  export let backgroundVisible = false;
 
   // LIC parameters
   export let domainRange: LICDomain = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
-  export let integrationSteps = 25;
+  export let integrationSteps = 50;
   export let stepSize = 0.5;
-  export let contrast = 1.5;
+  export let contrast = 2.5;
   export let seed = 12345;
+
+  // Color options
+  /** Color palette for magnitude coloring. Set to null for grayscale. */
+  export let colorPalette: ColorPalette | PaletteName | null = "plasma";
+
+  // Resolve palette from name or function
+  $: resolvedPalette =
+    colorPalette === null
+      ? null
+      : typeof colorPalette === "string"
+        ? PALETTES[colorPalette]
+        : colorPalette;
 
   // ----------------------------------------------------------------
   // State
   // ----------------------------------------------------------------
 
   // Compute canvas dimensions
-  const initialCanvasWidth = Math.floor((width - 2 * gap) / 3);
+  const initialCanvasWidth = Math.floor((width - gap) / 2);
   const initialCanvasHeight = height;
-  $: canvasWidth = Math.floor((width - 2 * gap) / 3);
+  $: canvasWidth = Math.floor((width - gap) / 2);
   $: canvasHeight = height;
 
-  // Three canvases
+  // Two canvases
   let canvas1: HTMLCanvasElement | null = null;
   let canvas2: HTMLCanvasElement | null = null;
-  let canvas3: HTMLCanvasElement | null = null;
   const canvas2d1 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
   const canvas2d2 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
-  const canvas2d3 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
   $: ctx1 = canvas1 && canvas2d1.ctx;
   $: ctx2 = canvas2 && canvas2d2.ctx;
-  $: ctx3 = canvas3 && canvas2d3.ctx;
 
   // Loading/error state
   let isLoading = true;
@@ -69,12 +88,6 @@
    * F(x, y) = (x, -y)
    */
   const saddleField: VectorFieldFn = (x, y) => [x, -y];
-
-  /**
-   * Source/sink field (radial outward).
-   * F(x, y) = (x, y)
-   */
-  const sourceField: VectorFieldFn = (x, y) => [x, y];
 
   // ----------------------------------------------------------------
   // LIC Computation
@@ -100,7 +113,7 @@
   }
 
   async function computeAllLIC() {
-    if (!ctx1 || !ctx2 || !ctx3 || !canvas1 || !canvas2 || !canvas3) return;
+    if (!ctx1 || !ctx2 || !canvas1 || !canvas2) return;
 
     // Check WebGPU availability
     const webgpuAvailable = await isWebGPUAvailable();
@@ -119,20 +132,25 @@
       stepSize,
       contrast,
       seed,
+      noiseScale: 4, // Wider streaks via low-frequency noise
     };
 
     try {
-      // Compute LIC for all three fields in parallel
-      const [result1, result2, result3] = await Promise.all([
+      // Compute LIC for both fields in parallel
+      const [result1, result2] = await Promise.all([
         computeLIC({ vectorField: rotationField, ...commonOptions }),
         computeLIC({ vectorField: saddleField, ...commonOptions }),
-        computeLIC({ vectorField: sourceField, ...commonOptions }),
       ]);
 
-      // Draw results with scaling
-      drawLICResult(ctx1, result1.toImageData());
-      drawLICResult(ctx2, result2.toImageData());
-      drawLICResult(ctx3, result3.toImageData());
+      // Draw results with scaling (colored or grayscale)
+      if (resolvedPalette) {
+        const colorOptions = { palette: resolvedPalette };
+        drawLICResult(ctx1, result1.toColoredImageData(colorOptions));
+        drawLICResult(ctx2, result2.toColoredImageData(colorOptions));
+      } else {
+        drawLICResult(ctx1, result1.toImageData());
+        drawLICResult(ctx2, result2.toImageData());
+      }
 
       isLoading = false;
     } catch (err) {
@@ -153,13 +171,13 @@
   });
 
   // Re-compute if contexts become available
-  $: if (ctx1 && ctx2 && ctx3 && isLoading && !errorMessage) {
+  $: if (ctx1 && ctx2 && isLoading && !errorMessage) {
     computeAllLIC();
   }
 </script>
 
 <div style="width: {width}px;">
-  <TripleFigure {gap} {backgroundVisible}>
+  <DoubleFigure {gap} {backgroundVisible}>
     {#snippet leftTitle()}
       Rotation
     {/snippet}
@@ -182,10 +200,10 @@
       <Katex math={"\\mathbf{F}(x,y) = (-y, x)"} />
     {/snippet}
 
-    {#snippet centerTitle()}
+    {#snippet rightTitle()}
       Saddle
     {/snippet}
-    {#snippet center()}
+    {#snippet right()}
       <div class="canvas-container" style="aspect-ratio: {canvasWidth}/{canvasHeight};">
         <canvas
           bind:this={canvas2}
@@ -197,38 +215,19 @@
         {/if}
       </div>
     {/snippet}
-    {#snippet centerLabel()}
-      <Katex math={"\\mathbf{F}(x,y) = (x, -y)"} />
-    {/snippet}
-
-    {#snippet rightTitle()}
-      Source
-    {/snippet}
-    {#snippet right()}
-      <div class="canvas-container" style="aspect-ratio: {canvasWidth}/{canvasHeight};">
-        <canvas
-          bind:this={canvas3}
-          use:canvas2d3.bindCanvas
-          style="width: 100%; height: 100%;"
-        ></canvas>
-        {#if isLoading}
-          <div class="loading-overlay">Computing LIC...</div>
-        {/if}
-      </div>
-    {/snippet}
     {#snippet rightLabel()}
-      <Katex math={"\\mathbf{F}(x,y) = (x, y)"} />
+      <Katex math={"\\mathbf{F}(x,y) = (x, -y)"} />
     {/snippet}
 
     {#snippet caption()}
       <strong>Line Integral Convolution (LIC) visualization.</strong>
       LIC convolves a noise texture along streamlines to reveal flow structure.
+      Color indicates vector field magnitude.
       <em>Left:</em> Rotation field with circular streamlines.
-      <em>Center:</em> Saddle point with hyperbolic flow.
-      <em>Right:</em> Source field with radial outward flow.
+      <em>Right:</em> Saddle point with hyperbolic flow.
       Computed using WebGPU compute shaders.
     {/snippet}
-  </TripleFigure>
+  </DoubleFigure>
 </div>
 
 <style>
