@@ -124,3 +124,11 @@ export {
   type TimelineBuilderAddAtOptions,
 } from './animation/timeline-builder';
 
+export {
+  exportAnimation,
+  downloadBlob,
+  downloadFrames,
+  type VideoExportOptions,
+  type ExportableAnimation,
+} from './animation/video-export';
+

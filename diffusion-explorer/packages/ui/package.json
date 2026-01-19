@@ -9,14 +9,18 @@
       "svelte": "./src/index.ts",
       "import": "./src/index.ts"
     },
+    "./node": {
+      "import": "./src/node.ts"
+    },
     "./styles/base.css": "./src/styles/base.css",
     "./styles/layout.css": "./src/styles/layout.css"
   },
   "dependencies": {
-	"d3": "^7.9.0",
-	"katex": "^0.16.22"
+    "d3": "^7.9.0",
+    "katex": "^0.16.22",
+    "webm-muxer": "^5.1.4"
   },
   "devDependencies": {
-	"@types/d3": "^7.4.3"
+    "@types/d3": "^7.4.3"
   }
 }
