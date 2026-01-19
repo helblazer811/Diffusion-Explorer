@@ -7,8 +7,8 @@
  * - Renders animated pulse effects along streamlines
  */
 
-import type { Clip } from './timeline';
-import type { AnimationWithData } from './animation';
+import type { Clip } from '../timeline';
+import type { AnimationWithData } from '../animation';
 import {
   generateStreamlines,
   computeStreamlineLengths,
@@ -16,8 +16,8 @@ import {
   precomputePatternIndices,
   computeAlphaTrail,
   type VectorFieldFn
-} from '../plotting/streamlines';
-import { drawTrajectories } from '../plotting/trajectories';
+} from '../../plotting/streamlines';
+import { drawTrajectories } from '../../plotting/trajectories';
 
 // ===== Types =====
 
@@ -311,4 +311,3 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
     return new StreamlineAnimation<TState>(options);
   }
 }
-
