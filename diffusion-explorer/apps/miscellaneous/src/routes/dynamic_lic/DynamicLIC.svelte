@@ -17,6 +17,8 @@
     initWebGPUContext,
     computeDLIC,
     isWebGPUAvailable,
+    exportAnimation,
+    downloadBlob,
     type Clip,
     type VectorFieldFn,
     type WebGPUContext,
@@ -36,7 +38,7 @@
     margin = 15,
 
     // Animation
-    animationDurationMs = 10000,
+    animationDurationMs = 1500,
     playingByDefault = true,
 
     // Streamline Appearance
@@ -116,6 +118,10 @@
   // Visibility
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+
+  // Export state
+  let isExporting = $state(false);
+  let exportProgress = $state(0);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -336,7 +342,6 @@
 
       // Clamp to available frames (handles progressive loading)
       const frameIndex = Math.min(state.dlicFrameIndex, cachedFrames.length - 1);
-      console.log(`[DynamicLIC] Drawing frame ${frameIndex} (target: ${state.dlicFrameIndex}, loaded: ${cachedFrames.length})`);
       ctxRight.putImageData(cachedFrames[frameIndex], dlicOffset, dlicOffset);
       ctxRight.restore();
     } else if (ctxRight && isPrecomputing) {
@@ -355,6 +360,46 @@
       ctxRight.font = "14px sans-serif";
       ctxRight.textAlign = "center";
       ctxRight.fillText(dlicError || "WebGPU not available", canvasWidth / 2, canvasHeight / 2);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Export
+  // ----------------------------------------------------------------
+
+  async function handleExport() {
+    if (!timeline || !canvasLeft || !canvasRight || isExporting) return;
+
+    isExporting = true;
+    exportProgress = 0;
+
+    try {
+      const videos = await exportAnimation(
+        {
+          timeline,
+          draw,
+          canvas: [canvasLeft, canvasRight],
+        },
+        {
+          fps: 30,
+          format: 'mp4',
+          bitrate: 20_000_000, // 20 Mbps for high quality
+          onProgress: (p) => {
+            exportProgress = p;
+          },
+        }
+      ) as Blob[];
+
+      // Download both videos
+      downloadBlob(videos[0], 'streamlines.mp4');
+      // Small delay between downloads
+      await new Promise(resolve => setTimeout(resolve, 100));
+      downloadBlob(videos[1], 'dlic.mp4');
+    } catch (err) {
+      console.error('[DynamicLIC] Export failed:', err);
+    } finally {
+      isExporting = false;
+      exportProgress = 0;
     }
   }
 
@@ -432,7 +477,20 @@
   {/snippet}
 
   {#snippet footer()}
-    <TimeSlider {timeline} showTicks={false} showTimeLabel={false} />
+    <div class="footer-controls">
+      <TimeSlider {timeline} showTicks={false} showTimeLabel={false} />
+      <button
+        class="export-button"
+        onclick={handleExport}
+        disabled={isExporting || !isInitialized}
+      >
+        {#if isExporting}
+          Exporting... {Math.round(exportProgress * 100)}%
+        {:else}
+          Export MP4
+        {/if}
+      </button>
+    </div>
   {/snippet}
 
   {#snippet caption()}
@@ -457,11 +515,44 @@
     color: #666;
     text-align: center;
     margin: 0 0 1rem 0;
-    max-width: 100%;
+    width: 100%;
     word-wrap: break-word;
     min-height: 5rem;
     display: flex;
     align-items: flex-end;
     justify-content: center;
+  }
+
+  .footer-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .footer-controls :global(.time-slider) {
+    flex: 1;
+  }
+
+  .export-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: white;
+    background-color: #3b82f6;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    white-space: nowrap;
+    min-width: 120px;
+  }
+
+  .export-button:hover:not(:disabled) {
+    background-color: #2563eb;
+  }
+
+  .export-button:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
   }
 </style>
