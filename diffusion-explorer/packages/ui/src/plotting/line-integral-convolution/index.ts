@@ -24,13 +24,31 @@ export type {
   LICDomain,
   LICOptions,
   LICResult,
+  LICColorOptions,
+  ColorPalette,
+  RGBColor,
   WebGPUContext,
-  VectorFieldFn
+  VectorFieldFn,
+  // DLIC types
+  DLICOptions,
+  DLICResult,
+  TimeVaryingVectorFieldFn
 } from './types';
 
 export {
   isWebGPUAvailable,
   initWebGPUContext,
   computeLIC,
-  drawLIC
+  drawLIC,
+  // Color palettes
+  viridis,
+  plasma,
+  inferno,
+  coolwarm,
+  turbo
 } from './line-integral-convolution';
+
+export {
+  computeDLIC,
+  drawDLIC
+} from './dynamic-line-integral-convolution';
