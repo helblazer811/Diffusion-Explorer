@@ -10,9 +10,9 @@ import type { DLICOptions, DLICResult, WebGPUContext } from './types';
 import { generateScaledNoise } from './noise';
 import { evaluateVectorFieldToBuffer, createLICResult } from './shared';
 import { initWebGPUContext } from './line-integral-convolution';
-import dlicShaderBase from './dlic-shader.wgsl?raw';
-import velocityFieldShader from './velocity-field.wgsl?raw';
-import integrationShader from './integration.wgsl?raw';
+import dlicShaderBase from './shaders/dlic-shader.wgsl?raw';
+import velocityFieldShader from './shaders/velocity-field.wgsl?raw';
+import integrationShader from './shaders/integration.wgsl?raw';
 
 // Concatenate shader sources: base shader + velocity field functions + integration functions
 const dlicShaderSource = dlicShaderBase

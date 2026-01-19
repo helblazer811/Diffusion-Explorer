@@ -7,15 +7,21 @@
 
 import type { LICOptions, LICResult, WebGPUContext, VectorFieldFn, LICColorOptions, ColorPalette, RGBColor } from './types';
 import { generateScaledNoise } from './noise';
-import licShaderBase from './lic-shader.wgsl?raw';
-import integrationShader from './integration.wgsl?raw';
+import licShaderBase from './shaders/lic-shader.wgsl?raw';
+import velocityFieldShader from './shaders/velocity-field.wgsl?raw';
+import integrationShader from './shaders/integration.wgsl?raw';
 
-// Concatenate shader sources: base shader + integration functions
-// Integration functions must come after getDirection() but before main()
-const licShaderSource = licShaderBase.replace(
-  '// Integration functions are defined in integration.wgsl and concatenated at build time',
-  integrationShader
-);
+// Concatenate shader sources: base shader + velocity field functions + integration functions
+// Velocity field functions must come after bindings, integration functions must come after getDirection()
+const licShaderSource = licShaderBase
+  .replace(
+    '// Velocity field functions are defined in velocity-field.wgsl and concatenated at build time',
+    velocityFieldShader
+  )
+  .replace(
+    '// Integration functions are defined in integration.wgsl and concatenated at build time',
+    integrationShader
+  );
 
 // Default LIC parameters
 const DEFAULT_INTEGRATION_STEPS = 20;
