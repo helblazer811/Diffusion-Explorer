@@ -117,3 +117,44 @@ export interface WebGPUContext {
   /** Release WebGPU resources */
   destroy(): void;
 }
+
+// ============================================================================
+// Dynamic LIC (DLIC) Types
+// ============================================================================
+
+/**
+ * Time-varying vector field function.
+ * Maps (x, y, t) to velocity [vx, vy].
+ */
+export type TimeVaryingVectorFieldFn = (x: number, y: number, t: number) => [number, number];
+
+/**
+ * Configuration options for Dynamic LIC computation.
+ * Extends LICOptions with animation-specific parameters.
+ */
+export interface DLICOptions extends LICOptions {
+  /** Animation phase (0-1), controls position in animation cycle.
+   *  Ignored when frameCount is set (phases are auto-computed as i/frameCount). */
+  phase: number;
+  /** Wavelength in pixels - how far noise travels per cycle (default: 40.0) */
+  wavelength?: number;
+  /** Time parameter for time-varying vector fields */
+  time?: number;
+  /** Time-varying vector field (overrides vectorField if provided) */
+  timeVaryingVectorField?: TimeVaryingVectorFieldFn;
+  /** Padding in pixels to compute beyond output boundaries (default: 0).
+   *  Helps eliminate edge artifacts by allowing full integration at boundaries.
+   *  Recommended: 32-64 pixels, or match maxArcLength. */
+  padding?: number;
+  /** Number of frames to compute (phases 0/n, 1/n, ..., (n-1)/n).
+   *  When set, returns DLICResult[] instead of DLICResult. */
+  frameCount?: number;
+  /** Frames per GPU command submission (default: 8).
+   *  Only used when frameCount is set. */
+  batchSize?: number;
+}
+
+/**
+ * Result type for Dynamic LIC computation (same structure as LICResult).
+ */
+export type DLICResult = LICResult;
