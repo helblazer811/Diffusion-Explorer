@@ -9,16 +9,16 @@
  *   style: { strokeWidth: 2, color: '#3b82f6', progressOpacity: 0.8, pointRadius: 4 }
  * });
  *
- * timeline.add(animation.clip, 0);
+ * timeline.add(animation.clip, { start: 0, end: 1 });
  * timeline.onTick((_, state) => {
  *   ctx.clearRect(0, 0, width, height);
  *   animation.draw(ctx, state);
  * });
  */
 
-import type { AnimationWithData } from './animation';
-import type { Clip } from './timeline';
-import { drawTrajectories, type TrajectoryStyleOptions } from '../plotting/trajectories';
+import type { AnimationWithData } from '../animation';
+import type { Clip } from '../timeline';
+import { drawTrajectories, type TrajectoryStyleOptions } from '../../plotting/trajectories';
 
 /**
  * Base animation state for pathline animation.
@@ -85,7 +85,6 @@ export class PathlineAnimation<TState extends PathlineAnimationState>
     // Create clip that maps normalized time to segmentIndex
     this.clip = {
       name: 'pathline-animation',
-      duration: 1,
       reduce: (t: number): Partial<TState> => ({
         segmentIndex: Math.floor(t * numSegments)
       } as Partial<TState>)
