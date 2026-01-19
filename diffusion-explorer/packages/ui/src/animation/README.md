@@ -28,7 +28,7 @@ resolution through a priority-based layer system.
 │            startSeeking() | endSeeking()                    │
 └─────────────────────────────────────────────────────────────┘
         ▲                           │
-        │ seek()                    │ onTick(time, state)
+        │ seek()                    │ onTick(t, state)  (t is 0-1)
         │ play/pause                │
         │                           ▼
 ┌───────────────┐           ┌───────────────┐
@@ -151,7 +151,7 @@ timeline.add({
   }
 }, 0);
 
-timeline.onTick((time, state) => draw(state));
+timeline.onTick((t, state) => draw(state));
 timeline.play();
 ```
 
