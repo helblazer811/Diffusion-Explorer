@@ -89,7 +89,7 @@ export class Timeline<TState> {
 
   // Internal
   private clock = new Clock();
-  private tickCallbacks: Set<(time: number, state: Readonly<TState>) => void> = new Set();
+  private tickCallbacks: Set<(normalizedTime: number, state: Readonly<TState>) => void> = new Set();
   private endPauseRemaining = 0;
 
   // ===== Clip Management =====
@@ -219,7 +219,7 @@ export class Timeline<TState> {
     this._time = Math.max(0, Math.min(normalizedT * this.duration, this.duration));
     this.endPauseRemaining = 0;
     this._cachedState = null;
-    this.tickCallbacks.forEach(cb => cb(this._time, this.state));
+    this.tickCallbacks.forEach(cb => cb(this._time / this.duration, this.state));
   }
 
   reset(): void {
@@ -265,10 +265,11 @@ export class Timeline<TState> {
 
   /**
    * Register tick callback (for figure to redraw).
-   * Multiple callbacks can be registered; each receives (time, state).
+   * Multiple callbacks can be registered; each receives (normalizedTime, state).
+   * @param callback - Receives normalized time (0-1) and current state
    * @returns Unsubscribe function
    */
-  onTick(callback: (time: number, state: Readonly<TState>) => void): () => void {
+  onTick(callback: (normalizedTime: number, state: Readonly<TState>) => void): () => void {
     this.tickCallbacks.add(callback);
     return () => {
       this.tickCallbacks.delete(callback);
@@ -284,7 +285,7 @@ export class Timeline<TState> {
   private tick(dt: number): void {
     // Skip time progression if seeking (but still fire callbacks for redraws)
     if (this._isSeeking) {
-      this.tickCallbacks.forEach(cb => cb(this._time, this.state));
+      this.tickCallbacks.forEach(cb => cb(this._time / this.duration, this.state));
       return;
     }
 
@@ -295,7 +296,7 @@ export class Timeline<TState> {
         this._time = 0;
         this._cachedState = null;
       }
-      this.tickCallbacks.forEach(cb => cb(this._time, this.state));
+      this.tickCallbacks.forEach(cb => cb(this._time / this.duration, this.state));
       return;
     }
 
@@ -314,7 +315,7 @@ export class Timeline<TState> {
       }
     }
 
-    this.tickCallbacks.forEach(cb => cb(this._time, this.state));
+    this.tickCallbacks.forEach(cb => cb(this._time / this.duration, this.state));
   }
 
   private resolveState(): TState {
