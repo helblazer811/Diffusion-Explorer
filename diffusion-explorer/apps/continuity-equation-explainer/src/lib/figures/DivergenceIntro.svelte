@@ -1,5 +1,5 @@
 <!-- Introduces the concept of divergence in flow matching with three side-by-side canvases. -->
-<!-- Uses GPU-accelerated WebGPU streamline rendering. -->
+<!-- Uses GPU-accelerated WebGPU streamline rendering with bloom post-processing. -->
 
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
@@ -12,6 +12,7 @@
     type VectorFieldFn,
     type StreamlineGPUData,
   } from "@diffusion-explorer/ui";
+  import { BloomEffect, type BloomOptions } from "@diffusion-explorer/ui/plotting/post-processing";
 
   // ----------------------------------------------------------------
   // Props
@@ -43,6 +44,12 @@
   export let pulsePauseWidthPixels = 10;  // Gap between pulses in pixels
   export let animationDuration = 4;       // Seconds for one animation cycle
 
+  // Bloom settings
+  export let bloomEnabled = false;
+  export let bloomThreshold = 0.3;
+  export let bloomIntensity = 1.2;
+  export let bloomRadius = 6;
+
   // ----------------------------------------------------------------
   // State
   // ----------------------------------------------------------------
@@ -63,6 +70,19 @@
   let renderer1: StreamlineRenderer | null = null;
   let renderer2: StreamlineRenderer | null = null;
   let renderer3: StreamlineRenderer | null = null;
+
+  // Shared WebGPU device (all renderers must use same device)
+  let sharedDevice: GPUDevice | null = null;
+
+  // Bloom effects
+  let bloom1: BloomEffect | null = null;
+  let bloom2: BloomEffect | null = null;
+  let bloom3: BloomEffect | null = null;
+
+  // Source textures for offscreen rendering
+  let sourceTexture1: GPUTexture | null = null;
+  let sourceTexture2: GPUTexture | null = null;
+  let sourceTexture3: GPUTexture | null = null;
 
   // Animation state
   let isInitialized = false;
@@ -158,6 +178,19 @@
       canvas3.width = canvasWidth * dpr;
       canvas3.height = canvasHeight * dpr;
 
+      // Create shared WebGPU device (all renderers must use the same device)
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        throw new Error('Failed to get WebGPU adapter');
+      }
+      sharedDevice = await adapter.requestDevice();
+
+      const gpuContext = {
+        adapter,
+        device: sharedDevice,
+        destroy: () => sharedDevice?.destroy(),
+      };
+
       const rendererOptions = {
         dpr,
         thickness: streamlineWidth,
@@ -167,11 +200,11 @@
         color: streamlineColor,
       };
 
-      // Create renderers
+      // Create renderers with shared device
       [renderer1, renderer2, renderer3] = await Promise.all([
-        StreamlineRenderer.create(canvas1, rendererOptions),
-        StreamlineRenderer.create(canvas2, rendererOptions),
-        StreamlineRenderer.create(canvas3, rendererOptions),
+        StreamlineRenderer.create(canvas1, rendererOptions, gpuContext),
+        StreamlineRenderer.create(canvas2, rendererOptions, gpuContext),
+        StreamlineRenderer.create(canvas3, rendererOptions, gpuContext),
       ]);
 
       // Generate streamlines for each field (in CSS pixels)
@@ -183,6 +216,31 @@
       renderer1.setStreamlines(streamlines1, 'random');
       renderer2.setStreamlines(streamlines2, 'random');
       renderer3.setStreamlines(streamlines3, 'random');
+
+      // Create bloom effects if enabled
+      if (bloomEnabled && sharedDevice) {
+        const format = renderer1.getFormat();
+        const physicalWidth = canvasWidth * dpr;
+        const physicalHeight = canvasHeight * dpr;
+
+        // Create source textures for offscreen rendering (using shared device)
+        const textureDesc: GPUTextureDescriptor = {
+          size: { width: physicalWidth, height: physicalHeight },
+          format,
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+        };
+
+        sourceTexture1 = sharedDevice.createTexture({ ...textureDesc, label: 'Divergence Intro Source 1' });
+        sourceTexture2 = sharedDevice.createTexture({ ...textureDesc, label: 'Divergence Intro Source 2' });
+        sourceTexture3 = sharedDevice.createTexture({ ...textureDesc, label: 'Divergence Intro Source 3' });
+
+        // Create bloom effects (using shared device)
+        [bloom1, bloom2, bloom3] = await Promise.all([
+          BloomEffect.create(sharedDevice, format, physicalWidth, physicalHeight),
+          BloomEffect.create(sharedDevice, format, physicalWidth, physicalHeight),
+          BloomEffect.create(sharedDevice, format, physicalWidth, physicalHeight),
+        ]);
+      }
 
       webgpuAvailable = true;
       isInitialized = true;
@@ -209,9 +267,41 @@
     // Clear with transparent background
     const clearColor: [number, number, number, number] = [0, 0, 0, 0];
 
-    renderer1.render({ phase }, clearColor);
-    renderer2.render({ phase }, clearColor);
-    renderer3.render({ phase }, clearColor);
+    // If bloom is enabled, render to offscreen texture then apply bloom
+    if (bloomEnabled && bloom1 && bloom2 && bloom3 && sourceTexture1 && sourceTexture2 && sourceTexture3 && sharedDevice) {
+      const device = sharedDevice;
+      const bloomOptions: BloomOptions = {
+        threshold: bloomThreshold,
+        intensity: bloomIntensity,
+        radius: bloomRadius,
+      };
+
+      // Render each canvas with bloom
+      const renderWithBloom = (
+        renderer: StreamlineRenderer,
+        bloom: BloomEffect,
+        sourceTexture: GPUTexture
+      ) => {
+        // Render streamlines to offscreen texture
+        const renderCmd = renderer.renderToTexture({ phase }, sourceTexture.createView(), clearColor);
+        device.queue.submit([renderCmd]);
+
+        // Apply bloom and output to canvas
+        const bloomEncoder = device.createCommandEncoder();
+        const canvasView = renderer.getContext().getCurrentTexture().createView();
+        bloom.apply(bloomEncoder, sourceTexture, canvasView, bloomOptions);
+        device.queue.submit([bloomEncoder.finish()]);
+      };
+
+      renderWithBloom(renderer1, bloom1, sourceTexture1);
+      renderWithBloom(renderer2, bloom2, sourceTexture2);
+      renderWithBloom(renderer3, bloom3, sourceTexture3);
+    } else {
+      // No bloom - render directly to canvas
+      renderer1.render({ phase }, clearColor);
+      renderer2.render({ phase }, clearColor);
+      renderer3.render({ phase }, clearColor);
+    }
   }
 
   function animate(timestamp: number) {
@@ -273,6 +363,15 @@
 
   onDestroy(() => {
     stopAnimation();
+    // Clean up bloom effects
+    if (bloom1) bloom1.destroy();
+    if (bloom2) bloom2.destroy();
+    if (bloom3) bloom3.destroy();
+    // Clean up source textures
+    if (sourceTexture1) sourceTexture1.destroy();
+    if (sourceTexture2) sourceTexture2.destroy();
+    if (sourceTexture3) sourceTexture3.destroy();
+    // Clean up renderers
     if (renderer1) renderer1.destroy();
     if (renderer2) renderer2.destroy();
     if (renderer3) renderer3.destroy();
