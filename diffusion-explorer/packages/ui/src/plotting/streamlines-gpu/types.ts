@@ -51,17 +51,19 @@ export interface StreamlineGPUData {
  * Uniforms for the streamline shader.
  */
 export interface StreamlineUniforms {
-  /** Canvas width in pixels */
+  /** Canvas width in physical pixels */
   width: number;
-  /** Canvas height in pixels */
+  /** Canvas height in physical pixels */
   height: number;
+  /** Device pixel ratio */
+  dpr: number;
   /** Animation phase (0-1) */
   phase: number;
-  /** Line thickness in pixels */
+  /** Line thickness in logical/CSS pixels */
   thickness: number;
-  /** Pulse width in pixels */
+  /** Pulse width in logical/CSS pixels */
   pulseWidth: number;
-  /** Total spacing (pulse + gap) in pixels */
+  /** Total spacing (pulse + gap) in logical/CSS pixels */
   pulseSpacing: number;
   /** Base opacity at pulse peak (0-1) */
   baseOpacity: number;
@@ -73,13 +75,18 @@ export interface StreamlineUniforms {
 
 /**
  * Options for creating a StreamlineRenderer.
+ *
+ * All pixel values (thickness, pulseWidth, pulseGap) are in logical/CSS pixels.
+ * They will be automatically scaled by DPR for rendering.
  */
 export interface StreamlineRendererOptions {
-  /** Line thickness in pixels (default: 2.5) */
+  /** Device pixel ratio (default: window.devicePixelRatio or 1) */
+  dpr?: number;
+  /** Line thickness in logical/CSS pixels (default: 2.5) */
   thickness?: number;
-  /** Pulse width in pixels (default: 30) */
+  /** Pulse width in logical/CSS pixels (default: 30) */
   pulseWidth?: number;
-  /** Gap between pulses in pixels (default: 50) */
+  /** Gap between pulses in logical/CSS pixels (default: 50) */
   pulseGap?: number;
   /** Base opacity at pulse peak (default: 0.8) */
   baseOpacity?: number;
@@ -97,7 +104,9 @@ export interface StreamlineRendererOptions {
 export interface StreamlineRenderStyle {
   /** Animation phase (0-1) */
   phase: number;
-  /** Optional override for thickness */
+  /** Optional override for device pixel ratio */
+  dpr?: number;
+  /** Optional override for thickness (in logical/CSS pixels) */
   thickness?: number;
   /** Optional override for color */
   color?: string | [number, number, number];

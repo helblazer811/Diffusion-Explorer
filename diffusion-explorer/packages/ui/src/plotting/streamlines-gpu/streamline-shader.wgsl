@@ -18,12 +18,14 @@
 // ============================================================================
 
 struct Uniforms {
-  // Canvas dimensions
+  // Canvas dimensions (physical pixels)
   width: f32,
   height: f32,
+  // Device pixel ratio (for scaling logical to physical coordinates)
+  dpr: f32,
   // Animation
   phase: f32,
-  // Appearance
+  // Appearance (in logical/CSS pixels, will be scaled by DPR)
   thickness: f32,
   pulseWidth: f32,
   pulseSpacing: f32,
@@ -82,15 +84,20 @@ fn vs_main(
 ) -> VertexOutput {
   var output: VertexOutput;
 
-  // Read segment data (8 floats per segment)
+  // Read segment data (8 floats per segment) - coordinates are in logical/CSS pixels
   let baseIdx = instanceIndex * 8u;
-  let p0 = vec2<f32>(segments[baseIdx], segments[baseIdx + 1u]);
-  let p1 = vec2<f32>(segments[baseIdx + 2u], segments[baseIdx + 3u]);
+  let p0_logical = vec2<f32>(segments[baseIdx], segments[baseIdx + 1u]);
+  let p1_logical = vec2<f32>(segments[baseIdx + 2u], segments[baseIdx + 3u]);
   let cumulativeLengthStart = segments[baseIdx + 4u];
   let totalLength = segments[baseIdx + 5u];
   let phaseOffset = segments[baseIdx + 6u];
 
-  // Compute segment direction and length
+  // Scale coordinates from logical pixels to physical pixels
+  let dpr = uniforms.dpr;
+  let p0 = p0_logical * dpr;
+  let p1 = p1_logical * dpr;
+
+  // Compute segment direction and length (in physical pixels)
   let delta = p1 - p0;
   let segmentLength = length(delta);
   let dir = select(vec2<f32>(1.0, 0.0), delta / segmentLength, segmentLength > 0.001);
@@ -101,11 +108,12 @@ fn vs_main(
   // Get quad position for this vertex
   let quadPos = QUAD_POSITIONS[vertexIndex % 6u];
 
-  // Half thickness plus margin for SDF anti-aliasing
-  let halfThickness = uniforms.thickness * 0.5;
-  let margin = halfThickness + 2.0; // Extra margin for rounded caps and AA
+  // Scale thickness by DPR for physical pixels
+  let physicalThickness = uniforms.thickness * dpr;
+  let halfThickness = physicalThickness * 0.5;
+  let margin = halfThickness + 2.0 * dpr; // Extra margin for rounded caps and AA
 
-  // Compute world position
+  // Compute world position (in physical pixels)
   // quadPos.x: 0 = start, 1 = end (with extension for rounded caps)
   // quadPos.y: -1 to 1 perpendicular extent
   let along = mix(-margin, segmentLength + margin, quadPos.x);
@@ -113,17 +121,18 @@ fn vs_main(
 
   let worldPos = p0 + dir * along + perp * across;
 
-  // Convert to NDC (-1 to 1)
+  // Convert to NDC (-1 to 1) using physical pixel dimensions
   let ndcX = (worldPos.x / uniforms.width) * 2.0 - 1.0;
   let ndcY = 1.0 - (worldPos.y / uniforms.height) * 2.0; // Flip Y for canvas coords
 
   output.position = vec4<f32>(ndcX, ndcY, 0.0, 1.0);
 
-  // Pass data to fragment shader
+  // Pass data to fragment shader (in physical pixels for SDF calculations)
   // localPos: position relative to segment start, in segment-local coordinates
   output.localPos = vec2<f32>(along, across);
   output.segmentDir = dir;
   output.segmentLength = segmentLength;
+  // Arc lengths remain in logical pixels for consistent pulse animation
   output.arcLengthStart = cumulativeLengthStart;
   output.totalLength = totalLength;
   output.phaseOffset = phaseOffset;
@@ -198,28 +207,35 @@ fn computePulseAlpha(arcLength: f32, phase: f32, phaseOffset: f32) -> f32 {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-  // Compute SDF distance
+  // Compute SDF distance (in physical pixels)
   let dist = capsuleSDF(input.localPos, input.segmentLength);
-  let halfThickness = uniforms.thickness * 0.5;
+
+  // Thickness scaled to physical pixels
+  let dpr = uniforms.dpr;
+  let physicalThickness = uniforms.thickness * dpr;
+  let halfThickness = physicalThickness * 0.5;
 
   // Signed distance (negative inside, positive outside)
   let signedDist = dist - halfThickness;
 
   // Anti-aliased alpha based on SDF
-  // Smooth transition over ~1.5 pixels for good AA
-  let sdfAlpha = 1.0 - smoothstep(-0.75, 0.75, signedDist);
+  // Smooth transition over ~1.5 physical pixels for good AA
+  let aaWidth = 0.75 * dpr;
+  let sdfAlpha = 1.0 - smoothstep(-aaWidth, aaWidth, signedDist);
 
   // Early discard for fully transparent pixels
   if (sdfAlpha < 0.001) {
     discard;
   }
 
-  // Compute arc length at this fragment
-  // localPos.x is the position along the segment (may be negative due to cap margin)
+  // Compute arc length at this fragment (convert from physical to logical pixels)
+  // localPos.x is the position along the segment in physical pixels
   let clampedLocalX = clamp(input.localPos.x, 0.0, input.segmentLength);
-  let arcLength = input.arcLengthStart + clampedLocalX;
+  // Convert to logical pixels for consistent pulse animation
+  let arcLengthPhysical = clampedLocalX;
+  let arcLength = input.arcLengthStart + arcLengthPhysical / dpr;
 
-  // Compute pulse alpha
+  // Compute pulse alpha (pulse parameters are in logical pixels)
   let pulseAlpha = computePulseAlpha(arcLength, uniforms.phase, input.phaseOffset);
 
   // Combine SDF alpha and pulse alpha
