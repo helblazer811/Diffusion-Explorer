@@ -1,7 +1,6 @@
 <script>
   import { ArticleHeader } from "@diffusion-explorer/ui";
   import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
-  import DivergenceIntroGPU from "$lib/figures/DivergenceIntroGPU.svelte";
   import DivergenceTheorem from "$lib/figures/DivergenceTheorem/DivergenceTheorem.svelte";
   import { Katex } from "@diffusion-explorer/ui";
 </script>
@@ -37,25 +36,14 @@
 <section id="divergence">
   <h2 class="section-heading">Divergence</h2>
   <DivergenceIntro>
-    <strong>Three types of vector field divergence (Canvas 2D).</strong>
-    The divergence of a vector field <Katex math="\mathbf{F} = (F_x, F_y)"/> is defined as
-    <Katex math="\nabla \cdot \mathbf{F} = \frac{\partial F_x}{\partial x} + \frac{\partial F_y}{\partial y}"/>
+    <strong>Three types of vector field divergence.</strong>
+    The divergence of a vector field <Katex math={"\\mathbf{F} = (F_x, F_y)"}/> is defined as
+    <Katex math={"\\nabla \\cdot \\mathbf{F} = \\frac{\\partial F_x}{\\partial x} + \\frac{\\partial F_y}{\\partial y}"}/>
     and describes the rate at which "density" expands or contracts at a point.
-    <em>Left:</em> A converging field (sink) has negative divergence (<Katex math="\nabla \cdot \mathbf{F} < 0"/>).
-    <em>Center:</em> A diverging field (source) has positive divergence (<Katex math="\nabla \cdot \mathbf{F} > 0"/>).
-    <em>Right:</em> An incompressible field has zero divergence (<Katex math="\nabla \cdot \mathbf{F} = 0"/>).
+    <em>Left:</em> A converging field (sink) has negative divergence (<Katex math={"\\nabla \\cdot \\mathbf{F} < 0"}/>).
+    <em>Center:</em> A diverging field (source) has positive divergence (<Katex math={"\\nabla \\cdot \\mathbf{F} > 0"}/>).
+    <em>Right:</em> An incompressible field has zero divergence (<Katex math={"\\nabla \\cdot \\mathbf{F} = 0"}/>).
   </DivergenceIntro>
-</section>
-
-<hr class="section-divider" />
-
-<section id="divergence-gpu">
-  <h2 class="section-heading">Divergence (GPU Renderer)</h2>
-  <DivergenceIntroGPU>
-    <strong>Same visualization using GPU-accelerated WebGPU renderer.</strong>
-    This version uses the new StreamlineRenderer with SDF-based rendering and
-    sawtooth pulse animation computed entirely on the GPU.
-  </DivergenceIntroGPU>
 </section>
 
 <hr class="section-divider" />

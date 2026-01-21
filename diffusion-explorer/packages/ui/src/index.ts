@@ -107,19 +107,12 @@ export {
   type StreamlineAnimationState,
   type StreamlineAnimationOptions,
   type StreamlineAnimationData,
+  type StreamlineAnimationCPUOptions,
+  type StreamlineAnimationGPUOptions,
   type StreamlineData,  // Legacy alias
   type StreamlineDomain,
   type StreamlineBackend,
 } from './animation/streamline-animation';
-
-// Legacy GPU animation class (deprecated, use StreamlineAnimation with backend: 'gpu')
-export {
-  StreamlineAnimationGPU,
-  type StreamlineAnimationGPUState,
-  type StreamlineAnimationGPUOptions,
-  type StreamlineGPUDomain,
-  type StreamlineGPUData,
-} from './animation/streamline-animation-gpu';
 
 export {
   PathlineAnimation,
