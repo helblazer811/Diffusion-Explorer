@@ -112,14 +112,14 @@ export {
   type StreamlineData,  // Legacy alias
   type StreamlineDomain,
   type StreamlineBackend,
-} from './animation/streamline-animation';
+} from './animation/animations/streamline-animation';
 
 export {
   PathlineAnimation,
   type PathlineAnimationState,
   type PathlineAnimationOptions,
   type PathlineData,
-} from './animation/pathline-animation';
+} from './animation/animations/pathline-animation';
 
 export {
   propagateStreamlines,
@@ -135,7 +135,7 @@ export {
   type DiscreteStreamlineData,
   type PropagateOptions,
   type TimeVaryingVectorFieldFn,
-} from './animation/streamline-propagation';
+} from './animation/animations/streamline-propagation';
 
 export {
   TimelineBuilder,
