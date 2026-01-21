@@ -179,9 +179,10 @@ fn sdLine(perpDist: f32, halfWidth: f32) -> f32 {
  * Information about which region of a pulse the fragment is in.
  */
 struct PulseInfo {
-  inPulse: bool,    // Whether fragment is in pulse (body or cap)
-  inCap: bool,      // Whether fragment is in capsule cap region
-  overshoot: f32,   // Distance past pulseWidth (for cap SDF), in logical pixels
+  inPulse: bool,      // Whether fragment is in pulse (body or cap)
+  inCap: bool,        // Whether fragment is in capsule cap region
+  overshoot: f32,     // Distance past pulseWidth (for cap SDF), in logical pixels
+  posInPattern: f32,  // Position within pulse pattern (for alpha interpolation)
 }
 
 /**
@@ -218,6 +219,7 @@ fn computePulseInfo(arcLength: f32, phase: f32, phaseOffset: f32) -> PulseInfo {
     info.inPulse = true;
     info.inCap = false;
     info.overshoot = 0.0;
+    info.posInPattern = posInPattern;
     return info;
   }
 
@@ -227,6 +229,7 @@ fn computePulseInfo(arcLength: f32, phase: f32, phaseOffset: f32) -> PulseInfo {
     info.inPulse = true;  // Potentially in cap (SDF will determine final visibility)
     info.inCap = true;
     info.overshoot = overshoot;
+    info.posInPattern = posInPattern;
     return info;
   }
 
@@ -234,6 +237,7 @@ fn computePulseInfo(arcLength: f32, phase: f32, phaseOffset: f32) -> PulseInfo {
   info.inPulse = false;
   info.inCap = false;
   info.overshoot = 0.0;
+  info.posInPattern = posInPattern;
   return info;
 }
 
@@ -298,12 +302,16 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let aaWidth = 0.75 * dpr;
   let alpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
 
+  // Linear alpha interpolation along pulse (0.0 at tail, 1.0 at head/cap)
+  let pulseAlpha = saturate(pulseInfo.posInPattern / uniforms.pulseWidth);
+
+  // Combine SDF alpha, pulse alpha, and base opacity
+  let finalAlpha = alpha * pulseAlpha * uniforms.baseOpacity;
+
   // Early discard for fully transparent pixels
-  if (alpha < 0.001) {
+  if (finalAlpha < 0.001) {
     discard;
   }
-
-  let finalAlpha = alpha * uniforms.baseOpacity;
 
   return vec4<f32>(
     uniforms.colorR,
