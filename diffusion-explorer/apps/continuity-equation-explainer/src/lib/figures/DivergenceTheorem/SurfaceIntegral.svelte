@@ -201,10 +201,10 @@
       const rawStreamlines = generateStreamlines(vectorFieldFn as VectorFieldFn, {
         domainMin,
         domainMax,
-        density,
+        density: 0.6,
         integrationDirection: 'both',
-        minlength: minPathLength,
-        maxlength: 10,
+        minlength: 1.0, // Filter out short streamlines
+        maxlength: 100,
       });
 
       // Convert to pixel coordinates
@@ -460,19 +460,19 @@
 </script>
 
 <div class="surface-integral-wrapper">
-  <div class="surface-integral-container">
+  <div class="surface-integral-container" style="width: {width}px; height: {height}px;">
     <!-- GPU canvas for streamlines (behind) -->
     <canvas
       bind:this={gpuCanvas}
       class="gpu-canvas"
-      style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
+      style="width: {width}px; height: {height}px;"
     ></canvas>
     <!-- 2D canvas for overlays (on top) -->
     <canvas
       bind:this={canvas}
       use:canvas2d.bindCanvas
       class="overlay-canvas"
-      style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
+      style="width: {width}px; height: {height}px;"
     ></canvas>
   </div>
 </div>
@@ -486,10 +486,6 @@
   }
 
   .surface-integral-container {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     position: relative;
   }
 
