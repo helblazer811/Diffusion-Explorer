@@ -58,13 +58,28 @@ export * from './plotting/contours';
 export * from './plotting/vector_field';
 export * from './plotting/mathjax';
 export * from './plotting/pathlines';
-export * from './plotting/streamlines';
+export * from './plotting/streamlines';  // New unified module with CPU/GPU support
 export * from './plotting/mesh_grid';
 export * from './plotting/heatmap';
 export { useCanvas2D } from './plotting/canvas';
 export * from './plotting/utils';
 export * from './plotting/surface';
 export * from './plotting/line-integral-convolution';
+
+// Legacy: streamlines-gpu is now part of plotting/streamlines/gpu
+// Re-export for backward compatibility
+export {
+  StreamlineRenderer,
+  prepareStreamlineData,
+  parseColor,
+  type StreamlineRendererOptions,
+  type StreamlineRenderStyle,
+  type StreamlineGPUData,
+  type StreamlineSegment,
+  type StreamlineUniforms,
+  type WebGPUContext,
+  type RGBAColor,
+} from './plotting/streamlines/gpu';
 
 // Animation utilities
 export {
@@ -91,8 +106,12 @@ export {
   StreamlineAnimation,
   type StreamlineAnimationState,
   type StreamlineAnimationOptions,
-  type StreamlineData,
+  type StreamlineAnimationData,
+  type StreamlineAnimationCPUOptions,
+  type StreamlineAnimationGPUOptions,
+  type StreamlineData,  // Legacy alias
   type StreamlineDomain,
+  type StreamlineBackend,
 } from './animation/streamline-animation';
 
 export {

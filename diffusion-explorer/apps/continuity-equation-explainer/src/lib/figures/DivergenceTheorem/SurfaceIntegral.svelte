@@ -1,15 +1,15 @@
 <!-- Surface integral visualization with streamlines and rotating normal/field vectors. -->
 
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     Timeline,
-    StreamlineAnimation,
     drawArrow,
     useCanvas2D,
     drawMathjax,
+    StreamlineRenderer,
+    generateStreamlines,
     type VectorFieldFn,
-    type StreamlineAnimationState,
   } from "@diffusion-explorer/ui";
   import {
     getTangentAndNormal,
@@ -90,6 +90,11 @@
   // State
   // ----------------------------------------------------------------
 
+  // GPU canvas for streamlines (behind)
+  let gpuCanvas: HTMLCanvasElement | null = null;
+  let streamlineRenderer: StreamlineRenderer | null = null;
+
+  // 2D canvas for overlays (on top)
   let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   $: ctx = canvas && canvas2d.ctx;
@@ -97,13 +102,13 @@
   let isInitialized = false;
   let wasPlayingBeforeHidden = false;
 
-  // Animation state extends StreamlineAnimationState
-  type AnimationState = StreamlineAnimationState & {
+  // Animation state - streamlinePhase drives the GPU renderer
+  type AnimationState = {
+    streamlinePhase: number; // 0-1 for pulse animation
     theta: number; // 0-2π for rotation around surface
   };
 
   let timeline: Timeline<AnimationState> | null = null;
-  let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
 
   // Bounding box for the curve
   let boundingBox: {
@@ -163,40 +168,65 @@
   // Setup
   // ----------------------------------------------------------------
 
+  async function initializeGPURenderer() {
+    if (!gpuCanvas || !boundingBox) return;
+
+    // Check WebGPU availability
+    if (!(navigator as any).gpu) {
+      console.warn("WebGPU not supported, streamlines will not render");
+      return;
+    }
+
+    try {
+      const dpr = window.devicePixelRatio || 1;
+
+      // Set canvas size (physical pixels)
+      gpuCanvas.width = width * dpr;
+      gpuCanvas.height = height * dpr;
+
+      // Create renderer
+      streamlineRenderer = await StreamlineRenderer.create(gpuCanvas, {
+        dpr,
+        thickness: streamlineWidth,
+        pulseWidth: pulseWidthPixels,
+        pulseGap: pulsePauseWidthPixels,
+        baseOpacity: 1.0,
+        color: streamlineColor,
+      });
+
+      // Generate streamlines in domain coordinates
+      const domainMin: [number, number] = [boundingBox.xMin - domainMargin, boundingBox.yMin - domainMargin];
+      const domainMax: [number, number] = [boundingBox.xMax + domainMargin, boundingBox.yMax + domainMargin];
+
+      const rawStreamlines = generateStreamlines(vectorFieldFn as VectorFieldFn, {
+        domainMin,
+        domainMax,
+        density: 0.6,
+        integrationDirection: 'both',
+        minlength: 1.0, // Filter out short streamlines
+        maxlength: 100,
+      });
+
+      // Convert to pixel coordinates
+      const pixelStreamlines = rawStreamlines.map((streamline) =>
+        streamline.map((point) => toPixel(point as [number, number]))
+      );
+
+      // Upload to GPU with synchronized offsets
+      streamlineRenderer.setStreamlines(pixelStreamlines, 'synchronized');
+    } catch (e) {
+      console.error("Failed to initialize StreamlineRenderer:", e);
+    }
+  }
+
   function runInitialComputation() {
     if (!canvas) return;
 
     // Compute bounding box from curve (needed for toPixel)
     boundingBox = computeBoundingBox();
-
-    // Create streamline animation
-    const totalDuration = Math.max(streamlineDuration, rotationDuration);
-
-    streamlineAnim = StreamlineAnimation.create<AnimationState>({
-      vectorFieldFn: vectorFieldFn as VectorFieldFn,
-      domain: {
-        xMin: boundingBox.xMin - domainMargin,
-        xMax: boundingBox.xMax + domainMargin,
-        yMin: boundingBox.yMin - domainMargin,
-        yMax: boundingBox.yMax + domainMargin,
-      },
-      toPixel,
-      density,
-      minPathLength,
-      segmentLength,
-      color: streamlineColor,
-      strokeWidth: streamlineWidth,
-      gradientSubdivisions,
-      pulseWidthPixels,
-      pulsePauseWidthPixels,
-      offsets: "synchronized",
-      loopMultiplier: totalDuration / streamlineDuration,
-    });
   }
 
   function setupTimeline() {
-    if (!streamlineAnim) return;
-
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { streamlinePhase: 0, theta: 0 };
 
@@ -204,8 +234,18 @@
     timeline.duration = totalDuration;
     timeline.looping = true;
 
-    // Add streamline clip from the animation
-    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
+    // Streamline phase clip
+    const streamlineEnd = streamlineDuration / totalDuration;
+    timeline.add(
+      {
+        name: "StreamlinePhase",
+        reduce(t: number) {
+          const loops = totalDuration / streamlineDuration;
+          return { streamlinePhase: (t * loops) % 1 };
+        },
+      },
+      { start: 0, end: streamlineEnd }
+    );
 
     // Rotation clip
     const rotationEnd = rotationDuration / totalDuration;
@@ -238,14 +278,17 @@
   // ----------------------------------------------------------------
 
   function draw(state: AnimationState) {
-    if (!ctx || !isInitialized || !streamlineAnim) return;
+    if (!ctx || !isInitialized) return;
 
     const { streamlinePhase, theta } = state;
 
-    ctx.clearRect(0, 0, width, height);
+    // 1. Draw GPU streamlines (on separate canvas)
+    if (streamlineRenderer) {
+      streamlineRenderer.render({ phase: streamlinePhase }, [0, 0, 0, 0]);
+    }
 
-    // 1. Draw streamlines (behind) - using the animation's draw function
-    streamlineAnim.draw(ctx, state);
+    // Clear 2D overlay canvas
+    ctx.clearRect(0, 0, width, height);
 
     // 2. Draw surface curve (on top of streamlines)
     drawClosedCurve(ctx, curveFn, toPixel, {
@@ -383,21 +426,31 @@
   // Lifecycle
   // ----------------------------------------------------------------
 
+  onMount(() => {
+    // GPU renderer needs to be initialized after canvas is available
+    if (gpuCanvas && boundingBox) {
+      initializeGPURenderer();
+    }
+  });
+
   onDestroy(() => {
     if (timeline) timeline.pause();
+    if (streamlineRenderer) streamlineRenderer.destroy();
   });
 
   // ----------------------------------------------------------------
   // Reactive Blocks
   // ----------------------------------------------------------------
 
-  // Initialize when canvas is ready
-  $: if (!isInitialized && canvas && curveFn && vectorFieldFn) {
+  // Initialize when canvases are ready
+  $: if (!isInitialized && canvas && gpuCanvas && curveFn && vectorFieldFn) {
     runInitialComputation();
     setupTimeline();
-    isInitialized = true;
-    draw(timeline!.initialState);
-    if (playingByDefault) startAnimation();
+    initializeGPURenderer().then(() => {
+      isInitialized = true;
+      draw(timeline!.initialState);
+      if (playingByDefault) startAnimation();
+    });
   }
 
   // Handle visibility changes
@@ -407,11 +460,19 @@
 </script>
 
 <div class="surface-integral-wrapper">
-  <div class="surface-integral-container">
+  <div class="surface-integral-container" style="width: {width}px; height: {height}px;">
+    <!-- GPU canvas for streamlines (behind) -->
+    <canvas
+      bind:this={gpuCanvas}
+      class="gpu-canvas"
+      style="width: {width}px; height: {height}px;"
+    ></canvas>
+    <!-- 2D canvas for overlays (on top) -->
     <canvas
       bind:this={canvas}
       use:canvas2d.bindCanvas
-      style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
+      class="overlay-canvas"
+      style="width: {width}px; height: {height}px;"
     ></canvas>
   </div>
 </div>
@@ -424,12 +485,18 @@
     width: 100%;
   }
 
-
   .surface-integral-container {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     position: relative;
+  }
+
+  .gpu-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .overlay-canvas {
+    position: relative;
+    z-index: 1;
   }
 </style>
