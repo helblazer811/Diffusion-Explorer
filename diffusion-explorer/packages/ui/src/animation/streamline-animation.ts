@@ -5,19 +5,27 @@
  * - Generates streamlines from a vector field
  * - Creates a Clip for Timeline integration
  * - Renders animated pulse effects along streamlines
+ *
+ * Supports two rendering modes:
+ * - 'canvas': Traditional Canvas 2D rendering (default)
+ * - 'shader': GPU-accelerated WebGPU compute shader rendering
  */
 
 import type { Clip } from './timeline';
 import type { AnimationWithData } from './animation';
 import {
   generateStreamlines,
-  computeStreamlineLengths,
   createAlphaLUT,
-  precomputePatternIndices,
   computeAlphaTrail,
   type VectorFieldFn
 } from '../plotting/streamlines';
 import { drawTrajectories } from '../plotting/trajectories';
+import {
+  StreamlineShaderRenderer,
+  buildStreamlineGeometry,
+  precomputePatternIndices as precomputePatternIndicesFromGeometry,
+  type StreamlineGeometry
+} from '../plotting/streamline-shader';
 
 // ===== Types =====
 
@@ -59,7 +67,12 @@ export type StreamlineAnimationOptions = {
   segmentLength?: number;
   integrationDirection?: 'forward' | 'backward' | 'both';
   startPoints?: [number, number][];  // Custom seed points for streamlines
-  subdivisionFactor?: number;  // Subdivide each segment into N pieces (default: 1 = no subdivision)
+  /**
+   * @deprecated Use `gradientSubdivisions` instead for smooth canvas gradients.
+   * For shader mode, this is ignored entirely since exact per-pixel alpha is computed.
+   * Subdivide each segment into N pieces (default: 1 = no subdivision)
+   */
+  subdivisionFactor?: number;
 
   // Animation (optional)
   pulseWidthPixels?: number;      // Pulse width in pixels (default: 30)
@@ -76,10 +89,26 @@ export type StreamlineAnimationOptions = {
   color?: string;
   strokeWidth?: number;
   gradientSubdivisions?: number;
+
+  // Render mode (optional)
+  /**
+   * Rendering mode:
+   * - 'canvas': Traditional Canvas 2D rendering (default)
+   * - 'shader': GPU-accelerated WebGPU compute shader rendering
+   *
+   * Shader mode requires canvasWidth and canvasHeight to be specified.
+   */
+  renderMode?: 'canvas' | 'shader';
+  /** Canvas width in pixels (required for shader mode) */
+  canvasWidth?: number;
+  /** Canvas height in pixels (required for shader mode) */
+  canvasHeight?: number;
 };
 
 /**
  * Per-streamline length data for animation.
+ * @deprecated Use StreamlineGeometry from streamline-shader module instead.
+ * Kept for backward compatibility.
  */
 export type StreamlineLengthData = {
   cumulativeLengths: number[];
@@ -100,9 +129,49 @@ export type StreamlineData = {
   lengthData: StreamlineLengthData[];
   /** Maximum streamline length across all streamlines */
   maxLength: number;
+  /** Unified geometry (single source of truth for segments) */
+  geometry: StreamlineGeometry;
 };
 
 // ===== Helper Functions =====
+
+/**
+ * Parse a CSS color string to RGB values in [0, 1] range.
+ *
+ * @param color - CSS color string (hex, rgb, etc.)
+ * @returns RGB tuple with values in [0, 1]
+ */
+function parseColorToRGB(color: string): [number, number, number] {
+  // Handle hex colors
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16) / 255;
+      const g = parseInt(hex[1] + hex[1], 16) / 255;
+      const b = parseInt(hex[2] + hex[2], 16) / 255;
+      return [r, g, b];
+    } else if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      return [r, g, b];
+    }
+  }
+
+  // Handle rgb() colors
+  const rgbMatch = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+  if (rgbMatch) {
+    return [
+      parseInt(rgbMatch[1]) / 255,
+      parseInt(rgbMatch[2]) / 255,
+      parseInt(rgbMatch[3]) / 255
+    ];
+  }
+
+  // Default to blue if parsing fails
+  console.warn(`Could not parse color "${color}", defaulting to blue`);
+  return [0.23, 0.51, 0.96]; // #3b82f6
+}
 
 /**
  * Subdivide each segment of a streamline into smaller pieces.
@@ -174,6 +243,21 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
   private readonly alphaLUT: Float32Array;
   private readonly alphaBuffers: Float32Array[];
 
+  // Shader rendering (optional)
+  private readonly renderMode: 'canvas' | 'shader';
+  private shaderRenderer: StreamlineShaderRenderer | null = null;
+  private shaderInitPromise: Promise<void> | null = null;
+  private readonly shaderOptions: {
+    width: number;
+    height: number;
+    strokeWidth: number;
+    pulseWidth: number;
+    pulsePauseWidth: number;
+    baseOpacity: number;
+    binaryPulse: boolean;
+    color: [number, number, number];
+  } | null = null;
+
   private constructor(options: StreamlineAnimationOptions) {
     const {
       vectorFieldFn,
@@ -198,7 +282,14 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       color = '#3b82f6',
       strokeWidth = 2.5,
       gradientSubdivisions = 12,
+      // Render mode defaults
+      renderMode = 'canvas',
+      canvasWidth,
+      canvasHeight,
     } = options;
+
+    // Store render mode
+    this.renderMode = renderMode;
 
     // Store style options
     this.baseOpacity = baseOpacity;
@@ -217,24 +308,20 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       startPoints,
     });
 
-    // Convert to pixel coordinates and apply subdivision
+    // Convert to pixel coordinates
+    // Skip subdivision for shader mode (exact per-pixel alpha makes it unnecessary)
+    // For canvas mode, subdivision is deprecated in favor of gradientSubdivisions
+    const shouldSubdivide = renderMode === 'canvas' && subdivisionFactor > 1;
+    if (subdivisionFactor > 1 && renderMode === 'shader') {
+      console.warn(
+        'subdivisionFactor is ignored in shader mode - exact per-pixel alpha is computed. ' +
+        'This option is deprecated; use gradientSubdivisions for canvas mode smooth gradients.'
+      );
+    }
     const streamlines = rawStreamlines.map((streamline) => {
       const pixelPoints = streamline.map((point) => toPixel(point as [number, number]));
-      return subdivideStreamline(pixelPoints, subdivisionFactor);
+      return shouldSubdivide ? subdivideStreamline(pixelPoints, subdivisionFactor) : pixelPoints;
     });
-
-    // Compute spacing for precomputation
-    const spacing = pulseWidthPixels + pulsePauseWidthPixels;
-
-    // Compute cumulative lengths and precompute pattern indices for each streamline
-    const lengthData: StreamlineLengthData[] = streamlines.map((streamline) => {
-      const { cumulativeLengths, totalLength } = computeStreamlineLengths(streamline);
-      const patternIndices = precomputePatternIndices(cumulativeLengths, spacing);
-      return { cumulativeLengths, totalLength, patternIndices };
-    });
-
-    // Find max length across all streamlines
-    const maxLength = Math.max(...lengthData.map((d) => d.totalLength), 0);
 
     // Generate offsets
     const offsets =
@@ -242,12 +329,38 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
         ? streamlines.map(() => Math.random())
         : streamlines.map(() => 0);
 
+    // Build unified geometry (single source of truth for segments and arc lengths)
+    const geometry = buildStreamlineGeometry(streamlines, offsets);
+
+    // Compute spacing for precomputation
+    const spacing = pulseWidthPixels + pulsePauseWidthPixels;
+
+    // Derive lengthData from geometry for backward compatibility with canvas renderer
+    // This uses the same underlying segment data, just a different view
+    const lengthData: StreamlineLengthData[] = geometry.streamlineMeta.map((meta, i) => {
+      // Build cumulative lengths from segment data
+      const cumulativeLengths: number[] = [0];
+      for (let j = 0; j < meta.segmentCount; j++) {
+        cumulativeLengths.push(geometry.segments[meta.startSegmentIdx + j].arcLengthEnd);
+      }
+      // Precompute pattern indices from geometry
+      const patternIndices = precomputePatternIndicesFromGeometry(geometry, i, spacing);
+      return {
+        cumulativeLengths,
+        totalLength: meta.totalLength,
+        patternIndices
+      };
+    });
+
+    // Find max length across all streamlines
+    const maxLength = Math.max(...geometry.streamlineMeta.map((m) => m.totalLength), 0);
+
     // Create alpha LUT and reusable buffers
     this.alphaLUT = createAlphaLUT(pulseWidthPixels, spacing, baseOpacity, 256, binaryPulse);
     this.alphaBuffers = streamlines.map((s) => new Float32Array(s.length));
 
-    // Store data
-    this.data = { streamlines, offsets, lengthData, maxLength };
+    // Store data (geometry is the source of truth, lengthData derived for compat)
+    this.data = { streamlines, offsets, lengthData, maxLength, geometry };
 
     // Create the clip
     this.clip = {
@@ -256,6 +369,49 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
         return { streamlinePhase: (t * loopMultiplier) % 1 } as Partial<TState>;
       },
     };
+
+    // Initialize shader renderer if in shader mode
+    if (renderMode === 'shader') {
+      if (canvasWidth === undefined || canvasHeight === undefined) {
+        throw new Error('canvasWidth and canvasHeight are required for shader render mode');
+      }
+
+      // Parse color string to RGB [0-1]
+      const colorRGB = parseColorToRGB(color);
+
+      // Store shader options for lazy initialization
+      this.shaderOptions = {
+        width: canvasWidth,
+        height: canvasHeight,
+        strokeWidth,
+        pulseWidth: pulseWidthPixels,
+        pulsePauseWidth: pulsePauseWidthPixels,
+        baseOpacity,
+        binaryPulse,
+        color: colorRGB
+      };
+
+      // Start async initialization
+      this.shaderInitPromise = this.initShaderRenderer();
+    }
+  }
+
+  /**
+   * Initialize the WebGPU shader renderer asynchronously.
+   */
+  private async initShaderRenderer(): Promise<void> {
+    if (!this.shaderOptions) return;
+
+    try {
+      // Use unified geometry for shader renderer (no redundant segment building)
+      this.shaderRenderer = await StreamlineShaderRenderer.create({
+        geometry: this.data.geometry,
+        options: this.shaderOptions
+      });
+    } catch (error) {
+      console.warn('Failed to initialize shader renderer, falling back to canvas:', error);
+      // Keep shaderRenderer as null, draw() will fall back to canvas
+    }
   }
 
   /**
@@ -269,6 +425,24 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
     if (streamlines.length === 0) return;
 
     const phase = state.streamlinePhase;
+
+    // Use shader renderer if available
+    if (this.renderMode === 'shader' && this.shaderRenderer) {
+      // Shader render is async, but we handle it synchronously here
+      // by caching the last rendered ImageData
+      this.renderWithShader(ctx, phase);
+      return;
+    }
+
+    // Canvas rendering (default)
+    this.renderWithCanvas(ctx, phase);
+  }
+
+  /**
+   * Render using Canvas 2D API.
+   */
+  private renderWithCanvas(ctx: CanvasRenderingContext2D, phase: number): void {
+    const { streamlines, offsets, lengthData } = this.data;
 
     // Compute per-segment alphas using precomputed LUT and pattern indices
     const perSegmentAlphas = streamlines.map((_, i) => {
@@ -297,6 +471,72 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       perSegmentAlphas,
       gradientSubdivisions: this.gradientSubdivisions,
     });
+  }
+
+  // Cache for shader rendering
+  private lastShaderPhase: number = -1;
+  private lastShaderImageData: ImageData | null = null;
+  private shaderRenderPending: boolean = false;
+
+  /**
+   * Render using WebGPU shader.
+   * Uses cached ImageData if phase hasn't changed, otherwise triggers async render.
+   */
+  private renderWithShader(ctx: CanvasRenderingContext2D, phase: number): void {
+    // If we have cached data for this phase, use it
+    if (this.lastShaderImageData && Math.abs(this.lastShaderPhase - phase) < 0.0001) {
+      ctx.putImageData(this.lastShaderImageData, 0, 0);
+      return;
+    }
+
+    // If a render is already pending, use cached data or fall back to canvas
+    if (this.shaderRenderPending) {
+      if (this.lastShaderImageData) {
+        ctx.putImageData(this.lastShaderImageData, 0, 0);
+      } else {
+        this.renderWithCanvas(ctx, phase);
+      }
+      return;
+    }
+
+    // Start async render
+    this.shaderRenderPending = true;
+    this.shaderRenderer!.render(phase).then((result) => {
+      this.lastShaderPhase = phase;
+      this.lastShaderImageData = result.imageData;
+      this.shaderRenderPending = false;
+    }).catch((error) => {
+      console.warn('Shader render failed:', error);
+      this.shaderRenderPending = false;
+    });
+
+    // For this frame, use cached data or fall back to canvas
+    if (this.lastShaderImageData) {
+      ctx.putImageData(this.lastShaderImageData, 0, 0);
+    } else {
+      this.renderWithCanvas(ctx, phase);
+    }
+  }
+
+  /**
+   * Wait for shader renderer initialization to complete.
+   * Useful if you want to ensure shader is ready before first render.
+   */
+  async waitForShaderInit(): Promise<boolean> {
+    if (this.shaderInitPromise) {
+      await this.shaderInitPromise;
+    }
+    return this.shaderRenderer !== null;
+  }
+
+  /**
+   * Clean up resources. Call when done with the animation.
+   */
+  destroy(): void {
+    if (this.shaderRenderer) {
+      this.shaderRenderer.destroy();
+      this.shaderRenderer = null;
+    }
   }
 
   /**
