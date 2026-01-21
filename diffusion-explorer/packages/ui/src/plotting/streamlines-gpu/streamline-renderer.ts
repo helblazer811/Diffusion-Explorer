@@ -35,6 +35,37 @@ const DEFAULT_COLOR = '#3b82f6';
 const UNIFORM_BUFFER_SIZE = 64;
 
 /**
+ * Merge consecutive short segments by removing intermediate points.
+ * This avoids visual artifacts when cap radius exceeds segment length.
+ */
+function mergeShortSegments(
+  streamline: number[][],
+  minLength: number
+): number[][] {
+  if (streamline.length < 2) return streamline;
+
+  const result: number[][] = [streamline[0]];
+
+  for (let i = 1; i < streamline.length; i++) {
+    const lastPoint = result[result.length - 1];
+    const currentPoint = streamline[i];
+    const dx = currentPoint[0] - lastPoint[0];
+    const dy = currentPoint[1] - lastPoint[1];
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // Always keep the last point of the streamline
+    const isLastPoint = i === streamline.length - 1;
+
+    if (dist >= minLength || isLastPoint) {
+      result.push(currentPoint);
+    }
+    // Otherwise skip this point (merge segment with next)
+  }
+
+  return result;
+}
+
+/**
  * Prepare streamline data for GPU upload.
  *
  * Converts an array of streamlines (each streamline is an array of [x, y] points)
@@ -42,15 +73,22 @@ const UNIFORM_BUFFER_SIZE = 64;
  *
  * @param streamlines - Array of streamlines in pixel coordinates
  * @param offsets - Phase offsets per streamline ('random' or 'synchronized')
+ * @param minSegmentLength - Minimum segment length; shorter segments are merged (default: 0 = no merging)
  * @returns GPU-ready data structure
  */
 export function prepareStreamlineData(
   streamlines: number[][][],
-  offsets: 'random' | 'synchronized' = 'synchronized'
+  offsets: 'random' | 'synchronized' = 'synchronized',
+  minSegmentLength: number = 0
 ): StreamlineGPUData {
+  // Pre-process to merge short segments if needed
+  const processedStreamlines = minSegmentLength > 0
+    ? streamlines.map(sl => mergeShortSegments(sl, minSegmentLength))
+    : streamlines;
+
   // Count total segments
   let segmentCount = 0;
-  for (const streamline of streamlines) {
+  for (const streamline of processedStreamlines) {
     if (streamline.length >= 2) {
       segmentCount += streamline.length - 1;
     }
@@ -62,7 +100,7 @@ export function prepareStreamlineData(
   let segmentIdx = 0;
   let streamlineIdx = 0;
 
-  for (const streamline of streamlines) {
+  for (const streamline of processedStreamlines) {
     if (streamline.length < 2) continue;
 
     // Compute lengths for this streamline
@@ -320,8 +358,11 @@ export class StreamlineRenderer {
     streamlines: number[][][],
     offsets: 'random' | 'synchronized' = 'synchronized'
   ): void {
-    // Prepare data
-    const gpuData = prepareStreamlineData(streamlines, offsets);
+    // Minimum segment length = cap radius (half thickness)
+    const minSegmentLength = this.thickness / 2;
+
+    // Prepare data with segment merging
+    const gpuData = prepareStreamlineData(streamlines, offsets, minSegmentLength);
     this.segmentCount = gpuData.segmentCount;
 
     if (this.segmentCount === 0) {
