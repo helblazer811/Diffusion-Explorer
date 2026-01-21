@@ -67,7 +67,12 @@ export type StreamlineAnimationOptions = {
   segmentLength?: number;
   integrationDirection?: 'forward' | 'backward' | 'both';
   startPoints?: [number, number][];  // Custom seed points for streamlines
-  subdivisionFactor?: number;  // Subdivide each segment into N pieces (default: 1 = no subdivision)
+  /**
+   * @deprecated Use `gradientSubdivisions` instead for smooth canvas gradients.
+   * For shader mode, this is ignored entirely since exact per-pixel alpha is computed.
+   * Subdivide each segment into N pieces (default: 1 = no subdivision)
+   */
+  subdivisionFactor?: number;
 
   // Animation (optional)
   pulseWidthPixels?: number;      // Pulse width in pixels (default: 30)
@@ -303,10 +308,19 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       startPoints,
     });
 
-    // Convert to pixel coordinates and apply subdivision
+    // Convert to pixel coordinates
+    // Skip subdivision for shader mode (exact per-pixel alpha makes it unnecessary)
+    // For canvas mode, subdivision is deprecated in favor of gradientSubdivisions
+    const shouldSubdivide = renderMode === 'canvas' && subdivisionFactor > 1;
+    if (subdivisionFactor > 1 && renderMode === 'shader') {
+      console.warn(
+        'subdivisionFactor is ignored in shader mode - exact per-pixel alpha is computed. ' +
+        'This option is deprecated; use gradientSubdivisions for canvas mode smooth gradients.'
+      );
+    }
     const streamlines = rawStreamlines.map((streamline) => {
       const pixelPoints = streamline.map((point) => toPixel(point as [number, number]));
-      return subdivideStreamline(pixelPoints, subdivisionFactor);
+      return shouldSubdivide ? subdivideStreamline(pixelPoints, subdivisionFactor) : pixelPoints;
     });
 
     // Generate offsets
