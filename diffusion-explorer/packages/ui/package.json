@@ -12,6 +12,9 @@
     "./node": {
       "import": "./src/node.ts"
     },
+    "./plotting/post-processing": {
+      "import": "./src/plotting/post-processing/index.ts"
+    },
     "./styles/base.css": "./src/styles/base.css",
     "./styles/layout.css": "./src/styles/layout.css"
   },

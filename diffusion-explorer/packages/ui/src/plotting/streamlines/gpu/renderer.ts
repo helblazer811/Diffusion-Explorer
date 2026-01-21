@@ -669,6 +669,34 @@ export class StreamlineRenderer {
   }
 
   /**
+   * Get the GPU device used by this renderer.
+   */
+  getDevice(): GPUDevice {
+    return this.device;
+  }
+
+  /**
+   * Get the texture format used by this renderer.
+   */
+  getFormat(): GPUTextureFormat {
+    return this.format;
+  }
+
+  /**
+   * Get the canvas context for direct access.
+   */
+  getContext(): GPUCanvasContext {
+    return this.context;
+  }
+
+  /**
+   * Get the current canvas dimensions in physical pixels.
+   */
+  getCanvasSize(): { width: number; height: number } {
+    return { width: this.canvasWidth, height: this.canvasHeight };
+  }
+
+  /**
    * Destroy the renderer and release GPU resources.
    */
   destroy(): void {
