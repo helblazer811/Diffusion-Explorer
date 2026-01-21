@@ -6,11 +6,11 @@
   import {
     TripleFigure,
     Katex,
-    drawTrajectories,
-    StreamlineAnimationGPU,
-    Timeline,
+    StreamlineRenderer,
+    prepareStreamlineData,
+    generateStreamlines,
     type VectorFieldFn,
-    type StreamlineAnimationGPUState,
+    type StreamlineGPUData,
   } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
@@ -37,8 +37,6 @@
   // Styling
   export let streamlineColor = "#e63946";
   export let streamlineWidth = 3.0;
-  export let staticMode = false;
-  export let staticOpacity = 0.8;
 
   // Animation pulse settings (pixel-based)
   export let pulseWidthPixels = 40;       // Width of pulse in pixels
@@ -56,27 +54,26 @@
   $: canvasWidth = Math.floor((width - 2 * gap) / 3);
   $: canvasHeight = height;
 
-  // DPR for high-DPI displays
-  let dpr = 1;
-
-  // Three canvases (WebGPU)
+  // Three canvases
   let canvas1: HTMLCanvasElement | null = null;
   let canvas2: HTMLCanvasElement | null = null;
   let canvas3: HTMLCanvasElement | null = null;
 
+  // GPU renderers
+  let renderer1: StreamlineRenderer | null = null;
+  let renderer2: StreamlineRenderer | null = null;
+  let renderer3: StreamlineRenderer | null = null;
+
   // Animation state
   let isInitialized = false;
-  let initPromise: Promise<void> | null = null;
+  let isPlaying = false;
   let wasPlayingBeforeHidden = false;
+  let animationFrameId: number | null = null;
+  let startTime: number | null = null;
+
+  // WebGPU availability
+  let webgpuAvailable = false;
   let initError: string | null = null;
-
-  // Timeline for animation
-  let timeline: Timeline<StreamlineAnimationGPUState> | null = null;
-
-  // Streamline animations (GPU)
-  let anim1: StreamlineAnimationGPU<StreamlineAnimationGPUState> | null = null;
-  let anim2: StreamlineAnimationGPU<StreamlineAnimationGPUState> | null = null;
-  let anim3: StreamlineAnimationGPU<StreamlineAnimationGPUState> | null = null;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -112,10 +109,6 @@
     ];
   }
 
-  // ----------------------------------------------------------------
-  // Setup
-  // ----------------------------------------------------------------
-
   function createToPixel(cw: number, ch: number): (p: [number, number]) => [number, number] {
     return ([x, y]: [number, number]): [number, number] => [
       ((x - domainRange.xMin) / (domainRange.xMax - domainRange.xMin)) * cw,
@@ -123,78 +116,82 @@
     ];
   }
 
-  function setupCanvasSize(canvas: HTMLCanvasElement) {
-    canvas.width = canvasWidth * dpr;
-    canvas.height = canvasHeight * dpr;
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
+  function generateStreamlinesForField(vectorFieldFn: VectorFieldFn, cw: number, ch: number): number[][][] {
+    const toPixel = createToPixel(cw, ch);
+
+    // Generate streamlines in domain coordinates
+    const rawStreamlines = generateStreamlines(vectorFieldFn, {
+      domainMin: [domainRange.xMin, domainRange.yMin],
+      domainMax: [domainRange.xMax, domainRange.yMax],
+      density,
+      integrationDirection: 'both',
+      minlength: minPathLength,
+    });
+
+    // Convert to pixel coordinates
+    return rawStreamlines.map((streamline) =>
+      streamline.map((point) => toPixel(point as [number, number]))
+    );
   }
 
-  async function runInitialComputation() {
+  async function initializeRenderers() {
     if (!canvas1 || !canvas2 || !canvas3) return;
 
     // Check WebGPU availability
-    if (typeof navigator === 'undefined' || !navigator.gpu) {
+    if (!navigator.gpu) {
       initError = "WebGPU is not supported in this browser";
       return;
     }
 
     try {
-      // Set up canvas sizes
-      setupCanvasSize(canvas1);
-      setupCanvasSize(canvas2);
-      setupCanvasSize(canvas3);
+      const dpr = window.devicePixelRatio || 1;
 
-      const toPixel = createToPixel(canvasWidth, canvasHeight);
-      const domain = {
-        xMin: domainRange.xMin,
-        xMax: domainRange.xMax,
-        yMin: domainRange.yMin,
-        yMax: domainRange.yMax
-      };
+      // Set canvas sizes (physical pixels)
+      canvas1.width = canvasWidth * dpr;
+      canvas1.height = canvasHeight * dpr;
+      canvas2.width = canvasWidth * dpr;
+      canvas2.height = canvasHeight * dpr;
+      canvas3.width = canvasWidth * dpr;
+      canvas3.height = canvasHeight * dpr;
 
-      const commonOptions = {
-        domain,
-        toPixel,
-        density,
-        minPathLength,
-        color: streamlineColor,
-        strokeWidth: streamlineWidth,
-        // Pixel-based pulse animation
-        pulseWidthPixels,
-        pulsePauseWidthPixels,
-        baseOpacity: 0.8,
-        offsets: 'random' as const,
+      const rendererOptions = {
         dpr,
+        thickness: streamlineWidth,
+        pulseWidth: pulseWidthPixels,
+        pulseGap: pulsePauseWidthPixels,
+        baseOpacity: 0.8,
+        color: streamlineColor,
       };
 
-      // Create animation objects (synchronous)
-      anim1 = StreamlineAnimationGPU.create({
-        vectorFieldFn: convergingFieldFn(0.5),
-        ...commonOptions,
-      });
-
-      anim2 = StreamlineAnimationGPU.create({
-        vectorFieldFn: divergingFieldFn(0.5),
-        ...commonOptions,
-      });
-
-      anim3 = StreamlineAnimationGPU.create({
-        vectorFieldFn: diagonalFieldFn(1.0),
-        ...commonOptions,
-      });
-
-      // Initialize GPU renderers (async)
-      await Promise.all([
-        anim1.init(canvas1),
-        anim2.init(canvas2),
-        anim3.init(canvas3),
+      // Create renderers
+      [renderer1, renderer2, renderer3] = await Promise.all([
+        StreamlineRenderer.create(canvas1, rendererOptions),
+        StreamlineRenderer.create(canvas2, rendererOptions),
+        StreamlineRenderer.create(canvas3, rendererOptions),
       ]);
 
-      isInitialized = true;
-      setupTimeline();
+      // Generate streamlines for each field (in CSS pixels)
+      const streamlines1 = generateStreamlinesForField(convergingFieldFn(0.5), canvasWidth, canvasHeight);
+      const streamlines2 = generateStreamlinesForField(divergingFieldFn(0.5), canvasWidth, canvasHeight);
+      const streamlines3 = generateStreamlinesForField(diagonalFieldFn(1.0), canvasWidth, canvasHeight);
 
-      if (timeline) {
-        draw(timeline.initialState);
-        if (playingByDefault) startAnimation();
+      // Upload to GPU with random offsets
+      renderer1.setStreamlines(streamlines1, 'random');
+      renderer2.setStreamlines(streamlines2, 'random');
+      renderer3.setStreamlines(streamlines3, 'random');
+
+      webgpuAvailable = true;
+      isInitialized = true;
+
+      // Initial draw
+      draw(0);
+
+      if (playingByDefault) {
+        startAnimation();
       }
     } catch (e) {
       initError = e instanceof Error ? e.message : "Failed to initialize WebGPU";
@@ -202,55 +199,49 @@
     }
   }
 
-  function setupTimeline() {
-    if (!anim1) return;
-
-    timeline = new Timeline<StreamlineAnimationGPUState>();
-    timeline.initialState = { streamlinePhase: 0 };
-    timeline.duration = animationDuration;
-    timeline.looping = true;
-
-    // Add the streamline phase clip (all animations share the same phase)
-    timeline.add(anim1.clip, 0);
-
-    // Register draw callback
-    timeline.onTick((_t, state) => {
-      draw(state);
-    });
-  }
-
   // ----------------------------------------------------------------
-  // Animations
+  // Animation
   // ----------------------------------------------------------------
 
-  function startAnimation() {
-    if (timeline) timeline.play();
-  }
-
-  function stopAnimation() {
-    if (timeline) timeline.pause();
-  }
-
-  // ----------------------------------------------------------------
-  // Drawing
-  // ----------------------------------------------------------------
-
-  function draw(state: StreamlineAnimationGPUState) {
-    if (!isInitialized) return;
-    if (!anim1 || !anim2 || !anim3) return;
+  function draw(phase: number) {
+    if (!renderer1 || !renderer2 || !renderer3) return;
 
     // Clear with transparent background
     const clearColor: [number, number, number, number] = [0, 0, 0, 0];
 
-    if (staticMode) {
-      // For static mode, render at full opacity with phase 0
-      anim1.render({ streamlinePhase: 0 }, clearColor);
-      anim2.render({ streamlinePhase: 0 }, clearColor);
-      anim3.render({ streamlinePhase: 0 }, clearColor);
-    } else {
-      anim1.render(state, clearColor);
-      anim2.render(state, clearColor);
-      anim3.render(state, clearColor);
+    renderer1.render({ phase }, clearColor);
+    renderer2.render({ phase }, clearColor);
+    renderer3.render({ phase }, clearColor);
+  }
+
+  function animate(timestamp: number) {
+    if (!isPlaying) return;
+
+    if (startTime === null) {
+      startTime = timestamp;
+    }
+
+    const elapsed = (timestamp - startTime) / 1000; // seconds
+    const phase = (elapsed / animationDuration) % 1;
+
+    draw(phase);
+
+    animationFrameId = requestAnimationFrame(animate);
+  }
+
+  function startAnimation() {
+    if (isPlaying || !isInitialized) return;
+    isPlaying = true;
+    startTime = null;
+    animationFrameId = requestAnimationFrame(animate);
+  }
+
+  function stopAnimation() {
+    if (!isPlaying) return;
+    isPlaying = false;
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
     }
   }
 
@@ -259,8 +250,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!isInitialized) return;
+    if (!active && isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -274,23 +265,26 @@
   // ----------------------------------------------------------------
 
   onMount(() => {
-    dpr = window.devicePixelRatio || 1;
+    // Initialize after canvas elements are available
+    if (canvas1 && canvas2 && canvas3) {
+      initializeRenderers();
+    }
   });
 
   onDestroy(() => {
-    if (timeline) timeline.dispose();
-    if (anim1) anim1.destroy();
-    if (anim2) anim2.destroy();
-    if (anim3) anim3.destroy();
+    stopAnimation();
+    if (renderer1) renderer1.destroy();
+    if (renderer2) renderer2.destroy();
+    if (renderer3) renderer3.destroy();
   });
 
   // ----------------------------------------------------------------
   // Reactive Blocks
   // ----------------------------------------------------------------
 
-  // Initialize when canvases are ready
-  $: if (!isInitialized && !initPromise && canvas1 && canvas2 && canvas3 && dpr > 0) {
-    initPromise = runInitialComputation();
+  // Initialize when canvases become available
+  $: if (!isInitialized && canvas1 && canvas2 && canvas3) {
+    initializeRenderers();
   }
 
   // Handle visibility changes
