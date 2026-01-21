@@ -111,7 +111,7 @@ fn vs_main(
   // Scale thickness by DPR for physical pixels
   let physicalThickness = uniforms.thickness * dpr;
   let halfThickness = physicalThickness * 0.5;
-  let margin = halfThickness + 1.0 * dpr; // AA margin only
+  let margin = halfThickness + 2.0 * dpr; // Cap radius + AA margin
 
   // Compute world position (in physical pixels)
   // quadPos.x: 0 = start, 1 = end
@@ -211,6 +211,7 @@ fn computePulseInfo(arcLength: f32, phase: f32, phaseOffset: f32) -> PulseInfo {
   let posInPattern = fract((arcLength - phasePixels) / uniforms.pulseSpacing) * uniforms.pulseSpacing;
 
   let halfThicknessLogical = uniforms.thickness * 0.5;
+  let aaMarginLogical = 1.0; // Extra margin for AA blur (matches ~0.75 * dpr / dpr)
 
   // Inside rectangular body
   if (posInPattern < uniforms.pulseWidth) {
@@ -220,9 +221,9 @@ fn computePulseInfo(arcLength: f32, phase: f32, phaseOffset: f32) -> PulseInfo {
     return info;
   }
 
-  // Check capsule cap region
+  // Check capsule cap region (includes AA margin for smooth edges)
   let overshoot = posInPattern - uniforms.pulseWidth;
-  if (overshoot < halfThicknessLogical) {
+  if (overshoot < halfThicknessLogical + aaMarginLogical) {
     info.inPulse = true;  // Potentially in cap (SDF will determine final visibility)
     info.inCap = true;
     info.overshoot = overshoot;
