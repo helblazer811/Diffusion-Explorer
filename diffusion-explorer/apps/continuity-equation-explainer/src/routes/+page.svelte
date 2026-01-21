@@ -37,12 +37,12 @@
   <h2 class="section-heading">Divergence</h2>
   <DivergenceIntro>
     <strong>Three types of vector field divergence.</strong>
-    The divergence of a vector field <Katex math="\mathbf{F} = (F_x, F_y)"/> is defined as
-    <Katex math="\nabla \cdot \mathbf{F} = \frac{\partial F_x}{\partial x} + \frac{\partial F_y}{\partial y}"/>
+    The divergence of a vector field <Katex math={"\\mathbf{F} = (F_x, F_y)"}/> is defined as
+    <Katex math={"\\nabla \\cdot \\mathbf{F} = \\frac{\\partial F_x}{\\partial x} + \\frac{\\partial F_y}{\\partial y}"}/>
     and describes the rate at which "density" expands or contracts at a point.
-    <em>Left:</em> A converging field (sink) has negative divergence (<Katex math="\nabla \cdot \mathbf{F} < 0"/>).
-    <em>Center:</em> A diverging field (source) has positive divergence (<Katex math="\nabla \cdot \mathbf{F} > 0"/>).
-    <em>Right:</em> An incompressible field has zero divergence (<Katex math="\nabla \cdot \mathbf{F} = 0"/>).
+    <em>Left:</em> A converging field (sink) has negative divergence (<Katex math={"\\nabla \\cdot \\mathbf{F} < 0"}/>).
+    <em>Center:</em> A diverging field (source) has positive divergence (<Katex math={"\\nabla \\cdot \\mathbf{F} > 0"}/>).
+    <em>Right:</em> An incompressible field has zero divergence (<Katex math={"\\nabla \\cdot \\mathbf{F} = 0"}/>).
   </DivergenceIntro>
 </section>
 

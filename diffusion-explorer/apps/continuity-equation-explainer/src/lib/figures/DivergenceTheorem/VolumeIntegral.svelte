@@ -1,14 +1,14 @@
 <!-- Volume integral visualization with animated grid subdivision inside the closed curve. -->
 
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     useCanvas2D,
     Timeline,
-    StreamlineAnimation,
     drawMathjax,
+    StreamlineRenderer,
+    generateStreamlines,
     type VectorFieldFn,
-    type StreamlineAnimationState,
   } from "@diffusion-explorer/ui";
   import { drawClosedCurve, type CurveFn } from "./divergence_theorem";
   import {
@@ -95,6 +95,11 @@
   // State
   // ----------------------------------------------------------------
 
+  // GPU canvas for streamlines (behind)
+  let gpuCanvas: HTMLCanvasElement | null = null;
+  let streamlineRenderer: StreamlineRenderer | null = null;
+
+  // 2D canvas for overlays (on top)
   let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   $: ctx = canvas && canvas2d.ctx;
@@ -102,11 +107,10 @@
   let isInitialized = false;
   let wasPlayingBeforeHidden = false;
 
-  // Combined animation state
-  type AnimationState = StreamlineAnimationState & CreateGridAnimationState & SubdivideGridAnimationState & DivergenceArrowAnimationState;
+  // Combined animation state - streamlinePhase drives the GPU renderer
+  type AnimationState = { streamlinePhase: number } & CreateGridAnimationState & SubdivideGridAnimationState & DivergenceArrowAnimationState;
 
   let timeline: Timeline<AnimationState> | null = null;
-  let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let createGridAnim: CreateGridAnimation<AnimationState> | null = null;
   let subdivideGridAnim: SubdivideGridAnimation<AnimationState> | null = null;
   let arrowAnim: DivergenceArrowAnimation<AnimationState> | null = null;
@@ -196,12 +200,13 @@
   function draw(state: AnimationState): void {
     if (!ctx || !isInitialized) return;
 
-    ctx.clearRect(0, 0, width, height);
-
-    // 1. Draw streamlines (behind everything) with pulse animation
-    if (showStreamlines && streamlineAnim) {
-      streamlineAnim.draw(ctx, state);
+    // 1. Draw GPU streamlines (on separate canvas)
+    if (showStreamlines && streamlineRenderer) {
+      streamlineRenderer.render({ phase: state.streamlinePhase }, [0, 0, 0, 0]);
     }
+
+    // Clear 2D overlay canvas
+    ctx.clearRect(0, 0, width, height);
 
     // 2. Draw surface fill (behind grid and arrows)
     drawClosedCurve(ctx, curveFn, toPixel, {
@@ -276,6 +281,57 @@
   // Setup
   // ----------------------------------------------------------------
 
+  async function initializeGPURenderer() {
+    if (!gpuCanvas || !boundingBox) return;
+
+    // Check WebGPU availability
+    if (!(navigator as any).gpu) {
+      console.warn("WebGPU not supported, streamlines will not render");
+      return;
+    }
+
+    try {
+      const dpr = window.devicePixelRatio || 1;
+
+      // Set canvas size (physical pixels)
+      gpuCanvas.width = width * dpr;
+      gpuCanvas.height = height * dpr;
+
+      // Create renderer
+      streamlineRenderer = await StreamlineRenderer.create(gpuCanvas, {
+        dpr,
+        thickness: streamlineWidth,
+        pulseWidth: pulseWidthPixels,
+        pulseGap: pulsePauseWidthPixels,
+        baseOpacity: streamlineOpacity,
+        color: streamlineColor,
+      });
+
+      // Generate streamlines in domain coordinates
+      const domainMin: [number, number] = [boundingBox.xMin - domainMargin, boundingBox.yMin - domainMargin];
+      const domainMax: [number, number] = [boundingBox.xMax + domainMargin, boundingBox.yMax + domainMargin];
+
+      const rawStreamlines = generateStreamlines(vectorFieldFn as VectorFieldFn, {
+        domainMin,
+        domainMax,
+        density: 0.5,
+        integrationDirection: 'both',
+        minlength: 1.0, // Filter out short streamlines
+        maxlength: 100,
+      });
+
+      // Convert to pixel coordinates
+      const pixelStreamlines = rawStreamlines.map((streamline) =>
+        streamline.map((point) => toPixel(point as [number, number]))
+      );
+
+      // Upload to GPU with synchronized offsets
+      streamlineRenderer.setStreamlines(pixelStreamlines, 'synchronized');
+    } catch (e) {
+      console.error("Failed to initialize StreamlineRenderer:", e);
+    }
+  }
+
   function runInitialComputation() {
     if (!canvas) return;
 
@@ -285,28 +341,6 @@
 
     // Find a top-left cell for the divergence annotation (at final resolution 2N)
     annotationTargetCell = findTopLeftValidCell(surfaceSamples, boundingBox, gridResolution * 2);
-
-    // Create streamline animation
-    streamlineAnim = StreamlineAnimation.create<AnimationState>({
-      vectorFieldFn: vectorFieldFn as VectorFieldFn,
-      domain: {
-        xMin: boundingBox.xMin - domainMargin,
-        xMax: boundingBox.xMax + domainMargin,
-        yMin: boundingBox.yMin - domainMargin,
-        yMax: boundingBox.yMax + domainMargin,
-      },
-      toPixel,
-      density: 0.4, // Lower density since view is more zoomed in
-      minPathLength,
-      segmentLength,
-      color: streamlineColor,
-      strokeWidth: streamlineWidth,
-      gradientSubdivisions,
-      pulseWidthPixels,
-      pulsePauseWidthPixels,
-      baseOpacity: streamlineOpacity,
-      offsets: "synchronized",
-    });
 
     // Create initial grid animation (resolution N)
     createGridAnim = CreateGridAnimation.create<AnimationState>({
@@ -340,7 +374,7 @@
   }
 
   function setupTimeline() {
-    if (!streamlineAnim || !createGridAnim || !subdivideGridAnim || !arrowAnim) return;
+    if (!createGridAnim || !subdivideGridAnim || !arrowAnim) return;
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
@@ -353,8 +387,16 @@
     timeline.looping = true;
     timeline.endPauseDuration = 2; // 2 second pause at end before looping
 
-    // Streamlines: full duration [0, 1]
-    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
+    // Streamlines: full duration [0, 1] - drives GPU renderer phase
+    timeline.add(
+      {
+        name: "StreamlinePhase",
+        reduce(t: number) {
+          return { streamlinePhase: t };
+        },
+      },
+      { start: 0, end: 1 }
+    );
 
     // CreateGrid: [0, 0.12] (~2 seconds)
     timeline.add(createGridAnim.clip, { start: 0, end: 0.12 });
@@ -397,21 +439,31 @@
   // Lifecycle
   // ----------------------------------------------------------------
 
+  onMount(() => {
+    // GPU renderer needs to be initialized after canvas is available
+    if (gpuCanvas && boundingBox) {
+      initializeGPURenderer();
+    }
+  });
+
   onDestroy(() => {
     if (timeline) timeline.pause();
+    if (streamlineRenderer) streamlineRenderer.destroy();
   });
 
   // ----------------------------------------------------------------
   // Reactive Blocks
   // ----------------------------------------------------------------
 
-  // Initialize when canvas is ready
-  $: if (!isInitialized && canvas && curveFn && vectorFieldFn) {
+  // Initialize when canvases are ready
+  $: if (!isInitialized && canvas && gpuCanvas && curveFn && vectorFieldFn) {
     runInitialComputation();
     setupTimeline();
-    isInitialized = true;
-    draw(timeline!.initialState);
-    if (playingByDefault) startAnimation();
+    initializeGPURenderer().then(() => {
+      isInitialized = true;
+      draw(timeline!.initialState);
+      if (playingByDefault) startAnimation();
+    });
   }
 
   // Handle visibility changes
@@ -421,11 +473,19 @@
 </script>
 
 <div class="volume-integral-wrapper">
-  <div class="volume-integral-container">
+  <div class="volume-integral-container" style="width: {width}px; height: {height}px;">
+    <!-- GPU canvas for streamlines (behind) -->
+    <canvas
+      bind:this={gpuCanvas}
+      class="gpu-canvas"
+      style="width: {width}px; height: {height}px;"
+    ></canvas>
+    <!-- 2D canvas for overlays (on top) -->
     <canvas
       bind:this={canvas}
       use:canvas2d.bindCanvas
-      style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
+      class="overlay-canvas"
+      style="width: {width}px; height: {height}px;"
     ></canvas>
   </div>
 </div>
@@ -439,10 +499,17 @@
   }
 
   .volume-integral-container {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     position: relative;
+  }
+
+  .gpu-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .overlay-canvas {
+    position: relative;
+    z-index: 1;
   }
 </style>
