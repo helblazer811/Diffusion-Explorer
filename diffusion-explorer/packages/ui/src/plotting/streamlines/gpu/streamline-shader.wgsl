@@ -186,68 +186,53 @@ fn sdLine(perpDist: f32, halfWidth: f32) -> f32 {
 // ----------------------------------------------------------------------------
 
 /**
- * Information about which region of a pulse the fragment is in.
+ * Information about the pulse region the fragment is in.
  */
 struct PulseInfo {
-  inPulse: bool,      // Whether fragment is in pulse (body or cap)
-  inCap: bool,        // Whether fragment is in capsule cap region
-  overshoot: f32,     // Distance past pulseWidth (for cap SDF), in logical pixels
-  posInPattern: f32,  // Position within pulse pattern (for alpha interpolation)
+  inPulseRegion: bool,  // Whether fragment is potentially in pulse render area
+  bodyStart: f32,       // Arc length where body starts (logical pixels)
+  bodyEnd: f32,         // Arc length where body ends (logical pixels)
+  posInPattern: f32,    // Position within pulse pattern (for alpha)
 }
 
 /**
- * Determine which region of a pulse the fragment is in.
+ * Compute pulse body bounds for the fragment's position.
  *
  * The pattern repeats every `pulseSpacing` pixels along the streamline.
- * Within each period:
- * - Body region (posInPattern < pulseWidth): Rectangular pulse body
- * - Cap region (posInPattern in [pulseWidth, pulseWidth + halfThickness]): Semicircular cap
- * - Gap region: No rendering
+ * This function finds the arc length positions of the nearest pulse's
+ * body start (tail) and body end (head).
  *
  * @param arcLength - Position along the streamline (logical pixels)
  * @param phase - Animation phase (0-1)
  * @param phaseOffset - Per-streamline phase offset (0-1)
- * @returns PulseInfo struct with region information
+ * @returns PulseInfo struct with body bounds and region info
  */
 fn computePulseInfo(arcLength: f32, phase: f32, phaseOffset: f32) -> PulseInfo {
   var info: PulseInfo;
 
   // Combine global phase and per-streamline offset
   let totalPhase = fract(phase + phaseOffset);
-
-  // Convert phase to pixel offset
   let phasePixels = totalPhase * uniforms.pulseSpacing;
 
-  // Position in pattern (shifted by phase)
+  // Position in pattern (0 to pulseSpacing)
   let posInPattern = fract((arcLength - phasePixels) / uniforms.pulseSpacing) * uniforms.pulseSpacing;
 
-  let halfThicknessLogical = uniforms.thickness * 0.5;
-  let aaMarginLogical = 1.0; // Extra margin for AA blur (matches ~0.75 * dpr / dpr)
+  // The pulse body spans [0, pulseWidth] in pattern space
+  // Convert to arc length of the pulse that contains/nearest this fragment
+  let patternStart = arcLength - posInPattern;  // Start of this pattern period
 
-  // Inside rectangular body
-  if (posInPattern < uniforms.pulseWidth) {
-    info.inPulse = true;
-    info.inCap = false;
-    info.overshoot = 0.0;
-    info.posInPattern = posInPattern;
-    return info;
-  }
-
-  // Check capsule cap region (includes AA margin for smooth edges)
-  let overshoot = posInPattern - uniforms.pulseWidth;
-  if (overshoot < halfThicknessLogical + aaMarginLogical) {
-    info.inPulse = true;  // Potentially in cap (SDF will determine final visibility)
-    info.inCap = true;
-    info.overshoot = overshoot;
-    info.posInPattern = posInPattern;
-    return info;
-  }
-
-  // In gap
-  info.inPulse = false;
-  info.inCap = false;
-  info.overshoot = 0.0;
+  info.bodyStart = patternStart;
+  info.bodyEnd = patternStart + uniforms.pulseWidth;
   info.posInPattern = posInPattern;
+
+  // Check if in potential render area (body + caps + AA margin)
+  let halfThickness = uniforms.thickness * 0.5;
+  let aaMargin = 1.0;
+  let capExtent = halfThickness + aaMargin;
+
+  info.inPulseRegion = (arcLength >= info.bodyStart - capExtent) &&
+                        (arcLength <= info.bodyEnd + capExtent);
+
   return info;
 }
 
@@ -266,53 +251,86 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Determine pulse region
   let pulseInfo = computePulseInfo(arcLength, uniforms.phase, input.phaseOffset);
 
-  // Early discard if in gap
-  if (!pulseInfo.inPulse) {
+  // Compute extents for early discard and SDF calculations
+  let halfThicknessLogical = uniforms.thickness * 0.5;
+  let perpDistLogical = perpDist / dpr;
+  let aaMarginLogical = 1.0;
+  let capExtent = halfThicknessLogical + aaMarginLogical;
+
+  // Streamline cap regions
+  let inStreamlineStartCap = arcLength < capExtent;
+  let inStreamlineEndCap = arcLength > input.totalLength - capExtent;
+
+  // Early discard if not in pulse region AND not in streamline cap region
+  if (!pulseInfo.inPulseRegion && !inStreamlineStartCap && !inStreamlineEndCap) {
     discard;
   }
 
   // Segment ownership check to prevent double-rendering of caps at segment boundaries
-  // Each segment "owns" arc lengths from arcLengthStart to arcLengthStart + segmentLength/dpr
   let segmentLengthLogical = input.segmentLength / dpr;
   let segmentArcEnd = input.arcLengthStart + segmentLengthLogical;
   let inExtendedRegion = input.localPos.x > input.segmentLength;
 
-  if (pulseInfo.inCap) {
-    // Cap's anchor point (where body ends) in arc length
-    let anchorArcLength = arcLength - pulseInfo.overshoot;
+  // Decode segment flags (1=first, 2=last, 3=both)
+  let isLastSegment = (input.segmentFlags >= 2.0);
 
-    // Discard caps whose anchor is before this segment's range (let previous segment render)
-    if (anchorArcLength < input.arcLengthStart - 0.001) {
-      discard;
-    }
+  // Clamp bodyEnd to totalLength for last segment (for ownership and SDF)
+  let effectiveBodyEnd = select(pulseInfo.bodyEnd, min(pulseInfo.bodyEnd, input.totalLength), isLastSegment);
 
-    // In extended region, also check if anchor is past this segment's range
-    if (inExtendedRegion && anchorArcLength > segmentArcEnd + 0.001) {
-      discard;
-    }
-  } else if (inExtendedRegion) {
-    // Non-cap fragments shouldn't render in extended region
+  // Segment owns caps whose center (bodyStart or bodyEnd) falls within its arc length range
+  let ownsTailCap = (pulseInfo.bodyStart >= input.arcLengthStart - 0.001) &&
+                     (pulseInfo.bodyStart <= segmentArcEnd + 0.001);
+  let ownsHeadCap = (effectiveBodyEnd >= input.arcLengthStart - 0.001) &&
+                     (effectiveBodyEnd <= segmentArcEnd + 0.001);
+
+  // Check if fragment is in a cap region
+  let inTailCapRegion = arcLength < pulseInfo.bodyStart;
+  let inHeadCapRegion = arcLength > effectiveBodyEnd;
+
+  // Discard caps we don't own (prevents double-rendering at segment boundaries)
+  if (inTailCapRegion && !ownsTailCap) {
+    discard;
+  }
+  if (inHeadCapRegion && !ownsHeadCap) {
     discard;
   }
 
-  // Compute signed distance based on region
-  var sd: f32;
-
-  if (pulseInfo.inCap) {
-    // Capsule cap: use circular SDF centered at pulse edge
-    let overshootPhysical = pulseInfo.overshoot * dpr;
-    let capPos = vec2<f32>(overshootPhysical, perpDist);
-    sd = sdCircle(capPos, halfThickness);
-  } else {
-    // Rectangular body: use line SDF
-    sd = sdLine(perpDist, halfThickness);
+  // In extended region, only render if we own a cap that extends there
+  if (inExtendedRegion) {
+    let inOwnedTailCap = ownsTailCap && inTailCapRegion;
+    let inOwnedHeadCap = ownsHeadCap && inHeadCapRegion;
+    if (!inOwnedTailCap && !inOwnedHeadCap) {
+      discard;
+    }
   }
 
-  // Streamline capsule SDF: clips pulses to [0, totalLength] with rounded ends
-  // This naturally bounds pulses to the streamline extent with semicircular caps
-  let halfThicknessLogical = uniforms.thickness * 0.5;
-  let perpDistLogical = perpDist / dpr;
+  // Compute pulse SDF (body + head cap + tail cap via union)
+  var sdPulse: f32 = 1e6;  // Start outside all pulses
 
+  // Body: rectangle between bodyStart and bodyEnd
+  let inBody = (arcLength >= pulseInfo.bodyStart) && (arcLength <= pulseInfo.bodyEnd);
+  if (inBody) {
+    sdPulse = sdLine(perpDistLogical, halfThicknessLogical);
+  }
+
+  // Tail cap (at bodyStart): semicircle
+  let tailDist = pulseInfo.bodyStart - arcLength;
+  if (tailDist > 0.0 && tailDist < capExtent) {
+    let tailSd = length(vec2<f32>(tailDist, perpDistLogical)) - halfThicknessLogical;
+    sdPulse = min(sdPulse, tailSd);
+  }
+
+  // Head cap (at effectiveBodyEnd)
+  let headDist = arcLength - effectiveBodyEnd;
+  if (headDist > 0.0 && headDist < capExtent) {
+    let headSd = length(vec2<f32>(headDist, perpDistLogical)) - halfThicknessLogical;
+    sdPulse = min(sdPulse, headSd);
+  }
+
+  // Convert pulse SDF to physical pixels
+  sdPulse = sdPulse * dpr;
+
+  // Streamline capsule SDF: clips pulses to [0, totalLength] with rounded ends
   var streamlineSd: f32;
   if (arcLength < 0.0) {
     // Before start: circular cap at arcLength=0
@@ -327,14 +345,15 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   streamlineSd = streamlineSd * dpr; // Convert to physical pixels
 
   // Intersect pulse SDF with streamline capsule
-  sd = max(sd, streamlineSd);
+  let sd = max(sdPulse, streamlineSd);
 
   // Anti-aliased alpha from signed distance
   let aaWidth = 0.75 * dpr;
   let alpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
 
-  // Linear alpha interpolation along pulse (0.0 at tail, 1.0 at head/cap)
-  let pulseAlpha = saturate(pulseInfo.posInPattern / uniforms.pulseWidth);
+  // Linear alpha interpolation along pulse (0.0 at tail/bodyStart, 1.0 at head/bodyEnd)
+  let normalizedPos = saturate((arcLength - pulseInfo.bodyStart) / uniforms.pulseWidth);
+  let pulseAlpha = normalizedPos;
 
   // Combine SDF alpha, pulse alpha, and base opacity
   let finalAlpha = alpha * pulseAlpha * uniforms.baseOpacity;
