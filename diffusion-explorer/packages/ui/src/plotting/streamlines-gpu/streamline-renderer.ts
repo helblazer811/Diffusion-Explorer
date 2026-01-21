@@ -31,7 +31,7 @@ const DEFAULT_BASE_OPACITY = 0.8;
 const DEFAULT_COLOR = '#3b82f6';
 
 // Uniform buffer size (must be 16-byte aligned)
-// 12 floats * 4 bytes = 48 bytes, round up to 64 for alignment
+// 13 floats * 4 bytes = 52 bytes, round up to 64 for alignment
 const UNIFORM_BUFFER_SIZE = 64;
 
 /**
@@ -128,10 +128,11 @@ export class StreamlineRenderer {
   private bindGroup: GPUBindGroup | null = null;
 
   private segmentCount = 0;
-  private canvasWidth: number;
-  private canvasHeight: number;
+  private canvasWidth: number;  // Physical pixels
+  private canvasHeight: number; // Physical pixels
+  private dpr: number;          // Device pixel ratio
 
-  // Cached options
+  // Cached options (in logical/CSS pixels)
   private thickness: number;
   private pulseWidth: number;
   private pulseSpacing: number;
@@ -147,6 +148,7 @@ export class StreamlineRenderer {
     uniformBuffer: GPUBuffer,
     canvasWidth: number,
     canvasHeight: number,
+    dpr: number,
     options: StreamlineRendererOptions
   ) {
     this.device = device;
@@ -154,10 +156,11 @@ export class StreamlineRenderer {
     this.format = format;
     this.pipeline = pipeline;
     this.uniformBuffer = uniformBuffer;
-    this.canvasWidth = canvasWidth;
-    this.canvasHeight = canvasHeight;
+    this.canvasWidth = canvasWidth;   // Physical pixels
+    this.canvasHeight = canvasHeight; // Physical pixels
+    this.dpr = dpr;
 
-    // Store options
+    // Store options (in logical/CSS pixels)
     this.thickness = options.thickness ?? DEFAULT_THICKNESS;
     this.pulseWidth = options.pulseWidth ?? DEFAULT_PULSE_WIDTH;
     const pulseGap = options.pulseGap ?? DEFAULT_PULSE_GAP;
@@ -170,7 +173,16 @@ export class StreamlineRenderer {
   /**
    * Create a new StreamlineRenderer for a canvas.
    *
-   * @param canvas - HTML canvas element to render to
+   * The canvas should already be sized for the device pixel ratio:
+   * - canvas.width = cssWidth * dpr (physical pixels)
+   * - canvas.height = cssHeight * dpr (physical pixels)
+   * - canvas.style.width = cssWidth + 'px' (CSS pixels)
+   * - canvas.style.height = cssHeight + 'px' (CSS pixels)
+   *
+   * Streamline coordinates should be in CSS/logical pixels. The renderer
+   * will automatically scale them to physical pixels based on DPR.
+   *
+   * @param canvas - HTML canvas element to render to (already DPR-sized)
    * @param options - Renderer configuration options
    * @param gpuContext - Optional existing WebGPU context
    * @returns Promise resolving to the renderer instance
@@ -181,6 +193,9 @@ export class StreamlineRenderer {
     options: StreamlineRendererOptions = {},
     gpuContext?: WebGPUContext
   ): Promise<StreamlineRenderer> {
+    // Get DPR from options or window
+    const dpr = options.dpr ?? (typeof window !== 'undefined' ? window.devicePixelRatio : 1) ?? 1;
+
     // Get or create device
     let device: GPUDevice;
     if (gpuContext) {
@@ -285,8 +300,9 @@ export class StreamlineRenderer {
       format,
       pipeline,
       uniformBuffer,
-      canvas.width,
-      canvas.height,
+      canvas.width,  // Physical pixels
+      canvas.height, // Physical pixels
+      dpr,
       options
     );
   }
@@ -383,12 +399,23 @@ export class StreamlineRenderer {
    *
    * Call this if the canvas is resized.
    *
-   * @param width - New canvas width in pixels
-   * @param height - New canvas height in pixels
+   * @param width - New canvas width in physical pixels
+   * @param height - New canvas height in physical pixels
+   * @param dpr - Optional new device pixel ratio
    */
-  resize(width: number, height: number): void {
+  resize(width: number, height: number, dpr?: number): void {
     this.canvasWidth = width;
     this.canvasHeight = height;
+    if (dpr !== undefined) {
+      this.dpr = dpr;
+    }
+  }
+
+  /**
+   * Get the current device pixel ratio.
+   */
+  getDpr(): number {
+    return this.dpr;
   }
 
   /**
@@ -428,21 +455,26 @@ export class StreamlineRenderer {
     const thickness = style.thickness ?? this.thickness;
     const baseOpacity = style.baseOpacity ?? this.baseOpacity;
     const color = style.color ? parseColor(style.color) : this.color;
+    const dpr = style.dpr ?? this.dpr;
 
+    // Uniform layout matches shader struct:
+    // width, height, dpr, phase, thickness, pulseWidth, pulseSpacing,
+    // baseOpacity, binaryPulse, colorR, colorG, colorB, colorA
     const uniformData = new Float32Array(16); // 64 bytes / 4
-    uniformData[0] = this.canvasWidth;
-    uniformData[1] = this.canvasHeight;
-    uniformData[2] = style.phase;
-    uniformData[3] = thickness;
-    uniformData[4] = this.pulseWidth;
-    uniformData[5] = this.pulseSpacing;
-    uniformData[6] = baseOpacity;
-    uniformData[7] = this.binaryPulse ? 1.0 : 0.0;
-    uniformData[8] = color[0];
-    uniformData[9] = color[1];
-    uniformData[10] = color[2];
-    uniformData[11] = color[3];
-    // Padding to 64 bytes (indices 12-15 unused)
+    uniformData[0] = this.canvasWidth;   // Physical pixels
+    uniformData[1] = this.canvasHeight;  // Physical pixels
+    uniformData[2] = dpr;
+    uniformData[3] = style.phase;
+    uniformData[4] = thickness;          // Logical pixels (shader scales by DPR)
+    uniformData[5] = this.pulseWidth;    // Logical pixels
+    uniformData[6] = this.pulseSpacing;  // Logical pixels
+    uniformData[7] = baseOpacity;
+    uniformData[8] = this.binaryPulse ? 1.0 : 0.0;
+    uniformData[9] = color[0];
+    uniformData[10] = color[1];
+    uniformData[11] = color[2];
+    uniformData[12] = color[3];
+    // Padding to 64 bytes (indices 13-15 unused)
 
     this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
@@ -510,20 +542,23 @@ export class StreamlineRenderer {
     const thickness = style.thickness ?? this.thickness;
     const baseOpacity = style.baseOpacity ?? this.baseOpacity;
     const color = style.color ? parseColor(style.color) : this.color;
+    const dpr = style.dpr ?? this.dpr;
 
+    // Uniform layout matches shader struct
     const uniformData = new Float32Array(16);
-    uniformData[0] = this.canvasWidth;
-    uniformData[1] = this.canvasHeight;
-    uniformData[2] = style.phase;
-    uniformData[3] = thickness;
-    uniformData[4] = this.pulseWidth;
-    uniformData[5] = this.pulseSpacing;
-    uniformData[6] = baseOpacity;
-    uniformData[7] = this.binaryPulse ? 1.0 : 0.0;
-    uniformData[8] = color[0];
-    uniformData[9] = color[1];
-    uniformData[10] = color[2];
-    uniformData[11] = color[3];
+    uniformData[0] = this.canvasWidth;   // Physical pixels
+    uniformData[1] = this.canvasHeight;  // Physical pixels
+    uniformData[2] = dpr;
+    uniformData[3] = style.phase;
+    uniformData[4] = thickness;          // Logical pixels
+    uniformData[5] = this.pulseWidth;    // Logical pixels
+    uniformData[6] = this.pulseSpacing;  // Logical pixels
+    uniformData[7] = baseOpacity;
+    uniformData[8] = this.binaryPulse ? 1.0 : 0.0;
+    uniformData[9] = color[0];
+    uniformData[10] = color[1];
+    uniformData[11] = color[2];
+    uniformData[12] = color[3];
 
     this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
