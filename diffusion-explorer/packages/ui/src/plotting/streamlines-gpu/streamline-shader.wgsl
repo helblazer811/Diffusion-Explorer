@@ -3,7 +3,7 @@
  *
  * Renders animated streamlines using:
  * - Instanced rendering (one instance per segment)
- * - Vertex shader expands segments into quads with rounded cap margins
+ * - Vertex shader expands segments into quads
  * - Fragment shader uses SDF for smooth edges and sawtooth pulse animation
  *
  * Each segment is defined by:
@@ -111,12 +111,13 @@ fn vs_main(
   // Scale thickness by DPR for physical pixels
   let physicalThickness = uniforms.thickness * dpr;
   let halfThickness = physicalThickness * 0.5;
-  let margin = halfThickness + 2.0 * dpr; // Extra margin for rounded caps and AA
+  let margin = halfThickness + 1.0 * dpr; // AA margin only
 
   // Compute world position (in physical pixels)
-  // quadPos.x: 0 = start, 1 = end (with extension for rounded caps)
+  // quadPos.x: 0 = start, 1 = end
   // quadPos.y: -1 to 1 perpendicular extent
-  let along = mix(-margin, segmentLength + margin, quadPos.x);
+  // Extend quad beyond segment end by margin for capsule cap rendering (includes AA)
+  let along = mix(0.0, segmentLength + margin, quadPos.x);
   let across = quadPos.y * margin;
 
   let worldPos = p0 + dir * along + perp * across;
@@ -144,42 +145,62 @@ fn vs_main(
 // Fragment Shader
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// Signed Distance Functions (SDF)
+// Convention: sd* functions return signed distance (negative inside, positive outside)
+// ----------------------------------------------------------------------------
+
 /**
- * Signed distance function for a line segment (capsule shape).
- * Returns distance from point p to the line segment from a to b.
- *
- * @param p - Point to measure from (in local coords where segment is along x-axis)
- * @param segmentLength - Length of the segment
+ * SDF for a circle centered at origin.
+ * @param p - Point to measure from
+ * @param r - Circle radius
  * @returns Signed distance (negative inside, positive outside)
  */
-fn capsuleSDF(localPos: vec2<f32>, segmentLength: f32) -> f32 {
-  // localPos.x is position along segment (0 = start, segmentLength = end)
-  // localPos.y is perpendicular distance
-
-  // Clamp to segment extent
-  let t = clamp(localPos.x, 0.0, segmentLength);
-
-  // Distance from clamped point
-  let dx = localPos.x - t;
-  let dy = localPos.y;
-
-  return sqrt(dx * dx + dy * dy);
+fn sdCircle(p: vec2<f32>, r: f32) -> f32 {
+  return length(p) - r;
 }
 
 /**
- * Compute alpha for sawtooth pulse pattern.
+ * SDF for horizontal line segment (infinite in x, bounded in y).
+ * Used for rectangular pulse body.
+ * @param perpDist - Perpendicular distance from centerline
+ * @param halfWidth - Half the line width
+ * @returns Signed distance (negative inside, positive outside)
+ */
+fn sdLine(perpDist: f32, halfWidth: f32) -> f32 {
+  return perpDist - halfWidth;
+}
+
+// ----------------------------------------------------------------------------
+// Pulse Pattern
+// ----------------------------------------------------------------------------
+
+/**
+ * Information about which region of a pulse the fragment is in.
+ */
+struct PulseInfo {
+  inPulse: bool,    // Whether fragment is in pulse (body or cap)
+  inCap: bool,      // Whether fragment is in capsule cap region
+  overshoot: f32,   // Distance past pulseWidth (for cap SDF), in logical pixels
+}
+
+/**
+ * Determine which region of a pulse the fragment is in.
  *
  * The pattern repeats every `pulseSpacing` pixels along the streamline.
  * Within each period:
- * - First `pulseWidth` pixels: alpha fades from 0 to baseOpacity (front to back)
- * - Remaining pixels: alpha = 0 (gap)
+ * - Body region (posInPattern < pulseWidth): Rectangular pulse body
+ * - Cap region (posInPattern in [pulseWidth, pulseWidth + halfThickness]): Semicircular cap
+ * - Gap region: No rendering
  *
- * @param arcLength - Position along the streamline (pixels)
+ * @param arcLength - Position along the streamline (logical pixels)
  * @param phase - Animation phase (0-1)
  * @param phaseOffset - Per-streamline phase offset (0-1)
- * @returns Alpha value (0-1)
+ * @returns PulseInfo struct with region information
  */
-fn computePulseAlpha(arcLength: f32, phase: f32, phaseOffset: f32) -> f32 {
+fn computePulseInfo(arcLength: f32, phase: f32, phaseOffset: f32) -> PulseInfo {
+  var info: PulseInfo;
+
   // Combine global phase and per-streamline offset
   let totalPhase = fract(phase + phaseOffset);
 
@@ -189,64 +210,100 @@ fn computePulseAlpha(arcLength: f32, phase: f32, phaseOffset: f32) -> f32 {
   // Position in pattern (shifted by phase)
   let posInPattern = fract((arcLength - phasePixels) / uniforms.pulseSpacing) * uniforms.pulseSpacing;
 
-  // Check if we're in the pulse region
+  let halfThicknessLogical = uniforms.thickness * 0.5;
+
+  // Inside rectangular body
   if (posInPattern < uniforms.pulseWidth) {
-    if (uniforms.binaryPulse > 0.5) {
-      // Binary mode: full opacity
-      return uniforms.baseOpacity;
-    } else {
-      // Gradient mode: fade from 0 at front to baseOpacity at back
-      let u = posInPattern / uniforms.pulseWidth;
-      return uniforms.baseOpacity * u;
-    }
+    info.inPulse = true;
+    info.inCap = false;
+    info.overshoot = 0.0;
+    return info;
   }
 
-  // In the gap region
-  return 0.0;
+  // Check capsule cap region
+  let overshoot = posInPattern - uniforms.pulseWidth;
+  if (overshoot < halfThicknessLogical) {
+    info.inPulse = true;  // Potentially in cap (SDF will determine final visibility)
+    info.inCap = true;
+    info.overshoot = overshoot;
+    return info;
+  }
+
+  // In gap
+  info.inPulse = false;
+  info.inCap = false;
+  info.overshoot = 0.0;
+  return info;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-  // Compute SDF distance (in physical pixels)
-  let dist = capsuleSDF(input.localPos, input.segmentLength);
-
-  // Thickness scaled to physical pixels
   let dpr = uniforms.dpr;
   let physicalThickness = uniforms.thickness * dpr;
   let halfThickness = physicalThickness * 0.5;
 
-  // Signed distance (negative inside, positive outside)
-  let signedDist = dist - halfThickness;
+  // Perpendicular distance (physical pixels)
+  let perpDist = abs(input.localPos.y);
 
-  // Anti-aliased alpha based on SDF
-  // Smooth transition over ~1.5 physical pixels for good AA
+  // Arc length at this fragment (logical pixels)
+  let arcLength = input.arcLengthStart + input.localPos.x / dpr;
+
+  // Determine pulse region
+  let pulseInfo = computePulseInfo(arcLength, uniforms.phase, input.phaseOffset);
+
+  // Early discard if in gap
+  if (!pulseInfo.inPulse) {
+    discard;
+  }
+
+  // Segment ownership check to prevent double-rendering of caps at segment boundaries
+  // Each segment "owns" arc lengths from arcLengthStart to arcLengthStart + segmentLength/dpr
+  let segmentLengthLogical = input.segmentLength / dpr;
+  let segmentArcEnd = input.arcLengthStart + segmentLengthLogical;
+  let inExtendedRegion = input.localPos.x > input.segmentLength;
+
+  if (pulseInfo.inCap) {
+    // Cap's anchor point (where body ends) in arc length
+    let anchorArcLength = arcLength - pulseInfo.overshoot;
+
+    // Discard caps whose anchor is before this segment's range (let previous segment render)
+    if (anchorArcLength < input.arcLengthStart - 0.001) {
+      discard;
+    }
+
+    // In extended region, also check if anchor is past this segment's range
+    if (inExtendedRegion && anchorArcLength > segmentArcEnd + 0.001) {
+      discard;
+    }
+  } else if (inExtendedRegion) {
+    // Non-cap fragments shouldn't render in extended region
+    discard;
+  }
+
+  // Compute signed distance based on region
+  var sd: f32;
+
+  if (pulseInfo.inCap) {
+    // Capsule cap: use circular SDF centered at pulse edge
+    let overshootPhysical = pulseInfo.overshoot * dpr;
+    let capPos = vec2<f32>(overshootPhysical, perpDist);
+    sd = sdCircle(capPos, halfThickness);
+  } else {
+    // Rectangular body: use line SDF
+    sd = sdLine(perpDist, halfThickness);
+  }
+
+  // Anti-aliased alpha from signed distance
   let aaWidth = 0.75 * dpr;
-  let sdfAlpha = 1.0 - smoothstep(-aaWidth, aaWidth, signedDist);
+  let alpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
 
   // Early discard for fully transparent pixels
-  if (sdfAlpha < 0.001) {
+  if (alpha < 0.001) {
     discard;
   }
 
-  // Compute arc length at this fragment (convert from physical to logical pixels)
-  // localPos.x is the position along the segment in physical pixels
-  let clampedLocalX = clamp(input.localPos.x, 0.0, input.segmentLength);
-  // Convert to logical pixels for consistent pulse animation
-  let arcLengthPhysical = clampedLocalX;
-  let arcLength = input.arcLengthStart + arcLengthPhysical / dpr;
+  let finalAlpha = alpha * uniforms.baseOpacity;
 
-  // Compute pulse alpha (pulse parameters are in logical pixels)
-  let pulseAlpha = computePulseAlpha(arcLength, uniforms.phase, input.phaseOffset);
-
-  // Combine SDF alpha and pulse alpha
-  let finalAlpha = sdfAlpha * pulseAlpha;
-
-  // Early discard for fully transparent pixels
-  if (finalAlpha < 0.001) {
-    discard;
-  }
-
-  // Output color with computed alpha
   return vec4<f32>(
     uniforms.colorR,
     uniforms.colorG,
