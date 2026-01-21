@@ -1,16 +1,16 @@
 <!-- Introduces the concept of divergence in flow matching with three side-by-side canvases. -->
+<!-- Uses GPU-accelerated WebGPU streamline rendering. -->
 
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     TripleFigure,
     Katex,
-    drawTrajectories,
-    StreamlineAnimation,
-    useCanvas2D,
-    Timeline,
+    StreamlineRenderer,
+    prepareStreamlineData,
+    generateStreamlines,
     type VectorFieldFn,
-    type StreamlineAnimationState,
+    type StreamlineGPUData,
   } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
@@ -37,9 +37,6 @@
   // Styling
   export let streamlineColor = "#e63946";
   export let streamlineWidth = 3.0;
-  export let gradientSubdivisions = 1;
-  export let staticMode = false;
-  export let staticOpacity = 0.8;
 
   // Animation pulse settings (pixel-based)
   export let pulseWidthPixels = 40;       // Width of pulse in pixels
@@ -54,33 +51,29 @@
   let isActive: ReturnType<typeof import('svelte/store').writable<boolean>> | undefined;
 
   // Compute canvas dimensions
-  const initialCanvasWidth = Math.floor((width - 2 * gap) / 3);
-  const initialCanvasHeight = height;
   $: canvasWidth = Math.floor((width - 2 * gap) / 3);
   $: canvasHeight = height;
 
-  // Three canvases with DPR-aware initialization
+  // Three canvases
   let canvas1: HTMLCanvasElement | null = null;
   let canvas2: HTMLCanvasElement | null = null;
   let canvas3: HTMLCanvasElement | null = null;
-  const canvas2d1 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
-  const canvas2d2 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
-  const canvas2d3 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
-  $: ctx1 = canvas1 && canvas2d1.ctx;
-  $: ctx2 = canvas2 && canvas2d2.ctx;
-  $: ctx3 = canvas3 && canvas2d3.ctx;
+
+  // GPU renderers
+  let renderer1: StreamlineRenderer | null = null;
+  let renderer2: StreamlineRenderer | null = null;
+  let renderer3: StreamlineRenderer | null = null;
 
   // Animation state
   let isInitialized = false;
+  let isPlaying = false;
   let wasPlayingBeforeHidden = false;
+  let animationFrameId: number | null = null;
+  let startTime: number | null = null;
 
-  // Timeline for animation
-  let timeline: Timeline<StreamlineAnimationState> | null = null;
-
-  // Streamline animations
-  let anim1: StreamlineAnimation<StreamlineAnimationState> | null = null;
-  let anim2: StreamlineAnimation<StreamlineAnimationState> | null = null;
-  let anim3: StreamlineAnimation<StreamlineAnimationState> | null = null;
+  // WebGPU availability
+  let webgpuAvailable = false;
+  let initError: string | null = null;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -88,9 +81,6 @@
 
   /**
    * Converging vector field (pure sink, no curl).
-   * F(x, y) = (-kx, -ky) - points radially inward
-   * Divergence: -2k < 0 (volume contracting)
-   * Curl: 0
    */
   function convergingFieldFn(k: number = 0.5): VectorFieldFn {
     return (x: number, y: number): [number, number] => [
@@ -101,9 +91,6 @@
 
   /**
    * Diverging vector field (pure source, no curl).
-   * F(x, y) = (kx, ky) - points radially outward
-   * Divergence: 2k > 0 (volume expanding)
-   * Curl: 0
    */
   function divergingFieldFn(k: number = 0.5): VectorFieldFn {
     return (x: number, y: number): [number, number] => [
@@ -114,9 +101,6 @@
 
   /**
    * Diagonal uniform vector field (incompressible).
-   * F(x, y) = (c, c) - constant diagonal direction
-   * Divergence: 0 (incompressible)
-   * Curl: 0
    */
   function diagonalFieldFn(c: number = 1.0): VectorFieldFn {
     return (_x: number, _y: number): [number, number] => [
@@ -125,10 +109,6 @@
     ];
   }
 
-  // ----------------------------------------------------------------
-  // Setup
-  // ----------------------------------------------------------------
-
   function createToPixel(cw: number, ch: number): (p: [number, number]) => [number, number] {
     return ([x, y]: [number, number]): [number, number] => [
       ((x - domainRange.xMin) / (domainRange.xMax - domainRange.xMin)) * cw,
@@ -136,110 +116,132 @@
     ];
   }
 
-  function runInitialComputation() {
-    if (!ctx1 || !ctx2 || !ctx3) return;
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
 
-    const toPixel = createToPixel(canvasWidth, canvasHeight);
-    const domain = {
-      xMin: domainRange.xMin,
-      xMax: domainRange.xMax,
-      yMin: domainRange.yMin,
-      yMax: domainRange.yMax
-    };
+  function generateStreamlinesForField(vectorFieldFn: VectorFieldFn, cw: number, ch: number): number[][][] {
+    const toPixel = createToPixel(cw, ch);
 
-    const commonOptions = {
-      domain,
-      toPixel,
+    // Generate streamlines in domain coordinates
+    const rawStreamlines = generateStreamlines(vectorFieldFn, {
+      domainMin: [domainRange.xMin, domainRange.yMin],
+      domainMax: [domainRange.xMax, domainRange.yMax],
       density,
-      minPathLength,
-      subdivisionFactor: 8,
-      color: streamlineColor,
-      strokeWidth: streamlineWidth,
-      gradientSubdivisions,
-      // Pixel-based pulse animation
-      pulseWidthPixels,
-      pulsePauseWidthPixels,
-      offsets: 'random' as const,
-    };
-
-    anim1 = StreamlineAnimation.create({
-      vectorFieldFn: convergingFieldFn(0.5),
-      ...commonOptions,
+      integrationDirection: 'both',
+      minlength: minPathLength,
     });
 
-    anim2 = StreamlineAnimation.create({
-      vectorFieldFn: divergingFieldFn(0.5),
-      ...commonOptions,
-    });
-
-    anim3 = StreamlineAnimation.create({
-      vectorFieldFn: diagonalFieldFn(1.0),
-      ...commonOptions,
-    });
+    // Convert to pixel coordinates
+    return rawStreamlines.map((streamline) =>
+      streamline.map((point) => toPixel(point as [number, number]))
+    );
   }
 
-  function setupTimeline() {
-    if (!anim1) return;
+  async function initializeRenderers() {
+    if (!canvas1 || !canvas2 || !canvas3) return;
 
-    timeline = new Timeline<StreamlineAnimationState>();
-    timeline.initialState = { streamlinePhase: 0 };
-    timeline.duration = animationDuration;
-    timeline.looping = true;
+    // Check WebGPU availability
+    if (!navigator.gpu) {
+      initError = "WebGPU is not supported in this browser";
+      return;
+    }
 
-    // Add the streamline phase clip (all animations share the same phase)
-    timeline.add(anim1.clip, 0);
+    try {
+      const dpr = window.devicePixelRatio || 1;
 
-    // Register draw callback
-    timeline.onTick((_t, state) => {
-      draw(state);
-    });
+      // Set canvas sizes (physical pixels)
+      canvas1.width = canvasWidth * dpr;
+      canvas1.height = canvasHeight * dpr;
+      canvas2.width = canvasWidth * dpr;
+      canvas2.height = canvasHeight * dpr;
+      canvas3.width = canvasWidth * dpr;
+      canvas3.height = canvasHeight * dpr;
+
+      const rendererOptions = {
+        dpr,
+        thickness: streamlineWidth,
+        pulseWidth: pulseWidthPixels,
+        pulseGap: pulsePauseWidthPixels,
+        baseOpacity: 0.8,
+        color: streamlineColor,
+      };
+
+      // Create renderers
+      [renderer1, renderer2, renderer3] = await Promise.all([
+        StreamlineRenderer.create(canvas1, rendererOptions),
+        StreamlineRenderer.create(canvas2, rendererOptions),
+        StreamlineRenderer.create(canvas3, rendererOptions),
+      ]);
+
+      // Generate streamlines for each field (in CSS pixels)
+      const streamlines1 = generateStreamlinesForField(convergingFieldFn(0.5), canvasWidth, canvasHeight);
+      const streamlines2 = generateStreamlinesForField(divergingFieldFn(0.5), canvasWidth, canvasHeight);
+      const streamlines3 = generateStreamlinesForField(diagonalFieldFn(1.0), canvasWidth, canvasHeight);
+
+      // Upload to GPU with random offsets
+      renderer1.setStreamlines(streamlines1, 'random');
+      renderer2.setStreamlines(streamlines2, 'random');
+      renderer3.setStreamlines(streamlines3, 'random');
+
+      webgpuAvailable = true;
+      isInitialized = true;
+
+      // Initial draw
+      draw(0);
+
+      if (playingByDefault) {
+        startAnimation();
+      }
+    } catch (e) {
+      initError = e instanceof Error ? e.message : "Failed to initialize WebGPU";
+      console.error("WebGPU initialization error:", e);
+    }
   }
 
   // ----------------------------------------------------------------
-  // Animations
+  // Animation
   // ----------------------------------------------------------------
+
+  function draw(phase: number) {
+    if (!renderer1 || !renderer2 || !renderer3) return;
+
+    // Clear with transparent background
+    const clearColor: [number, number, number, number] = [0, 0, 0, 0];
+
+    renderer1.render({ phase }, clearColor);
+    renderer2.render({ phase }, clearColor);
+    renderer3.render({ phase }, clearColor);
+  }
+
+  function animate(timestamp: number) {
+    if (!isPlaying) return;
+
+    if (startTime === null) {
+      startTime = timestamp;
+    }
+
+    const elapsed = (timestamp - startTime) / 1000; // seconds
+    const phase = (elapsed / animationDuration) % 1;
+
+    draw(phase);
+
+    animationFrameId = requestAnimationFrame(animate);
+  }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (isPlaying || !isInitialized) return;
+    isPlaying = true;
+    startTime = null;
+    animationFrameId = requestAnimationFrame(animate);
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
-  }
-
-  // ----------------------------------------------------------------
-  // Drawing
-  // ----------------------------------------------------------------
-
-  function drawStatic(ctx: CanvasRenderingContext2D, anim: StreamlineAnimation<StreamlineAnimationState>) {
-    drawTrajectories(ctx, anim.data.streamlines, anim.data.streamlines[0]?.length ?? 0, {
-      strokeWidth: streamlineWidth,
-      color: streamlineColor,
-      progressOpacity: staticOpacity,
-      pointRadius: 0,
-      showPreview: false,
-      showHeadMarker: false
-    });
-  }
-
-  function draw(state: StreamlineAnimationState) {
-    if (!ctx1 || !ctx2 || !ctx3 || !isInitialized) return;
-    if (!anim1 || !anim2 || !anim3) return;
-
-    const { streamlinePhase } = state;
-
-    ctx1.clearRect(0, 0, canvasWidth, canvasHeight);
-    ctx2.clearRect(0, 0, canvasWidth, canvasHeight);
-    ctx3.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    if (staticMode) {
-      drawStatic(ctx1, anim1);
-      drawStatic(ctx2, anim2);
-      drawStatic(ctx3, anim3);
-    } else {
-      anim1.draw(ctx1, state);
-      anim2.draw(ctx2, state);
-      anim3.draw(ctx3, state);
+    if (!isPlaying) return;
+    isPlaying = false;
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
     }
   }
 
@@ -248,8 +250,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!isInitialized) return;
+    if (!active && isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -262,23 +264,27 @@
   // Lifecycle
   // ----------------------------------------------------------------
 
+  onMount(() => {
+    // Initialize after canvas elements are available
+    if (canvas1 && canvas2 && canvas3) {
+      initializeRenderers();
+    }
+  });
+
   onDestroy(() => {
-    if (timeline) timeline.dispose();
+    stopAnimation();
+    if (renderer1) renderer1.destroy();
+    if (renderer2) renderer2.destroy();
+    if (renderer3) renderer3.destroy();
   });
 
   // ----------------------------------------------------------------
   // Reactive Blocks
   // ----------------------------------------------------------------
 
-  // Initialize when canvases are ready
-  $: if (!isInitialized && ctx1 && ctx2 && ctx3) {
-    runInitialComputation();
-    setupTimeline();
-    isInitialized = true;
-    if (timeline) {
-      draw(timeline.initialState);
-      if (playingByDefault) startAnimation();
-    }
+  // Initialize when canvases become available
+  $: if (!isInitialized && canvas1 && canvas2 && canvas3) {
+    initializeRenderers();
   }
 
   // Handle visibility changes
@@ -288,51 +294,57 @@
 </script>
 
 <div style="width: {width}px; position: relative; left: 50%; transform: translateX(-50%);">
-  <TripleFigure {gap} {backgroundVisible} bind:isActive>
-    {#snippet leftTitle()}
-      Converging
-    {/snippet}
-    {#snippet left()}
-      <canvas
-        bind:this={canvas1}
-        use:canvas2d1.bindCanvas
-        style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
-      ></canvas>
-    {/snippet}
-    {#snippet leftLabel()}
-      <Katex math={"\\nabla \\cdot F < 0"} />
-    {/snippet}
+  {#if initError}
+    <div style="padding: 20px; text-align: center; color: #e63946;">
+      <p>WebGPU Error: {initError}</p>
+      <p style="font-size: 0.9em; color: #666;">
+        WebGPU requires a modern browser with GPU support enabled.
+      </p>
+    </div>
+  {:else}
+    <TripleFigure {gap} {backgroundVisible} bind:isActive>
+      {#snippet leftTitle()}
+        Converging
+      {/snippet}
+      {#snippet left()}
+        <canvas
+          bind:this={canvas1}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+        ></canvas>
+      {/snippet}
+      {#snippet leftLabel()}
+        <Katex math={"\\nabla \\cdot F < 0"} />
+      {/snippet}
 
-    {#snippet centerTitle()}
-      Diverging
-    {/snippet}
-    {#snippet center()}
-      <canvas
-        bind:this={canvas2}
-        use:canvas2d2.bindCanvas
-        style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
-      ></canvas>
-    {/snippet}
-    {#snippet centerLabel()}
-      <Katex math={"\\nabla \\cdot F > 0"} />
-    {/snippet}
+      {#snippet centerTitle()}
+        Diverging
+      {/snippet}
+      {#snippet center()}
+        <canvas
+          bind:this={canvas2}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+        ></canvas>
+      {/snippet}
+      {#snippet centerLabel()}
+        <Katex math={"\\nabla \\cdot F > 0"} />
+      {/snippet}
 
-    {#snippet rightTitle()}
-      Incompressible
-    {/snippet}
-    {#snippet right()}
-      <canvas
-        bind:this={canvas3}
-        use:canvas2d3.bindCanvas
-        style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
-      ></canvas>
-    {/snippet}
-    {#snippet rightLabel()}
-      <Katex math={"\\nabla \\cdot F = 0"} />
-    {/snippet}
+      {#snippet rightTitle()}
+        Incompressible
+      {/snippet}
+      {#snippet right()}
+        <canvas
+          bind:this={canvas3}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+        ></canvas>
+      {/snippet}
+      {#snippet rightLabel()}
+        <Katex math={"\\nabla \\cdot F = 0"} />
+      {/snippet}
 
-    {#snippet caption()}
-      {@render children?.()}
-    {/snippet}
-  </TripleFigure>
+      {#snippet caption()}
+        {@render children?.()}
+      {/snippet}
+    </TripleFigure>
+  {/if}
 </div>
