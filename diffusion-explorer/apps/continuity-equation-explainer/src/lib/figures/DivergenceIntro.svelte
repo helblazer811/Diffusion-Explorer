@@ -1,16 +1,16 @@
 <!-- Introduces the concept of divergence in flow matching with three side-by-side canvases. -->
+<!-- Uses GPU-accelerated WebGPU streamline rendering. -->
 
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     TripleFigure,
     Katex,
     drawTrajectories,
-    StreamlineAnimation,
-    useCanvas2D,
+    StreamlineAnimationGPU,
     Timeline,
     type VectorFieldFn,
-    type StreamlineAnimationState,
+    type StreamlineAnimationGPUState,
   } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
@@ -37,7 +37,6 @@
   // Styling
   export let streamlineColor = "#e63946";
   export let streamlineWidth = 3.0;
-  export let gradientSubdivisions = 1;
   export let staticMode = false;
   export let staticOpacity = 0.8;
 
@@ -54,33 +53,30 @@
   let isActive: ReturnType<typeof import('svelte/store').writable<boolean>> | undefined;
 
   // Compute canvas dimensions
-  const initialCanvasWidth = Math.floor((width - 2 * gap) / 3);
-  const initialCanvasHeight = height;
   $: canvasWidth = Math.floor((width - 2 * gap) / 3);
   $: canvasHeight = height;
 
-  // Three canvases with DPR-aware initialization
+  // DPR for high-DPI displays
+  let dpr = 1;
+
+  // Three canvases (WebGPU)
   let canvas1: HTMLCanvasElement | null = null;
   let canvas2: HTMLCanvasElement | null = null;
   let canvas3: HTMLCanvasElement | null = null;
-  const canvas2d1 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
-  const canvas2d2 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
-  const canvas2d3 = useCanvas2D(initialCanvasWidth, initialCanvasHeight);
-  $: ctx1 = canvas1 && canvas2d1.ctx;
-  $: ctx2 = canvas2 && canvas2d2.ctx;
-  $: ctx3 = canvas3 && canvas2d3.ctx;
 
   // Animation state
   let isInitialized = false;
+  let initPromise: Promise<void> | null = null;
   let wasPlayingBeforeHidden = false;
+  let initError: string | null = null;
 
   // Timeline for animation
-  let timeline: Timeline<StreamlineAnimationState> | null = null;
+  let timeline: Timeline<StreamlineAnimationGPUState> | null = null;
 
-  // Streamline animations
-  let anim1: StreamlineAnimation<StreamlineAnimationState> | null = null;
-  let anim2: StreamlineAnimation<StreamlineAnimationState> | null = null;
-  let anim3: StreamlineAnimation<StreamlineAnimationState> | null = null;
+  // Streamline animations (GPU)
+  let anim1: StreamlineAnimationGPU<StreamlineAnimationGPUState> | null = null;
+  let anim2: StreamlineAnimationGPU<StreamlineAnimationGPUState> | null = null;
+  let anim3: StreamlineAnimationGPU<StreamlineAnimationGPUState> | null = null;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -88,9 +84,6 @@
 
   /**
    * Converging vector field (pure sink, no curl).
-   * F(x, y) = (-kx, -ky) - points radially inward
-   * Divergence: -2k < 0 (volume contracting)
-   * Curl: 0
    */
   function convergingFieldFn(k: number = 0.5): VectorFieldFn {
     return (x: number, y: number): [number, number] => [
@@ -101,9 +94,6 @@
 
   /**
    * Diverging vector field (pure source, no curl).
-   * F(x, y) = (kx, ky) - points radially outward
-   * Divergence: 2k > 0 (volume expanding)
-   * Curl: 0
    */
   function divergingFieldFn(k: number = 0.5): VectorFieldFn {
     return (x: number, y: number): [number, number] => [
@@ -114,9 +104,6 @@
 
   /**
    * Diagonal uniform vector field (incompressible).
-   * F(x, y) = (c, c) - constant diagonal direction
-   * Divergence: 0 (incompressible)
-   * Curl: 0
    */
   function diagonalFieldFn(c: number = 1.0): VectorFieldFn {
     return (_x: number, _y: number): [number, number] => [
@@ -136,52 +123,89 @@
     ];
   }
 
-  function runInitialComputation() {
-    if (!ctx1 || !ctx2 || !ctx3) return;
+  function setupCanvasSize(canvas: HTMLCanvasElement) {
+    canvas.width = canvasWidth * dpr;
+    canvas.height = canvasHeight * dpr;
+  }
 
-    const toPixel = createToPixel(canvasWidth, canvasHeight);
-    const domain = {
-      xMin: domainRange.xMin,
-      xMax: domainRange.xMax,
-      yMin: domainRange.yMin,
-      yMax: domainRange.yMax
-    };
+  async function runInitialComputation() {
+    if (!canvas1 || !canvas2 || !canvas3) return;
 
-    const commonOptions = {
-      domain,
-      toPixel,
-      density,
-      minPathLength,
-      subdivisionFactor: 8,
-      color: streamlineColor,
-      strokeWidth: streamlineWidth,
-      gradientSubdivisions,
-      // Pixel-based pulse animation
-      pulseWidthPixels,
-      pulsePauseWidthPixels,
-      offsets: 'random' as const,
-    };
+    // Check WebGPU availability
+    if (typeof navigator === 'undefined' || !navigator.gpu) {
+      initError = "WebGPU is not supported in this browser";
+      return;
+    }
 
-    anim1 = StreamlineAnimation.create({
-      vectorFieldFn: convergingFieldFn(0.5),
-      ...commonOptions,
-    });
+    try {
+      // Set up canvas sizes
+      setupCanvasSize(canvas1);
+      setupCanvasSize(canvas2);
+      setupCanvasSize(canvas3);
 
-    anim2 = StreamlineAnimation.create({
-      vectorFieldFn: divergingFieldFn(0.5),
-      ...commonOptions,
-    });
+      const toPixel = createToPixel(canvasWidth, canvasHeight);
+      const domain = {
+        xMin: domainRange.xMin,
+        xMax: domainRange.xMax,
+        yMin: domainRange.yMin,
+        yMax: domainRange.yMax
+      };
 
-    anim3 = StreamlineAnimation.create({
-      vectorFieldFn: diagonalFieldFn(1.0),
-      ...commonOptions,
-    });
+      const commonOptions = {
+        domain,
+        toPixel,
+        density,
+        minPathLength,
+        color: streamlineColor,
+        strokeWidth: streamlineWidth,
+        // Pixel-based pulse animation
+        pulseWidthPixels,
+        pulsePauseWidthPixels,
+        baseOpacity: 0.8,
+        offsets: 'random' as const,
+        dpr,
+      };
+
+      // Create animation objects (synchronous)
+      anim1 = StreamlineAnimationGPU.create({
+        vectorFieldFn: convergingFieldFn(0.5),
+        ...commonOptions,
+      });
+
+      anim2 = StreamlineAnimationGPU.create({
+        vectorFieldFn: divergingFieldFn(0.5),
+        ...commonOptions,
+      });
+
+      anim3 = StreamlineAnimationGPU.create({
+        vectorFieldFn: diagonalFieldFn(1.0),
+        ...commonOptions,
+      });
+
+      // Initialize GPU renderers (async)
+      await Promise.all([
+        anim1.init(canvas1),
+        anim2.init(canvas2),
+        anim3.init(canvas3),
+      ]);
+
+      isInitialized = true;
+      setupTimeline();
+
+      if (timeline) {
+        draw(timeline.initialState);
+        if (playingByDefault) startAnimation();
+      }
+    } catch (e) {
+      initError = e instanceof Error ? e.message : "Failed to initialize WebGPU";
+      console.error("WebGPU initialization error:", e);
+    }
   }
 
   function setupTimeline() {
     if (!anim1) return;
 
-    timeline = new Timeline<StreamlineAnimationState>();
+    timeline = new Timeline<StreamlineAnimationGPUState>();
     timeline.initialState = { streamlinePhase: 0 };
     timeline.duration = animationDuration;
     timeline.looping = true;
@@ -211,35 +235,22 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  function drawStatic(ctx: CanvasRenderingContext2D, anim: StreamlineAnimation<StreamlineAnimationState>) {
-    drawTrajectories(ctx, anim.data.streamlines, anim.data.streamlines[0]?.length ?? 0, {
-      strokeWidth: streamlineWidth,
-      color: streamlineColor,
-      progressOpacity: staticOpacity,
-      pointRadius: 0,
-      showPreview: false,
-      showHeadMarker: false
-    });
-  }
-
-  function draw(state: StreamlineAnimationState) {
-    if (!ctx1 || !ctx2 || !ctx3 || !isInitialized) return;
+  function draw(state: StreamlineAnimationGPUState) {
+    if (!isInitialized) return;
     if (!anim1 || !anim2 || !anim3) return;
 
-    const { streamlinePhase } = state;
-
-    ctx1.clearRect(0, 0, canvasWidth, canvasHeight);
-    ctx2.clearRect(0, 0, canvasWidth, canvasHeight);
-    ctx3.clearRect(0, 0, canvasWidth, canvasHeight);
+    // Clear with transparent background
+    const clearColor: [number, number, number, number] = [0, 0, 0, 0];
 
     if (staticMode) {
-      drawStatic(ctx1, anim1);
-      drawStatic(ctx2, anim2);
-      drawStatic(ctx3, anim3);
+      // For static mode, render at full opacity with phase 0
+      anim1.render({ streamlinePhase: 0 }, clearColor);
+      anim2.render({ streamlinePhase: 0 }, clearColor);
+      anim3.render({ streamlinePhase: 0 }, clearColor);
     } else {
-      anim1.draw(ctx1, state);
-      anim2.draw(ctx2, state);
-      anim3.draw(ctx3, state);
+      anim1.render(state, clearColor);
+      anim2.render(state, clearColor);
+      anim3.render(state, clearColor);
     }
   }
 
@@ -262,8 +273,15 @@
   // Lifecycle
   // ----------------------------------------------------------------
 
+  onMount(() => {
+    dpr = window.devicePixelRatio || 1;
+  });
+
   onDestroy(() => {
     if (timeline) timeline.dispose();
+    if (anim1) anim1.destroy();
+    if (anim2) anim2.destroy();
+    if (anim3) anim3.destroy();
   });
 
   // ----------------------------------------------------------------
@@ -271,14 +289,8 @@
   // ----------------------------------------------------------------
 
   // Initialize when canvases are ready
-  $: if (!isInitialized && ctx1 && ctx2 && ctx3) {
-    runInitialComputation();
-    setupTimeline();
-    isInitialized = true;
-    if (timeline) {
-      draw(timeline.initialState);
-      if (playingByDefault) startAnimation();
-    }
+  $: if (!isInitialized && !initPromise && canvas1 && canvas2 && canvas3 && dpr > 0) {
+    initPromise = runInitialComputation();
   }
 
   // Handle visibility changes
@@ -288,51 +300,57 @@
 </script>
 
 <div style="width: {width}px; position: relative; left: 50%; transform: translateX(-50%);">
-  <TripleFigure {gap} {backgroundVisible} bind:isActive>
-    {#snippet leftTitle()}
-      Converging
-    {/snippet}
-    {#snippet left()}
-      <canvas
-        bind:this={canvas1}
-        use:canvas2d1.bindCanvas
-        style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
-      ></canvas>
-    {/snippet}
-    {#snippet leftLabel()}
-      <Katex math={"\\nabla \\cdot F < 0"} />
-    {/snippet}
+  {#if initError}
+    <div style="padding: 20px; text-align: center; color: #e63946;">
+      <p>WebGPU Error: {initError}</p>
+      <p style="font-size: 0.9em; color: #666;">
+        WebGPU requires a modern browser with GPU support enabled.
+      </p>
+    </div>
+  {:else}
+    <TripleFigure {gap} {backgroundVisible} bind:isActive>
+      {#snippet leftTitle()}
+        Converging
+      {/snippet}
+      {#snippet left()}
+        <canvas
+          bind:this={canvas1}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+        ></canvas>
+      {/snippet}
+      {#snippet leftLabel()}
+        <Katex math={"\\nabla \\cdot F < 0"} />
+      {/snippet}
 
-    {#snippet centerTitle()}
-      Diverging
-    {/snippet}
-    {#snippet center()}
-      <canvas
-        bind:this={canvas2}
-        use:canvas2d2.bindCanvas
-        style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
-      ></canvas>
-    {/snippet}
-    {#snippet centerLabel()}
-      <Katex math={"\\nabla \\cdot F > 0"} />
-    {/snippet}
+      {#snippet centerTitle()}
+        Diverging
+      {/snippet}
+      {#snippet center()}
+        <canvas
+          bind:this={canvas2}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+        ></canvas>
+      {/snippet}
+      {#snippet centerLabel()}
+        <Katex math={"\\nabla \\cdot F > 0"} />
+      {/snippet}
 
-    {#snippet rightTitle()}
-      Incompressible
-    {/snippet}
-    {#snippet right()}
-      <canvas
-        bind:this={canvas3}
-        use:canvas2d3.bindCanvas
-        style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
-      ></canvas>
-    {/snippet}
-    {#snippet rightLabel()}
-      <Katex math={"\\nabla \\cdot F = 0"} />
-    {/snippet}
+      {#snippet rightTitle()}
+        Incompressible
+      {/snippet}
+      {#snippet right()}
+        <canvas
+          bind:this={canvas3}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+        ></canvas>
+      {/snippet}
+      {#snippet rightLabel()}
+        <Katex math={"\\nabla \\cdot F = 0"} />
+      {/snippet}
 
-    {#snippet caption()}
-      {@render children?.()}
-    {/snippet}
-  </TripleFigure>
+      {#snippet caption()}
+        {@render children?.()}
+      {/snippet}
+    </TripleFigure>
+  {/if}
 </div>

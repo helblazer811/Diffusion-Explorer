@@ -97,6 +97,14 @@ export {
 } from './animation/streamline-animation';
 
 export {
+  StreamlineAnimationGPU,
+  type StreamlineAnimationGPUState,
+  type StreamlineAnimationGPUOptions,
+  type StreamlineGPUDomain,
+  type StreamlineGPUData,
+} from './animation/streamline-animation-gpu';
+
+export {
   PathlineAnimation,
   type PathlineAnimationState,
   type PathlineAnimationOptions,
