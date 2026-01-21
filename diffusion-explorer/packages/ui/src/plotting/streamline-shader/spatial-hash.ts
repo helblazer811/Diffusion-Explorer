@@ -12,7 +12,7 @@ import type {
   PackedStreamlineData,
   SpatialHashOptions
 } from './types';
-import type { StreamlineLengthData } from '../../animation/streamline-animation';
+import type { StreamlineGeometry } from './geometry';
 
 /**
  * Check if a line segment intersects or passes through a cell.
@@ -47,21 +47,18 @@ function segmentIntersectsCell(
 }
 
 /**
- * Build a spatial hash from streamlines in pixel coordinates.
+ * Build a spatial hash from unified streamline geometry.
  *
- * @param streamlines - Array of streamlines, each is array of [x, y] points in pixels
- * @param lengthData - Per-streamline length data from precomputation
- * @param offsets - Per-streamline phase offsets (0-1)
+ * @param geometry - Unified streamline geometry (segments already computed)
  * @param options - Spatial hash configuration
- * @returns Spatial hash structure
+ * @returns Spatial hash structure (references geometry.segments, no duplication)
  */
-export function buildSpatialHash(
-  streamlines: number[][][],
-  lengthData: StreamlineLengthData[],
-  offsets: number[],
+export function buildSpatialHashFromGeometry(
+  geometry: StreamlineGeometry,
   options: SpatialHashOptions
 ): StreamlineSpatialHash {
   const { width, height, strokeWidth } = options;
+  const { segments } = geometry;
 
   // Cell size should be large enough to limit segments per cell,
   // but small enough that threads can skip cells efficiently.
@@ -72,57 +69,37 @@ export function buildSpatialHash(
   const gridHeight = Math.ceil(height / cellSize);
   const numCells = gridWidth * gridHeight;
 
-  // First pass: collect all segments and count segments per cell
-  const segments: StreamlineSegment[] = [];
+  // Build cell segment lists
   const cellSegmentLists: number[][] = new Array(numCells);
   for (let i = 0; i < numCells; i++) {
     cellSegmentLists[i] = [];
   }
 
-  for (let streamlineIdx = 0; streamlineIdx < streamlines.length; streamlineIdx++) {
-    const streamline = streamlines[streamlineIdx];
-    const lengths = lengthData[streamlineIdx];
-    const offset = offsets[streamlineIdx] ?? 0;
+  // Assign each segment to cells it touches
+  for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
+    const segment = segments[segmentIndex];
+    const { p0, p1 } = segment;
 
-    if (streamline.length < 2) continue;
+    // Find all cells this segment touches
+    const minCellX = Math.max(0, Math.floor((Math.min(p0[0], p1[0]) - strokeWidth) / cellSize));
+    const maxCellX = Math.min(gridWidth - 1, Math.floor((Math.max(p0[0], p1[0]) + strokeWidth) / cellSize));
+    const minCellY = Math.max(0, Math.floor((Math.min(p0[1], p1[1]) - strokeWidth) / cellSize));
+    const maxCellY = Math.min(gridHeight - 1, Math.floor((Math.max(p0[1], p1[1]) + strokeWidth) / cellSize));
 
-    for (let segIdx = 0; segIdx < streamline.length - 1; segIdx++) {
-      const p0 = streamline[segIdx] as [number, number];
-      const p1 = streamline[segIdx + 1] as [number, number];
+    for (let cy = minCellY; cy <= maxCellY; cy++) {
+      for (let cx = minCellX; cx <= maxCellX; cx++) {
+        const cellMinX = cx * cellSize;
+        const cellMinY = cy * cellSize;
+        const cellMaxX = cellMinX + cellSize;
+        const cellMaxY = cellMinY + cellSize;
 
-      const segment: StreamlineSegment = {
-        p0,
-        p1,
-        arcLengthStart: lengths.cumulativeLengths[segIdx],
-        arcLengthEnd: lengths.cumulativeLengths[segIdx + 1],
-        totalLength: lengths.totalLength,
-        offset
-      };
-
-      const segmentIndex = segments.length;
-      segments.push(segment);
-
-      // Find all cells this segment touches
-      const minCellX = Math.max(0, Math.floor((Math.min(p0[0], p1[0]) - strokeWidth) / cellSize));
-      const maxCellX = Math.min(gridWidth - 1, Math.floor((Math.max(p0[0], p1[0]) + strokeWidth) / cellSize));
-      const minCellY = Math.max(0, Math.floor((Math.min(p0[1], p1[1]) - strokeWidth) / cellSize));
-      const maxCellY = Math.min(gridHeight - 1, Math.floor((Math.max(p0[1], p1[1]) + strokeWidth) / cellSize));
-
-      for (let cy = minCellY; cy <= maxCellY; cy++) {
-        for (let cx = minCellX; cx <= maxCellX; cx++) {
-          const cellMinX = cx * cellSize;
-          const cellMinY = cy * cellSize;
-          const cellMaxX = cellMinX + cellSize;
-          const cellMaxY = cellMinY + cellSize;
-
-          if (segmentIntersectsCell(
-            p0[0], p0[1], p1[0], p1[1],
-            cellMinX, cellMinY, cellMaxX, cellMaxY,
-            strokeWidth
-          )) {
-            const cellIdx = cy * gridWidth + cx;
-            cellSegmentLists[cellIdx].push(segmentIndex);
-          }
+        if (segmentIntersectsCell(
+          p0[0], p0[1], p1[0], p1[1],
+          cellMinX, cellMinY, cellMaxX, cellMaxY,
+          strokeWidth
+        )) {
+          const cellIdx = cy * gridWidth + cx;
+          cellSegmentLists[cellIdx].push(segmentIndex);
         }
       }
     }
@@ -155,7 +132,7 @@ export function buildSpatialHash(
     cellOffsets,
     cellCounts,
     segmentIndices,
-    segments
+    segments // Reference the same array, no duplication
   };
 }
 
@@ -209,21 +186,16 @@ export function packSpatialHashForGPU(
 }
 
 /**
- * Build and pack streamline data for GPU rendering.
- * Convenience function that combines buildSpatialHash and packSpatialHashForGPU.
+ * Build and pack streamline data for GPU rendering from unified geometry.
  *
- * @param streamlines - Array of streamlines in pixel coordinates
- * @param lengthData - Per-streamline length data
- * @param offsets - Per-streamline phase offsets
+ * @param geometry - Unified streamline geometry
  * @param options - Rendering options
  * @returns Packed data ready for GPU upload
  */
 export function buildPackedStreamlineData(
-  streamlines: number[][][],
-  lengthData: StreamlineLengthData[],
-  offsets: number[],
+  geometry: StreamlineGeometry,
   options: SpatialHashOptions
 ): PackedStreamlineData {
-  const hash = buildSpatialHash(streamlines, lengthData, offsets, options);
+  const hash = buildSpatialHashFromGeometry(geometry, options);
   return packSpatialHashForGPU(hash, options);
 }

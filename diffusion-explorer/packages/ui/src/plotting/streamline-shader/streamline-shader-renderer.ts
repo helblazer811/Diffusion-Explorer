@@ -7,7 +7,7 @@
  */
 
 import type { PackedStreamlineData, StreamlineShaderOptions } from './types';
-import type { StreamlineLengthData } from '../../animation/streamline-animation';
+import type { StreamlineGeometry } from './geometry';
 import { buildPackedStreamlineData } from './spatial-hash';
 import streamlineShaderSource from './streamline-shader.wgsl?raw';
 
@@ -27,10 +27,13 @@ export interface StreamlineShaderResult {
  *
  * @example
  * ```typescript
+ * import { buildStreamlineGeometry } from './geometry';
+ *
+ * // Build unified geometry (shared with canvas renderer)
+ * const geometry = buildStreamlineGeometry(polylines, offsets);
+ *
  * const renderer = await StreamlineShaderRenderer.create({
- *   streamlines,
- *   lengthData,
- *   offsets,
+ *   geometry,
  *   options: {
  *     width: 800,
  *     height: 600,
@@ -110,17 +113,15 @@ export class StreamlineShaderRenderer {
   /**
    * Create a new StreamlineShaderRenderer.
    *
-   * @param config - Configuration including streamlines and rendering options
+   * @param config - Configuration including unified geometry and rendering options
    * @returns Promise resolving to renderer instance
    * @throws Error if WebGPU is not available
    */
   static async create(config: {
-    streamlines: number[][][];
-    lengthData: StreamlineLengthData[];
-    offsets: number[];
+    geometry: StreamlineGeometry;
     options: StreamlineShaderOptions;
   }): Promise<StreamlineShaderRenderer> {
-    const { streamlines, lengthData, offsets, options } = config;
+    const { geometry, options } = config;
 
     // Initialize WebGPU
     if (!navigator.gpu) {
@@ -134,8 +135,8 @@ export class StreamlineShaderRenderer {
 
     const device = await adapter.requestDevice();
 
-    // Build spatial hash and pack data
-    const packedData = buildPackedStreamlineData(streamlines, lengthData, offsets, {
+    // Build spatial hash and pack data from unified geometry
+    const packedData = buildPackedStreamlineData(geometry, {
       width: options.width,
       height: options.height,
       strokeWidth: options.strokeWidth,

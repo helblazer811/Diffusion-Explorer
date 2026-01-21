@@ -15,14 +15,17 @@ import type { Clip } from './timeline';
 import type { AnimationWithData } from './animation';
 import {
   generateStreamlines,
-  computeStreamlineLengths,
   createAlphaLUT,
-  precomputePatternIndices,
   computeAlphaTrail,
   type VectorFieldFn
 } from '../plotting/streamlines';
 import { drawTrajectories } from '../plotting/trajectories';
-import { StreamlineShaderRenderer } from '../plotting/streamline-shader';
+import {
+  StreamlineShaderRenderer,
+  buildStreamlineGeometry,
+  precomputePatternIndices as precomputePatternIndicesFromGeometry,
+  type StreamlineGeometry
+} from '../plotting/streamline-shader';
 
 // ===== Types =====
 
@@ -99,6 +102,8 @@ export type StreamlineAnimationOptions = {
 
 /**
  * Per-streamline length data for animation.
+ * @deprecated Use StreamlineGeometry from streamline-shader module instead.
+ * Kept for backward compatibility.
  */
 export type StreamlineLengthData = {
   cumulativeLengths: number[];
@@ -119,6 +124,8 @@ export type StreamlineData = {
   lengthData: StreamlineLengthData[];
   /** Maximum streamline length across all streamlines */
   maxLength: number;
+  /** Unified geometry (single source of truth for segments) */
+  geometry: StreamlineGeometry;
 };
 
 // ===== Helper Functions =====
@@ -302,31 +309,44 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       return subdivideStreamline(pixelPoints, subdivisionFactor);
     });
 
-    // Compute spacing for precomputation
-    const spacing = pulseWidthPixels + pulsePauseWidthPixels;
-
-    // Compute cumulative lengths and precompute pattern indices for each streamline
-    const lengthData: StreamlineLengthData[] = streamlines.map((streamline) => {
-      const { cumulativeLengths, totalLength } = computeStreamlineLengths(streamline);
-      const patternIndices = precomputePatternIndices(cumulativeLengths, spacing);
-      return { cumulativeLengths, totalLength, patternIndices };
-    });
-
-    // Find max length across all streamlines
-    const maxLength = Math.max(...lengthData.map((d) => d.totalLength), 0);
-
     // Generate offsets
     const offsets =
       offsetMode === 'random'
         ? streamlines.map(() => Math.random())
         : streamlines.map(() => 0);
 
+    // Build unified geometry (single source of truth for segments and arc lengths)
+    const geometry = buildStreamlineGeometry(streamlines, offsets);
+
+    // Compute spacing for precomputation
+    const spacing = pulseWidthPixels + pulsePauseWidthPixels;
+
+    // Derive lengthData from geometry for backward compatibility with canvas renderer
+    // This uses the same underlying segment data, just a different view
+    const lengthData: StreamlineLengthData[] = geometry.streamlineMeta.map((meta, i) => {
+      // Build cumulative lengths from segment data
+      const cumulativeLengths: number[] = [0];
+      for (let j = 0; j < meta.segmentCount; j++) {
+        cumulativeLengths.push(geometry.segments[meta.startSegmentIdx + j].arcLengthEnd);
+      }
+      // Precompute pattern indices from geometry
+      const patternIndices = precomputePatternIndicesFromGeometry(geometry, i, spacing);
+      return {
+        cumulativeLengths,
+        totalLength: meta.totalLength,
+        patternIndices
+      };
+    });
+
+    // Find max length across all streamlines
+    const maxLength = Math.max(...geometry.streamlineMeta.map((m) => m.totalLength), 0);
+
     // Create alpha LUT and reusable buffers
     this.alphaLUT = createAlphaLUT(pulseWidthPixels, spacing, baseOpacity, 256, binaryPulse);
     this.alphaBuffers = streamlines.map((s) => new Float32Array(s.length));
 
-    // Store data
-    this.data = { streamlines, offsets, lengthData, maxLength };
+    // Store data (geometry is the source of truth, lengthData derived for compat)
+    this.data = { streamlines, offsets, lengthData, maxLength, geometry };
 
     // Create the clip
     this.clip = {
@@ -369,10 +389,9 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
     if (!this.shaderOptions) return;
 
     try {
+      // Use unified geometry for shader renderer (no redundant segment building)
       this.shaderRenderer = await StreamlineShaderRenderer.create({
-        streamlines: this.data.streamlines,
-        lengthData: this.data.lengthData,
-        offsets: this.data.offsets,
+        geometry: this.data.geometry,
         options: this.shaderOptions
       });
     } catch (error) {
