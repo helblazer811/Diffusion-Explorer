@@ -60,6 +60,7 @@ struct VertexOutput {
   @location(3) arcLengthStart: f32,      // Cumulative arc length at segment start
   @location(4) totalLength: f32,         // Total streamline length
   @location(5) phaseOffset: f32,         // Per-streamline phase offset
+  @location(6) segmentFlags: f32,        // Segment flags: 1=first, 2=last, 3=both
 }
 
 // Quad vertices: 6 vertices per instance (2 triangles)
@@ -91,6 +92,11 @@ fn vs_main(
   let cumulativeLengthStart = segments[baseIdx + 4u];
   let totalLength = segments[baseIdx + 5u];
   let phaseOffset = segments[baseIdx + 6u];
+  let segmentFlags = segments[baseIdx + 7u];
+
+  // Decode segment flags (1=first, 2=last, 3=both)
+  let isFirstSegment = (segmentFlags == 1.0) || (segmentFlags == 3.0);
+  let isLastSegment = (segmentFlags >= 2.0);
 
   // Scale coordinates from logical pixels to physical pixels
   let dpr = uniforms.dpr;
@@ -116,8 +122,11 @@ fn vs_main(
   // Compute world position (in physical pixels)
   // quadPos.x: 0 = start, 1 = end
   // quadPos.y: -1 to 1 perpendicular extent
-  // Extend quad beyond segment end by margin for capsule cap rendering (includes AA)
-  let along = mix(0.0, segmentLength + margin, quadPos.x);
+  // Extend quad for capsule cap rendering:
+  // - First segment: extend backward for streamline start cap
+  // - All segments: extend forward for pulse caps at segment boundaries
+  let startExtend = select(0.0, margin, isFirstSegment);
+  let along = mix(-startExtend, segmentLength + margin, quadPos.x);
   let across = quadPos.y * margin;
 
   let worldPos = p0 + dir * along + perp * across;
@@ -137,6 +146,7 @@ fn vs_main(
   output.arcLengthStart = cumulativeLengthStart;
   output.totalLength = totalLength;
   output.phaseOffset = phaseOffset;
+  output.segmentFlags = segmentFlags;
 
   return output;
 }
@@ -297,6 +307,27 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // Rectangular body: use line SDF
     sd = sdLine(perpDist, halfThickness);
   }
+
+  // Streamline capsule SDF: clips pulses to [0, totalLength] with rounded ends
+  // This naturally bounds pulses to the streamline extent with semicircular caps
+  let halfThicknessLogical = uniforms.thickness * 0.5;
+  let perpDistLogical = perpDist / dpr;
+
+  var streamlineSd: f32;
+  if (arcLength < 0.0) {
+    // Before start: circular cap at arcLength=0
+    streamlineSd = length(vec2<f32>(-arcLength, perpDistLogical)) - halfThicknessLogical;
+  } else if (arcLength > input.totalLength) {
+    // Past end: circular cap at arcLength=totalLength
+    streamlineSd = length(vec2<f32>(arcLength - input.totalLength, perpDistLogical)) - halfThicknessLogical;
+  } else {
+    // On streamline: perpendicular distance only
+    streamlineSd = perpDistLogical - halfThicknessLogical;
+  }
+  streamlineSd = streamlineSd * dpr; // Convert to physical pixels
+
+  // Intersect pulse SDF with streamline capsule
+  sd = max(sd, streamlineSd);
 
   // Anti-aliased alpha from signed distance
   let aaWidth = 0.75 * dpr;

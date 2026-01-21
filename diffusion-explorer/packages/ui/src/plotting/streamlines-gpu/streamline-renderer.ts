@@ -122,7 +122,10 @@ export function prepareStreamlineData(
       segments[baseIdx + 4] = cumulativeLengths[i];
       segments[baseIdx + 5] = totalLength;
       segments[baseIdx + 6] = phaseOffset;
-      segments[baseIdx + 7] = 0; // padding
+      // Segment flags: 1 = first, 2 = last, 3 = both (single-segment streamline)
+      const isFirst = (i === 0) ? 1.0 : 0.0;
+      const isLast = (i === streamline.length - 2) ? 2.0 : 0.0;
+      segments[baseIdx + 7] = isFirst + isLast;
 
       segmentIdx++;
     }
