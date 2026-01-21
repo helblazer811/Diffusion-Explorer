@@ -65,6 +65,7 @@ export { useCanvas2D } from './plotting/canvas';
 export * from './plotting/utils';
 export * from './plotting/surface';
 export * from './plotting/line-integral-convolution';
+export * from './plotting/streamlines-gpu';
 
 // Animation utilities
 export {
