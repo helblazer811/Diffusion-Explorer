@@ -1,10 +1,34 @@
 /**
- * Reusable streamline animation abstraction.
+ * Unified streamline animation class supporting both CPU and GPU backends.
  *
  * Provides a class-based animation that:
  * - Generates streamlines from a vector field
  * - Creates a Clip for Timeline integration
  * - Renders animated pulse effects along streamlines
+ * - Supports both Canvas 2D (CPU) and WebGPU (GPU) rendering
+ *
+ * @example
+ * // CPU backend (default)
+ * const anim = StreamlineAnimation.create<MyState>({
+ *   vectorFieldFn,
+ *   domain: { xMin: -2, xMax: 2, yMin: -2, yMax: 2 },
+ *   toPixel,
+ *   color: '#3b82f6',
+ * });
+ *
+ * // GPU backend
+ * const animGPU = StreamlineAnimation.create<MyState>({
+ *   backend: 'gpu',
+ *   vectorFieldFn,
+ *   domain: { xMin: -2, xMax: 2, yMin: -2, yMax: 2 },
+ *   toPixel,
+ *   color: '#3b82f6',
+ * });
+ * await animGPU.init(canvas);
+ *
+ * // In animation loop:
+ * anim.draw(ctx, state);        // CPU
+ * animGPU.render(state);        // GPU
  */
 
 import type { Clip } from './timeline';
@@ -15,94 +39,32 @@ import {
   createAlphaLUT,
   precomputePatternIndices,
   computeAlphaTrail,
-  type VectorFieldFn
+  StreamlineRenderer,
+  type StreamlineRendererOptions,
+  type StreamlineLengthData,
 } from '../plotting/streamlines';
 import { drawTrajectories } from '../plotting/trajectories';
+import type {
+  StreamlineBackend,
+  StreamlineAnimationState,
+  StreamlineAnimationData,
+  StreamlineAnimationOptions,
+  StreamlineAnimationCPUOptions,
+  StreamlineAnimationGPUOptions,
+} from './streamline-animation.types';
 
-// ===== Types =====
-
-/**
- * Base animation state type for streamline animations.
- * Users extend this for their own animation state.
- *
- * @example
- * type MyAnimationState = StreamlineAnimationState & {
- *   theta: number;  // rotation angle
- * };
- */
-export type StreamlineAnimationState = {
-  streamlinePhase: number;
+// Re-export types for backward compatibility
+export type {
+  StreamlineAnimationState,
+  StreamlineAnimationOptions,
+  StreamlineAnimationData,
+  StreamlineBackend,
 };
+export type { StreamlineDomain } from '../plotting/streamlines';
 
-/**
- * Domain bounds for streamline generation.
- */
-export type StreamlineDomain = {
-  xMin: number;
-  xMax: number;
-  yMin: number;
-  yMax: number;
-};
-
-/**
- * Options for creating a streamline animation.
- */
-export type StreamlineAnimationOptions = {
-  // Required
-  vectorFieldFn: VectorFieldFn;
-  domain: StreamlineDomain;
-  toPixel: (p: [number, number]) => [number, number];
-
-  // Generation (optional)
-  density?: number | [number, number];
-  minPathLength?: number;
-  segmentLength?: number;
-  integrationDirection?: 'forward' | 'backward' | 'both';
-  startPoints?: [number, number][];  // Custom seed points for streamlines
-  subdivisionFactor?: number;  // Subdivide each segment into N pieces (default: 1 = no subdivision)
-
-  // Animation (optional)
-  pulseWidthPixels?: number;      // Pulse width in pixels (default: 30)
-  pulsePauseWidthPixels?: number; // Gap between pulses in pixels (default: 50)
-  baseOpacity?: number;           // Maximum opacity at pulse back (default: 0.8)
-  offsets?: 'random' | 'synchronized';  // How to offset pulses between streamlines
-  binaryPulse?: boolean;          // If true, no alpha gradient - just on/off streaks
-
-  // Clip options (optional)
-  /** Number of pulse animation loops per clip duration (default: 1) */
-  loopMultiplier?: number;
-
-  // Style (optional)
-  color?: string;
-  strokeWidth?: number;
-  gradientSubdivisions?: number;
-};
-
-/**
- * Per-streamline length data for animation.
- */
-export type StreamlineLengthData = {
-  cumulativeLengths: number[];
-  totalLength: number;
-  /** Precomputed LUT indices for alpha computation */
-  patternIndices: Uint16Array;
-};
-
-/**
- * Data exposed by StreamlineAnimation.
- */
-export type StreamlineData = {
-  /** Generated streamlines in pixel coordinates */
-  streamlines: number[][][];
-  /** Per-streamline animation offsets */
-  offsets: number[];
-  /** Per-streamline length data (for pixel-based animation) */
-  lengthData: StreamlineLengthData[];
-  /** Maximum streamline length across all streamlines */
-  maxLength: number;
-};
-
-// ===== Helper Functions =====
+// Legacy type aliases for backward compatibility
+export type StreamlineData = StreamlineAnimationData;
+export type StreamlineLengthData_Legacy = StreamlineLengthData;
 
 /**
  * Subdivide each segment of a streamline into smaller pieces.
@@ -134,17 +96,23 @@ function subdivideStreamline(points: number[][], factor: number): number[][] {
   return result;
 }
 
-// ===== Class Implementation =====
+/**
+ * Internal: CPU-specific length data with pattern indices.
+ */
+type CPULengthData = StreamlineLengthData & {
+  patternIndices: Uint16Array;
+};
 
 /**
  * Animated streamlines for visualizing vector fields.
  *
  * Implements AnimationWithData to provide:
  * - A clip for Timeline integration
- * - A draw method for rendering
+ * - A draw method for rendering (CPU) or render method (GPU)
  * - Access to generated streamline data
  *
  * @example
+ * // CPU backend (default)
  * const anim = StreamlineAnimation.create<MyState>({
  *   vectorFieldFn,
  *   domain: { xMin: -2, xMax: 2, yMin: -2, yMax: 2 },
@@ -157,24 +125,278 @@ function subdivideStreamline(points: number[][], factor: number): number[][] {
  *
  * // In draw function:
  * anim.draw(ctx, state);
+ *
+ * @example
+ * // GPU backend
+ * const anim = StreamlineAnimation.create<MyState>({
+ *   backend: 'gpu',
+ *   vectorFieldFn,
+ *   domain,
+ *   toPixel,
+ * });
+ *
+ * await anim.init(canvas);  // Required for GPU
+ * anim.render(state);       // Use render() instead of draw()
  */
 export class StreamlineAnimation<TState extends StreamlineAnimationState>
-  implements AnimationWithData<TState, StreamlineData> {
+  implements AnimationWithData<TState, StreamlineAnimationData> {
 
   readonly clip: Clip<TState>;
-  readonly data: StreamlineData;
+  readonly data: StreamlineAnimationData;
+  readonly backend: StreamlineBackend;
 
-  // Style options
+  // CPU-specific state
   private readonly baseOpacity: number;
   private readonly color: string;
   private readonly strokeWidth: number;
   private readonly gradientSubdivisions: number;
+  private readonly alphaLUT: Float32Array | null;
+  private readonly alphaBuffers: Float32Array[] | null;
+  private readonly cpuLengthData: CPULengthData[] | null;
 
-  // Animation data
-  private readonly alphaLUT: Float32Array;
-  private readonly alphaBuffers: Float32Array[];
+  // GPU-specific state
+  private readonly rendererOptions: StreamlineRendererOptions | null;
+  private readonly offsetMode: 'random' | 'synchronized';
+  private renderer: StreamlineRenderer | null = null;
+  private canvas: HTMLCanvasElement | null = null;
+  private isInitialized = false;
 
-  private constructor(options: StreamlineAnimationOptions) {
+  private constructor(
+    options: StreamlineAnimationOptions,
+    data: StreamlineAnimationData,
+    clip: Clip<TState>,
+    cpuState: {
+      baseOpacity: number;
+      color: string;
+      strokeWidth: number;
+      gradientSubdivisions: number;
+      alphaLUT: Float32Array | null;
+      alphaBuffers: Float32Array[] | null;
+      cpuLengthData: CPULengthData[] | null;
+    } | null,
+    gpuState: {
+      rendererOptions: StreamlineRendererOptions;
+      offsetMode: 'random' | 'synchronized';
+    } | null
+  ) {
+    this.data = data;
+    this.clip = clip;
+    this.backend = options.backend ?? 'cpu';
+
+    // CPU state
+    if (cpuState) {
+      this.baseOpacity = cpuState.baseOpacity;
+      this.color = cpuState.color;
+      this.strokeWidth = cpuState.strokeWidth;
+      this.gradientSubdivisions = cpuState.gradientSubdivisions;
+      this.alphaLUT = cpuState.alphaLUT;
+      this.alphaBuffers = cpuState.alphaBuffers;
+      this.cpuLengthData = cpuState.cpuLengthData;
+    } else {
+      this.baseOpacity = 0.8;
+      this.color = '#3b82f6';
+      this.strokeWidth = 2.5;
+      this.gradientSubdivisions = 12;
+      this.alphaLUT = null;
+      this.alphaBuffers = null;
+      this.cpuLengthData = null;
+    }
+
+    // GPU state
+    if (gpuState) {
+      this.rendererOptions = gpuState.rendererOptions;
+      this.offsetMode = gpuState.offsetMode;
+    } else {
+      this.rendererOptions = null;
+      this.offsetMode = 'synchronized';
+    }
+  }
+
+  /**
+   * Initialize the GPU renderer with a canvas element.
+   * Required for GPU backend before rendering.
+   *
+   * @param canvas - HTML canvas element to render to
+   * @throws Error if WebGPU is not available or if backend is 'cpu'
+   */
+  async init(canvas: HTMLCanvasElement): Promise<void> {
+    if (this.backend !== 'gpu') {
+      throw new Error('init() is only available for GPU backend');
+    }
+
+    if (!this.rendererOptions) {
+      throw new Error('GPU renderer options not configured');
+    }
+
+    if (this.isInitialized && this.canvas === canvas) {
+      return; // Already initialized with this canvas
+    }
+
+    // Destroy existing renderer if switching canvas
+    if (this.renderer) {
+      this.renderer.destroy();
+      this.renderer = null;
+    }
+
+    this.canvas = canvas;
+
+    // Create renderer
+    this.renderer = await StreamlineRenderer.create(canvas, this.rendererOptions);
+
+    // Upload streamlines
+    this.renderer.setStreamlines(this.data.streamlines, this.offsetMode);
+
+    this.isInitialized = true;
+  }
+
+  /**
+   * Check if the GPU animation has been initialized.
+   */
+  get initialized(): boolean {
+    return this.isInitialized;
+  }
+
+  /**
+   * Draw the streamlines at the current animation state (CPU backend).
+   *
+   * @param ctx - Canvas 2D rendering context
+   * @param state - Current animation state (uses streamlinePhase)
+   */
+  draw(ctx: CanvasRenderingContext2D, state: TState): void {
+    if (this.backend === 'gpu') {
+      console.warn('StreamlineAnimation.draw() called on GPU backend - use render() instead');
+      return;
+    }
+
+    if (!this.alphaLUT || !this.alphaBuffers || !this.cpuLengthData) {
+      return;
+    }
+
+    const { streamlines, offsets } = this.data;
+    if (streamlines.length === 0) return;
+
+    const phase = state.streamlinePhase;
+
+    // Compute per-segment alphas using precomputed LUT and pattern indices
+    const perSegmentAlphas = streamlines.map((_, i) => {
+      const { patternIndices } = this.cpuLengthData![i];
+      const offset = offsets[i] ?? 0;
+      const outBuffer = this.alphaBuffers![i];
+
+      computeAlphaTrail(
+        patternIndices,
+        this.alphaLUT!,
+        phase,
+        offset,
+        outBuffer
+      );
+      return Array.from(outBuffer);
+    });
+
+    // Draw all streamlines
+    drawTrajectories(ctx, streamlines, 0, {
+      strokeWidth: this.strokeWidth,
+      color: this.color,
+      progressOpacity: this.baseOpacity,
+      pointRadius: 0,
+      showPreview: false,
+      showHeadMarker: false,
+      perSegmentAlphas,
+      gradientSubdivisions: this.gradientSubdivisions,
+    });
+  }
+
+  /**
+   * Render the streamlines at the current animation state (GPU backend).
+   *
+   * @param state - Current animation state (uses streamlinePhase)
+   * @param clearColor - Optional background color (RGBA 0-1), default transparent
+   */
+  render(
+    state: TState,
+    clearColor: [number, number, number, number] = [0, 0, 0, 0]
+  ): void {
+    if (this.backend !== 'gpu') {
+      console.warn('StreamlineAnimation.render() called on CPU backend - use draw() instead');
+      return;
+    }
+
+    if (!this.renderer || !this.isInitialized) {
+      console.warn('StreamlineAnimation: render() called before init()');
+      return;
+    }
+
+    this.renderer.render({ phase: state.streamlinePhase }, clearColor);
+  }
+
+  /**
+   * Update GPU rendering options (GPU backend only).
+   */
+  updateOptions(options: Partial<StreamlineRendererOptions>): void {
+    if (this.renderer) {
+      this.renderer.updateOptions(options);
+    }
+  }
+
+  /**
+   * Resize the canvas (GPU backend only).
+   *
+   * @param width - New width in physical pixels
+   * @param height - New height in physical pixels
+   * @param dpr - Optional new device pixel ratio
+   */
+  resize(width: number, height: number, dpr?: number): void {
+    if (this.renderer) {
+      this.renderer.resize(width, height, dpr);
+    }
+  }
+
+  /**
+   * Get the underlying GPU renderer (for advanced use).
+   */
+  getRenderer(): StreamlineRenderer | null {
+    return this.renderer;
+  }
+
+  /**
+   * Destroy the animation and release GPU resources.
+   */
+  destroy(): void {
+    if (this.renderer) {
+      this.renderer.destroy();
+      this.renderer = null;
+    }
+    this.canvas = null;
+    this.isInitialized = false;
+  }
+
+  /**
+   * Create a new StreamlineAnimation instance.
+   *
+   * @param options - Configuration options for the animation
+   * @returns A new StreamlineAnimation instance
+   */
+  static create<TState extends StreamlineAnimationState>(
+    options: StreamlineAnimationOptions
+  ): StreamlineAnimation<TState> {
+    const backend = options.backend ?? 'cpu';
+
+    if (backend === 'gpu') {
+      return StreamlineAnimation.createGPU<TState>(options as StreamlineAnimationGPUOptions);
+    } else {
+      return StreamlineAnimation.createCPU<TState>(options as StreamlineAnimationCPUOptions);
+    }
+  }
+
+  /**
+   * Create a CPU-backend StreamlineAnimation.
+   *
+   * @param options - CPU-specific configuration options
+   * @returns A new StreamlineAnimation with CPU backend
+   */
+  static createCPU<TState extends StreamlineAnimationState>(
+    options: StreamlineAnimationCPUOptions
+  ): StreamlineAnimation<TState> {
     const {
       vectorFieldFn,
       domain,
@@ -200,12 +422,6 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       gradientSubdivisions = 12,
     } = options;
 
-    // Store style options
-    this.baseOpacity = baseOpacity;
-    this.color = color;
-    this.strokeWidth = strokeWidth;
-    this.gradientSubdivisions = gradientSubdivisions;
-
     // Generate streamlines in domain coordinates
     const rawStreamlines = generateStreamlines(vectorFieldFn, {
       domainMin: [domain.xMin, domain.yMin],
@@ -227,11 +443,18 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
     const spacing = pulseWidthPixels + pulsePauseWidthPixels;
 
     // Compute cumulative lengths and precompute pattern indices for each streamline
-    const lengthData: StreamlineLengthData[] = streamlines.map((streamline) => {
+    const cpuLengthData: CPULengthData[] = streamlines.map((streamline) => {
       const { cumulativeLengths, totalLength } = computeStreamlineLengths(streamline);
       const patternIndices = precomputePatternIndices(cumulativeLengths, spacing);
       return { cumulativeLengths, totalLength, patternIndices };
     });
+
+    // Create generic length data for the public data object
+    const lengthData: StreamlineLengthData[] = cpuLengthData.map(({ cumulativeLengths, totalLength, patternIndices }) => ({
+      cumulativeLengths,
+      totalLength,
+      patternIndices,
+    }));
 
     // Find max length across all streamlines
     const maxLength = Math.max(...lengthData.map((d) => d.totalLength), 0);
@@ -243,72 +466,141 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
         : streamlines.map(() => 0);
 
     // Create alpha LUT and reusable buffers
-    this.alphaLUT = createAlphaLUT(pulseWidthPixels, spacing, baseOpacity, 256, binaryPulse);
-    this.alphaBuffers = streamlines.map((s) => new Float32Array(s.length));
+    const alphaLUT = createAlphaLUT(pulseWidthPixels, spacing, baseOpacity, 256, binaryPulse);
+    const alphaBuffers = streamlines.map((s) => new Float32Array(s.length));
 
     // Store data
-    this.data = { streamlines, offsets, lengthData, maxLength };
+    const data: StreamlineAnimationData = { streamlines, offsets, lengthData, maxLength };
 
     // Create the clip
-    this.clip = {
+    const clip: Clip<TState> = {
       name: 'StreamlinePhase',
       reduce(t: number) {
         return { streamlinePhase: (t * loopMultiplier) % 1 } as Partial<TState>;
       },
     };
+
+    // Convert color to string if needed
+    const colorStr = typeof color === 'string'
+      ? color
+      : `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+
+    return new StreamlineAnimation<TState>(
+      options,
+      data,
+      clip,
+      {
+        baseOpacity,
+        color: colorStr,
+        strokeWidth,
+        gradientSubdivisions,
+        alphaLUT,
+        alphaBuffers,
+        cpuLengthData,
+      },
+      null
+    );
   }
 
   /**
-   * Draw the streamlines at the current animation state.
+   * Create a GPU-backend StreamlineAnimation.
    *
-   * @param ctx - Canvas 2D rendering context
-   * @param state - Current animation state (uses streamlinePhase)
+   * @param options - GPU-specific configuration options
+   * @returns A new StreamlineAnimation with GPU backend (not yet initialized)
    */
-  draw(ctx: CanvasRenderingContext2D, state: TState): void {
-    const { streamlines, offsets, lengthData } = this.data;
-    if (streamlines.length === 0) return;
-
-    const phase = state.streamlinePhase;
-
-    // Compute per-segment alphas using precomputed LUT and pattern indices
-    const perSegmentAlphas = streamlines.map((_, i) => {
-      const { patternIndices } = lengthData[i];
-      const offset = offsets[i] ?? 0;
-      const outBuffer = this.alphaBuffers[i];
-
-      computeAlphaTrail(
-        patternIndices,
-        this.alphaLUT,
-        phase,
-        offset,
-        outBuffer
-      );
-      return Array.from(outBuffer);
-    });
-
-    // Draw all streamlines
-    drawTrajectories(ctx, streamlines, 0, {
-      strokeWidth: this.strokeWidth,
-      color: this.color,
-      progressOpacity: this.baseOpacity,
-      pointRadius: 0,
-      showPreview: false,
-      showHeadMarker: false,
-      perSegmentAlphas,
-      gradientSubdivisions: this.gradientSubdivisions,
-    });
-  }
-
-  /**
-   * Create a new StreamlineAnimation instance.
-   *
-   * @param options - Configuration options for the animation
-   * @returns A new StreamlineAnimation instance
-   */
-  static create<TState extends StreamlineAnimationState>(
-    options: StreamlineAnimationOptions
+  static createGPU<TState extends StreamlineAnimationState>(
+    options: StreamlineAnimationGPUOptions
   ): StreamlineAnimation<TState> {
-    return new StreamlineAnimation<TState>(options);
+    const {
+      vectorFieldFn,
+      domain,
+      toPixel,
+      // Generation defaults
+      density = 1.0,
+      minPathLength = 2.0,
+      integrationDirection = 'both',
+      startPoints,
+      // Animation defaults
+      pulseWidthPixels = 30,
+      pulsePauseWidthPixels = 50,
+      baseOpacity = 0.8,
+      offsets: offsetMode = 'synchronized',
+      binaryPulse = false,
+      // Clip defaults
+      loopMultiplier = 1,
+      // Style defaults
+      color = '#3b82f6',
+      strokeWidth = 2.5,
+      // GPU-specific
+      dpr,
+    } = options;
+
+    // Generate streamlines in domain coordinates
+    const rawStreamlines = generateStreamlines(vectorFieldFn, {
+      domainMin: [domain.xMin, domain.yMin],
+      domainMax: [domain.xMax, domain.yMax],
+      density,
+      integrationDirection,
+      minlength: minPathLength,
+      startPoints,
+    });
+
+    // Convert to pixel coordinates
+    const streamlines = rawStreamlines.map((streamline) =>
+      streamline.map((point) => toPixel(point as [number, number]))
+    );
+
+    // Compute lengths for each streamline
+    const lengthData: StreamlineLengthData[] = streamlines.map((streamline) => {
+      const { cumulativeLengths, totalLength } = computeStreamlineLengths(streamline);
+      return { cumulativeLengths, totalLength };
+    });
+
+    // Find max length
+    const maxLength = Math.max(...lengthData.map((d) => d.totalLength), 0);
+
+    // Generate offsets (stored for reference, actual offsets applied during setStreamlines)
+    const offsets =
+      offsetMode === 'random'
+        ? streamlines.map(() => Math.random())
+        : streamlines.map(() => 0);
+
+    // Create data object
+    const data: StreamlineAnimationData = {
+      streamlines,
+      offsets,
+      lengthData,
+      maxLength,
+    };
+
+    // Create renderer options
+    const rendererOptions: StreamlineRendererOptions = {
+      dpr,
+      thickness: strokeWidth,
+      pulseWidth: pulseWidthPixels,
+      pulseGap: pulsePauseWidthPixels,
+      baseOpacity,
+      binaryPulse,
+      color,
+    };
+
+    // Create the clip
+    const clip: Clip<TState> = {
+      name: 'StreamlinePhaseGPU',
+      reduce(t: number) {
+        return { streamlinePhase: (t * loopMultiplier) % 1 } as Partial<TState>;
+      },
+    };
+
+    return new StreamlineAnimation<TState>(
+      options,
+      data,
+      clip,
+      null,
+      {
+        rendererOptions,
+        offsetMode,
+      }
+    );
   }
 }
-
