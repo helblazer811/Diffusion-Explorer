@@ -5,6 +5,10 @@
  * - Generates streamlines from a vector field
  * - Creates a Clip for Timeline integration
  * - Renders animated pulse effects along streamlines
+ *
+ * Supports two rendering modes:
+ * - 'canvas': Traditional Canvas 2D rendering (default)
+ * - 'shader': GPU-accelerated WebGPU compute shader rendering
  */
 
 import type { Clip } from './timeline';
@@ -18,6 +22,7 @@ import {
   type VectorFieldFn
 } from '../plotting/streamlines';
 import { drawTrajectories } from '../plotting/trajectories';
+import { StreamlineShaderRenderer } from '../plotting/streamline-shader';
 
 // ===== Types =====
 
@@ -76,6 +81,20 @@ export type StreamlineAnimationOptions = {
   color?: string;
   strokeWidth?: number;
   gradientSubdivisions?: number;
+
+  // Render mode (optional)
+  /**
+   * Rendering mode:
+   * - 'canvas': Traditional Canvas 2D rendering (default)
+   * - 'shader': GPU-accelerated WebGPU compute shader rendering
+   *
+   * Shader mode requires canvasWidth and canvasHeight to be specified.
+   */
+  renderMode?: 'canvas' | 'shader';
+  /** Canvas width in pixels (required for shader mode) */
+  canvasWidth?: number;
+  /** Canvas height in pixels (required for shader mode) */
+  canvasHeight?: number;
 };
 
 /**
@@ -103,6 +122,44 @@ export type StreamlineData = {
 };
 
 // ===== Helper Functions =====
+
+/**
+ * Parse a CSS color string to RGB values in [0, 1] range.
+ *
+ * @param color - CSS color string (hex, rgb, etc.)
+ * @returns RGB tuple with values in [0, 1]
+ */
+function parseColorToRGB(color: string): [number, number, number] {
+  // Handle hex colors
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16) / 255;
+      const g = parseInt(hex[1] + hex[1], 16) / 255;
+      const b = parseInt(hex[2] + hex[2], 16) / 255;
+      return [r, g, b];
+    } else if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      return [r, g, b];
+    }
+  }
+
+  // Handle rgb() colors
+  const rgbMatch = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+  if (rgbMatch) {
+    return [
+      parseInt(rgbMatch[1]) / 255,
+      parseInt(rgbMatch[2]) / 255,
+      parseInt(rgbMatch[3]) / 255
+    ];
+  }
+
+  // Default to blue if parsing fails
+  console.warn(`Could not parse color "${color}", defaulting to blue`);
+  return [0.23, 0.51, 0.96]; // #3b82f6
+}
 
 /**
  * Subdivide each segment of a streamline into smaller pieces.
@@ -174,6 +231,21 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
   private readonly alphaLUT: Float32Array;
   private readonly alphaBuffers: Float32Array[];
 
+  // Shader rendering (optional)
+  private readonly renderMode: 'canvas' | 'shader';
+  private shaderRenderer: StreamlineShaderRenderer | null = null;
+  private shaderInitPromise: Promise<void> | null = null;
+  private readonly shaderOptions: {
+    width: number;
+    height: number;
+    strokeWidth: number;
+    pulseWidth: number;
+    pulsePauseWidth: number;
+    baseOpacity: number;
+    binaryPulse: boolean;
+    color: [number, number, number];
+  } | null = null;
+
   private constructor(options: StreamlineAnimationOptions) {
     const {
       vectorFieldFn,
@@ -198,7 +270,14 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       color = '#3b82f6',
       strokeWidth = 2.5,
       gradientSubdivisions = 12,
+      // Render mode defaults
+      renderMode = 'canvas',
+      canvasWidth,
+      canvasHeight,
     } = options;
+
+    // Store render mode
+    this.renderMode = renderMode;
 
     // Store style options
     this.baseOpacity = baseOpacity;
@@ -256,6 +335,50 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
         return { streamlinePhase: (t * loopMultiplier) % 1 } as Partial<TState>;
       },
     };
+
+    // Initialize shader renderer if in shader mode
+    if (renderMode === 'shader') {
+      if (canvasWidth === undefined || canvasHeight === undefined) {
+        throw new Error('canvasWidth and canvasHeight are required for shader render mode');
+      }
+
+      // Parse color string to RGB [0-1]
+      const colorRGB = parseColorToRGB(color);
+
+      // Store shader options for lazy initialization
+      this.shaderOptions = {
+        width: canvasWidth,
+        height: canvasHeight,
+        strokeWidth,
+        pulseWidth: pulseWidthPixels,
+        pulsePauseWidth: pulsePauseWidthPixels,
+        baseOpacity,
+        binaryPulse,
+        color: colorRGB
+      };
+
+      // Start async initialization
+      this.shaderInitPromise = this.initShaderRenderer();
+    }
+  }
+
+  /**
+   * Initialize the WebGPU shader renderer asynchronously.
+   */
+  private async initShaderRenderer(): Promise<void> {
+    if (!this.shaderOptions) return;
+
+    try {
+      this.shaderRenderer = await StreamlineShaderRenderer.create({
+        streamlines: this.data.streamlines,
+        lengthData: this.data.lengthData,
+        offsets: this.data.offsets,
+        options: this.shaderOptions
+      });
+    } catch (error) {
+      console.warn('Failed to initialize shader renderer, falling back to canvas:', error);
+      // Keep shaderRenderer as null, draw() will fall back to canvas
+    }
   }
 
   /**
@@ -269,6 +392,24 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
     if (streamlines.length === 0) return;
 
     const phase = state.streamlinePhase;
+
+    // Use shader renderer if available
+    if (this.renderMode === 'shader' && this.shaderRenderer) {
+      // Shader render is async, but we handle it synchronously here
+      // by caching the last rendered ImageData
+      this.renderWithShader(ctx, phase);
+      return;
+    }
+
+    // Canvas rendering (default)
+    this.renderWithCanvas(ctx, phase);
+  }
+
+  /**
+   * Render using Canvas 2D API.
+   */
+  private renderWithCanvas(ctx: CanvasRenderingContext2D, phase: number): void {
+    const { streamlines, offsets, lengthData } = this.data;
 
     // Compute per-segment alphas using precomputed LUT and pattern indices
     const perSegmentAlphas = streamlines.map((_, i) => {
@@ -297,6 +438,72 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       perSegmentAlphas,
       gradientSubdivisions: this.gradientSubdivisions,
     });
+  }
+
+  // Cache for shader rendering
+  private lastShaderPhase: number = -1;
+  private lastShaderImageData: ImageData | null = null;
+  private shaderRenderPending: boolean = false;
+
+  /**
+   * Render using WebGPU shader.
+   * Uses cached ImageData if phase hasn't changed, otherwise triggers async render.
+   */
+  private renderWithShader(ctx: CanvasRenderingContext2D, phase: number): void {
+    // If we have cached data for this phase, use it
+    if (this.lastShaderImageData && Math.abs(this.lastShaderPhase - phase) < 0.0001) {
+      ctx.putImageData(this.lastShaderImageData, 0, 0);
+      return;
+    }
+
+    // If a render is already pending, use cached data or fall back to canvas
+    if (this.shaderRenderPending) {
+      if (this.lastShaderImageData) {
+        ctx.putImageData(this.lastShaderImageData, 0, 0);
+      } else {
+        this.renderWithCanvas(ctx, phase);
+      }
+      return;
+    }
+
+    // Start async render
+    this.shaderRenderPending = true;
+    this.shaderRenderer!.render(phase).then((result) => {
+      this.lastShaderPhase = phase;
+      this.lastShaderImageData = result.imageData;
+      this.shaderRenderPending = false;
+    }).catch((error) => {
+      console.warn('Shader render failed:', error);
+      this.shaderRenderPending = false;
+    });
+
+    // For this frame, use cached data or fall back to canvas
+    if (this.lastShaderImageData) {
+      ctx.putImageData(this.lastShaderImageData, 0, 0);
+    } else {
+      this.renderWithCanvas(ctx, phase);
+    }
+  }
+
+  /**
+   * Wait for shader renderer initialization to complete.
+   * Useful if you want to ensure shader is ready before first render.
+   */
+  async waitForShaderInit(): Promise<boolean> {
+    if (this.shaderInitPromise) {
+      await this.shaderInitPromise;
+    }
+    return this.shaderRenderer !== null;
+  }
+
+  /**
+   * Clean up resources. Call when done with the animation.
+   */
+  destroy(): void {
+    if (this.shaderRenderer) {
+      this.shaderRenderer.destroy();
+      this.shaderRenderer = null;
+    }
   }
 
   /**
