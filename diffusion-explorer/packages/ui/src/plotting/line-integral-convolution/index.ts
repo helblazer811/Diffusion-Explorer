@@ -52,3 +52,9 @@ export {
   computeDLIC,
   drawDLIC
 } from './dynamic-line-integral-convolution';
+
+export {
+  computeTimeVaryingDLIC,
+  evaluateTimeVaryingVectorFieldTo3DBuffer,
+  type TimeVaryingDLICOptions
+} from './time-varying-dlic';

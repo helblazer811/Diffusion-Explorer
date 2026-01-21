@@ -24,6 +24,7 @@
 		<li><a href="/path_independence">Path Independence</a></li>
 		<li><a href="/streamline_propagation">Streamline Propagation</a></li>
 		<li><a href="/streamline_generation">Streamline Generation</a></li>
+		<li><a href="/flow_model_dlic">Flow Model DLIC</a></li>
 	</ul>
 </section>
 
