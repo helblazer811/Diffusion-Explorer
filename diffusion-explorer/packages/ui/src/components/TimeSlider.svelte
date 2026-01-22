@@ -43,7 +43,7 @@
     // Subscribe to updates (replaces any previous subscription)
     unsubscribe?.();
     unsubscribe = timeline.onTick((t) => {
-      sliderValue = t / timeline.duration;
+      sliderValue = t;
       playing = timeline.isPlaying;
     });
   } else {

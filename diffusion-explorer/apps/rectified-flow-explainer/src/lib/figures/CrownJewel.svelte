@@ -266,7 +266,6 @@
   // Left segment clip - runs full timeline duration
   const leftSegmentClip = {
     name: "LeftSegments",
-    duration: 1,
     reduce(t: number) {
       return {
         leftTime: t,
@@ -278,7 +277,6 @@
   // Right segment clip - runs at 2x speed (completes in half the time)
   const rightSegmentClip = {
     name: "RightSegments",
-    duration: rightSpeedMultiplier,
     reduce(t: number) {
       return {
         rightTime: t,
@@ -296,10 +294,10 @@
       rightSegmentIndex: 0,
     };
 
-    // Add clips - both start at 0, right finishes at 0.5
+    // Add clips - both start at 0, right finishes at 0.5 (2x speed)
     // Note: No explicit pause clip needed - Timeline holds final state for ended clips
-    timeline.add(leftSegmentClip, 0);
-    timeline.add(rightSegmentClip, 0);
+    timeline.add(leftSegmentClip, { start: 0, end: 1 });
+    timeline.add(rightSegmentClip, { start: 0, end: rightSpeedMultiplier });
 
     // Set timeline duration (animation only) and end pause
     timeline.duration = (animationDuration - endPauseDurationMs) / 1000;

@@ -236,7 +236,6 @@ TODO:
   // Forward clip (0→1)
   const forwardClip = {
     name: "Forward",
-    duration: 1,
     reduce(t) {
       return { time: t };
     }
@@ -245,7 +244,6 @@ TODO:
   // Backward clip (1→0)
   const backwardClip = {
     name: "Backward",
-    duration: 1,
     reduce(t) {
       return { time: 1 - t };
     }
@@ -260,11 +258,15 @@ TODO:
     const forwardDuration = animationDuration / totalCycleDuration;
     const pauseNormalized = pauseDuration / totalCycleDuration;
 
-    // Add clips in sequence
-    timeline.add({ ...forwardClip, duration: forwardDuration }, 0);
-    timeline.add(createPauseClip(pauseNormalized), forwardDuration);
-    timeline.add({ ...backwardClip, duration: forwardDuration }, forwardDuration + pauseNormalized);
-    timeline.add(createPauseClip(pauseNormalized), 2 * forwardDuration + pauseNormalized);
+    // Add clips in sequence with proper timing objects
+    const t1 = forwardDuration;
+    const t2 = forwardDuration + pauseNormalized;
+    const t3 = 2 * forwardDuration + pauseNormalized;
+
+    timeline.add(forwardClip, { start: 0, end: t1 });
+    timeline.add(createPauseClip(), { start: t1, end: t2 });
+    timeline.add(backwardClip, { start: t2, end: t3 });
+    timeline.add(createPauseClip(), { start: t3, end: 1 });
 
     // Set duration in seconds
     timeline.duration = totalCycleDuration / 1000;
