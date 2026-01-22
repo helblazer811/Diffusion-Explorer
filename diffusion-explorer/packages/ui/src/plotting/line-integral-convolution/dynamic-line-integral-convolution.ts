@@ -99,11 +99,20 @@ export async function* computeDLIC(
     phase,
     wavelength = DEFAULT_WAVELENGTH,
     padding = 0,
-    frameCount,
+    frameCount: userFrameCount,
     batchSize = 8,
+    // New time-varying options
+    timeVaryingVelocityBuffer,
+    numTimeSlices: userNumTimeSlices,
   } = options;
 
-  // Resolve vector field (static or time-varying)
+  // Determine number of time slices
+  const numTimeSlices = timeVaryingVelocityBuffer ? (userNumTimeSlices ?? 1) : 1;
+
+  // For time-varying fields, frameCount should equal numTimeSlices
+  const frameCount = timeVaryingVelocityBuffer ? numTimeSlices : userFrameCount;
+
+  // Resolve vector field (static or time-varying at single time)
   const vectorField = timeVaryingVectorField
     ? (x: number, y: number) => timeVaryingVectorField(x, y, time)
     : staticVectorField;
@@ -200,7 +209,16 @@ export async function* computeDLIC(
     });
 
     // Pre-compute vector field on CPU grid (use padded domain)
-    const vectorFieldData = evaluateVectorFieldToBuffer(vectorField, velocityWidth, velocityHeight, paddedDomain);
+    // For time-varying fields, use the provided buffer; otherwise compute single slice
+    let vectorFieldData: Float32Array;
+    if (timeVaryingVelocityBuffer && numTimeSlices > 1) {
+      // Use pre-computed time-varying buffer directly
+      vectorFieldData = timeVaryingVelocityBuffer;
+    } else {
+      // Static field: compute single time slice
+      vectorFieldData = evaluateVectorFieldToBuffer(vectorField, velocityWidth, velocityHeight, paddedDomain);
+    }
+
     vectorFieldBuffer = device.createBuffer({
       label: 'Vector Field',
       size: vectorFieldData.byteLength,
@@ -246,8 +264,13 @@ export async function* computeDLIC(
         // Compute phase: use provided phase for single frame, auto-compute for batched
         const framePhase = totalFrames > 1 ? frameIndex / totalFrames : phase;
 
-        // Create uniform buffer with this frame's phase
-        const uniformData = new ArrayBuffer(64);
+        // For time-varying fields, each frame corresponds to a time slice
+        // For static fields (numTimeSlices=1), always use slice 0
+        const currentTimeSlice = numTimeSlices > 1 ? frameIndex : 0;
+
+        // Create uniform buffer with this frame's phase and time slice
+        // Size: 72 bytes (18 fields * 4 bytes), padded to 80 for 16-byte alignment
+        const uniformData = new ArrayBuffer(80);
         const uniformView = new DataView(uniformData);
         uniformView.setUint32(0, paddedWidth, true);          // width (padded)
         uniformView.setUint32(4, paddedHeight, true);         // height (padded)
@@ -265,6 +288,8 @@ export async function* computeDLIC(
         uniformView.setUint32(52, velocityHeight, true);      // velocityHeight
         uniformView.setFloat32(56, framePhase, true);         // phase (DLIC-specific)
         uniformView.setFloat32(60, wavelength, true);         // wavelength (DLIC-specific)
+        uniformView.setUint32(64, numTimeSlices, true);       // numTimeSlices
+        uniformView.setUint32(68, currentTimeSlice, true);    // currentTimeSlice
 
         const uniformBuffer = device.createBuffer({
           label: `DLIC Uniforms Frame ${frameIndex}`,

@@ -24,6 +24,8 @@
 		<li><a href="/path_independence">Path Independence</a></li>
 		<li><a href="/streamline_propagation">Streamline Propagation</a></li>
 		<li><a href="/streamline_generation">Streamline Generation</a></li>
+		<li><a href="/dynamic_lic">Dynamic Line Integral Convolution</a></li>
+		<li><a href="/flow_model_lic">Flow Model LIC Visualization</a></li>
 	</ul>
 </section>
 

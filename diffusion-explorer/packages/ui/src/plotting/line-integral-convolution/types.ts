@@ -138,20 +138,34 @@ export interface DLICOptions extends LICOptions {
   phase: number;
   /** Wavelength in pixels - how far noise travels per cycle (default: 40.0) */
   wavelength?: number;
-  /** Time parameter for time-varying vector fields */
+  /** Time parameter for time-varying vector fields (deprecated, use timeVaryingVelocityBuffer instead) */
   time?: number;
-  /** Time-varying vector field (overrides vectorField if provided) */
+  /** Time-varying vector field function (deprecated, use timeVaryingVelocityBuffer instead) */
   timeVaryingVectorField?: TimeVaryingVectorFieldFn;
   /** Padding in pixels to compute beyond output boundaries (default: 0).
    *  Helps eliminate edge artifacts by allowing full integration at boundaries.
    *  Recommended: 32-64 pixels, or match maxArcLength. */
   padding?: number;
   /** Number of frames to compute (phases 0/n, 1/n, ..., (n-1)/n).
-   *  When set, returns DLICResult[] instead of DLICResult. */
+   *  When set, returns DLICResult[] instead of DLICResult.
+   *  For time-varying fields, this should equal numTimeSlices. */
   frameCount?: number;
   /** Frames per GPU command submission (default: 8).
    *  Only used when frameCount is set. */
   batchSize?: number;
+
+  // ============================================================================
+  // Time-varying vector field support (new API)
+  // ============================================================================
+
+  /** Pre-computed velocity buffer for time-varying fields.
+   *  Layout: Float32Array of [numTimeSlices * velocityHeight * velocityWidth * 2]
+   *  where each slice contains [vx, vy] pairs in row-major order.
+   *  When provided, frameCount is automatically set to numTimeSlices. */
+  timeVaryingVelocityBuffer?: Float32Array;
+  /** Number of time slices in the velocity buffer (default: 1 for static fields).
+   *  Required when timeVaryingVelocityBuffer is provided. */
+  numTimeSlices?: number;
 }
 
 /**

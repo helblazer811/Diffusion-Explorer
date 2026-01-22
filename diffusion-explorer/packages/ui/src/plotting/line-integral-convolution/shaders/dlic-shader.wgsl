@@ -18,6 +18,8 @@ struct Uniforms {
   velocityHeight: u32,           // Velocity grid height
   phase: f32,                    // Animation phase (0-1)
   wavelength: f32,               // Pixels to advect per cycle
+  numTimeSlices: u32,            // Number of time slices (1 for static fields)
+  currentTimeSlice: u32,         // Current time slice index for this frame
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -30,8 +32,55 @@ struct Uniforms {
 
 // Integration functions are defined in integration.wgsl and concatenated at build time
 
+// ============================================================================
+// DLIC-specific time-aware functions (use currentTimeSlice from uniforms)
+// These override the shared functions for time-varying vector field support
+// ============================================================================
+
+// Get normalized velocity direction at pixel position using current time slice
+fn getDirectionAtCurrentTime(px: f32, py: f32) -> vec2<f32> {
+  let v = sampleVelocityAtTime(px, py, uniforms.currentTimeSlice);
+  let mag = length(v);
+  if (mag < 1e-8) {
+    return vec2<f32>(0.0, 0.0);
+  }
+  return v / mag;
+}
+
+// Euler integration step using current time slice
+fn eulerStepAtCurrentTime(pos: vec2<f32>, direction: f32) -> vec2<f32> {
+  let h = uniforms.stepSize * direction;
+  let dir = getDirectionAtCurrentTime(pos.x, pos.y);
+  return pos + h * dir;
+}
+
+// 4th-order Runge-Kutta integration step using current time slice
+fn rk4StepAtCurrentTime(pos: vec2<f32>, direction: f32) -> vec2<f32> {
+  let h = uniforms.stepSize * direction;
+
+  // RK4 stages
+  let k1 = getDirectionAtCurrentTime(pos.x, pos.y);
+  let k2 = getDirectionAtCurrentTime(pos.x + 0.5 * h * k1.x, pos.y + 0.5 * h * k1.y);
+  let k3 = getDirectionAtCurrentTime(pos.x + 0.5 * h * k2.x, pos.y + 0.5 * h * k2.y);
+  let k4 = getDirectionAtCurrentTime(pos.x + h * k3.x, pos.y + h * k3.y);
+
+  // Weighted sum
+  return pos + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+}
+
+// Integration step dispatcher using current time slice
+fn integrationStepAtCurrentTime(pos: vec2<f32>, direction: f32) -> vec2<f32> {
+  if (uniforms.useEuler != 0u) {
+    return eulerStepAtCurrentTime(pos, direction);
+  }
+  return rk4StepAtCurrentTime(pos, direction);
+}
+
+// ============================================================================
+
 // Advect position backward to find where noise should be sampled from
 // This creates the flowing effect by shifting the noise origin
+// Uses current time slice for time-varying vector field support
 fn advectNoisePosition(startPos: vec2<f32>) -> vec2<f32> {
   let advectDist = uniforms.phase * uniforms.wavelength;
   var pos = startPos;
@@ -41,7 +90,7 @@ fn advectNoisePosition(startPos: vec2<f32>) -> vec2<f32> {
   // Backward integration to find where noise "came from"
   while (distTraveled < advectDist && i < uniforms.maxIterations && isInBounds(pos.x, pos.y)) {
     let prevPos = pos;
-    pos = integrationStep(pos, -1.0);  // Backward direction
+    pos = integrationStepAtCurrentTime(pos, -1.0);  // Backward direction, current time slice
     distTraveled += length(pos - prevPos);
     i += 1u;
   }
@@ -88,7 +137,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     weightSum += w;
 
     let prevPos = pos;
-    pos = integrationStep(pos, 1.0);  // Forward direction
+    pos = integrationStepAtCurrentTime(pos, 1.0);  // Forward direction, current time slice
     arcLength += length(pos - prevPos);
     i += 1u;
   }
@@ -113,7 +162,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     }
 
     let prevPos = pos;
-    pos = integrationStep(pos, -1.0);  // Backward direction
+    pos = integrationStepAtCurrentTime(pos, -1.0);  // Backward direction, current time slice
     arcLength += length(pos - prevPos);
     i += 1u;
   }
@@ -129,7 +178,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
 
   output[pixelIndex] = result;
 
-  // Store magnitude at original pixel position (not advected)
-  let velocity = sampleVelocity(startPos.x, startPos.y);
+  // Store magnitude at original pixel position (not advected), using current time slice
+  let velocity = sampleVelocityAtTime(startPos.x, startPos.y, uniforms.currentTimeSlice);
   magnitudeOut[pixelIndex] = length(velocity);
 }
