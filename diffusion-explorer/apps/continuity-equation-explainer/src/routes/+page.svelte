@@ -2,6 +2,7 @@
   import { ArticleHeader } from "@diffusion-explorer/ui";
   import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
   import DivergenceTheorem from "$lib/figures/DivergenceTheorem/DivergenceTheorem.svelte";
+  import InvertibilityExplanation from "$lib/figures/InvertibilityExplanation.svelte";
   import { Katex } from "@diffusion-explorer/ui";
 </script>
 
@@ -61,6 +62,26 @@
     and the red arrow shows the field vector at each point.
     <em>Right:</em> Volume integral showing the grid subdivision of the interior region.
   </DivergenceTheorem>
+</section>
+
+<hr class="section-divider" />
+
+<section id="invertibility">
+  <h2 class="section-heading">Invertibility</h2>
+  <p>
+    For a flow to be well-behaved, it must be <em>invertible</em> - meaning
+    distinct starting points must map to distinct locations at all times.
+    When two trajectories merge at some time <Katex math={"t"}/>, we lose the
+    ability to determine which starting point a particle came from. This motivates
+    the conservation of mass in the continuity equation.
+  </p>
+  <InvertibilityExplanation>
+    <strong>Non-invertible flow.</strong>
+    Two distinct starting points <Katex math={"x_a"}/> and <Katex math={"x_b"}/>
+    converge to the same location at time <Katex math={"t"}/>, then follow
+    identical paths afterward. This violates invertibility because we cannot
+    uniquely determine the origin of a particle at the merged location.
+  </InvertibilityExplanation>
 </section>
 
 <hr class="section-divider" />
