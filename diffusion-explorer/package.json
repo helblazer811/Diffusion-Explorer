@@ -1,5 +1,11 @@
 {
   "name": "diffusion-explorer",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"]
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "dependencies": {
+    "mp4-muxer": "^5.2.2"
+  }
 }

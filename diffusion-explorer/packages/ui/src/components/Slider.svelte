@@ -38,7 +38,7 @@
   let isDragging = false;
 
   function handleDragStart() {
-    if (isDragging) return;
+    if (isDragging || typeof document === 'undefined') return;
     isDragging = true;
     onDragStart();
     // Listen for drag end on document (user may release outside slider)
@@ -47,7 +47,7 @@
   }
 
   function handleDragEnd() {
-    if (!isDragging) return;
+    if (!isDragging || typeof document === 'undefined') return;
     isDragging = false;
     onDragEnd();
     document.removeEventListener('mouseup', handleDragEnd);
@@ -56,8 +56,10 @@
 
   // Cleanup on component destroy
   onDestroy(() => {
-    document.removeEventListener('mouseup', handleDragEnd);
-    document.removeEventListener('touchend', handleDragEnd);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.removeEventListener('touchend', handleDragEnd);
+    }
   });
 
   // Dynamic background gradient based on current value
