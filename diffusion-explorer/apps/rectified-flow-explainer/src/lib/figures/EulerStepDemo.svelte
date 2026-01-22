@@ -277,7 +277,6 @@
 
     const eulerStepClip = {
       name: "EulerSteps",
-      duration: 1,
       reduce(t: number) {
         const rawStep = t * NUM_STEPS;
         const currentStep = Math.floor(rawStep);
@@ -297,7 +296,7 @@
       segmentIndex: 0,
       segmentProgress: 0,
     };
-    timeline.add(eulerStepClip, 0);
+    timeline.add(eulerStepClip, { start: 0, end: 1 });
     timeline.duration = EULER_REAL_DURATION / 1000;
     timeline.setEndPause(PAUSE_BEFORE_RESTART / 1000);
     timeline.looping = true;

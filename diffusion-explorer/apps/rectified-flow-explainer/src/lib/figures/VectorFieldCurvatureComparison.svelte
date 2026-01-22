@@ -141,7 +141,6 @@
   // Main animation clip (reducer pattern)
   const mainClip = {
     name: "Animation",
-    duration: 1,
     reduce(t: number) {
       return { time: t };
     }
@@ -152,7 +151,7 @@
     timeline.initialState = { time: 0 };
 
     // Add main animation clip
-    timeline.add(mainClip, 0);
+    timeline.add(mainClip, { start: 0, end: 1 });
 
     // Set timeline duration and end pause
     timeline.duration = animationDuration / 1000;

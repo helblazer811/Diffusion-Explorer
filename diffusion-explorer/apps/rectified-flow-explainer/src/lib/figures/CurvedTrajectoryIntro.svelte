@@ -198,7 +198,7 @@
     timeline.endPauseDuration = pauseBeforeRestart / 1000;
 
     // Use the clip from PathlineAnimation
-    timeline.add(pathlineAnimation.clip, 0);
+    timeline.add(pathlineAnimation.clip, { start: 0, end: 1 });
 
     // Register tick callback
     timeline.onTick((_, state) => draw(state));

@@ -184,7 +184,6 @@
     // Main animation clip - computes derived state from t
     const mainClip = {
       name: "Animation",
-      duration: 1,
       reduce(t: number) {
         return {
           time: t,
@@ -195,7 +194,7 @@
     };
 
     // Add main animation clip
-    timeline.add(mainClip, 0);
+    timeline.add(mainClip, { start: 0, end: 1 });
 
     // Set timeline duration and end pause
     timeline.duration = animationDuration / 1000;
