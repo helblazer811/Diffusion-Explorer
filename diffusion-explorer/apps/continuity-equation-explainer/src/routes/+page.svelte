@@ -1,9 +1,36 @@
 <script>
-  import { ArticleHeader } from "@diffusion-explorer/ui";
+  import { onMount } from "svelte";
+  import { base } from "$app/paths";
+  import { ArticleHeader, Katex } from "@diffusion-explorer/ui";
+  import { generateClippedGaussianSamples } from "@diffusion-explorer/diffusion";
   import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
   import DivergenceTheorem from "$lib/figures/DivergenceTheorem/DivergenceTheorem.svelte";
   import InvertibilityExplanation from "$lib/figures/InvertibilityExplanation.svelte";
-  import { Katex } from "@diffusion-explorer/ui";
+  import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
+
+  // Data for ReverseSampling
+  let reverseSamplingData = null;
+
+  onMount(async () => {
+    // Generate source distribution (Gaussian)
+    const sourceDistribution = generateClippedGaussianSamples(300);
+
+    // Load target distribution and cached reverse trajectories in parallel
+    const [targetRes, trajRes] = await Promise.all([
+      fetch(`${base}/flow_invertibility/data/smiley_face.json`),
+      fetch(`${base}/flow_invertibility/cached_samples/reverse_trajectories.json`),
+    ]);
+
+    const targetData = await targetRes.json();
+    const trajData = await trajRes.json();
+
+    reverseSamplingData = {
+      trajectories: trajData.trajectories,
+      sourceDistribution,
+      targetDistribution: targetData.points,
+      config: trajData.config,
+    };
+  });
 </script>
 
 <svelte:head>
@@ -82,6 +109,24 @@
     identical paths afterward. This violates invertibility because we cannot
     uniquely determine the origin of a particle at the merged location.
   </InvertibilityExplanation>
+</section>
+
+<hr class="section-divider" />
+
+<section id="reverse-sampling">
+  <h2 class="section-heading">Reverse Sampling</h2>
+  <p>
+    Flow models can be run in reverse, mapping samples from the target
+    distribution back to the source distribution. This demonstrates the
+    invertibility of the learned flow transformation.
+  </p>
+  {#if reverseSamplingData}
+    <ReverseSampling data={reverseSamplingData}>
+      <strong>Reverse sampling trajectories.</strong>
+      Starting from points in the target distribution (right), the model traces
+      paths back to the source distribution (left).
+    </ReverseSampling>
+  {/if}
 </section>
 
 <hr class="section-divider" />
