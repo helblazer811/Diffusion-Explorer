@@ -12,7 +12,11 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"train:pull-toward-mean": "tsx scripts/pull_toward_mean/train.ts",
-		"sample:pull-toward-mean": "tsx scripts/pull_toward_mean/sample.ts"
+		"sample:pull-toward-mean": "tsx scripts/pull_toward_mean/sample.ts",
+		"train:flow-dlic": "tsx scripts/flow_model_dlic/train.ts",
+		"compute:flow-dlic-grids": "tsx scripts/flow_model_dlic/compute_velocity_grid.ts",
+		"sample:flow-dlic": "tsx scripts/flow_model_dlic/sample_trajectories.ts",
+		"prepare:flow-dlic": "npm run train:flow-dlic && npm run compute:flow-dlic-grids && npm run sample:flow-dlic"
 	},
 	"devDependencies": {
 		"@diffusion-explorer/diffusion": "*",
