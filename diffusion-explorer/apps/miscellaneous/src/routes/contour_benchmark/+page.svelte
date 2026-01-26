@@ -13,11 +13,7 @@
   let pointCount = 5000;
   let gridSize = 100;
   let numLevels = 10;
-  let blurRadius = 10;
-
-  // Debug mode: render GPU segments via CPU
-  let debugCpuRender = false;
-  let gpuSegmentCount = 0;
+  let bandwidth = 20;  // Same scale as D3's contourDensity
 
   // Density visualization mode
   let showDensityGrid = false;
@@ -109,7 +105,7 @@
     const computeStart = performance.now();
     const contours = computeContours(pointsArray, {
       gridSize,
-      bandwidth: blurRadius,  // Use blur radius directly for tighter contours
+      bandwidth,
       thresholds: numLevels,
       domain: [0, 1, 0, 1],
     });
@@ -156,50 +152,10 @@
       gpuRenderer.setPoints(points, { xMin: 0, xMax: 1, yMin: 0, yMax: 1 });
       const computeEnd = performance.now();
 
-      // Render (stencil fill + blit) OR debug CPU render
+      // Render (threshold fill)
+      console.log('[GPU Benchmark] Rendering...');
       const renderStart = performance.now();
-
-      if (debugCpuRender && cpuCtx) {
-        // Debug mode: read back GPU segments and render via CPU
-        console.log('[GPU Benchmark] Debug mode: reading segments from GPU...');
-        const segments = await gpuRenderer.getSegments();
-        gpuSegmentCount = segments.length;
-        console.log('[GPU Benchmark] Got', segments.length, 'segments');
-
-        // Clear GPU canvas with a simple color to show it's in debug mode
-        const gpuCtx = gpuCanvas.getContext('2d');
-        if (gpuCtx) {
-          gpuCtx.fillStyle = '#f0f0f0';
-          gpuCtx.fillRect(0, 0, gpuCanvas.width, gpuCanvas.height);
-        }
-
-        // Render segments to CPU canvas (overlay on top of CPU contours)
-        // Actually, let's render to a separate area - clear and draw on GPU canvas
-        const debugCanvas = document.createElement('canvas');
-        debugCanvas.width = canvasWidth;
-        debugCanvas.height = canvasHeight;
-        const debugCtx = debugCanvas.getContext('2d')!;
-        debugCtx.fillStyle = 'white';
-        debugCtx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-        plotSegments(debugCtx, segments, {
-          xScale: (x) => x * canvasWidth,
-          yScale: (y) => (1 - y) * canvasHeight,
-          numLevels,
-          opacity: 1,
-          lineWidth: 1.5,
-          colorScale: (t) => d3.interpolateBlues(0.3 + t * 0.7),
-        });
-
-        // Copy to GPU canvas
-        if (gpuCtx) {
-          gpuCtx.drawImage(debugCanvas, 0, 0);
-        }
-      } else {
-        console.log('[GPU Benchmark] Rendering with stencil...');
-        gpuRenderer.render();
-        gpuSegmentCount = 0;
-      }
+      gpuRenderer.render();
       const renderEnd = performance.now();
 
       gpuMetrics = {
@@ -337,7 +293,7 @@
       console.log('[GPU Init] Creating ContourRenderer...');
       gpuRenderer = await ContourRenderer.create(gpuCanvas, {
         gridSize,
-        blurRadius,
+        bandwidth,
         numLevels,
         dpr: window.devicePixelRatio,
         opacity: 0.9,
@@ -373,7 +329,7 @@
 
   // Reactively update GPU renderer options
   $: if (gpuRenderer) {
-    gpuRenderer.updateOptions({ gridSize, blurRadius, numLevels });
+    gpuRenderer.updateOptions({ gridSize, bandwidth, numLevels });
   }
 </script>
 
@@ -404,14 +360,9 @@
     </label>
 
     <label>
-      Blur Radius:
-      <input type="range" bind:value={blurRadius} min={1} max={30} step={1} />
-      <span>{blurRadius}</span>
-    </label>
-
-    <label class="checkbox-label">
-      <input type="checkbox" bind:checked={debugCpuRender} />
-      Debug: Render GPU segments via CPU
+      Bandwidth:
+      <input type="range" bind:value={bandwidth} min={5} max={50} step={1} />
+      <span>{bandwidth}</span>
     </label>
 
     <label class="checkbox-label">
@@ -436,16 +387,15 @@
     </div>
 
     <div class="canvas-container">
-      <h3>GPU (WebGPU){debugCpuRender ? ' - Debug Mode' : ''}</h3>
-      <canvas bind:this={gpuCanvas}></canvas>
+      <h3>GPU (WebGPU)</h3>
+      <div class="canvas-wrapper">
+        <canvas bind:this={gpuCanvas}></canvas>
+      </div>
       {#if gpuSupported}
         <div class="metrics">
           <p>Compute: {gpuMetrics.compute.toFixed(2)} ms</p>
           <p>Render: {gpuMetrics.render.toFixed(2)} ms</p>
           <p><strong>Total: {gpuMetrics.total.toFixed(2)} ms</strong></p>
-          {#if debugCpuRender && gpuSegmentCount > 0}
-            <p class="debug-info">Segments: {gpuSegmentCount.toLocaleString()}</p>
-          {/if}
         </div>
       {:else}
         <div class="error">
@@ -558,6 +508,11 @@
     margin-bottom: 0.5rem;
   }
 
+  .canvas-wrapper {
+    position: relative;
+    display: inline-block;
+  }
+
   canvas {
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -567,11 +522,6 @@
     margin-top: 1rem;
     text-align: left;
     font-size: 0.9rem;
-  }
-
-  .debug-info {
-    color: #7c3aed;
-    font-style: italic;
   }
 
   .metrics p {

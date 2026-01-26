@@ -5,8 +5,11 @@
  * 1. binning: Bins 2D points into a histogram grid using atomic operations
  * 2. findMax: Finds the maximum count value in the histogram
  * 3. normalize: Converts histogram counts (u32) to normalized density values (f32)
- * 4. blurHorizontal: Horizontal pass of separable Gaussian blur
- * 5. blurVertical: Vertical pass of separable Gaussian blur
+ * 4. boxBlurHorizontal: Horizontal pass of box blur (apply 3x for D3 match)
+ * 5. boxBlurVertical: Vertical pass of box blur (apply 3x for D3 match)
+ *
+ * The blur uses D3-style 3-pass box blur with clamped edge handling.
+ * Each pass outputs the average of a sliding window: sum / (2*radius + 1).
  */
 
 struct Uniforms {
@@ -112,83 +115,71 @@ fn normalize(@builtin(global_invocation_id) globalId: vec3<u32>) {
 }
 
 // ============================================================================
-// Blur pass bindings (separate bind group)
+// Box blur pass bindings (separate bind group)
+// No kernel buffer needed - box blur uses uniform weights
 // ============================================================================
 @group(0) @binding(0) var<uniform> blurUniforms: Uniforms;
 @group(0) @binding(1) var<storage, read> inputGrid: array<f32>;
 @group(0) @binding(2) var<storage, read_write> outputGrid: array<f32>;
-@group(0) @binding(3) var<storage, read> kernel: array<f32>;  // kernel[0] = center, kernel[i] = offset i
 
 /**
- * Horizontal blur pass.
- * Each thread processes one grid cell.
+ * Horizontal box blur pass (sliding window average).
+ * Apply 3 times for D3-equivalent smoothing.
+ * Uses clamped edge handling (repeats boundary values).
  */
-@compute @workgroup_size(16, 16)
-fn blurHorizontal(@builtin(global_invocation_id) globalId: vec3<u32>) {
-  let x = globalId.x;
-  let y = globalId.y;
+@compute @workgroup_size(256)
+fn boxBlurHorizontal(@builtin(global_invocation_id) globalId: vec3<u32>) {
+  let idx = globalId.x;
+  let y = idx / blurUniforms.gridWidth;
+  let x = idx % blurUniforms.gridWidth;
 
-  if (x >= blurUniforms.gridWidth || y >= blurUniforms.gridHeight) {
+  if (idx >= blurUniforms.gridWidth * blurUniforms.gridHeight) {
     return;
   }
 
   let radius = i32(blurUniforms.blurRadius);
+  let windowSize = 2 * radius + 1;
+  let invWindow = 1.0 / f32(windowSize);
+  let width = i32(blurUniforms.gridWidth);
+
+  // Accumulate window sum with clamped edge handling
   var sum = 0.0;
-
-  // Center weight
-  let centerIdx = y * blurUniforms.gridWidth + x;
-  sum += inputGrid[centerIdx] * kernel[0];
-
-  // Left and right weights (symmetric kernel)
-  for (var i = 1; i <= radius; i++) {
-    let leftX = max(0, i32(x) - i);
-    let rightX = min(i32(blurUniforms.gridWidth) - 1, i32(x) + i);
-
-    let leftIdx = y * blurUniforms.gridWidth + u32(leftX);
-    let rightIdx = y * blurUniforms.gridWidth + u32(rightX);
-
-    let weight = kernel[u32(i)];
-    sum += inputGrid[leftIdx] * weight;
-    sum += inputGrid[rightIdx] * weight;
+  for (var dx = -radius; dx <= radius; dx++) {
+    let sx = clamp(i32(x) + dx, 0, width - 1);
+    sum += inputGrid[y * blurUniforms.gridWidth + u32(sx)];
   }
 
-  outputGrid[centerIdx] = sum;
+  outputGrid[idx] = sum * invWindow;
 }
 
 /**
- * Vertical blur pass.
- * Each thread processes one grid cell.
+ * Vertical box blur pass (sliding window average).
+ * Apply 3 times for D3-equivalent smoothing.
+ * Uses clamped edge handling (repeats boundary values).
  */
-@compute @workgroup_size(16, 16)
-fn blurVertical(@builtin(global_invocation_id) globalId: vec3<u32>) {
-  let x = globalId.x;
-  let y = globalId.y;
+@compute @workgroup_size(256)
+fn boxBlurVertical(@builtin(global_invocation_id) globalId: vec3<u32>) {
+  let idx = globalId.x;
+  let y = idx / blurUniforms.gridWidth;
+  let x = idx % blurUniforms.gridWidth;
 
-  if (x >= blurUniforms.gridWidth || y >= blurUniforms.gridHeight) {
+  if (idx >= blurUniforms.gridWidth * blurUniforms.gridHeight) {
     return;
   }
 
   let radius = i32(blurUniforms.blurRadius);
+  let windowSize = 2 * radius + 1;
+  let invWindow = 1.0 / f32(windowSize);
+  let height = i32(blurUniforms.gridHeight);
+
+  // Accumulate window sum with clamped edge handling
   var sum = 0.0;
-
-  // Center weight
-  let centerIdx = y * blurUniforms.gridWidth + x;
-  sum += inputGrid[centerIdx] * kernel[0];
-
-  // Top and bottom weights (symmetric kernel)
-  for (var i = 1; i <= radius; i++) {
-    let topY = max(0, i32(y) - i);
-    let bottomY = min(i32(blurUniforms.gridHeight) - 1, i32(y) + i);
-
-    let topIdx = u32(topY) * blurUniforms.gridWidth + x;
-    let bottomIdx = u32(bottomY) * blurUniforms.gridWidth + x;
-
-    let weight = kernel[u32(i)];
-    sum += inputGrid[topIdx] * weight;
-    sum += inputGrid[bottomIdx] * weight;
+  for (var dy = -radius; dy <= radius; dy++) {
+    let sy = clamp(i32(y) + dy, 0, height - 1);
+    sum += inputGrid[u32(sy) * blurUniforms.gridWidth + x];
   }
 
-  outputGrid[centerIdx] = sum;
+  outputGrid[idx] = sum * invWindow;
 }
 
 // ============================================================================
@@ -244,4 +235,134 @@ fn normalizeSmoothed(@builtin(global_invocation_id) globalId: vec3<u32>) {
   if (maxVal > 0.0) {
     smoothedGrid[idx] = value / maxVal;
   }
+}
+
+// ============================================================================
+// Threshold-based fill shader
+// Renders filled contours by computing per-pixel alpha from density levels
+// ============================================================================
+
+struct ThresholdFillUniforms {
+  width: f32,
+  height: f32,
+  gridWidth: u32,
+  gridHeight: u32,
+  numLevels: u32,
+  opacity: f32,
+  _pad0: u32,
+  _pad1: u32,
+}
+
+struct ThresholdVertexOutput {
+  @builtin(position) position: vec4<f32>,
+  @location(0) uv: vec2<f32>,
+}
+
+@group(0) @binding(0) var<uniform> fillUniforms: ThresholdFillUniforms;
+@group(0) @binding(1) var<storage, read> fillDensityGrid: array<f32>;
+@group(0) @binding(2) var<storage, read> thresholds: array<f32>;
+@group(0) @binding(3) var<storage, read> colorLUT: array<vec4<f32>>;
+
+/**
+ * Full-screen quad vertex shader for threshold fill.
+ */
+@vertex
+fn vs_threshold(@builtin(vertex_index) vertexIndex: u32) -> ThresholdVertexOutput {
+  var output: ThresholdVertexOutput;
+
+  // Full-screen quad (2 triangles, 6 vertices)
+  var pos: vec2<f32>;
+  var uv: vec2<f32>;
+
+  switch (vertexIndex) {
+    case 0u: {
+      pos = vec2<f32>(-1.0, 1.0);
+      uv = vec2<f32>(0.0, 0.0);
+    }
+    case 1u: {
+      pos = vec2<f32>(-1.0, -1.0);
+      uv = vec2<f32>(0.0, 1.0);
+    }
+    case 2u: {
+      pos = vec2<f32>(1.0, 1.0);
+      uv = vec2<f32>(1.0, 0.0);
+    }
+    case 3u: {
+      pos = vec2<f32>(1.0, 1.0);
+      uv = vec2<f32>(1.0, 0.0);
+    }
+    case 4u: {
+      pos = vec2<f32>(-1.0, -1.0);
+      uv = vec2<f32>(0.0, 1.0);
+    }
+    case 5u: {
+      pos = vec2<f32>(1.0, -1.0);
+      uv = vec2<f32>(1.0, 1.0);
+    }
+    default: {
+      pos = vec2<f32>(0.0, 0.0);
+      uv = vec2<f32>(0.0, 0.0);
+    }
+  }
+
+  output.position = vec4<f32>(pos, 0.0, 1.0);
+  output.uv = uv;
+  return output;
+}
+
+/**
+ * Sample density at UV with bilinear interpolation.
+ */
+fn sampleDensityAtUV(uv: vec2<f32>) -> f32 {
+  // Map UV to grid coordinates (flip Y: UV y=0 is top, grid y=0 is bottom)
+  let gx = uv.x * f32(fillUniforms.gridWidth - 1u);
+  let gy = (1.0 - uv.y) * f32(fillUniforms.gridHeight - 1u);
+
+  let x0 = u32(floor(gx));
+  let y0 = u32(floor(gy));
+  let x1 = min(x0 + 1u, fillUniforms.gridWidth - 1u);
+  let y1 = min(y0 + 1u, fillUniforms.gridHeight - 1u);
+
+  let fx = fract(gx);
+  let fy = fract(gy);
+
+  let d00 = fillDensityGrid[y0 * fillUniforms.gridWidth + x0];
+  let d10 = fillDensityGrid[y0 * fillUniforms.gridWidth + x1];
+  let d01 = fillDensityGrid[y1 * fillUniforms.gridWidth + x0];
+  let d11 = fillDensityGrid[y1 * fillUniforms.gridWidth + x1];
+
+  // Bilinear interpolation
+  let d0 = mix(d00, d10, fx);
+  let d1 = mix(d01, d11, fx);
+  return mix(d0, d1, fy);
+}
+
+/**
+ * Find which threshold level the density exceeds.
+ * Returns -1 if below all thresholds.
+ */
+fn findLevelForDensity(density: f32) -> i32 {
+  var level: i32 = -1;
+  for (var i = 0u; i < fillUniforms.numLevels; i++) {
+    if (density >= thresholds[i]) {
+      level = i32(i);
+    }
+  }
+  return level;
+}
+
+/**
+ * Fragment shader for threshold-based fill.
+ */
+@fragment
+fn fs_threshold(input: ThresholdVertexOutput) -> @location(0) vec4<f32> {
+  let density = sampleDensityAtUV(input.uv);
+  let level = findLevelForDensity(density);
+
+  if (level < 0) {
+    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+  }
+
+  let color = colorLUT[level];
+  return vec4<f32>(color.rgb, color.a * fillUniforms.opacity);
 }
