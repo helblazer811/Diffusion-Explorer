@@ -1,0 +1,121 @@
+/**
+ * Shared type definitions for contour generation and rendering.
+ *
+ * These types are used by both CPU and GPU backends.
+ */
+
+/**
+ * Domain bounds for contour computation.
+ */
+export interface ContourDomain {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
+/**
+ * Options for computing contours from point data.
+ */
+export interface ContourOptions {
+  /** Grid resolution for density estimation (default: 100) */
+  gridSize?: number;
+  /** Bandwidth for kernel density estimation - larger = smoother (default: 20) */
+  bandwidth?: number;
+  /** Number of contour levels or explicit threshold values (default: 10) */
+  thresholds?: number | number[];
+  /** Domain bounds [xMin, xMax, yMin, yMax] - if not provided, computed from points */
+  domain?: [number, number, number, number];
+}
+
+/**
+ * Options for GPU contour computation.
+ */
+export interface ContourGPUOptions {
+  /** Grid resolution for density estimation (default: 100) */
+  gridSize?: number;
+  /** Blur radius in grid cells (default: 10) */
+  blurRadius?: number;
+  /** Number of contour levels (default: 10) */
+  numLevels?: number;
+  /** Domain bounds - if not provided, computed from points */
+  domain?: ContourDomain;
+}
+
+/**
+ * Color scale function mapping normalized value [0, 1] to RGBA.
+ */
+export type ColorScaleFn = (t: number) => [number, number, number, number];
+
+/**
+ * Options for rendering contours.
+ */
+export interface ContourRenderOptions {
+  /** Color scale function mapping [0, 1] to RGBA (values 0-1) */
+  colorScale?: ColorScaleFn;
+  /** Single fill color as RGBA (values 0-1) - overrides colorScale if provided */
+  fillColor?: [number, number, number, number];
+  /** Global opacity (default: 1) */
+  opacity?: number;
+}
+
+/**
+ * Parsed color as normalized RGBA values [0-1].
+ */
+export type RGBAColor = [number, number, number, number];
+
+/**
+ * Parse a color string or array to RGBA values [0-1].
+ */
+export function parseContourColor(color: string | [number, number, number] | RGBAColor): RGBAColor {
+  if (Array.isArray(color)) {
+    if (color.length === 4) {
+      return color as RGBAColor;
+    }
+    return [color[0] / 255, color[1] / 255, color[2] / 255, 1.0];
+  }
+
+  // Parse hex color
+  const hex = color.replace('#', '');
+  if (hex.length === 3) {
+    const r = parseInt(hex[0] + hex[0], 16) / 255;
+    const g = parseInt(hex[1] + hex[1], 16) / 255;
+    const b = parseInt(hex[2] + hex[2], 16) / 255;
+    return [r, g, b, 1.0];
+  } else if (hex.length === 6) {
+    const r = parseInt(hex.slice(0, 2), 16) / 255;
+    const g = parseInt(hex.slice(2, 4), 16) / 255;
+    const b = parseInt(hex.slice(4, 6), 16) / 255;
+    return [r, g, b, 1.0];
+  }
+
+  // Default to blue
+  return [0.231, 0.510, 0.965, 1.0]; // #3b82f6
+}
+
+/**
+ * Create a simple linear color scale between two colors.
+ */
+export function createLinearColorScale(
+  startColor: RGBAColor,
+  endColor: RGBAColor
+): ColorScaleFn {
+  return (t: number): RGBAColor => {
+    const clampedT = Math.max(0, Math.min(1, t));
+    return [
+      startColor[0] + (endColor[0] - startColor[0]) * clampedT,
+      startColor[1] + (endColor[1] - startColor[1]) * clampedT,
+      startColor[2] + (endColor[2] - startColor[2]) * clampedT,
+      startColor[3] + (endColor[3] - startColor[3]) * clampedT,
+    ];
+  };
+}
+
+/**
+ * Default blue color scale with reduced alpha for additive blending.
+ * Lower alpha values allow overlapping contours to accumulate brightness.
+ */
+export const defaultColorScale: ColorScaleFn = createLinearColorScale(
+  [0.4, 0.6, 1.0, 0.15],    // Light blue, low alpha
+  [0.1, 0.3, 0.8, 0.4]      // Darker blue, moderate alpha
+);
