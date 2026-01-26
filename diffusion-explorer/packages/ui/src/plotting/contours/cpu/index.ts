@@ -1,3 +1,12 @@
+/**
+ * CPU-based contour computation and rendering using D3.
+ *
+ * This module provides Canvas 2D-based contour rendering using
+ * D3's contour density estimation and marching squares.
+ *
+ * @module contours/cpu
+ */
+
 import * as d3 from "d3";
 
 /**
@@ -231,6 +240,96 @@ export function plotContours(
       ctx.lineWidth = strokeWidth;
       ctx.stroke();
     }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Options for rendering raw contour segments
+ */
+export interface PlotSegmentsOptions {
+  /** Color scale function mapping [0, 1] to color string */
+  colorScale?: (t: number) => string;
+  /** Global opacity (default: 1) */
+  opacity?: number;
+  /** Line width (default: 1) */
+  lineWidth?: number;
+  /** Scale functions to convert from normalized [0,1] to pixel coordinates */
+  xScale: (x: number) => number;
+  yScale: (y: number) => number;
+  /** Number of contour levels (for color normalization) */
+  numLevels: number;
+}
+
+/**
+ * Segment data structure (matches GPU ContourSegment)
+ */
+export interface ContourSegmentData {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  contourLevel: number;
+  contourIndex: number;
+  valid: number;
+}
+
+/**
+ * Render raw contour segments directly to a canvas context.
+ * This is useful for debugging GPU-computed segments by rendering them on CPU.
+ *
+ * @param ctx - Canvas 2D rendering context
+ * @param segments - Array of contour segments
+ * @param options - Rendering options
+ */
+export function plotSegments(
+  ctx: CanvasRenderingContext2D,
+  segments: ContourSegmentData[],
+  options: PlotSegmentsOptions
+): void {
+  const {
+    colorScale = d3.interpolateBlues,
+    opacity = 1,
+    lineWidth = 1,
+    xScale,
+    yScale,
+    numLevels,
+  } = options;
+
+  if (segments.length === 0) return;
+
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'round';
+
+  // Group segments by level for efficient rendering
+  const byLevel = new Map<number, ContourSegmentData[]>();
+  for (const seg of segments) {
+    if (seg.valid < 0.5) continue;
+    const level = Math.round(seg.contourIndex);
+    if (!byLevel.has(level)) byLevel.set(level, []);
+    byLevel.get(level)!.push(seg);
+  }
+
+  // Draw each level
+  for (const [level, levelSegments] of byLevel) {
+    // Normalize level to [0, 1] for color
+    const t = numLevels > 1 ? (level + 1) / (numLevels + 1) : 0.5;
+    ctx.strokeStyle = colorScale(t);
+
+    ctx.beginPath();
+    for (const seg of levelSegments) {
+      const x0 = xScale(seg.x0);
+      const y0 = yScale(seg.y0);
+      const x1 = xScale(seg.x1);
+      const y1 = yScale(seg.y1);
+
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+    }
+    ctx.stroke();
   }
 
   ctx.restore();
