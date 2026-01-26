@@ -21,7 +21,7 @@ import {
 import type { ContourDomain, ColorScaleFn } from '../types';
 import { defaultColorScale } from '../types';
 
-import densityShaderSource from './density.wgsl?raw';
+import contoursShaderSource from './contours.wgsl?raw';
 
 // Default options
 const DEFAULT_GRID_SIZE = 100;
@@ -212,7 +212,7 @@ export class ContourRenderer {
     // Create shader modules
     const densityModule = device.createShaderModule({
       label: 'Contour Density Shader',
-      code: densityShaderSource,
+      code: contoursShaderSource,
     });
     // Threshold fill shaders are now in density.wgsl
     const thresholdFillModule = densityModule;
