@@ -141,7 +141,7 @@ export const settings = {
     },
     // Contour plot styling
     contour: {
-      bandwidth: 15,
+      bandwidth: 30,
       thresholds: 3,
       opacity: 0.3,
       fillColor: '#f17720',

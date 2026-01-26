@@ -14,3 +14,5 @@ export {
   type PlotSegmentsOptions,
   type ContourSegmentData,
 } from './contours';
+
+export { CPUContourRenderer, type CPUContourRendererOptions } from './renderer';

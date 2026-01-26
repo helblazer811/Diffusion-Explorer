@@ -34,8 +34,13 @@ export interface ContourOptions {
 export interface ContourGPUOptions {
   /** Grid resolution for density estimation (default: 100) */
   gridSize?: number;
-  /** Blur radius in grid cells (default: 10) */
-  blurRadius?: number;
+  /**
+   * Bandwidth for kernel density estimation (default: 20).
+   * Uses the same scale as D3's contourDensity bandwidth parameter.
+   * Internally converted to blur radius using D3's formula:
+   * r = (sqrt(4 * bandwidth^2 + 1) - 1) / 2
+   */
+  bandwidth?: number;
   /** Number of contour levels (default: 10) */
   numLevels?: number;
   /** Domain bounds - if not provided, computed from points */
@@ -112,10 +117,11 @@ export function createLinearColorScale(
 }
 
 /**
- * Default blue color scale with reduced alpha for additive blending.
- * Lower alpha values allow overlapping contours to accumulate brightness.
+ * Default blue color scale with alpha gradient for compositing.
+ * Outer levels (low t) are more transparent, inner levels (high t) are more opaque.
+ * This creates a layered effect where overlapping regions appear more saturated.
  */
 export const defaultColorScale: ColorScaleFn = createLinearColorScale(
-  [0.4, 0.6, 1.0, 0.15],    // Light blue, low alpha
-  [0.1, 0.3, 0.8, 0.4]      // Darker blue, moderate alpha
+  [0.3, 0.5, 1.0, 0.25],    // Outer levels: lighter blue, more transparent
+  [0.1, 0.3, 0.9, 0.6]      // Inner levels: darker blue, more opaque
 );

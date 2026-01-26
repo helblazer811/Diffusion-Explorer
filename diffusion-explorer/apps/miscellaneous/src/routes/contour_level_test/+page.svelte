@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ContourRenderer } from '@diffusion-explorer/ui';
+  import { GPUContourRenderer } from '@diffusion-explorer/ui';
 
   const canvasSize = 400;
   const numLevels = 10;
@@ -10,7 +10,7 @@
 
   let densityCanvas: HTMLCanvasElement;
   let gpuCanvas: HTMLCanvasElement;
-  let gpuRenderer: ContourRenderer | null = null;
+  let gpuRenderer: GPUContourRenderer | null = null;
 
   let diagnostics = {
     densityRange: { min: 0, max: 0 },
@@ -95,7 +95,7 @@
 
   onMount(async () => {
     try {
-      gpuRenderer = await ContourRenderer.create(gpuCanvas, {
+      gpuRenderer = await GPUContourRenderer.create(gpuCanvas, {
         gridSize,
         bandwidth,
         numLevels,
