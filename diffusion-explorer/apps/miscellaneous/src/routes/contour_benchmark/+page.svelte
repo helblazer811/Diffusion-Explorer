@@ -4,7 +4,7 @@
     computeContours,
     plotContours,
     plotSegments,
-    ContourRenderer,
+    GPUContourRenderer,
     useCanvas2D,
   } from '@diffusion-explorer/ui';
   import * as d3 from 'd3';
@@ -33,7 +33,7 @@
   let cpuCtx: CanvasRenderingContext2D | null = null;
 
   // GPU renderer
-  let gpuRenderer: ContourRenderer | null = null;
+  let gpuRenderer: GPUContourRenderer | null = null;
 
   // Test data
   let points: Float32Array | null = null;
@@ -290,15 +290,15 @@
         return;
       }
 
-      console.log('[GPU Init] Creating ContourRenderer...');
-      gpuRenderer = await ContourRenderer.create(gpuCanvas, {
+      console.log('[GPU Init] Creating GPUContourRenderer...');
+      gpuRenderer = await GPUContourRenderer.create(gpuCanvas, {
         gridSize,
         bandwidth,
         numLevels,
         dpr: window.devicePixelRatio,
         opacity: 0.9,
       });
-      console.log('[GPU Init] ContourRenderer created successfully');
+      console.log('[GPU Init] GPUContourRenderer created successfully');
 
       gpuSupported = true;
     } catch (e) {

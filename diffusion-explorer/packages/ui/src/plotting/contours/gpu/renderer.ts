@@ -39,6 +39,21 @@ function bandwidthToBlurRadius(bandwidth: number): number {
 }
 
 /**
+ * Convert number[][] to Float32Array.
+ */
+function normalizeToFloat32Array(points: Float32Array | number[][]): Float32Array {
+  if (points instanceof Float32Array) {
+    return points;
+  }
+  const result = new Float32Array(points.length * 2);
+  for (let i = 0; i < points.length; i++) {
+    result[i * 2] = points[i][0];
+    result[i * 2 + 1] = points[i][1];
+  }
+  return result;
+}
+
+/**
  * Compute domain from points with padding.
  */
 function computeDomainFromPoints(points: Float32Array): ContourDomain {
@@ -72,7 +87,7 @@ function computeDomainFromPoints(points: Float32Array): ContourDomain {
 /**
  * GPU-accelerated contour renderer.
  */
-export class ContourRenderer {
+export class GPUContourRenderer {
   private device: GPUDevice;
   private context: GPUCanvasContext;
   private format: GPUTextureFormat;
@@ -127,6 +142,17 @@ export class ContourRenderer {
   private numPoints = 0;
   private isDataDirty = true;
 
+  // Multi-frame state
+  private pendingFrames: Map<number, { points: Float32Array; domain: ContourDomain }> = new Map();
+  private frameBuffers: Map<number, {
+    smoothedGridBuffer: GPUBuffer;
+    pointBuffer: GPUBuffer;
+    histogramGridBuffer: GPUBuffer;
+    maxValueBuffer: GPUBuffer;
+    densityGridBuffer: GPUBuffer;
+    tempGridBuffer: GPUBuffer;
+  }> = new Map();
+
   private constructor(
     device: GPUDevice,
     context: GPUCanvasContext,
@@ -174,13 +200,13 @@ export class ContourRenderer {
   }
 
   /**
-   * Create a new ContourRenderer.
+   * Create a new GPUContourRenderer.
    */
   static async create(
     canvas: HTMLCanvasElement,
     options: ContourRendererOptions = {},
     gpuContext?: WebGPUContext
-  ): Promise<ContourRenderer> {
+  ): Promise<GPUContourRenderer> {
     // Get or create device
     let device: GPUDevice;
     if (gpuContext) {
@@ -385,7 +411,7 @@ export class ContourRenderer {
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
-    return new ContourRenderer(
+    return new GPUContourRenderer(
       device,
       context,
       format,
@@ -410,8 +436,9 @@ export class ContourRenderer {
   /**
    * Set point data for contour computation.
    */
-  setPoints(points: Float32Array, domain?: ContourDomain): void {
-    this.numPoints = points.length / 2;
+  setPoints(points: Float32Array | number[][], domain?: ContourDomain): void {
+    const normalizedPoints = normalizeToFloat32Array(points);
+    this.numPoints = normalizedPoints.length / 2;
 
     if (this.numPoints === 0) {
       this.pointBuffer = null;
@@ -419,7 +446,7 @@ export class ContourRenderer {
       return;
     }
 
-    this.domain = domain ?? computeDomainFromPoints(points);
+    this.domain = domain ?? computeDomainFromPoints(normalizedPoints);
 
     // Destroy old buffers
     this.pointBuffer?.destroy();
@@ -432,10 +459,10 @@ export class ContourRenderer {
     // Create point buffer
     this.pointBuffer = this.device.createBuffer({
       label: 'Contour Points',
-      size: points.byteLength,
+      size: normalizedPoints.byteLength,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
-    this.device.queue.writeBuffer(this.pointBuffer, 0, points);
+    this.device.queue.writeBuffer(this.pointBuffer, 0, normalizedPoints);
 
     // Create grid buffers
     const gridCells = this.gridSize * this.gridSize;
@@ -696,6 +723,13 @@ export class ContourRenderer {
   }
 
   /**
+   * Draw contours to the canvas (alias for render).
+   */
+  draw(): void {
+    this.render();
+  }
+
+  /**
    * Render contours to the canvas.
    */
   render(style?: ContourRenderStyle): void {
@@ -775,6 +809,376 @@ export class ContourRenderer {
     this.canvasWidth = width;
     this.canvasHeight = height;
     if (dpr !== undefined) this.dpr = dpr;
+  }
+
+  /**
+   * Update the color scale.
+   */
+  setColorScale(colorScale: ColorScaleFn): void {
+    this.colorScale = colorScale;
+  }
+
+  /**
+   * Update the opacity.
+   */
+  setOpacity(opacity: number): void {
+    this.opacity = opacity;
+  }
+
+  // ============================================================================
+  // Multi-frame API
+  // ============================================================================
+
+  /**
+   * Queue points for a specific frame (no computation yet).
+   */
+  setPointsForFrame(frameIndex: number, points: Float32Array | number[][], domain?: ContourDomain): void {
+    const normalizedPoints = normalizeToFloat32Array(points);
+    this.pendingFrames.set(frameIndex, {
+      points: normalizedPoints,
+      domain: domain ?? computeDomainFromPoints(normalizedPoints),
+    });
+  }
+
+  /**
+   * Compute all queued frames in parallel.
+   * All compute passes are encoded into a single command buffer for GPU parallelism.
+   */
+  async computeAllFrames(): Promise<void> {
+    if (this.pendingFrames.size === 0) return;
+
+    const gridCells = this.gridSize * this.gridSize;
+
+    // Create buffers and encode compute passes for all frames
+    const commandEncoder = this.device.createCommandEncoder();
+
+    for (const [frameIndex, { points, domain }] of this.pendingFrames) {
+      // Create buffers for this frame
+      const pointBuffer = this.device.createBuffer({
+        label: `Contour Points Frame ${frameIndex}`,
+        size: points.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      this.device.queue.writeBuffer(pointBuffer, 0, points);
+
+      const histogramGridBuffer = this.device.createBuffer({
+        label: `Contour Histogram Grid Frame ${frameIndex}`,
+        size: gridCells * 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+
+      const maxValueBuffer = this.device.createBuffer({
+        label: `Contour Max Value Frame ${frameIndex}`,
+        size: 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+
+      const densityGridBuffer = this.device.createBuffer({
+        label: `Contour Density Grid Frame ${frameIndex}`,
+        size: gridCells * 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+      });
+
+      const tempGridBuffer = this.device.createBuffer({
+        label: `Contour Temp Grid Frame ${frameIndex}`,
+        size: gridCells * 4,
+        usage: GPUBufferUsage.STORAGE,
+      });
+
+      const smoothedGridBuffer = this.device.createBuffer({
+        label: `Contour Smoothed Grid Frame ${frameIndex}`,
+        size: gridCells * 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+      });
+
+      // Store buffers for later use
+      this.frameBuffers.set(frameIndex, {
+        smoothedGridBuffer,
+        pointBuffer,
+        histogramGridBuffer,
+        maxValueBuffer,
+        densityGridBuffer,
+        tempGridBuffer,
+      });
+
+      // Clear histogram and max value
+      this.device.queue.writeBuffer(histogramGridBuffer, 0, new Uint32Array(gridCells));
+      this.device.queue.writeBuffer(maxValueBuffer, 0, new Uint32Array([0]));
+
+      // Update uniforms for this frame
+      const uniformData = new ArrayBuffer(COMPUTE_UNIFORM_BUFFER_SIZE);
+      const uniformView = new DataView(uniformData);
+      uniformView.setUint32(0, this.gridSize, true);
+      uniformView.setUint32(4, this.gridSize, true);
+      uniformView.setUint32(8, this.numLevels, true);
+      uniformView.setUint32(12, points.length / 2, true);
+      uniformView.setFloat32(16, domain.xMin, true);
+      uniformView.setFloat32(20, domain.xMax, true);
+      uniformView.setFloat32(24, domain.yMin, true);
+      uniformView.setFloat32(28, domain.yMax, true);
+      uniformView.setUint32(32, this.blurRadius, true);
+      this.device.queue.writeBuffer(this.computeUniformBuffer, 0, uniformData);
+
+      // Create bind groups for this frame
+      const binningBindGroup = this.device.createBindGroup({
+        layout: this.binningPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+          { binding: 1, resource: { buffer: pointBuffer } },
+          { binding: 2, resource: { buffer: histogramGridBuffer } },
+        ],
+      });
+
+      const findMaxBindGroup = this.device.createBindGroup({
+        layout: this.findMaxPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+          { binding: 1, resource: { buffer: histogramGridBuffer } },
+          { binding: 2, resource: { buffer: densityGridBuffer } },
+          { binding: 3, resource: { buffer: maxValueBuffer } },
+        ],
+      });
+
+      const normalizeBindGroup = this.device.createBindGroup({
+        layout: this.normalizePipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+          { binding: 1, resource: { buffer: histogramGridBuffer } },
+          { binding: 2, resource: { buffer: densityGridBuffer } },
+          { binding: 3, resource: { buffer: maxValueBuffer } },
+        ],
+      });
+
+      // Blur bind groups
+      const blurHBindGroup = this.device.createBindGroup({
+        layout: this.blurHPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+          { binding: 1, resource: { buffer: densityGridBuffer } },
+          { binding: 2, resource: { buffer: tempGridBuffer } },
+        ],
+      });
+
+      const blurHBindGroupAlt = this.device.createBindGroup({
+        layout: this.blurHPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+          { binding: 1, resource: { buffer: tempGridBuffer } },
+          { binding: 2, resource: { buffer: densityGridBuffer } },
+        ],
+      });
+
+      const blurVBindGroup = this.device.createBindGroup({
+        layout: this.blurVPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+          { binding: 1, resource: { buffer: tempGridBuffer } },
+          { binding: 2, resource: { buffer: smoothedGridBuffer } },
+        ],
+      });
+
+      const blurVBindGroupAlt = this.device.createBindGroup({
+        layout: this.blurVPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+          { binding: 1, resource: { buffer: smoothedGridBuffer } },
+          { binding: 2, resource: { buffer: tempGridBuffer } },
+        ],
+      });
+
+      const findMaxSmoothedBindGroup = this.device.createBindGroup({
+        layout: this.findMaxSmoothedPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+          { binding: 1, resource: { buffer: tempGridBuffer } },
+          { binding: 2, resource: { buffer: smoothedGridBuffer } },
+          { binding: 3, resource: { buffer: maxValueBuffer } },
+        ],
+      });
+
+      const normalizeSmoothedBindGroup = this.device.createBindGroup({
+        layout: this.normalizeSmoothedPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+          { binding: 1, resource: { buffer: tempGridBuffer } },
+          { binding: 2, resource: { buffer: smoothedGridBuffer } },
+          { binding: 3, resource: { buffer: maxValueBuffer } },
+        ],
+      });
+
+      const numPoints = points.length / 2;
+      const blurWorkgroups = Math.ceil(gridCells / 256);
+
+      // Encode compute passes for this frame
+      const binningPass = commandEncoder.beginComputePass();
+      binningPass.setPipeline(this.binningPipeline);
+      binningPass.setBindGroup(0, binningBindGroup);
+      binningPass.dispatchWorkgroups(Math.ceil(numPoints / 256));
+      binningPass.end();
+
+      const findMaxPass = commandEncoder.beginComputePass();
+      findMaxPass.setPipeline(this.findMaxPipeline);
+      findMaxPass.setBindGroup(0, findMaxBindGroup);
+      findMaxPass.dispatchWorkgroups(blurWorkgroups);
+      findMaxPass.end();
+
+      const normalizePass = commandEncoder.beginComputePass();
+      normalizePass.setPipeline(this.normalizePipeline);
+      normalizePass.setBindGroup(0, normalizeBindGroup);
+      normalizePass.dispatchWorkgroups(blurWorkgroups);
+      normalizePass.end();
+
+      // Box blur passes (3 horizontal, 3 vertical)
+      const blurH1 = commandEncoder.beginComputePass();
+      blurH1.setPipeline(this.blurHPipeline);
+      blurH1.setBindGroup(0, blurHBindGroup);
+      blurH1.dispatchWorkgroups(blurWorkgroups);
+      blurH1.end();
+
+      const blurH2 = commandEncoder.beginComputePass();
+      blurH2.setPipeline(this.blurHPipeline);
+      blurH2.setBindGroup(0, blurHBindGroupAlt);
+      blurH2.dispatchWorkgroups(blurWorkgroups);
+      blurH2.end();
+
+      const blurH3 = commandEncoder.beginComputePass();
+      blurH3.setPipeline(this.blurHPipeline);
+      blurH3.setBindGroup(0, blurHBindGroup);
+      blurH3.dispatchWorkgroups(blurWorkgroups);
+      blurH3.end();
+
+      const blurV1 = commandEncoder.beginComputePass();
+      blurV1.setPipeline(this.blurVPipeline);
+      blurV1.setBindGroup(0, blurVBindGroup);
+      blurV1.dispatchWorkgroups(blurWorkgroups);
+      blurV1.end();
+
+      const blurV2 = commandEncoder.beginComputePass();
+      blurV2.setPipeline(this.blurVPipeline);
+      blurV2.setBindGroup(0, blurVBindGroupAlt);
+      blurV2.dispatchWorkgroups(blurWorkgroups);
+      blurV2.end();
+
+      const blurV3 = commandEncoder.beginComputePass();
+      blurV3.setPipeline(this.blurVPipeline);
+      blurV3.setBindGroup(0, blurVBindGroup);
+      blurV3.dispatchWorkgroups(blurWorkgroups);
+      blurV3.end();
+
+      // Post-blur normalization
+      this.device.queue.writeBuffer(maxValueBuffer, 0, new Uint32Array([0]));
+
+      const findMaxSmoothedPass = commandEncoder.beginComputePass();
+      findMaxSmoothedPass.setPipeline(this.findMaxSmoothedPipeline);
+      findMaxSmoothedPass.setBindGroup(0, findMaxSmoothedBindGroup);
+      findMaxSmoothedPass.dispatchWorkgroups(blurWorkgroups);
+      findMaxSmoothedPass.end();
+
+      const normalizeSmoothedPass = commandEncoder.beginComputePass();
+      normalizeSmoothedPass.setPipeline(this.normalizeSmoothedPipeline);
+      normalizeSmoothedPass.setBindGroup(0, normalizeSmoothedBindGroup);
+      normalizeSmoothedPass.dispatchWorkgroups(blurWorkgroups);
+      normalizeSmoothedPass.end();
+    }
+
+    // Submit all work at once
+    this.device.queue.submit([commandEncoder.finish()]);
+
+    // Wait for all frames to complete
+    await this.device.queue.onSubmittedWorkDone();
+
+    this.pendingFrames.clear();
+  }
+
+  /**
+   * Draw a specific pre-computed frame.
+   */
+  drawFrame(frameIndex: number): void {
+    const frameData = this.frameBuffers.get(frameIndex);
+    if (!frameData) return;
+
+    // Build color LUT
+    const colorLUTData = new Float32Array(this.numLevels * 4);
+    for (let i = 0; i < this.numLevels; i++) {
+      const t = (i + 1) / (this.numLevels + 1);
+      const color = this.colorScale(t);
+      colorLUTData[i * 4 + 0] = color[0];
+      colorLUTData[i * 4 + 1] = color[1];
+      colorLUTData[i * 4 + 2] = color[2];
+      colorLUTData[i * 4 + 3] = color[3];
+    }
+    this.device.queue.writeBuffer(this.colorLUTBuffer, 0, colorLUTData);
+
+    // Update thresholds
+    const thresholds = new Float32Array(this.numLevels);
+    for (let i = 0; i < this.numLevels; i++) {
+      thresholds[i] = (i + 1) / (this.numLevels + 1);
+    }
+    this.device.queue.writeBuffer(this.thresholdBuffer, 0, thresholds);
+
+    // Update threshold fill uniforms
+    const uniformData = new ArrayBuffer(THRESHOLD_FILL_UNIFORM_SIZE);
+    const view = new DataView(uniformData);
+    view.setFloat32(0, this.canvasWidth, true);
+    view.setFloat32(4, this.canvasHeight, true);
+    view.setUint32(8, this.gridSize, true);
+    view.setUint32(12, this.gridSize, true);
+    view.setUint32(16, this.numLevels, true);
+    view.setFloat32(20, this.opacity, true);
+    this.device.queue.writeBuffer(this.thresholdFillUniformBuffer, 0, uniformData);
+
+    // Create bind group for this frame's smoothed grid
+    const bindGroup = this.device.createBindGroup({
+      layout: this.thresholdFillPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.thresholdFillUniformBuffer } },
+        { binding: 1, resource: { buffer: frameData.smoothedGridBuffer } },
+        { binding: 2, resource: { buffer: this.thresholdBuffer } },
+        { binding: 3, resource: { buffer: this.colorLUTBuffer } },
+      ],
+    });
+
+    // Render
+    const commandEncoder = this.device.createCommandEncoder();
+    const textureView = this.context.getCurrentTexture().createView();
+
+    const renderPass = commandEncoder.beginRenderPass({
+      colorAttachments: [{
+        view: textureView,
+        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        loadOp: 'clear',
+        storeOp: 'store',
+      }],
+    });
+    renderPass.setPipeline(this.thresholdFillPipeline);
+    renderPass.setBindGroup(0, bindGroup);
+    renderPass.draw(6, 1);
+    renderPass.end();
+
+    this.device.queue.submit([commandEncoder.finish()]);
+  }
+
+  /**
+   * Get number of computed frames.
+   */
+  getFrameCount(): number {
+    return this.frameBuffers.size;
+  }
+
+  /**
+   * Clear all cached frames and release their GPU resources.
+   */
+  clearFrames(): void {
+    for (const frameData of this.frameBuffers.values()) {
+      frameData.smoothedGridBuffer.destroy();
+      frameData.pointBuffer.destroy();
+      frameData.histogramGridBuffer.destroy();
+      frameData.maxValueBuffer.destroy();
+      frameData.densityGridBuffer.destroy();
+      frameData.tempGridBuffer.destroy();
+    }
+    this.frameBuffers.clear();
+    this.pendingFrames.clear();
   }
 
   /**
@@ -863,6 +1267,10 @@ export class ContourRenderer {
    * Destroy the renderer and release resources.
    */
   destroy(): void {
+    // Clean up multi-frame buffers
+    this.clearFrames();
+
+    // Clean up shared buffers
     this.computeUniformBuffer.destroy();
     this.thresholdFillUniformBuffer.destroy();
     this.thresholdBuffer.destroy();

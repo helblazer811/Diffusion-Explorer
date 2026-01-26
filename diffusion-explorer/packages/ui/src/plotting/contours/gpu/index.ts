@@ -9,7 +9,7 @@
  * @module contours/gpu
  */
 
-export { ContourRenderer } from './renderer';
+export { GPUContourRenderer } from './renderer';
 
 export type {
   ContourRendererOptions,
