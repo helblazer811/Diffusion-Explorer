@@ -3,57 +3,32 @@
  *
  * The rendering pipeline:
  * 1. Points are binned into a density grid (GPU compute)
- * 2. Grid is blurred with Gaussian kernel (GPU compute)
- * 3. Marching squares extracts contour segments (GPU compute)
- * 4. Stencil-based rendering fills contours (GPU render)
- * 5. Result is cached to framebuffer for repeated draws
+ * 2. Grid is blurred with box blur kernel (GPU compute)
+ * 3. Threshold-based fill renders per-pixel alpha (GPU render)
+ * 4. Result is cached to framebuffer for repeated draws
  */
 
 import type { WebGPUContext } from '../../line-integral-convolution/types';
-import type { ContourDomain, RGBAColor, ColorScaleFn } from '../types';
+import type { ContourDomain, ColorScaleFn } from '../types';
 
 export type { WebGPUContext };
 
 /**
- * A single contour segment extracted by marching squares.
- * Packed for GPU buffer (32 bytes per segment).
+ * Uniforms for threshold-based fill shader.
  */
-export interface ContourSegment {
-  /** Start point x coordinate (normalized 0-1) */
-  x0: number;
-  /** Start point y coordinate (normalized 0-1) */
-  y0: number;
-  /** End point x coordinate (normalized 0-1) */
-  x1: number;
-  /** End point y coordinate (normalized 0-1) */
-  y1: number;
-  /** Threshold value of this contour level */
-  contourLevel: number;
-  /** Index of this contour level (0 to numLevels-1) */
-  contourIndex: number;
-  /** Validity flag (1.0 = valid, 0.0 = invalid) */
-  valid: number;
-  /** Padding for alignment */
-  _padding: number;
-}
-
-/**
- * GPU data for contour rendering.
- */
-export interface ContourGPUData {
-  /** Segment data packed for GPU upload */
-  segments: Float32Array;
-  /** Maximum number of segment slots allocated */
-  maxSegmentSlots: number;
+export interface ThresholdFillUniforms {
+  /** Canvas width in physical pixels */
+  width: number;
+  /** Canvas height in physical pixels */
+  height: number;
+  /** Grid width in cells */
+  gridWidth: number;
+  /** Grid height in cells */
+  gridHeight: number;
   /** Number of contour levels */
   numLevels: number;
-  /** Grid dimensions */
-  gridWidth: number;
-  gridHeight: number;
-  /** Domain bounds */
-  domain: ContourDomain;
-  /** Threshold values for each level */
-  thresholds: Float32Array;
+  /** Global opacity multiplier */
+  opacity: number;
 }
 
 /**
@@ -106,8 +81,13 @@ export interface ContourRendererOptions {
   dpr?: number;
   /** Grid resolution for density estimation (default: 100) */
   gridSize?: number;
-  /** Blur radius in grid cells (default: 10) */
-  blurRadius?: number;
+  /**
+   * Bandwidth for kernel density estimation (default: 20).
+   * Uses the same scale as D3's contourDensity bandwidth parameter.
+   * Internally converted to blur radius using D3's formula:
+   * r = (sqrt(4 * bandwidth^2 + 1) - 1) / 2
+   */
+  bandwidth?: number;
   /** Number of contour levels (default: 10) */
   numLevels?: number;
   /** Color scale function (default: blue gradient) */
@@ -138,17 +118,11 @@ export interface ContourPipelineTimings {
   blur: number;
   /** Time for marching squares (ms) */
   marchingSquares: number;
-  /** Time for stencil rendering (ms) */
+  /** Time for triangle rendering (ms) */
   render: number;
   /** Total pipeline time (ms) */
   total: number;
 }
-
-/**
- * Buffer layout constants.
- */
-export const CONTOUR_SEGMENT_SIZE = 32; // 8 floats * 4 bytes
-export const CONTOUR_SEGMENT_FLOATS = 8;
 
 /**
  * Compute uniform buffer size (must be 16-byte aligned).
@@ -156,6 +130,8 @@ export const CONTOUR_SEGMENT_FLOATS = 8;
 export const COMPUTE_UNIFORM_BUFFER_SIZE = 64; // Padded for alignment
 
 /**
- * Render uniform buffer size (must be 16-byte aligned).
+ * Threshold fill uniform buffer size (must be 16-byte aligned).
+ * Layout: width(f32), height(f32), gridWidth(u32), gridHeight(u32),
+ *         numLevels(u32), opacity(f32), pad0(u32), pad1(u32)
  */
-export const RENDER_UNIFORM_BUFFER_SIZE = 64; // Padded for alignment
+export const THRESHOLD_FILL_UNIFORM_SIZE = 32; // 8 values * 4 bytes
