@@ -107,6 +107,8 @@ export class ContourRenderer {
   private normalizePipeline: GPUComputePipeline;
   private blurHPipeline: GPUComputePipeline;
   private blurVPipeline: GPUComputePipeline;
+  private findMaxSmoothedPipeline: GPUComputePipeline;
+  private normalizeSmoothedPipeline: GPUComputePipeline;
   private marchingSquaresPipeline: GPUComputePipeline;
 
   // Render pipelines
@@ -140,6 +142,8 @@ export class ContourRenderer {
   private normalizeBindGroup: GPUBindGroup | null = null;
   private blurHBindGroup: GPUBindGroup | null = null;
   private blurVBindGroup: GPUBindGroup | null = null;
+  private findMaxSmoothedBindGroup: GPUBindGroup | null = null;
+  private normalizeSmoothedBindGroup: GPUBindGroup | null = null;
   private marchingSquaresBindGroup: GPUBindGroup | null = null;
   private stencilBindGroup: GPUBindGroup | null = null;
   private fillBindGroup: GPUBindGroup | null = null;
@@ -169,6 +173,8 @@ export class ContourRenderer {
     normalizePipeline: GPUComputePipeline,
     blurHPipeline: GPUComputePipeline,
     blurVPipeline: GPUComputePipeline,
+    findMaxSmoothedPipeline: GPUComputePipeline,
+    normalizeSmoothedPipeline: GPUComputePipeline,
     marchingSquaresPipeline: GPUComputePipeline,
     stencilPipeline: GPURenderPipeline,
     fillPipeline: GPURenderPipeline,
@@ -190,6 +196,8 @@ export class ContourRenderer {
     this.normalizePipeline = normalizePipeline;
     this.blurHPipeline = blurHPipeline;
     this.blurVPipeline = blurVPipeline;
+    this.findMaxSmoothedPipeline = findMaxSmoothedPipeline;
+    this.normalizeSmoothedPipeline = normalizeSmoothedPipeline;
     this.marchingSquaresPipeline = marchingSquaresPipeline;
     this.stencilPipeline = stencilPipeline;
     this.fillPipeline = fillPipeline;
@@ -338,6 +346,35 @@ export class ContourRenderer {
       compute: { module: densityModule, entryPoint: 'blurVertical' },
     });
 
+    // Create post-blur normalization bind group layout
+    // This reads from smoothedGrid (f32) and writes back to it after finding max
+    const postBlurNormalizeBindGroupLayout = device.createBindGroupLayout({
+      label: 'Contour Post-Blur Normalize Bind Group Layout',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } }, // unused placeholder (f32)
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } }, // smoothedGrid (read/write f32)
+        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } }, // maxValue atomic (u32)
+      ],
+    });
+
+    const postBlurNormalizePipelineLayout = device.createPipelineLayout({
+      label: 'Contour Post-Blur Normalize Pipeline Layout',
+      bindGroupLayouts: [postBlurNormalizeBindGroupLayout],
+    });
+
+    const findMaxSmoothedPipeline = device.createComputePipeline({
+      label: 'Contour Find Max Smoothed Pipeline',
+      layout: postBlurNormalizePipelineLayout,
+      compute: { module: densityModule, entryPoint: 'findMaxSmoothed' },
+    });
+
+    const normalizeSmoothedPipeline = device.createComputePipeline({
+      label: 'Contour Normalize Smoothed Pipeline',
+      layout: postBlurNormalizePipelineLayout,
+      compute: { module: densityModule, entryPoint: 'normalizeSmoothed' },
+    });
+
     const marchingSquaresPipeline = device.createComputePipeline({
       label: 'Contour Marching Squares Pipeline',
       layout: computePipelineLayout,
@@ -374,7 +411,7 @@ export class ContourRenderer {
           compare: 'always',
           failOp: 'keep',
           depthFailOp: 'keep',
-          passOp: 'invert',  // XOR mode
+          passOp: 'invert',  // XOR mode for scanline fill
         },
         stencilBack: {
           compare: 'always',
@@ -382,6 +419,7 @@ export class ContourRenderer {
           depthFailOp: 'keep',
           passOp: 'invert',
         },
+        stencilWriteMask: 0x01,
       },
       primitive: { topology: 'triangle-list' },
     });
@@ -397,22 +435,22 @@ export class ContourRenderer {
         targets: [{
           format,
           blend: {
-            // Additive blending for glow effect where contours overlap
-            color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
-            alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+            // Alpha compositing: overlapping regions accumulate saturation
+            color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+            alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
           },
         }],
       },
       depthStencil: {
         format: 'stencil8',
         stencilFront: {
-          compare: 'not-equal',  // Only draw where stencil is set
+          compare: 'equal',  // Only draw where stencil bit 0 is set (== 1)
           failOp: 'keep',
           depthFailOp: 'keep',
           passOp: 'keep',
         },
         stencilBack: {
-          compare: 'not-equal',
+          compare: 'equal',
           failOp: 'keep',
           depthFailOp: 'keep',
           passOp: 'keep',
@@ -502,6 +540,8 @@ export class ContourRenderer {
       normalizePipeline,
       blurHPipeline,
       blurVPipeline,
+      findMaxSmoothedPipeline,
+      normalizeSmoothedPipeline,
       marchingSquaresPipeline,
       stencilPipeline,
       fillPipeline,
@@ -700,6 +740,30 @@ export class ContourRenderer {
       ],
     });
 
+    // Post-blur normalization bind groups
+    // These use smoothedGridBuffer for both reading and writing (in-place normalization)
+    this.findMaxSmoothedBindGroup = this.device.createBindGroup({
+      label: 'Contour Find Max Smoothed Bind Group',
+      layout: this.findMaxSmoothedPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+        { binding: 1, resource: { buffer: this.tempGridBuffer! } },  // unused placeholder
+        { binding: 2, resource: { buffer: this.smoothedGridBuffer! } },
+        { binding: 3, resource: { buffer: this.maxValueBuffer! } },
+      ],
+    });
+
+    this.normalizeSmoothedBindGroup = this.device.createBindGroup({
+      label: 'Contour Normalize Smoothed Bind Group',
+      layout: this.normalizeSmoothedPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.computeUniformBuffer } },
+        { binding: 1, resource: { buffer: this.tempGridBuffer! } },  // unused placeholder
+        { binding: 2, resource: { buffer: this.smoothedGridBuffer! } },
+        { binding: 3, resource: { buffer: this.maxValueBuffer! } },
+      ],
+    });
+
     this.marchingSquaresBindGroup = this.device.createBindGroup({
       label: 'Contour Marching Squares Bind Group',
       layout: this.marchingSquaresPipeline.getBindGroupLayout(0),
@@ -763,7 +827,37 @@ export class ContourRenderer {
     );
     blurVPass.end();
 
-    // Pass 6: Marching squares
+    // Submit blur passes first, then clear max value buffer for re-use
+    this.device.queue.submit([commandEncoder.finish()]);
+
+    // Clear max value buffer before post-blur normalization
+    this.device.queue.writeBuffer(this.maxValueBuffer!, 0, new Uint32Array([0]));
+
+    // Create new command encoder for post-blur normalization
+    const postBlurEncoder = this.device.createCommandEncoder();
+
+    // Pass 6: Find max of smoothed grid
+    console.log('[ContourRenderer] Pass 6: Find max smoothed...');
+    const findMaxSmoothedPass = postBlurEncoder.beginComputePass();
+    findMaxSmoothedPass.setPipeline(this.findMaxSmoothedPipeline);
+    findMaxSmoothedPass.setBindGroup(0, this.findMaxSmoothedBindGroup!);
+    findMaxSmoothedPass.dispatchWorkgroups(Math.ceil(gridCells / 256));
+    findMaxSmoothedPass.end();
+
+    // Pass 7: Normalize smoothed grid to [0, 1]
+    console.log('[ContourRenderer] Pass 7: Normalize smoothed...');
+    const normalizeSmoothedPass = postBlurEncoder.beginComputePass();
+    normalizeSmoothedPass.setPipeline(this.normalizeSmoothedPipeline);
+    normalizeSmoothedPass.setBindGroup(0, this.normalizeSmoothedBindGroup!);
+    normalizeSmoothedPass.dispatchWorkgroups(Math.ceil(gridCells / 256));
+    normalizeSmoothedPass.end();
+
+    this.device.queue.submit([postBlurEncoder.finish()]);
+
+    // Create another command encoder for marching squares
+    const msEncoder = this.device.createCommandEncoder();
+
+    // Pass 8: Marching squares
     const cellWidth = this.gridSize - 1;
     const cellHeight = this.gridSize - 1;
 
@@ -773,9 +867,9 @@ export class ContourRenderer {
     const zeroData = new Float32Array(segmentBufferSize / 4);
     this.device.queue.writeBuffer(this.segmentBuffer!, 0, zeroData);
 
-    console.log('[ContourRenderer] Pass 6: Marching squares...');
+    console.log('[ContourRenderer] Pass 8: Marching squares...');
     console.log(`  - workgroups: ${Math.ceil(cellWidth / 8)} x ${Math.ceil(cellHeight / 8)} x ${this.numLevels}`);
-    const msPass = commandEncoder.beginComputePass();
+    const msPass = msEncoder.beginComputePass();
     msPass.setPipeline(this.marchingSquaresPipeline);
     msPass.setBindGroup(0, this.marchingSquaresBindGroup);
     msPass.dispatchWorkgroups(
@@ -785,8 +879,8 @@ export class ContourRenderer {
     );
     msPass.end();
 
-    console.log('[ContourRenderer] Submitting compute command buffer...');
-    this.device.queue.submit([commandEncoder.finish()]);
+    console.log('[ContourRenderer] Submitting marching squares command buffer...');
+    this.device.queue.submit([msEncoder.finish()]);
     console.log('[ContourRenderer] Compute pipeline complete');
 
     this.isDataDirty = false;
@@ -882,7 +976,10 @@ export class ContourRenderer {
     // Render each contour level (outer to inner for proper layering)
     console.log(`[ContourRenderer] Rendering ${this.numLevels} contour levels...`);
     for (let level = this.numLevels - 1; level >= 0; level--) {
-      const color = this.colorScale((level + 1) / (this.numLevels + 1));
+      // Map level to color: inner levels (low level number, rendered last) should have
+      // higher t values for more saturated/opaque colors that show on top
+      const t = 1 - (level + 1) / (this.numLevels + 1);
+      const color = this.colorScale(t);
       console.log(`[ContourRenderer]   Level ${level}: color=(${color[0].toFixed(3)}, ${color[1].toFixed(3)}, ${color[2].toFixed(3)}, ${color[3].toFixed(3)})`);
 
       // Update render uniforms
@@ -921,7 +1018,7 @@ export class ContourRenderer {
       });
       stencilPass.setPipeline(this.stencilPipeline);
       stencilPass.setBindGroup(0, this.stencilBindGroup!);
-      stencilPass.setStencilReference(0);
+      stencilPass.setStencilReference(1);  // Write 1 to stencil where quads are drawn
       // 6 vertices per quad (2 triangles for scanline fill), maxSegmentSlots instances
       stencilPass.draw(6, maxSegmentSlots, 0, 0);
       stencilPass.end();
@@ -941,7 +1038,7 @@ export class ContourRenderer {
       });
       fillPass.setPipeline(this.fillPipeline);
       fillPass.setBindGroup(0, this.fillBindGroup!);
-      fillPass.setStencilReference(0);
+      fillPass.setStencilReference(1);  // Fill where stencil bit 0 == 1 (inside contour)
       fillPass.draw(3, 1, 0, 0);
       fillPass.end();
     }

@@ -190,3 +190,58 @@ fn blurVertical(@builtin(global_invocation_id) globalId: vec3<u32>) {
 
   outputGrid[centerIdx] = sum;
 }
+
+// ============================================================================
+// Post-blur normalization pass bindings (separate bind group)
+// Uses f32 smoothed grid for both read and write (in-place normalization)
+// ============================================================================
+@group(0) @binding(0) var<uniform> postBlurUniforms: Uniforms;
+@group(0) @binding(1) var<storage, read> unusedPlaceholder: array<f32>;  // placeholder for layout compatibility
+@group(0) @binding(2) var<storage, read_write> smoothedGrid: array<f32>;
+@group(0) @binding(3) var<storage, read_write> postBlurMaxValue: array<atomic<u32>>;
+
+/**
+ * Find maximum value in the blurred f32 density grid using atomic max.
+ * This is needed because Gaussian blur reduces peak values significantly.
+ */
+@compute @workgroup_size(256)
+fn findMaxSmoothed(@builtin(global_invocation_id) globalId: vec3<u32>) {
+  let idx = globalId.x;
+  let totalCells = postBlurUniforms.gridWidth * postBlurUniforms.gridHeight;
+
+  if (idx >= totalCells) {
+    return;
+  }
+
+  let value = smoothedGrid[idx];
+
+  // Convert to fixed-point for atomic max (multiply by large number to preserve precision)
+  // Using 10^6 gives us 6 decimal places of precision
+  let fixedPoint = u32(value * 1000000.0);
+  atomicMax(&postBlurMaxValue[0], fixedPoint);
+}
+
+/**
+ * Normalize the blurred density grid to [0, 1] range in-place.
+ * This ensures thresholds work correctly after blur reduces peak values.
+ */
+@compute @workgroup_size(256)
+fn normalizeSmoothed(@builtin(global_invocation_id) globalId: vec3<u32>) {
+  let idx = globalId.x;
+  let totalCells = postBlurUniforms.gridWidth * postBlurUniforms.gridHeight;
+
+  if (idx >= totalCells) {
+    return;
+  }
+
+  // Read max value (stored as fixed-point)
+  let maxFixed = f32(atomicLoad(&postBlurMaxValue[0]));
+  let maxVal = maxFixed / 1000000.0;
+
+  let value = smoothedGrid[idx];
+
+  // Normalize to [0, 1] and write back
+  if (maxVal > 0.0) {
+    smoothedGrid[idx] = value / maxVal;
+  }
+}
