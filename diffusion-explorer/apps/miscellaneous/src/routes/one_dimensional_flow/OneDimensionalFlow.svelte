@@ -10,8 +10,10 @@
     useVisibilityHandler,
     useCanvas2D,
     drawHeatmap,
+    precomputeHeatmap,
     selectTrajectoriesWithMask,
     type PathlineAnimationState,
+    type PrecomputedHeatmap,
   } from "@diffusion-explorer/ui";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import { base } from "$app/paths";
@@ -130,7 +132,10 @@
   // Setup
   // ----------------------------------------------------------------
 
-  function runInitialComputation() {
+  // Precomputed heatmap density (for GPU acceleration)
+  let precomputedHeatmap: PrecomputedHeatmap | null = null;
+
+  async function runInitialComputation() {
     const bgCtx = bgCanvas2d.ctx;
     if (!bgCtx || trajectories.length === 0) return;
 
@@ -142,12 +147,23 @@
     xScale = d3.scaleLinear().domain([0, 1]).range([margin.left, margin.left + plotWidth]);
     yScale = d3.scaleLinear().domain(valueDomain).range([margin.top + plotHeight, margin.top]);
 
-    // Draw static heatmap on background canvas
+    // Draw static heatmap on background canvas (GPU-accelerated)
     const heatmapPoints = toHeatmapPoints(trajectories);
-    drawHeatmap(bgCtx, heatmapPoints, {
+    const domain: [number, number, number, number] = [0, 1, valueDomain[0], valueDomain[1]];
+
+    // Precompute density on GPU (falls back to CPU if unavailable)
+    const startTime = performance.now();
+    precomputedHeatmap = await precomputeHeatmap(heatmapPoints, {
       resolution: heatmapResolution,
       bandwidth: 5,
-      domain: [0, 1, valueDomain[0], valueDomain[1]],
+      domain,
+    });
+    const endTime = performance.now();
+    console.log(`Heatmap precomputed on ${precomputedHeatmap.backend} in ${(endTime - startTime).toFixed(1)}ms`);
+
+    // Draw using precomputed density
+    drawHeatmap(bgCtx, heatmapPoints, {
+      precomputed: precomputedHeatmap,
       colorScale,
       opacity: 0.9,
       bounds: { x: margin.left, y: margin.top, width: plotWidth, height: plotHeight },
@@ -434,7 +450,7 @@
   // Lifecycle
   // ----------------------------------------------------------------
 
-  function trySetup() {
+  async function trySetup() {
     if (setupComplete) return;
 
     const bgCtx = bgCanvas2d.ctx;
@@ -443,7 +459,7 @@
 
     setupComplete = true;
 
-    runInitialComputation();
+    await runInitialComputation();
     setupTimeline();
 
     if (timeline) {
