@@ -290,12 +290,13 @@
   // ----------------------------------------------------------------
 
   function draw(
+    canvas: HTMLCanvasElement,
     ctx: CanvasRenderingContext2D,
     pathlineAnimation: PathlineAnimation<AnimationState>,
     state: AnimationState,
     userTrajectories: number[][][]
   ) {
-    if (!ctx || !pathlineAnimation) return;
+    if (!canvas || !ctx || !pathlineAnimation) return;
 
     const { time: logicalTime } = state;
 
@@ -356,8 +357,9 @@
   }
 
   function updateLeftVisualization() {
-    if (!isDataValid || !leftCtx || !leftPathlineAnimation) return;
+    if (!isDataValid || !leftCanvas2d.canvas || !leftCtx || !leftPathlineAnimation) return;
     draw(
+      leftCanvas2d.canvas,
       leftCtx,
       leftPathlineAnimation,
       getCurrentState(),
@@ -366,8 +368,9 @@
   }
 
   function updateRightVisualization() {
-    if (!isDataValid || !rightCtx || !rightPathlineAnimation) return;
+    if (!isDataValid || !rightCanvas2d.canvas || !rightCtx || !rightPathlineAnimation) return;
     draw(
+      rightCanvas2d.canvas,
       rightCtx,
       rightPathlineAnimation,
       getCurrentState(),
