@@ -204,7 +204,7 @@ type CPULengthData = StreamlineLengthData & {
  * timeline.add(anim.clip, { start: 0, end: 1 });
  *
  * // In draw function:
- * anim.draw(ctx, state);
+ * anim.draw(ctx, state);  // ctx is CanvasRenderingContext2D
  *
  * @example
  * // GPU backend
@@ -373,7 +373,7 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       return Array.from(outBuffer);
     });
 
-    // Draw all streamlines
+    // Draw all streamlines (uses GPU by default with CPU fallback)
     drawTrajectories(ctx, streamlines, 0, {
       strokeWidth: this.strokeWidth,
       color: this.color,
@@ -383,7 +383,7 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       showHeadMarker: false,
       perSegmentAlphas,
       gradientSubdivisions: this.gradientSubdivisions,
-    });
+    }, { backend: 'cpu' });  // Force CPU since this is the CPU backend path
   }
 
   /**
