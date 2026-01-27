@@ -24,6 +24,7 @@
 		<li><a href="/path_independence">Path Independence</a></li>
 		<li><a href="/streamline_propagation">Streamline Propagation</a></li>
 		<li><a href="/streamline_generation">Streamline Generation</a></li>
+		<li><a href="/marching_squares">Marching Squares</a></li>
 	</ul>
 </section>
 
