@@ -1,4 +1,4 @@
-import { drawArrowHead } from './utils';
+import { drawArrowHead } from '../../utils';
 
 export interface PartialTrajectoryOptions {
   color: string;
