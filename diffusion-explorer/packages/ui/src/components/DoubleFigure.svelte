@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
 
+  export let title = undefined;
   export let left = undefined;
   export let right = undefined;
   export let footer = undefined;
@@ -63,6 +64,11 @@
 </script>
 
 <figure class="double-figure" bind:this={figureElement}>
+  {#if title}
+    <div class="figure-title">
+      {@render title?.()}
+    </div>
+  {/if}
   <div
     class="double-figure-container"
     style="gap: {gap}px;"
@@ -91,6 +97,11 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+  }
+
+  .figure-title {
+    text-align: center;
+    margin-bottom: 0.5rem;
   }
 
   .double-figure-container {

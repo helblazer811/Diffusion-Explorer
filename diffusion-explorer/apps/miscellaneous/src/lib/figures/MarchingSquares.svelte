@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { DoubleFigure, useCanvas2D, drawHeatmap, Timeline, type Clip } from '@diffusion-explorer/ui';
+  import { DoubleFigure, useCanvas2D, Timeline, type Clip } from '@diffusion-explorer/ui';
   import * as d3 from 'd3';
   import {
     getAllCasePolygons,
@@ -8,22 +8,30 @@
     getCaseIndex,
     type Point,
   } from '../marching-squares';
+  import { loadVolcanoData, evaluateHeightmap } from '../topography-data';
+  import {
+    computeContourCells,
+    traceContourLines,
+    drawContourLines,
+    chainSegments,
+    type EdgeSegment,
+  } from '../contour-outlining';
+  import { IncrementalComponentTracker, type CellInfo } from '../union-find-components';
 
   // ================================================================
   // Props - Component interface
   // ================================================================
   export let canvasWidth = 400;
   export let canvasHeight = 400;
-  export let gridSize = 12;
-  export let numSamples = 800;
-  export let bandwidth = 8;
-  export let threshold = 0.3;
+  export let gridSize = 8;
+  export let numContourLevels = 3;
+  export let blurSigma = 0;
 
   // ================================================================
   // State - Canvas, ctx, scales, flags, animation state
   // ================================================================
-  const marginWidth = 40;
-  const marginHeight = 40;
+  const marginWidth = 20;
+  const marginHeight = 20;
 
   // Canvas managers
   const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
@@ -33,7 +41,7 @@
   let leftCanvas: HTMLCanvasElement | null = null;
   let rightCanvas: HTMLCanvasElement | null = null;
 
-  // Visibility binding - receives store from DoubleFigure
+  // Visibility binding
   let figureIsActive: ReturnType<typeof import('svelte/store').writable<boolean>> | undefined;
 
   // Initialize flag
@@ -46,24 +54,41 @@
   // Scales
   let xScale: d3.ScaleLinear<number, number>;
   let yScale: d3.ScaleLinear<number, number>;
-  const domain: [number, number, number, number] = [-3, 3, -3, 3];
-  const [xMin, xMax, yMin, yMax] = domain;
 
-  // Generated samples for the 3-mode Gaussian
-  let samples: number[][] = [];
+  // Volcano heightmap data
+  let heightmap: Float32Array;
+  let heightmapWidth: number;
+  let heightmapHeight: number;
+  let minHeight: number;
+  let maxHeight: number;
 
-  // Density grid for marching squares evaluation
-  let densityGrid: Float32Array | null = null;
-  const densityResolution = 100;
+  // Pre-rendered heatmap
+  let heatmapImageData: ImageData | null = null;
+
+  // Contour data for all levels
+  let contourLevels: Array<{
+    threshold: number;
+    polylines: Point[][];
+  }> = [];
+
+  // Component trackers (one per level) for incremental connected component visualization
+  let componentTrackers: IncrementalComponentTracker[] = [];
 
   // Timeline
   let timeline: Timeline<AnimationState>;
 
+  // Number of threshold levels
+  const numLevels = 1;
+
+  // Minimum threshold as fraction of height range (0 = minHeight, 1 = maxHeight)
+  const minThresholdFraction = 0.15;
+
   // Animation state type
   type AnimationState = {
-    currentCellIndex: number;  // Which cell we're highlighting (0 to gridSize*gridSize - 1)
-    highlightedCaseIndex: number;  // Which case (0-15) to highlight on the right
-    showPolygon: boolean;  // Whether to show the polygon on the current cell
+    currentLevel: number;
+    currentCellIndex: number;
+    highlightedCaseIndex: number;
+    completedLevels: number[];
   };
 
   // ================================================================
@@ -71,173 +96,56 @@
   // ================================================================
 
   /**
-   * Sample from a single 2D Gaussian
+   * Evaluate heightmap at grid coordinates
    */
-  function sampleGaussian2D(
-    meanX: number,
-    meanY: number,
-    stdX: number,
-    stdY: number
-  ): [number, number] {
-    // Box-Muller transform
-    const u1 = Math.random();
-    const u2 = Math.random();
-    const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-    const z1 = Math.sqrt(-2 * Math.log(u1)) * Math.sin(2 * Math.PI * u2);
-    return [meanX + z0 * stdX, meanY + z1 * stdY];
+  function evalHeightAt(col: number, row: number): number {
+    const hx = (col / gridSize) * (heightmapWidth - 1);
+    const hy = (row / gridSize) * (heightmapHeight - 1);
+    return evaluateHeightmap(heightmap, heightmapWidth, heightmapHeight, hx, hy);
   }
 
   /**
-   * Generate samples from a 3-mode Gaussian mixture
+   * Get normalized height at grid position
    */
-  function generate3ModeGaussianSamples(n: number): number[][] {
-    const modes = [
-      { mean: [-1.5, 1.0], std: [0.5, 0.5], weight: 0.35 },
-      { mean: [1.2, 0.8], std: [0.6, 0.4], weight: 0.35 },
-      { mean: [0, -1.5], std: [0.4, 0.6], weight: 0.3 },
-    ];
-
-    const result: number[][] = [];
-    for (let i = 0; i < n; i++) {
-      // Choose which mode to sample from
-      const r = Math.random();
-      let cumWeight = 0;
-      let selectedMode = modes[0];
-      for (const mode of modes) {
-        cumWeight += mode.weight;
-        if (r < cumWeight) {
-          selectedMode = mode;
-          break;
-        }
-      }
-
-      const [x, y] = sampleGaussian2D(
-        selectedMode.mean[0],
-        selectedMode.mean[1],
-        selectedMode.std[0],
-        selectedMode.std[1]
-      );
-      result.push([x, y]);
-    }
-    return result;
+  function getNormalizedHeight(col: number, row: number): number {
+    const height = evalHeightAt(col, row);
+    return (height - minHeight) / (maxHeight - minHeight);
   }
 
   /**
-   * Compute density grid using kernel density estimation
+   * Convert plasma color to RGB tuple
    */
-  function computeDensityGrid(
-    points: number[][],
-    resolution: number,
-    sigma: number
-  ): Float32Array {
-    const w = resolution;
-    const h = resolution;
-    const grid = new Float32Array(w * h);
-
-    const toGridX = (x: number) => ((x - xMin) / (xMax - xMin)) * (w - 1);
-    const toGridY = (y: number) => ((y - yMin) / (yMax - yMin)) * (h - 1);
-
-    // Splat points
-    for (const [x, y] of points) {
-      const gx = Math.round(toGridX(x));
-      const gy = Math.round(toGridY(y));
-      if (gx >= 0 && gx < w && gy >= 0 && gy < h) {
-        grid[gy * w + gx] += 1;
-      }
+  function plasmaColorScale(t: number): [number, number, number] {
+    const color = d3.color(d3.interpolatePlasma(t));
+    if (color) {
+      const rgb = color.rgb();
+      return [Math.round(rgb.r), Math.round(rgb.g), Math.round(rgb.b)];
     }
-
-    // Gaussian blur
-    const radius = Math.ceil(3 * sigma);
-    const size = radius * 2 + 1;
-    const kernel = new Float32Array(size);
-
-    let sum = 0;
-    for (let i = -radius; i <= radius; i++) {
-      const v = Math.exp(-(i * i) / (2 * sigma * sigma));
-      kernel[i + radius] = v;
-      sum += v;
-    }
-    for (let i = 0; i < size; i++) kernel[i] /= sum;
-
-    // Horizontal blur
-    const temp = new Float32Array(w * h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        let acc = 0;
-        for (let k = -radius; k <= radius; k++) {
-          const xx = x + k;
-          if (xx >= 0 && xx < w) {
-            acc += grid[y * w + xx] * kernel[k + radius];
-          }
-        }
-        temp[y * w + x] = acc;
-      }
-    }
-
-    // Vertical blur
-    const out = new Float32Array(w * h);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        let acc = 0;
-        for (let k = -radius; k <= radius; k++) {
-          const yy = y + k;
-          if (yy >= 0 && yy < h) {
-            acc += temp[yy * w + x] * kernel[k + radius];
-          }
-        }
-        out[y * w + x] = acc;
-      }
-    }
-
-    return out;
+    return [0, 0, 0];
   }
 
   /**
-   * Evaluate the density at a given point using bilinear interpolation
+   * Pre-render the heatmap as ImageData at full volcano resolution
    */
-  function evaluateDensity(x: number, y: number): number {
-    if (!densityGrid) return 0;
+  function createHeatmapImageData(): ImageData {
+    const imageData = new ImageData(heightmapWidth, heightmapHeight);
+    const data = imageData.data;
 
-    const w = densityResolution;
-    const h = densityResolution;
+    for (let row = 0; row < heightmapHeight; row++) {
+      for (let col = 0; col < heightmapWidth; col++) {
+        const height = heightmap[row * heightmapWidth + col];
+        const t = (height - minHeight) / (maxHeight - minHeight) * 0.7;
+        const [r, g, b] = plasmaColorScale(t);
 
-    // Convert to grid coordinates
-    const gx = ((x - xMin) / (xMax - xMin)) * (w - 1);
-    const gy = ((y - yMin) / (yMax - yMin)) * (h - 1);
-
-    const x0 = Math.floor(gx);
-    const y0 = Math.floor(gy);
-    const x1 = Math.min(x0 + 1, w - 1);
-    const y1 = Math.min(y0 + 1, h - 1);
-
-    if (x0 < 0 || x0 >= w || y0 < 0 || y0 >= h) return 0;
-
-    const fx = gx - x0;
-    const fy = gy - y0;
-
-    const v00 = densityGrid[y0 * w + x0];
-    const v10 = densityGrid[y0 * w + x1];
-    const v01 = densityGrid[y1 * w + x0];
-    const v11 = densityGrid[y1 * w + x1];
-
-    return (
-      v00 * (1 - fx) * (1 - fy) +
-      v10 * fx * (1 - fy) +
-      v01 * (1 - fx) * fy +
-      v11 * fx * fy
-    );
-  }
-
-  /**
-   * Get max density value for normalization
-   */
-  function getMaxDensity(): number {
-    if (!densityGrid) return 1;
-    let max = 0;
-    for (let i = 0; i < densityGrid.length; i++) {
-      if (densityGrid[i] > max) max = densityGrid[i];
+        const idx = (row * heightmapWidth + col) * 4;
+        data[idx] = r;
+        data[idx + 1] = g;
+        data[idx + 2] = b;
+        data[idx + 3] = 255;
+      }
     }
-    return max || 1;
+
+    return imageData;
   }
 
   // ================================================================
@@ -248,79 +156,107 @@
     // Create scales
     xScale = d3
       .scaleLinear()
-      .domain([xMin, xMax])
+      .domain([0, gridSize])
       .range([marginWidth, canvasWidth - marginWidth]);
 
     yScale = d3
       .scaleLinear()
-      .domain([yMin, yMax])
-      .range([canvasHeight - marginHeight, marginHeight]);
+      .domain([0, gridSize])
+      .range([marginHeight, canvasHeight - marginHeight]);
 
-    // Generate samples
-    samples = generate3ModeGaussianSamples(numSamples);
+    // Pre-render heatmap
+    heatmapImageData = createHeatmapImageData();
 
-    // Compute density grid
-    densityGrid = computeDensityGrid(samples, densityResolution, bandwidth);
+    // Compute contour lines at multiple levels (starting from higher minimum)
+    contourLevels = [];
+    for (let i = 0; i < numContourLevels; i++) {
+      const t = minThresholdFraction + ((i + 1) / (numContourLevels + 1)) * (1 - minThresholdFraction);
+      const threshold = minHeight + t * (maxHeight - minHeight);
+
+      const cells = computeContourCells(evalHeightAt, gridSize, gridSize, threshold);
+      const polylines = traceContourLines(cells, gridSize, gridSize);
+
+      contourLevels.push({ threshold, polylines });
+    }
+
+    // Initialize component trackers for each level
+    componentTrackers = [];
+    for (let i = 0; i < numLevels; i++) {
+      componentTrackers.push(new IncrementalComponentTracker());
+    }
   }
 
   // ================================================================
   // Animations - setupTimeline(), clips, onTick
   // ================================================================
 
+  /**
+   * Get threshold value for a given level (0 to numLevels-1)
+   * Thresholds are evenly spaced from minThresholdFraction to maxHeight
+   */
+  function getThresholdForLevel(level: number): number {
+    const t = minThresholdFraction + ((level + 1) / (numLevels + 1)) * (1 - minThresholdFraction);
+    return minHeight + t * (maxHeight - minHeight);
+  }
+
   function setupTimeline() {
     timeline = new Timeline<AnimationState>();
 
     const totalCells = gridSize * gridSize;
+    const totalIterations = totalCells * numLevels;
 
     timeline.initialState = {
+      currentLevel: 0,
       currentCellIndex: -1,
       highlightedCaseIndex: -1,
-      showPolygon: false,
+      completedLevels: [],
     };
 
-    // Animation duration: ~0.15 seconds per cell
-    timeline.duration = totalCells * 0.15;
+    timeline.duration = totalIterations * 0.5;
     timeline.looping = true;
     timeline.setEndPause(2);
 
-    // Create the cell iteration clip
     const cellIterationClip: Clip<AnimationState> = {
       name: 'CellIteration',
       reduce(t: number) {
-        // t goes from 0 to 1 over the duration
-        const cellIndex = Math.min(
-          Math.floor(t * totalCells),
-          totalCells - 1
+        const globalIndex = Math.min(
+          Math.floor(t * totalIterations),
+          totalIterations - 1
         );
 
-        // Calculate which case this cell matches
+        const currentLevel = Math.floor(globalIndex / totalCells);
+        const cellIndex = globalIndex % totalCells;
+
+        // Build list of completed levels
+        const completedLevels: number[] = [];
+        for (let i = 0; i < currentLevel; i++) {
+          completedLevels.push(i);
+        }
+
+        // Get threshold for current level
+        const threshold = getThresholdForLevel(currentLevel);
+
         const row = Math.floor(cellIndex / gridSize);
         const col = cellIndex % gridSize;
 
-        const cellWidth = (xMax - xMin) / gridSize;
-        const cellHeight = (yMax - yMin) / gridSize;
-
-        const cellXMin = xMin + col * cellWidth;
-        const cellYMin = yMin + row * cellHeight;
-
-        // Get corner values (normalized)
-        const maxDensity = getMaxDensity();
-        const tl = evaluateDensity(cellXMin, cellYMin) / maxDensity;
-        const tr = evaluateDensity(cellXMin + cellWidth, cellYMin) / maxDensity;
-        const bl = evaluateDensity(cellXMin, cellYMin + cellHeight) / maxDensity;
-        const br = evaluateDensity(cellXMin + cellWidth, cellYMin + cellHeight) / maxDensity;
+        const tl = evalHeightAt(col, row);
+        const tr = evalHeightAt(col + 1, row);
+        const br = evalHeightAt(col + 1, row + 1);
+        const bl = evalHeightAt(col, row + 1);
 
         const caseIndex = getCaseIndex(tl, tr, br, bl, threshold);
 
         return {
+          currentLevel,
           currentCellIndex: cellIndex,
           highlightedCaseIndex: caseIndex,
-          showPolygon: true,
+          completedLevels,
         };
       },
     };
 
-    timeline.add(cellIterationClip, { start: 0, end: 1 });
+    // Start at 0.05 to add a pause at the beginning before animation starts
+    timeline.add(cellIterationClip, { start: 0.05, end: 1 });
 
     timeline.onTick((_, state) => {
       draw(state);
@@ -332,14 +268,27 @@
   // ================================================================
 
   /**
-   * White to blue color scale
+   * Draw the terrain heatmap at full resolution
    */
-  function whiteToBlueScale(t: number): string {
-    // Interpolate from white (low density) to blue (high density)
-    const r = Math.round(255 * (1 - t));
-    const g = Math.round(255 * (1 - t));
-    const b = 255;
-    return `rgb(${r}, ${g}, ${b})`;
+  function drawHeatmapLayer(ctx: CanvasRenderingContext2D) {
+    if (!heatmapImageData) return;
+
+    ctx.save();
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = heatmapImageData.width;
+    tempCanvas.height = heatmapImageData.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (tempCtx) {
+      tempCtx.putImageData(heatmapImageData, 0, 0);
+      const plotWidth = canvasWidth - 2 * marginWidth;
+      const plotHeight = canvasHeight - 2 * marginHeight;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(tempCanvas, marginWidth, marginHeight, plotWidth, plotHeight);
+    }
+
+    ctx.restore();
   }
 
   /**
@@ -347,33 +296,40 @@
    */
   function drawGrid(ctx: CanvasRenderingContext2D) {
     ctx.save();
-    ctx.strokeStyle = 'rgba(128, 128, 128, 0.4)';
-    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1.5;
 
-    const cellWidthData = (xMax - xMin) / gridSize;
-    const cellHeightData = (yMax - yMin) / gridSize;
-
-    // Vertical lines
     for (let col = 0; col <= gridSize; col++) {
-      const x = xMin + col * cellWidthData;
-      const px = xScale(x);
+      const px = xScale(col);
       ctx.beginPath();
-      ctx.moveTo(px, yScale(yMax));
-      ctx.lineTo(px, yScale(yMin));
+      ctx.moveTo(px, yScale(0));
+      ctx.lineTo(px, yScale(gridSize));
       ctx.stroke();
     }
 
-    // Horizontal lines
     for (let row = 0; row <= gridSize; row++) {
-      const y = yMin + row * cellHeightData;
-      const py = yScale(y);
+      const py = yScale(row);
       ctx.beginPath();
-      ctx.moveTo(xScale(xMin), py);
-      ctx.lineTo(xScale(xMax), py);
+      ctx.moveTo(xScale(0), py);
+      ctx.lineTo(xScale(gridSize), py);
       ctx.stroke();
     }
 
     ctx.restore();
+  }
+
+  /**
+   * Draw all contour lines (white)
+   */
+  function drawAllContourLines(ctx: CanvasRenderingContext2D) {
+    for (const level of contourLevels) {
+      drawContourLines(ctx, level.polylines, {
+        xScale: (x) => xScale(x),
+        yScale: (y) => yScale(y),
+        strokeColor: 'white',
+        lineWidth: 2,
+      });
+    }
   }
 
   /**
@@ -385,81 +341,218 @@
     const row = Math.floor(cellIndex / gridSize);
     const col = cellIndex % gridSize;
 
-    const cellWidthData = (xMax - xMin) / gridSize;
-    const cellHeightData = (yMax - yMin) / gridSize;
-
-    const cellXMin = xMin + col * cellWidthData;
-    const cellYMin = yMin + row * cellHeightData;
-
-    const px = xScale(cellXMin);
-    const py = yScale(cellYMin + cellHeightData);
-    const pw = xScale(cellXMin + cellWidthData) - px;
-    const ph = yScale(cellYMin) - py;
+    const px = xScale(col);
+    const py = yScale(row);
+    const pw = xScale(col + 1) - px;
+    const ph = yScale(row + 1) - py;
 
     ctx.save();
-    ctx.strokeStyle = '#ff6b6b';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 4;
     ctx.strokeRect(px, py, pw, ph);
     ctx.restore();
   }
 
   /**
-   * Draw all processed cells (cells before current index) with their polygons
+   * Extract the outer boundary edges of a connected component.
+   * This traces around the filled polygon region, including edges where
+   * the component borders unfilled cells or the grid edge.
    */
-  function drawProcessedCells(ctx: CanvasRenderingContext2D, upToCellIndex: number) {
-    if (upToCellIndex < 0) return;
+  function extractComponentBoundary(cells: CellInfo[]): Array<{ start: Point; end: Point }> {
+    const filledSet = new Set(cells.map((c) => `${c.row},${c.col}`));
+    const segments: Array<{ start: Point; end: Point }> = [];
 
-    const cellWidthData = (xMax - xMin) / gridSize;
-    const cellHeightData = (yMax - yMin) / gridSize;
-    const maxDensity = getMaxDensity();
-    const casePolygons = getAllCasePolygons();
+    for (const cell of cells) {
+      const { row, col, polygon } = cell;
 
-    ctx.save();
-    ctx.fillStyle = 'rgba(59, 130, 246, 0.6)';  // Blue with transparency
+      // For each edge of the polygon, determine if it should be drawn
+      for (let i = 0; i < polygon.length; i++) {
+        const p1 = polygon[i];
+        const p2 = polygon[(i + 1) % polygon.length];
 
-    for (let cellIndex = 0; cellIndex <= upToCellIndex; cellIndex++) {
-      const row = Math.floor(cellIndex / gridSize);
-      const col = cellIndex % gridSize;
+        // Convert to grid coordinates
+        const start: Point = [col + p1[0], row + p1[1]];
+        const end: Point = [col + p2[0], row + p2[1]];
 
-      const cellXMin = xMin + col * cellWidthData;
-      const cellYMin = yMin + row * cellHeightData;
+        // Determine if this edge is on the boundary of the filled region
+        // An edge is on the boundary if:
+        // 1. It's a contour edge (connects midpoints) - always include
+        // 2. It's on a cell edge where the neighbor is not in the filled set
 
-      // Get corner values
-      const tl = evaluateDensity(cellXMin, cellYMin) / maxDensity;
-      const tr = evaluateDensity(cellXMin + cellWidthData, cellYMin) / maxDensity;
-      const bl = evaluateDensity(cellXMin, cellYMin + cellHeightData) / maxDensity;
-      const br = evaluateDensity(cellXMin + cellWidthData, cellYMin + cellHeightData) / maxDensity;
+        const p1IsMidpoint = p1[0] === 0.5 || p1[1] === 0.5;
+        const p2IsMidpoint = p2[0] === 0.5 || p2[1] === 0.5;
 
-      const caseIndex = getCaseIndex(tl, tr, br, bl, threshold);
-      const polygon = casePolygons[caseIndex];
+        // Case 1: Contour edge (midpoint to midpoint) - always part of boundary
+        if (p1IsMidpoint && p2IsMidpoint) {
+          segments.push({ start, end });
+          continue;
+        }
 
-      if (polygon.length > 0) {
-        const px = xScale(cellXMin);
-        const py = yScale(cellYMin + cellHeightData);
-        const pw = xScale(cellXMin + cellWidthData) - px;
-        const ph = yScale(cellYMin) - py;
+        // Case 2: Edge along cell boundary - include if neighbor not filled
+        // Check which cell edge this polygon edge lies on
+        const isOnTop = p1[1] === 0 && p2[1] === 0;
+        const isOnBottom = p1[1] === 1 && p2[1] === 1;
+        const isOnLeft = p1[0] === 0 && p2[0] === 0;
+        const isOnRight = p1[0] === 1 && p2[0] === 1;
 
+        let neighborKey: string | null = null;
+        if (isOnTop) neighborKey = `${row - 1},${col}`;
+        else if (isOnBottom) neighborKey = `${row + 1},${col}`;
+        else if (isOnLeft) neighborKey = `${row},${col - 1}`;
+        else if (isOnRight) neighborKey = `${row},${col + 1}`;
+
+        // Include edge if it's on a cell boundary and neighbor is not filled
+        if (neighborKey !== null && !filledSet.has(neighborKey)) {
+          segments.push({ start, end });
+        }
+      }
+    }
+
+    return segments;
+  }
+
+  /**
+   * Draw filled polygons and outlines for all connected components in a tracker
+   */
+  function drawComponentOutlines(ctx: CanvasRenderingContext2D, tracker: IncrementalComponentTracker) {
+    const components = tracker.getAllComponents();
+
+    // First, fill all cells with mostly opaque white
+    for (const [_, cells] of components) {
+      for (const cell of cells) {
+        const { row, col, polygon } = cell;
+        const px = xScale(col);
+        const py = yScale(row);
+        const pw = xScale(col + 1) - px;
+        const ph = yScale(row + 1) - py;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.beginPath();
         for (let i = 0; i < polygon.length; i++) {
           const [nx, ny] = polygon[i];
           const canvasX = px + nx * pw;
           const canvasY = py + ny * ph;
-          if (i === 0) {
-            ctx.moveTo(canvasX, canvasY);
-          } else {
-            ctx.lineTo(canvasX, canvasY);
-          }
+          if (i === 0) ctx.moveTo(canvasX, canvasY);
+          else ctx.lineTo(canvasX, canvasY);
         }
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
       }
     }
 
+  }
+
+  /**
+   * Draw a single cell filled (for the current cell being processed)
+   */
+  function drawFilledCell(
+    ctx: CanvasRenderingContext2D,
+    row: number,
+    col: number,
+    polygon: Point[]
+  ) {
+    const px = xScale(col);
+    const py = yScale(row);
+    const pw = xScale(col + 1) - px;
+    const ph = yScale(row + 1) - py;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
+    ctx.beginPath();
+    for (let i = 0; i < polygon.length; i++) {
+      const [nx, ny] = polygon[i];
+      const canvasX = px + nx * pw;
+      const canvasY = py + ny * ph;
+      if (i === 0) ctx.moveTo(canvasX, canvasY);
+      else ctx.lineTo(canvasX, canvasY);
+    }
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   }
 
   /**
-   * Draw the 4x4 grid of marching squares cases on the right canvas
+   * Draw cells for a specific threshold level using incremental component tracking
+   * Shows outlines for all processed cells, and fills the current cell
+   */
+  function drawLevelCells(
+    ctx: CanvasRenderingContext2D,
+    level: number,
+    upToCellIndex: number,
+    highlightCurrentCell: boolean
+  ) {
+    const threshold = getThresholdForLevel(level);
+    const casePolygons = getAllCasePolygons();
+    const totalCells = gridSize * gridSize;
+    const maxIndex = upToCellIndex < 0 ? -1 : Math.min(upToCellIndex, totalCells - 1);
+
+    if (maxIndex < 0) return;
+
+    const tracker = componentTrackers[level];
+
+    // Reset and rebuild tracker up to current cell
+    tracker.clear();
+
+    let currentCellInfo: CellInfo | null = null;
+
+    for (let cellIndex = 0; cellIndex <= maxIndex; cellIndex++) {
+      const row = Math.floor(cellIndex / gridSize);
+      const col = cellIndex % gridSize;
+
+      const tl = evalHeightAt(col, row);
+      const tr = evalHeightAt(col + 1, row);
+      const br = evalHeightAt(col + 1, row + 1);
+      const bl = evalHeightAt(col, row + 1);
+
+      const caseIndex = getCaseIndex(tl, tr, br, bl, threshold);
+      const polygon = casePolygons[caseIndex];
+
+      if (polygon.length > 0) {
+        const cellInfo: CellInfo = {
+          row,
+          col,
+          caseIndex,
+          polygon: polygon as [number, number][],
+        };
+        tracker.addCell(cellInfo);
+
+        // Track if this is the current cell
+        if (cellIndex === maxIndex) {
+          currentCellInfo = cellInfo;
+        }
+      }
+    }
+
+    // Draw all component outlines
+    drawComponentOutlines(ctx, tracker);
+
+    // Highlight current cell with filled polygon (brief flash)
+    if (highlightCurrentCell && currentCellInfo) {
+      drawFilledCell(ctx, currentCellInfo.row, currentCellInfo.col, currentCellInfo.polygon);
+    }
+  }
+
+  /**
+   * Draw all processed cells with their polygons across all levels
+   */
+  function drawProcessedCells(ctx: CanvasRenderingContext2D, state: AnimationState) {
+    const totalCells = gridSize * gridSize;
+
+    // Draw completed levels (all cells) - no highlight
+    for (const level of state.completedLevels) {
+      drawLevelCells(ctx, level, totalCells - 1, false);
+    }
+
+    // Draw current level (up to current cell) - highlight current cell
+    if (state.currentCellIndex >= 0) {
+      drawLevelCells(ctx, state.currentLevel, state.currentCellIndex, true);
+    }
+  }
+
+  /**
+   * Draw the 4x4 grid of marching squares cases
    */
   function drawCasesGrid(ctx: CanvasRenderingContext2D, highlightedCase: number) {
     const casePolygons = getAllCasePolygons();
@@ -482,44 +575,24 @@
       const cellX = startX + col * (cellSize + gap);
       const cellY = startY + row * (cellSize + gap);
 
-      // Draw cell background
       ctx.save();
-      ctx.fillStyle = '#f5f5f5';
+      ctx.fillStyle = '#2a2a2a';
       ctx.fillRect(cellX, cellY, cellSize, cellSize);
 
-      // Draw cell border
       const isHighlighted = caseIndex === highlightedCase;
-      ctx.strokeStyle = isHighlighted ? '#ff6b6b' : '#ccc';
-      ctx.lineWidth = isHighlighted ? 3 : 1;
+      ctx.strokeStyle = isHighlighted ? 'white' : '#ccc';
+      ctx.lineWidth = isHighlighted ? 4 : 1;
       ctx.strokeRect(cellX, cellY, cellSize, cellSize);
 
-      // Draw corner indicators
       const cornerStates = getCaseCornerStates(caseIndex);
       const cornerRadius = 4;
-      const cornerOffset = 6;
+      const cornerOffset = 10;
 
-      const corners = [
-        { x: cellX + cornerOffset, y: cellY + cornerOffset, filled: cornerStates.tl },
-        { x: cellX + cellSize - cornerOffset, y: cellY + cornerOffset, filled: cornerStates.tr },
-        { x: cellX + cellSize - cornerOffset, y: cellY + cellSize - cornerOffset, filled: cornerStates.br },
-        { x: cellX + cornerOffset, y: cellY + cellSize - cornerOffset, filled: cornerStates.bl },
-      ];
-
-      for (const corner of corners) {
-        ctx.beginPath();
-        ctx.arc(corner.x, corner.y, cornerRadius, 0, Math.PI * 2);
-        ctx.fillStyle = corner.filled ? '#3b82f6' : '#ddd';
-        ctx.fill();
-        ctx.strokeStyle = '#999';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      // Draw polygon
+      // Draw polygon first so corners appear on top
       const polygon = casePolygons[caseIndex];
       if (polygon.length > 0) {
         ctx.beginPath();
-        ctx.fillStyle = 'rgba(59, 130, 246, 0.6)';
+        ctx.fillStyle = 'white';
         for (let i = 0; i < polygon.length; i++) {
           const [nx, ny] = polygon[i];
           const canvasX = cellX + nx * cellSize;
@@ -534,14 +607,76 @@
         ctx.fill();
       }
 
-      // Draw case number
-      ctx.fillStyle = '#666';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${caseIndex}`, cellX + cellSize / 2, cellY + cellSize + 12);
+      // Draw corners on top of polygon
+      const corners = [
+        { x: cellX + cornerOffset, y: cellY + cornerOffset, filled: cornerStates.tl },
+        { x: cellX + cellSize - cornerOffset, y: cellY + cornerOffset, filled: cornerStates.tr },
+        { x: cellX + cellSize - cornerOffset, y: cellY + cellSize - cornerOffset, filled: cornerStates.br },
+        { x: cellX + cornerOffset, y: cellY + cellSize - cornerOffset, filled: cornerStates.bl },
+      ];
+
+      for (const corner of corners) {
+        ctx.beginPath();
+        ctx.arc(corner.x, corner.y, cornerRadius, 0, Math.PI * 2);
+        if (corner.filled) {
+          // Filled region: black circle outline, no fill
+          ctx.strokeStyle = 'black';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        } else {
+          // Unfilled region: white outline only, no fill
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
 
       ctx.restore();
     }
+  }
+
+  /**
+   * Draw a semi-transparent overlay over the case table, excluding the highlighted case
+   */
+  function drawCaseTableOverlay(ctx: CanvasRenderingContext2D, highlightedCase: number) {
+    if (highlightedCase < 0) return; // No overlay if nothing highlighted
+
+    const padding = 20;
+    const gap = 10;
+    const availableWidth = canvasWidth - 2 * padding;
+    const availableHeight = canvasHeight - 2 * padding;
+    const cellSize = Math.min(
+      (availableWidth - 3 * gap) / 4,
+      (availableHeight - 3 * gap) / 4
+    );
+
+    const startX = padding + (availableWidth - (4 * cellSize + 3 * gap)) / 2;
+    const startY = padding + (availableHeight - (4 * cellSize + 3 * gap)) / 2;
+
+    // Calculate highlighted cell position
+    const highlightRow = Math.floor(highlightedCase / 4);
+    const highlightCol = highlightedCase % 4;
+    const highlightX = startX + highlightCol * (cellSize + gap);
+    const highlightY = startY + highlightRow * (cellSize + gap);
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(26, 26, 26, 0.5)'; // #1a1a1a with 0.5 opacity
+
+    // Create path covering entire canvas, then cut out highlighted cell
+    ctx.beginPath();
+
+    // Outer rectangle (entire canvas)
+    ctx.rect(0, 0, canvasWidth, canvasHeight);
+
+    // Inner rectangle (highlighted cell) - drawn counter-clockwise to create hole
+    ctx.moveTo(highlightX, highlightY);
+    ctx.lineTo(highlightX, highlightY + cellSize);
+    ctx.lineTo(highlightX + cellSize, highlightY + cellSize);
+    ctx.lineTo(highlightX + cellSize, highlightY);
+    ctx.closePath();
+
+    ctx.fill('evenodd');
+    ctx.restore();
   }
 
   /**
@@ -550,38 +685,25 @@
   function draw(state: AnimationState) {
     if (!leftCtx || !rightCtx) return;
 
-    // Clear both canvases
-    leftCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-    rightCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+    // Fill both canvases with dark gray background
+    leftCtx.fillStyle = '#1a1a1a';
+    leftCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+    rightCtx.fillStyle = '#1a1a1a';
+    rightCtx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // ---- Left canvas: Heatmap + Grid + Processed cells + Current cell highlight ----
-
-    // Draw heatmap
-    drawHeatmap(leftCtx, samples, {
-      resolution: 100,
-      bandwidth: bandwidth,
-      domain: domain,
-      colorScale: whiteToBlueScale,
-      opacity: 1,
-      xScale: xScale,
-      yScale: yScale,
-    });
-
-    // Draw grid
+    // ---- Left canvas ----
+    drawHeatmapLayer(leftCtx);
     drawGrid(leftCtx);
-
-    // Draw processed cells with polygons
-    drawProcessedCells(leftCtx, state.currentCellIndex);
-
-    // Highlight current cell
+    drawProcessedCells(leftCtx, state);
     drawCellHighlight(leftCtx, state.currentCellIndex);
 
-    // ---- Right canvas: 4x4 grid of cases ----
+    // ---- Right canvas ----
     drawCasesGrid(rightCtx, state.highlightedCaseIndex);
+    drawCaseTableOverlay(rightCtx, state.highlightedCaseIndex);
   }
 
   // ================================================================
-  // Event Handlers - Canvas clicks, sliders, visibility
+  // Event Handlers
   // ================================================================
 
   function handleVisibilityChange(isVisible: boolean) {
@@ -594,10 +716,10 @@
   }
 
   // ================================================================
-  // Lifecycle - onMount, onDestroy
+  // Lifecycle
   // ================================================================
 
-  onMount(() => {
+  onMount(async () => {
     if (leftCanvas) {
       leftCanvas2d.init(leftCanvas);
     }
@@ -605,11 +727,18 @@
       rightCanvas2d.init(rightCanvas);
     }
 
+    // Load volcano data
+    const volcanoData = await loadVolcanoData('/volcano.csv', blurSigma);
+    heightmap = volcanoData.data;
+    heightmapWidth = volcanoData.width;
+    heightmapHeight = volcanoData.height;
+    minHeight = volcanoData.minHeight;
+    maxHeight = volcanoData.maxHeight;
+
     runInitialComputation();
     setupTimeline();
     isInitialized = true;
 
-    // Initial draw
     draw(timeline.state);
   });
 
@@ -620,7 +749,7 @@
   });
 
   // ================================================================
-  // Reactive Blocks - $: statements
+  // Reactive Blocks
   // ================================================================
 
   $: if (figureIsActive !== undefined && isInitialized) {
@@ -628,31 +757,71 @@
   }
 </script>
 
-<DoubleFigure gap={20} bind:isActive={figureIsActive}>
-  {#snippet left()}
-    <canvas
-      bind:this={leftCanvas}
-      width={canvasWidth}
-      height={canvasHeight}
-      style="width: {canvasWidth}px; height: {canvasHeight}px;"
-    />
-  {/snippet}
+<div class="figure-container">
+  <DoubleFigure gap={20} bind:isActive={figureIsActive} backgroundVisible={false}>
+    {#snippet title()}
+      <h2 class="main-title">Generating Contours with Marching Squares</h2>
+    {/snippet}
 
-  {#snippet right()}
-    <canvas
-      bind:this={rightCanvas}
-      width={canvasWidth}
-      height={canvasHeight}
-      style="width: {canvasWidth}px; height: {canvasHeight}px;"
-    />
-  {/snippet}
+    {#snippet left()}
+      <div class="panel">
+        <h3 class="panel-title">Maunga Whau Volcano Topography</h3>
+        <canvas
+          bind:this={leftCanvas}
+          width={canvasWidth}
+          height={canvasHeight}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+        />
+      </div>
+    {/snippet}
 
-  {#snippet caption()}
-    <strong>Marching Squares Algorithm.</strong> Left: A 3-mode Gaussian mixture rendered
-    as a heatmap with a grid overlay. The algorithm processes each cell from top-left
-    to bottom-right, determining which of the 16 cases matches based on corner density
-    values above/below the threshold. Right: The 16 possible marching squares cases.
-    Filled corners (blue dots) indicate values above the threshold. The currently
-    matched case is highlighted in red.
-  {/snippet}
-</DoubleFigure>
+    {#snippet right()}
+      <div class="panel">
+        <h3 class="panel-title">Marching Squares Case Table</h3>
+        <canvas
+          bind:this={rightCanvas}
+          width={canvasWidth}
+          height={canvasHeight}
+          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+        />
+      </div>
+    {/snippet}
+
+    {#snippet caption()}
+      <strong>Marching Squares Algorithm.</strong> Left: Maunga Whau volcano elevation data
+      rendered as a heatmap. The algorithm processes each cell from top-left to bottom-right,
+      determining which of the 16 cases matches based on corner values above/below the threshold.
+      Contour lines show elevation bands. Right: The 16 possible marching squares cases.
+    {/snippet}
+  </DoubleFigure>
+</div>
+
+<style>
+  .figure-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .main-title {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #e8e8e8;
+    margin: 0 0 0.25rem 0;
+    text-align: center;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .panel-title {
+    font-size: 1.3rem;
+    font-weight: 500;
+    color: #e0e0e0;
+    margin: 0 0 0.5rem 0;
+    text-align: center;
+  }
+</style>
