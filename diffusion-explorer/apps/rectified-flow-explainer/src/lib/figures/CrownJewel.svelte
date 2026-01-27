@@ -104,8 +104,8 @@
   $: numSegments = numTimeSteps - 1;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let leftCanvas = null;
-  let rightCanvas = null;
+  let leftCanvas: HTMLCanvasElement | null = null;
+  let rightCanvas: HTMLCanvasElement | null = null;
   const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
   const rightCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
   // Tie ctx reactivity to canvas variables so it updates when action runs
@@ -224,8 +224,8 @@
     }
   }
 
-  // Build style object for trajectory drawing
-  function getTrajectoryStyle(opacity) {
+  // Build style object for CPU trajectory drawing
+  function getTrajectoryStyle(opacity: number) {
     return {
       strokeWidth: trajectoryStrokeWidth,
       color: trajectoryColor,
@@ -242,6 +242,7 @@
         : undefined,
     };
   }
+
 
   // ----------------------------------------------------------------
   // Setup
@@ -340,13 +341,14 @@
   // Draw trajectories (clears and redraws each frame)
   // Pure renderer: receives pre-computed state, only derives userSegmentIndex from logicalTime + trajectory length
   function draw(
+    canvas: HTMLCanvasElement,
     ctx: CanvasRenderingContext2D,
     scaledTrajectories: number[][][],
     state: AnimationState,
     panel: "left" | "right",
     userTrajectories: number[][][]
   ) {
-    if (!ctx) return;
+    if (!ctx || !canvas) return;
 
     const segmentIndex =
       panel === "left" ? state.leftSegmentIndex : state.rightSegmentIndex;
@@ -380,7 +382,7 @@
     }
 
     // --- Dynamic Foreground ---
-    // Draw default trajectories
+    // Draw default trajectories (GPU by default, falls back to CPU)
     const defaultOpacity = hasUserTrajectory
       ? dimmedTrajectoryOpacity
       : trajectoryProgressOpacity;
@@ -427,8 +429,9 @@
   }
 
   function updateLeftVisualization() {
-    if (!isDataValid || !leftCtx) return;
+    if (!isDataValid || !leftCanvas || !leftCtx) return;
     draw(
+      leftCanvas,
       leftCtx,
       scaledLeftTrajectories,
       getCurrentState(),
@@ -438,8 +441,9 @@
   }
 
   function updateRightVisualization() {
-    if (!isDataValid || !rightCtx) return;
+    if (!isDataValid || !rightCanvas || !rightCtx) return;
     draw(
+      rightCanvas,
       rightCtx,
       scaledRightTrajectories,
       getCurrentState(),

@@ -232,7 +232,7 @@
 
     // --- Draw existing/pre-computed trajectories (dimmed if user has clicked) ---
     if (pathlineAnimation) {
-      pathlineAnimation.draw(ctx, state, {
+      pathlineAnimation.draw(fgCanvas2d.canvas, state, {
         progressOpacity: hasUserTrajectories ? dimmedOpacity : normalOpacity,
       });
     }

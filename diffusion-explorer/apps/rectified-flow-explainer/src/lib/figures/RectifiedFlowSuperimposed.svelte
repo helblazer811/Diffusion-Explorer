@@ -232,12 +232,13 @@
 
   // Draw scatter plot + trajectories (using PathlineAnimation)
   function draw(
+    canvas: HTMLCanvasElement,
     ctx: CanvasRenderingContext2D,
     pathlineAnimation: PathlineAnimation<AnimationState>,
     state: AnimationState,
     userTrajectories: number[][][]
   ) {
-    if (!ctx || !pathlineAnimation) return;
+    if (!canvas || !ctx || !pathlineAnimation) return;
 
     // Clear previous frame
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -285,8 +286,8 @@
   function updateVisualization(state: AnimationState) {
     if (!isDataValid || !leftCtx || !rightCtx || !leftPathlineAnimation || !rightPathlineAnimation) return;
 
-    draw(leftCtx, leftPathlineAnimation, state, userFlowMatchingTrajectories);
-    draw(rightCtx, rightPathlineAnimation, state, userRectifiedFlowTrajectories);
+    draw(leftCanvas2d.canvas, leftCtx, leftPathlineAnimation, state, userFlowMatchingTrajectories);
+    draw(rightCanvas2d.canvas, rightCtx, rightPathlineAnimation, state, userRectifiedFlowTrajectories);
   }
 
   // ----------------------------------------------------------------

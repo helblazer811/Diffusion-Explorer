@@ -692,7 +692,7 @@
       segmentProgress: state.leftSegmentProgress,
       inEndPause: state.leftInEndPause
     };
-    drawApproximation(leftCtx, leftApprox, leftState);
+    drawApproximation(leftCanvas, leftApprox, leftState);
     if (state.leftInEndPause) {
       drawLeftErrorLines();
     }
@@ -707,7 +707,7 @@
       segmentProgress: state.rightSegmentProgress,
       inEndPause: state.rightInEndPause
     };
-    drawApproximation(rightCtx, rightApprox, rightState);
+    drawApproximation(rightCanvas, rightApprox, rightState);
     if (state.rightInEndPause) {
       drawRightErrorLines();
     }

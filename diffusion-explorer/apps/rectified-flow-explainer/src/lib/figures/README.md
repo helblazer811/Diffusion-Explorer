@@ -81,7 +81,7 @@ function draw(state: AnimationState) {
   // --- Dynamic Foreground ---
   // Trajectories, animated points, time-dependent elements
   const { segmentIndex } = state;
-  drawTrajectories(ctx, trajectories, segmentIndex, ...);
+  drawTrajectories(ctx, trajectories, segmentIndex, style);
   drawAnimatedPoint(ctx, currentPosition);
 }
 ```
