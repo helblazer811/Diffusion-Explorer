@@ -2,7 +2,7 @@
  * Type definitions for Line Integral Convolution (LIC) visualization.
  */
 
-import type { VectorFieldFn } from '../streamlines';
+import type { VectorFieldFn } from '../streamlines/index';
 
 export type { VectorFieldFn };
 

@@ -8,7 +8,7 @@
  * by maintaining connectivity of the original streamline structure.
  */
 
-import { generateStreamlines, generateStreamlinePath2D, type StreamlineOptions, type VectorFieldFn } from '../../plotting/streamlines';
+import { generateStreamlines, generateStreamlinePath2D, type StreamlineOptions, type VectorFieldFn } from '../../plotting/streamlines/index';
 
 /**
  * A time-varying vector field function.

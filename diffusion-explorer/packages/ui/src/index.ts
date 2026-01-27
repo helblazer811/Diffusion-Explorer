@@ -58,7 +58,7 @@ export * from './plotting/contours';
 export * from './plotting/vector_field';
 export * from './plotting/mathjax';
 export * from './plotting/pathlines';
-export * from './plotting/streamlines';  // New unified module with CPU/GPU support
+export * from './plotting/streamlines/index';  // New unified module with CPU/GPU support
 export * from './plotting/mesh_grid';
 export * from './plotting/heatmap';
 export { useCanvas2D } from './plotting/canvas';
