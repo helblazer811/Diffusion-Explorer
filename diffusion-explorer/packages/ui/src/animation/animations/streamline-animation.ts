@@ -44,7 +44,7 @@ import {
   type StreamlineLengthData,
   type VectorFieldFn,
   type StreamlineDomain,
-} from '../../plotting/streamlines';
+} from '../../plotting/streamlines/index';
 import { drawTrajectories } from '../../plotting/trajectories';
 
 // ============================================================================
