@@ -61,7 +61,7 @@ export * from './plotting/pathlines';
 export * from './plotting/streamlines/index';  // New unified module with CPU/GPU support
 export * from './plotting/mesh_grid';
 export * from './plotting/heatmap';
-export { useCanvas2D } from './plotting/canvas';
+export { useCanvas2D, useCanvasWebGPU } from './plotting/canvas';
 export * from './plotting/utils';
 export * from './plotting/line-integral-convolution';
 
@@ -119,22 +119,6 @@ export {
   type PathlineAnimationOptions,
   type PathlineData,
 } from './animation/animations/pathline-animation';
-
-export {
-  propagateStreamlines,
-  generateDiscreteStreamlines,
-  interpolateCurves,
-  getDiscreteSnapshot,
-  sampleStreamlineUniformly,
-  precomputePropagatedPaths,
-  precomputeDiscretePaths,
-  getPropagatedPathIndex,
-  getDiscretePathIndex,
-  type PropagatedStreamlineData,
-  type DiscreteStreamlineData,
-  type PropagateOptions,
-  type TimeVaryingVectorFieldFn,
-} from './animation/animations/streamline-propagation';
 
 export {
   TimelineBuilder,
