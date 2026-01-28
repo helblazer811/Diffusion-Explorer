@@ -7,6 +7,7 @@
   import { settings } from "$lib/settings";
 
   // Figure imports
+  import CrownJewel from "$lib/figures/CrownJewel.svelte";
   import ProbabilityPathIntro from "$lib/figures/ProbabilityPathIntro.svelte";
   import FlowInvertibility from "$lib/figures/FlowInvertibility.svelte";
   import InvertibilityExplanation from "$lib/figures/InvertibilityExplanation.svelte";
@@ -26,6 +27,9 @@
 
   // Data for ReverseSampling
   let reverseSamplingData = null;
+
+  // Data for CrownJewel
+  let crownJewelTrajectories = [];
 
   /**
    * Transpose trajectories from [sampleIndex][timeStep][x,y] to [timeStep][sampleIndex][x,y]
@@ -108,6 +112,16 @@
     } catch (e) {
       console.warn("Failed to load ReverseSampling data:", e);
     }
+
+    // Load data for CrownJewel
+    try {
+      const res = await fetch(`${base}/crown_jewel/cached_samples/trajectories.json`);
+      if (res.ok) {
+        crownJewelTrajectories = await res.json();
+      }
+    } catch (e) {
+      console.warn("Failed to load CrownJewel data:", e);
+    }
   });
 </script>
 
@@ -125,6 +139,10 @@
   authorLink="https://alechelbling.com"
   date="2025"
 />
+
+{#if crownJewelTrajectories.length > 0}
+  <CrownJewel trajectories={crownJewelTrajectories} height={400} />
+{/if}
 
 <!-- Introduction Section -->
 <section id="introduction">
