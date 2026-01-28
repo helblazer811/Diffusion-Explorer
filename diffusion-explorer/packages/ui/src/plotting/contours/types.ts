@@ -41,10 +41,41 @@ export interface ContourGPUOptions {
    * r = (sqrt(4 * bandwidth^2 + 1) - 1) / 2
    */
   bandwidth?: number;
-  /** Number of contour levels (default: 10) */
-  numLevels?: number;
+  /**
+   * Threshold specification for contour levels.
+   * - If a number: generates that many uniformly-spaced thresholds
+   * - If an array: uses those exact percentile values (should be in [0, 1])
+   * Default: 10
+   */
+  thresholds?: number | number[];
   /** Domain bounds - if not provided, computed from points */
   domain?: ContourDomain;
+}
+
+/**
+ * Normalized threshold configuration after processing options.
+ */
+export interface NormalizedThresholds {
+  /** The actual threshold values in ascending order */
+  values: number[];
+  /** The number of threshold levels */
+  count: number;
+}
+
+/**
+ * Normalize threshold configuration to an array of explicit values.
+ */
+export function normalizeThresholds(thresholds?: number | number[]): NormalizedThresholds {
+  if (Array.isArray(thresholds)) {
+    const sorted = [...thresholds].sort((a, b) => a - b);
+    return { values: sorted, count: sorted.length };
+  }
+  const count = thresholds ?? 10;
+  const values: number[] = [];
+  for (let i = 0; i < count; i++) {
+    values.push((i + 1) / (count + 1));
+  }
+  return { values, count };
 }
 
 /**

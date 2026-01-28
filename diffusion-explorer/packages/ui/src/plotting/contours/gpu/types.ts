@@ -88,8 +88,13 @@ export interface ContourRendererOptions {
    * r = (sqrt(4 * bandwidth^2 + 1) - 1) / 2
    */
   bandwidth?: number;
-  /** Number of contour levels (default: 10) */
-  numLevels?: number;
+  /**
+   * Threshold specification for contour levels.
+   * - If a number: generates that many uniformly-spaced thresholds
+   * - If an array: uses those exact percentile values (should be in [0, 1])
+   * Default: 10
+   */
+  thresholds?: number | number[];
   /** Color scale function (default: blue gradient) */
   colorScale?: ColorScaleFn;
   /** Global opacity (default: 1.0) */

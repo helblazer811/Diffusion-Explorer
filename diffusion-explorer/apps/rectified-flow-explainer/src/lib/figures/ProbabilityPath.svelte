@@ -243,7 +243,7 @@
         canvas: contourCanvas,
         gridSize: 100,
         bandwidth: contourBandwidth,
-        numLevels: contourThresholds,
+        thresholds: contourThresholds,
         opacity: 1.0,  // Alpha is controlled in colorScale, not here
         colorScale,
         dpr,
