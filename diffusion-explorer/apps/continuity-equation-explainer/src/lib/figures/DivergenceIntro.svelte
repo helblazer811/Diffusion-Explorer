@@ -22,27 +22,31 @@
   export let children = undefined;
 
   // Layout
-  export let width = 900;
-  export let height = 300;
+  export let width = 800;
+  export let height = 250;
   export let gap = 20;
-  export let backgroundVisible = true;
+  export let backgroundVisible = false;
 
   // Animation
   export let playingByDefault = true;
 
   // Streamline generation
-  export let domainRange = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
+  // Use a larger domain than visible area so streamlines extend to edges
+  export let domainRange = { xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 };
+  export let visibleRange = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
   export let density: number | [number, number] = 1.0;
   export let minPathLength = 0.5;
 
   // Styling
-  export let streamlineColor = "#e63946";
+  export let streamlineColor = "#3b82f6";
   export let streamlineWidth = 3.0;
+  export let edgeFadeSize = 10; // Size of edge fade in pixels
 
   // Animation pulse settings (pixel-based)
   export let pulseWidthPixels = 40;       // Width of pulse in pixels
   export let pulsePauseWidthPixels = 10;  // Gap between pulses in pixels
   export let animationDuration = 4;       // Seconds for one animation cycle
+  export let binaryPulse = false;         // true = solid pulses, false = gradient alpha
 
   // Bloom settings
   export let bloomEnabled = false;
@@ -130,9 +134,10 @@
   }
 
   function createToPixel(cw: number, ch: number): (p: [number, number]) => [number, number] {
+    // Map visible range to canvas (streamlines outside visible range will extend beyond canvas edges)
     return ([x, y]: [number, number]): [number, number] => [
-      ((x - domainRange.xMin) / (domainRange.xMax - domainRange.xMin)) * cw,
-      ((domainRange.yMax - y) / (domainRange.yMax - domainRange.yMin)) * ch
+      ((x - visibleRange.xMin) / (visibleRange.xMax - visibleRange.xMin)) * cw,
+      ((visibleRange.yMax - y) / (visibleRange.yMax - visibleRange.yMin)) * ch
     ];
   }
 
@@ -198,6 +203,7 @@
         pulseGap: pulsePauseWidthPixels,
         baseOpacity: 0.8,
         color: streamlineColor,
+        binaryPulse: binaryPulse ? 1.0 : 0.0,
       };
 
       // Create renderers with shared device
@@ -408,7 +414,8 @@
       {#snippet left()}
         <canvas
           bind:this={canvas1}
-          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+          class="edge-fade"
+          style="width: {canvasWidth}px; height: {canvasHeight}px; --fade-size: {edgeFadeSize}px;"
         ></canvas>
       {/snippet}
       {#snippet leftLabel()}
@@ -421,7 +428,8 @@
       {#snippet center()}
         <canvas
           bind:this={canvas2}
-          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+          class="edge-fade"
+          style="width: {canvasWidth}px; height: {canvasHeight}px; --fade-size: {edgeFadeSize}px;"
         ></canvas>
       {/snippet}
       {#snippet centerLabel()}
@@ -434,7 +442,8 @@
       {#snippet right()}
         <canvas
           bind:this={canvas3}
-          style="width: {canvasWidth}px; height: {canvasHeight}px;"
+          class="edge-fade"
+          style="width: {canvasWidth}px; height: {canvasHeight}px; --fade-size: {edgeFadeSize}px;"
         ></canvas>
       {/snippet}
       {#snippet rightLabel()}
@@ -447,3 +456,38 @@
     </TripleFigure>
   {/if}
 </div>
+
+<style>
+  .edge-fade {
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      white var(--fade-size),
+      white calc(100% - var(--fade-size)),
+      transparent 100%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      white var(--fade-size),
+      white calc(100% - var(--fade-size)),
+      transparent 100%
+    );
+    mask-composite: intersect;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      white var(--fade-size),
+      white calc(100% - var(--fade-size)),
+      transparent 100%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      white var(--fade-size),
+      white calc(100% - var(--fade-size)),
+      transparent 100%
+    );
+    -webkit-mask-composite: source-in;
+  }
+</style>
