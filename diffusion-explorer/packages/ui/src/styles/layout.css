@@ -115,40 +115,50 @@
 }
 
 /* ==========================================================================
-   References & Citations
+   Article Footer (Acknowledgements, References, Citations)
    ========================================================================== */
 
-.acknowledgements p {
-  font-size: 1rem;
-  line-height: 1.4rem;
+.article-footer {
+  color: #777;
+  font-size: 1.2rem;
 }
 
-.references ol {
+.article-footer h2 {
+  font-size: 1.5rem;
+  color: #777;
+  margin-top: 1.5rem;
+}
+
+.article-footer p {
+  font-size: 1.2rem;
+  line-height: 1.5;
+}
+
+.article-footer ol {
   padding-left: 1.5rem;
-  font-size: 1rem;
-  line-height: 1.6rem;
+  font-size: 1.2rem;
+  font-weight: 350;
+  line-height: 1.5;
 }
 
-.references li {
-  margin-bottom: 1rem;
-}
-
-.cite-section p {
-  font-size: 1rem;
-  line-height: 1.4rem;
+.article-footer li {
   margin-bottom: 0.75rem;
 }
 
-.cite-section pre {
+.article-footer .cite-section p {
+  margin-bottom: 0.5rem;
+}
+
+.article-footer .cite-section pre {
   background: #f5f5f5;
   padding: 1rem;
   border-radius: 6px;
   overflow-x: auto;
-  font-size: 0.9rem;
+  font-size: 1.0rem;
   line-height: 1.5;
 }
 
-.cite-section code {
+.article-footer .cite-section code {
   background: none;
   padding: 0;
   font-size: inherit;
