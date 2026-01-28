@@ -3,7 +3,8 @@
   import { writable } from "svelte/store";
   import { base } from "$app/paths";
   import { ArticleHeader, Katex } from "@diffusion-explorer/ui";
-  import { generateClippedGaussianSamples } from "@diffusion-explorer/diffusion";
+  import { generateClippedGaussianSamples, clipSamplesToRadius, clipTrajectoriesToStartingRadius, loadCachedTrajectories } from "@diffusion-explorer/diffusion";
+  import { settings } from "$lib/settings";
 
   // Figure imports
   import ProbabilityPathIntro from "$lib/figures/ProbabilityPathIntro.svelte";
@@ -49,17 +50,17 @@
     // Generate source distribution (Gaussian)
     const sourceDistribution = generateClippedGaussianSamples(300);
 
-    // Load data for ProbabilityPathIntro
+    // Load data for ProbabilityPathIntro (same cached samples as ProbabilityPath in rectified-flow-explainer)
     try {
-      const trajRes = await fetch(`${base}/flow_invertibility/cached_samples/trajectories.json`);
-      if (trajRes.ok) {
-        const trajData = await trajRes.json();
-        // Use source and target from the trajectory data
-        probabilityPathSourceSamples = trajData.sourceDistribution || [];
-        probabilityPathTargetSamples = trajData.targetDistribution || [];
-        // Transpose trajectories: [sample][time][x,y] -> [time][sample][x,y]
-        const transposed = transposeTrajectories(trajData.allTrajectories);
-        allTimeSamples.set(transposed);
+      const result = await loadCachedTrajectories(`${base}/flow_invertibility/cached_samples/flow_matching_trajectories.json`);
+      if (result) {
+        // Clip trajectories to only include samples starting within radius
+        const clippingRadius = settings.stylingSettings.scatterPlot.clippingRadius;
+        const clippedTrajectories = clipTrajectoriesToStartingRadius(result.trajectories, clippingRadius);
+        allTimeSamples.set(clippedTrajectories);
+        // Use clipped source and target from trajectories
+        probabilityPathSourceSamples = clippedTrajectories[0] || [];
+        probabilityPathTargetSamples = clippedTrajectories[clippedTrajectories.length - 1] || [];
       }
     } catch (e) {
       console.warn("Failed to load ProbabilityPathIntro data:", e);
@@ -89,20 +90,18 @@
     }
 
     // Load data for ReverseSampling (reverse trajectories)
+    // Use the normalized targetDistribution from trajectories.json (loaded above for flowInvertibilityData)
+    // to ensure the rendered distribution matches what was used to compute the trajectories
     try {
-      const [targetRes, trajRes] = await Promise.all([
-        fetch(`${base}/flow_invertibility/data/smiley_face.json`),
-        fetch(`${base}/flow_invertibility/cached_samples/reverse_trajectories.json`),
-      ]);
+      const trajRes = await fetch(`${base}/flow_invertibility/cached_samples/reverse_trajectories.json`);
 
-      if (targetRes.ok && trajRes.ok) {
-        const targetData = await targetRes.json();
+      if (trajRes.ok && flowInvertibilityData) {
         const trajData = await trajRes.json();
 
         reverseSamplingData = {
           trajectories: trajData.trajectories,
           sourceDistribution,
-          targetDistribution: targetData.points,
+          targetDistribution: flowInvertibilityData.targetDistribution,
           config: trajData.config,
         };
       }
@@ -129,7 +128,7 @@
 
 <!-- Introduction Section -->
 <section id="introduction">
-  <h2 class="section-heading">Introduction</h2>
+  <h2 id="introduction-heading" class="section-heading">Introduction</h2>
   <p>
     Computer scientists have a time-honored tradition of stealing concepts from physics and rebranding
     them with a nice computational flair, and of course this article is no different. Flow-based
@@ -169,7 +168,7 @@
 
 <!-- Background on Flow Models -->
 <section id="background">
-  <h2 class="section-heading">Background on Flow Models</h2>
+  <h2 id="background-heading" class="section-heading">Background on Flow Models</h2>
 
   <h3 id="what-is-a-flow">What is a flow?</h3>
 
@@ -179,6 +178,11 @@
     {allTimeSamples}
     {isTraining}
     backgroundVisible={false}
+    showContours={true}
+    height={450}
+    distributionScaleFactor={0.7}
+    yShiftFactor={-0.6}
+    numScatterSamples={150}
   >
     <strong>The probability path of a flow model.</strong>
     Samples from a simple source distribution <Katex math={"p_0"} /> are transformed along
@@ -262,7 +266,7 @@
 
 <!-- Derivation of the Continuity Equation -->
 <section id="derivation">
-  <h2 class="section-heading">Derivation of the Continuity Equation</h2>
+  <h2 id="derivation-heading" class="section-heading">Derivation of the Continuity Equation</h2>
   <p>
     We know that the <em>continuity equation</em> is what unlocks the ability to do exact likelihood
     evaluation with flows: but where does it come from? Answering this question requires a number of
@@ -492,7 +496,7 @@
 
 <!-- Evaluating Exact Likelihoods -->
 <section id="exact-likelihoods">
-  <h2 class="section-heading">Evaluating Exact Likelihoods</h2>
+  <h2 id="exact-likelihoods-heading" class="section-heading">Evaluating Exact Likelihoods</h2>
   <p>
     Now that we are equipped with the continuity equation, we want to finally derive the capability
     of flows to evaluate exact likelihoods.
@@ -592,9 +596,18 @@
 
 <hr class="section-divider" />
 
+<!-- Acknowledgements Section -->
+<section id="acknowledgements">
+  <h2 id="acknowledgements-heading" class="section-heading">Acknowledgements</h2>
+  <p>
+  </p>
+</section>
+
+<hr class="section-divider" />
+
 <!-- References Section -->
 <section id="references" class="references">
-  <h2 class="section-heading">References</h2>
+  <h2 id="references-heading" class="section-heading">References</h2>
   <ol>
     <li>
       Lipman, Y., Chen, R. T., Ben-Hamu, H., Nickel, M., & Le, M. (2022). Flow matching for
@@ -613,4 +626,20 @@
       data with rectified flow. <em>arXiv preprint arXiv:2209.03003</em>.
     </li>
   </ol>
+</section>
+
+<hr class="section-divider" />
+
+<!-- How to Cite Section -->
+<section id="cite">
+  <h2 id="cite-heading" class="section-heading">How to Cite</h2>
+  <div class="cite-section">
+    <p>If you found this explainer helpful, please consider citing it:</p>
+    <pre><code>@article{"{"}helbling2025continuityequation,
+  title = {"{"}Flow Models: A Visual Introduction to the Continuity Equation and Exact Likelihood Evaluation{"}"},
+  author = {"{"}Helbling, Alec{"}"},
+  year = {"{"}2025{"}"},
+  url = {"{"}https://alechelbling.com/continuity-equation{"}"}
+{"}"}</code></pre>
+  </div>
 </section>
