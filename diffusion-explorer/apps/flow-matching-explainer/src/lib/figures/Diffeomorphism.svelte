@@ -17,8 +17,11 @@ TODO:
     createSourceTargetScales,
     Timeline,
     createPauseClip,
-    useCanvas2D
+    useCanvas2D,
+    computeContours,
+    plotContours
   } from "@diffusion-explorer/ui";
+  import * as d3 from "d3";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -33,7 +36,7 @@ TODO:
   export let targetDistributionSamples = [];
 
   // Mesh grid styling props
-  export let meshGridColor = settings.stylingSettings.trajectory.color;
+  export let meshGridColor = "#666666";
   export let meshGridOpacity = 0.8;
   export let meshGridStrokeWidth = 2;
 
@@ -54,7 +57,7 @@ TODO:
 
   // Scatter plot styling
   export let scatterPointRadius = settings.stylingSettings.scatterPlot.radius;
-  export let scatterPointOpacity = settings.stylingSettings.scatterPlot.opacity;
+  export let scatterPointOpacity = 0.3;
   export let scatterPointColor = settings.stylingSettings.scatterPlot.color;
 
   // Label styling
@@ -66,6 +69,15 @@ TODO:
 
   // Background visibility
   export let backgroundVisible = false;
+
+  // Contour props
+  export let showContours = true;
+  export let contourOpacity = 0.7;
+  export let contourGridSize = 100;
+  export let contourBandwidth = 15;
+  export let contourLevels = 15;
+  export let contourColorScale = (t) => d3.interpolateRgb("white", "orange")(t);
+  export let contourNumSamples = 5000;
 
   // ----------------------------------------------------------------
   // State
@@ -91,6 +103,7 @@ TODO:
   // Animation state - Timeline system
   let isInitialized = false;
   let timeline = null;
+  let displayTime = 0;  // Semantic time for slider display (tracks state.time)
 
   // Visibility-based animation control
   let figureIsActive;
@@ -99,6 +112,15 @@ TODO:
   // FlowModelClient instance
   let client = null;
   let activeRequestId = null;
+
+  // Contour state
+  // Shape: [timesteps][numSamples][2]
+  let contourTrajectories = [];
+  // Precomputed contour data array, one per timestep
+  let precomputedContours = [];
+  // Domain for contour rendering [xMin, xMax, yMin, yMax]
+  let contourDataDomain = null;
+  let contourActiveRequestId = null;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -170,6 +192,68 @@ TODO:
     ]);
   }
 
+  // Generate random initial points for contour sampling
+  function generateContourInitialPoints(numSamples) {
+    const domain = computeDomainRange();
+    const points = [];
+    for (let i = 0; i < numSamples; i++) {
+      const x = domain.xMin + Math.random() * (domain.xMax - domain.xMin);
+      const y = domain.yMin + Math.random() * (domain.yMax - domain.yMin);
+      points.push([x, y]);
+    }
+    return points;
+  }
+
+  // Precompute contours for each timestep
+  function precomputeContoursData() {
+    if (contourTrajectories.length === 0 || !scales) return;
+
+    // Compute domain from all trajectory points
+    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    for (const timestep of contourTrajectories) {
+      for (const [x, y] of timestep) {
+        xMin = Math.min(xMin, x);
+        xMax = Math.max(xMax, x);
+        yMin = Math.min(yMin, y);
+        yMax = Math.max(yMax, y);
+      }
+    }
+    const padding = Math.max(xMax - xMin, yMax - yMin) * 0.1;
+    contourDataDomain = [xMin - padding, xMax + padding, yMin - padding, yMax + padding];
+
+    // Precompute contours for each timestep
+    precomputedContours = contourTrajectories.map(points =>
+      computeContours(points, {
+        gridSize: contourGridSize,
+        bandwidth: contourBandwidth,
+        thresholds: contourLevels,
+        domain: contourDataDomain
+      })
+    );
+  }
+
+  // Draw precomputed contours with horizontal interpolation
+  function drawPrecomputedContours(contourData, t) {
+    if (!ctx || !scales || !contourDataDomain) return;
+
+    // Animated center position (same interpolation as mesh grid)
+    const centerPixelX = scales.sourceCenterPixelX +
+      t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+
+    // Create scale functions that account for the animated horizontal position
+    const xScale = (dataX) => centerPixelX + (dataX - scales.sourceMeanX) * scales.xScaleFactor;
+    const yScale = (dataY) => scales.yScale(dataY);
+
+    plotContours(ctx, contourData, {
+      colorScale: contourColorScale,
+      fill: true,
+      stroke: false,
+      opacity: contourOpacity,
+      xScale,
+      yScale
+    });
+  }
+
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
@@ -200,6 +284,30 @@ TODO:
     }
   }
 
+  // Sample trajectories for contour visualization
+  async function sampleContourTrajectories() {
+    if (!client) return;
+
+    const initialPoints = generateContourInitialPoints(contourNumSamples);
+
+    try {
+      const result = client.sampleFromInitialPoints(
+        initialPoints,
+        numSteps
+      );
+
+      contourActiveRequestId = result.requestId;
+      contourTrajectories = await result.promise;
+      contourActiveRequestId = null;
+
+      // Precompute contours after trajectories are loaded
+      precomputeContoursData();
+    } catch (error) {
+      contourActiveRequestId = null;
+      console.error("Error sampling contour trajectories:", error);
+    }
+  }
+
   function initializeVisualization() {
     if (!canvas) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
@@ -227,6 +335,9 @@ TODO:
     );
 
     sampleGridTrajectories();
+    if (showContours) {
+      sampleContourTrajectories();
+    }
   }
 
   // ----------------------------------------------------------------
@@ -274,8 +385,17 @@ TODO:
 
     // Register tick callback
     timeline.onTick((_t, state) => {
+      displayTime = state.time;  // Track semantic time for slider
       draw(state);
     });
+  }
+
+  // Handle seeking by display time - map to forward clip's timeline range
+  function handleSeekByDisplayTime(t) {
+    if (!timeline) return;
+    const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
+    const forwardEnd = animationDuration / totalCycleDuration;
+    timeline.seek(t * forwardEnd);
   }
 
   function startAnimation() {
@@ -317,6 +437,16 @@ TODO:
     drawScatterPlot(ctx, targetPixelCoords, scatterPointRadius, scatterPointColor, scatterPointOpacity);
 
     // --- Dynamic Foreground ---
+
+    // Draw contours (behind mesh grid)
+    if (showContours && precomputedContours.length > 0 && contourDataDomain) {
+      const contourTimestepIndex = Math.min(
+        Math.floor(time * (precomputedContours.length - 1)),
+        precomputedContours.length - 1
+      );
+      drawPrecomputedContours(precomputedContours[contourTimestepIndex], time);
+    }
+
     // Draw mesh grid if data is ready
     if (allGridStates.length > 0) {
       // Get current grid state based on animation time
@@ -372,6 +502,11 @@ TODO:
     if (activeRequestId && client) {
       client.stopRequest(activeRequestId);
     }
+
+    // Cancel contour request
+    if (contourActiveRequestId && client) {
+      client.stopRequest(contourActiveRequestId);
+    }
   });
 
   // ----------------------------------------------------------------
@@ -401,6 +536,11 @@ TODO:
   $: if (isInitialized && allGridStates.length > 0 && timeline) {
     draw(timeline.state);
   }
+
+  // Redraw when contour data becomes available
+  $: if (isInitialized && precomputedContours.length > 0 && timeline) {
+    draw(timeline.state);
+  }
 </script>
 
 <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
@@ -413,7 +553,7 @@ TODO:
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider {timeline} color={meshGridColor} />
+      <TimeSlider {timeline} {displayTime} onSeekByDisplayTime={handleSeekByDisplayTime} color="orange" />
     </div>
   {/snippet}
 </Figure>

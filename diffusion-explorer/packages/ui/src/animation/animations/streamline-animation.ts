@@ -7,32 +7,29 @@
  * - Renders animated pulse effects along streamlines
  * - Supports both Canvas 2D (CPU) and WebGPU (GPU) rendering
  *
+ * Both backends have identical lifecycle and API:
+ * 1. Create with StreamlineAnimation.create()
+ * 2. Initialize with await anim.init(canvas)
+ * 3. Draw with anim.draw(state)
+ * 4. Cleanup with anim.destroy()
+ *
  * @example
- * // CPU backend (default)
  * const anim = StreamlineAnimation.create<MyState>({
  *   vectorFieldFn,
  *   domain: { xMin: -2, xMax: 2, yMin: -2, yMax: 2 },
  *   toPixel,
  *   color: '#3b82f6',
+ *   backend: 'cpu', // or 'gpu'
  * });
  *
- * // GPU backend
- * const animGPU = StreamlineAnimation.create<MyState>({
- *   backend: 'gpu',
- *   vectorFieldFn,
- *   domain: { xMin: -2, xMax: 2, yMin: -2, yMax: 2 },
- *   toPixel,
- *   color: '#3b82f6',
- * });
- * await animGPU.init(canvas);
+ * await anim.init(canvas);
  *
  * // In animation loop:
- * anim.draw(ctx, state);        // CPU
- * animGPU.render(state);        // GPU
+ * anim.draw(state);
  */
 
-import type { Clip } from '../timeline';
 import type { AnimationWithData } from '../animation';
+import type { Clip } from '../timeline';
 import {
   generateStreamlines,
   computeStreamlineLengths,
@@ -192,7 +189,6 @@ type CPULengthData = StreamlineLengthData & {
  * - Access to generated streamline data
  *
  * @example
- * // CPU backend (default)
  * const anim = StreamlineAnimation.create<MyState>({
  *   vectorFieldFn,
  *   domain: { xMin: -2, xMax: 2, yMin: -2, yMax: 2 },
@@ -201,22 +197,11 @@ type CPULengthData = StreamlineLengthData & {
  *   color: '#3b82f6',
  * });
  *
+ * await anim.init(canvas);  // Required for both backends
  * timeline.add(anim.clip, { start: 0, end: 1 });
  *
  * // In draw function:
- * anim.draw(ctx, state);  // ctx is CanvasRenderingContext2D
- *
- * @example
- * // GPU backend
- * const anim = StreamlineAnimation.create<MyState>({
- *   backend: 'gpu',
- *   vectorFieldFn,
- *   domain,
- *   toPixel,
- * });
- *
- * await anim.init(canvas);  // Required for GPU
- * anim.render(state);       // Use render() instead of draw()
+ * anim.draw(state);  // Works for both CPU and GPU
  */
 export class StreamlineAnimation<TState extends StreamlineAnimationState>
   implements AnimationWithData<TState, StreamlineAnimationData> {
@@ -233,6 +218,9 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
   private readonly alphaLUT: Float32Array | null;
   private readonly alphaBuffers: Float32Array[] | null;
   private readonly cpuLengthData: CPULengthData[] | null;
+
+  // CPU-specific runtime state
+  private ctx: CanvasRenderingContext2D | null = null;
 
   // GPU-specific state
   private readonly rendererOptions: StreamlineRendererOptions | null;
@@ -293,23 +281,35 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
   }
 
   /**
-   * Initialize the GPU renderer with a canvas element.
-   * Required for GPU backend before rendering.
+   * Initialize the animation with a canvas element.
+   * Required for both backends before drawing.
+   *
+   * For CPU backend: stores the 2D rendering context.
+   * For GPU backend: creates the WebGPU renderer.
    *
    * @param canvas - HTML canvas element to render to
-   * @throws Error if WebGPU is not available or if backend is 'cpu'
+   * @throws Error if context cannot be obtained (CPU) or WebGPU not available (GPU)
    */
   async init(canvas: HTMLCanvasElement): Promise<void> {
-    if (this.backend !== 'gpu') {
-      throw new Error('init() is only available for GPU backend');
-    }
-
-    if (!this.rendererOptions) {
-      throw new Error('GPU renderer options not configured');
-    }
-
     if (this.isInitialized && this.canvas === canvas) {
       return; // Already initialized with this canvas
+    }
+
+    // Handle CPU backend
+    if (this.backend === 'cpu') {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Failed to get 2D rendering context');
+      }
+      this.ctx = ctx;
+      this.canvas = canvas;
+      this.isInitialized = true;
+      return;
+    }
+
+    // Handle GPU backend
+    if (!this.rendererOptions) {
+      throw new Error('GPU renderer options not configured');
     }
 
     // Destroy existing renderer if switching canvas
@@ -330,25 +330,40 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
   }
 
   /**
-   * Check if the GPU animation has been initialized.
+   * Check if the animation has been initialized.
    */
   get initialized(): boolean {
     return this.isInitialized;
   }
 
   /**
-   * Draw the streamlines at the current animation state (CPU backend).
+   * Draw the streamlines at the current animation state.
+   * Works for both CPU and GPU backends after init() has been called.
    *
-   * @param ctx - Canvas 2D rendering context
    * @param state - Current animation state (uses streamlinePhase)
+   * @param clearColor - Optional background color (RGBA 0-1), GPU only, default transparent
    */
-  draw(ctx: CanvasRenderingContext2D, state: TState): void {
-    if (this.backend === 'gpu') {
-      console.warn('StreamlineAnimation.draw() called on GPU backend - use render() instead');
+  draw(
+    state: TState,
+    clearColor: [number, number, number, number] = [0, 0, 0, 0]
+  ): void {
+    if (!this.isInitialized) {
+      console.warn('StreamlineAnimation.draw() called before init()');
       return;
     }
 
-    if (!this.alphaLUT || !this.alphaBuffers || !this.cpuLengthData) {
+    if (this.backend === 'cpu') {
+      this.drawCPU(state);
+    } else {
+      this.drawGPU(state, clearColor);
+    }
+  }
+
+  /**
+   * Internal: CPU rendering implementation.
+   */
+  private drawCPU(state: TState): void {
+    if (!this.ctx || !this.alphaLUT || !this.alphaBuffers || !this.cpuLengthData) {
       return;
     }
 
@@ -373,36 +388,27 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       return Array.from(outBuffer);
     });
 
-    // Draw all streamlines (uses GPU by default with CPU fallback)
-    drawTrajectories(ctx, streamlines, 0, {
+    // Draw all streamlines
+    drawTrajectories(this.ctx, streamlines, 0, {
       strokeWidth: this.strokeWidth,
       color: this.color,
-      progressOpacity: this.baseOpacity,
+      opacity: this.baseOpacity,
       pointRadius: 0,
       showPreview: false,
       showHeadMarker: false,
       perSegmentAlphas,
       gradientSubdivisions: this.gradientSubdivisions,
-    }, { backend: 'cpu' });  // Force CPU since this is the CPU backend path
+    });
   }
 
   /**
-   * Render the streamlines at the current animation state (GPU backend).
-   *
-   * @param state - Current animation state (uses streamlinePhase)
-   * @param clearColor - Optional background color (RGBA 0-1), default transparent
+   * Internal: GPU rendering implementation.
    */
-  render(
+  private drawGPU(
     state: TState,
-    clearColor: [number, number, number, number] = [0, 0, 0, 0]
+    clearColor: [number, number, number, number]
   ): void {
-    if (this.backend !== 'gpu') {
-      console.warn('StreamlineAnimation.render() called on CPU backend - use draw() instead');
-      return;
-    }
-
-    if (!this.renderer || !this.isInitialized) {
-      console.warn('StreamlineAnimation: render() called before init()');
+    if (!this.renderer) {
       return;
     }
 
@@ -439,13 +445,14 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
   }
 
   /**
-   * Destroy the animation and release GPU resources.
+   * Destroy the animation and release resources.
    */
   destroy(): void {
     if (this.renderer) {
       this.renderer.destroy();
       this.renderer = null;
     }
+    this.ctx = null;
     this.canvas = null;
     this.isInitialized = false;
   }

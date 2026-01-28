@@ -48,7 +48,7 @@
   export let trajectoryColor = "#f17720";
   export let trajectoryStrokeWidth = 3;
   export let trajectoryPointRadius = 3;
-  export let trajectoryProgressOpacity = 0.8;
+  export let trajectoryOpacity = 0.8;
 
   // Label styling
   export let labelColor = "#666";
@@ -187,7 +187,7 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline(): void {
+  async function setupTimeline(): Promise<void> {
     if (transformedTrajectories.length === 0) return;
 
     // Create PathlineAnimation for trajectories
@@ -198,10 +198,13 @@
           color: trajectoryColor,
           strokeWidth: trajectoryStrokeWidth,
           pointRadius: trajectoryPointRadius,
-          progressOpacity: trajectoryProgressOpacity,
+          opacity: trajectoryOpacity,
         },
       }
     );
+
+    // Initialize with canvas
+    await pathlineAnimation.init(canvas!);
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { segmentIndex: 0 };
@@ -253,7 +256,7 @@
     });
 
     // --- Dynamic Foreground ---
-    pathlineAnimation.draw(ctx, state);
+    pathlineAnimation.draw(state);
   }
 
   // ----------------------------------------------------------------
@@ -271,12 +274,13 @@
   // Initialize when canvas and data are ready
   $: if (canvas && data && data.trajectories?.length > 0 && !initialized) {
     initializeData();
-    setupTimeline();
-    initialized = true;
-    if (timeline) {
-      draw(timeline.initialState);
-      if (playingByDefault) timeline.play();
-    }
+    setupTimeline().then(() => {
+      initialized = true;
+      if (timeline) {
+        draw(timeline.initialState);
+        if (playingByDefault) timeline.play();
+      }
+    });
   }
 
   // Handle visibility changes

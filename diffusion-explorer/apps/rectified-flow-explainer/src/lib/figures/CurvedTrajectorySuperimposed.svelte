@@ -34,7 +34,7 @@
   export let trajectoryColor = settings.stylingSettings.trajectory.color;
   export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
   export let trajectoryPointRadius = settings.stylingSettings.trajectory.endpointRadius;
-  export let trajectoryProgressOpacity = settings.stylingSettings.trajectory.progressOpacity;
+  export let trajectoryOpacity = settings.stylingSettings.trajectory.opacity;
   export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
   export let showTrajectoryPreview = false;
   export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory visible with fade
@@ -155,7 +155,7 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline() {
+  async function setupTimeline() {
     // Create PathlineAnimation for trajectories
     pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(
       scaledTrajectories,
@@ -164,10 +164,13 @@
           color: trajectoryColor,
           strokeWidth: trajectoryStrokeWidth,
           pointRadius: endpointRadius,
-          progressOpacity: trajectoryProgressOpacity,
+          opacity: trajectoryOpacity,
         }
       }
     );
+
+    // Initialize the animation with the canvas
+    await pathlineAnimation.init(canvas);
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { segmentIndex: 0 };
@@ -209,8 +212,8 @@
 
     // --- Dynamic Foreground ---
     // Draw default trajectories (dimmed if user has clicked)
-    const defaultOpacity = hasUserTrajectory ? 0.15 : trajectoryProgressOpacity;
-    pathlineAnimation.draw(ctx, state, { progressOpacity: defaultOpacity });
+    const defaultOpacity = hasUserTrajectory ? 0.15 : trajectoryOpacity;
+    pathlineAnimation.draw(state, { opacity: defaultOpacity });
 
     // Draw all user-defined trajectories (highlighted) on top
     if (userTrajectories.length > 0) {
@@ -221,9 +224,8 @@
         const userSegmentIndex = Math.min(segmentIndex, userNumSegments - 1);
 
         pathlineAnimation.draw(
-          ctx,
           { ...state, segmentIndex: userSegmentIndex, pathlines: validUserTrajectories },
-          { progressOpacity: 1.0 }
+          { opacity: 1.0 }
         );
       }
 
@@ -336,8 +338,9 @@
 
   $: if (isDataValid && canvas && !isInitialized) {
     runInitialComputation();
-    setupTimeline();
-    if (playingByDefault) startAnimation();
+    setupTimeline().then(() => {
+      if (playingByDefault) startAnimation();
+    });
   }
 
   // Handle visibility changes (pause when off-screen, resume when back)

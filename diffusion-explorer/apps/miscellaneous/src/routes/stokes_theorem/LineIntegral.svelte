@@ -136,7 +136,7 @@
   // Setup
   // ----------------------------------------------------------------
 
-  function runInitialComputation() {
+  async function runInitialComputation() {
     if (!canvas) return;
 
     // Compute bounding box from curve
@@ -165,6 +165,9 @@
       offsets: "synchronized",
       loopMultiplier: totalDuration / streamlineDuration,
     });
+
+    // Initialize the animation with the canvas
+    await streamlineAnim.init(canvas);
   }
 
   function setupTimeline() {
@@ -218,7 +221,7 @@
     ctx.clearRect(0, 0, width, height);
 
     // 1. Draw streamlines (behind)
-    streamlineAnim.draw(ctx, state);
+    streamlineAnim.draw(state);
 
     // 2. Draw white overlay between streamlines and surface
     ctx.fillStyle = "white";
@@ -386,11 +389,12 @@
 
   // Initialize when canvas is ready
   $: if (!isInitialized && canvas && curveFn && vectorFieldFn) {
-    runInitialComputation();
-    setupTimeline();
-    isInitialized = true;
-    draw(timeline!.initialState);
-    if (playingByDefault) startAnimation();
+    isInitialized = true; // Set early to prevent re-entry
+    runInitialComputation().then(() => {
+      setupTimeline();
+      draw(timeline!.initialState);
+      if (playingByDefault) startAnimation();
+    });
   }
 
   // Handle visibility changes

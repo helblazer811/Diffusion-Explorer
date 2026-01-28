@@ -10,6 +10,7 @@
     plotContours,
     Timeline,
     useCanvas2D,
+    useCanvasWebGPU,
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
@@ -61,16 +62,16 @@
     settings.stylingSettings.trajectory.strokeWidth;
   export let trajectoryPointRadius =
     settings.stylingSettings.trajectory.endpointRadius;
-  export let trajectoryProgressOpacity =
-    settings.stylingSettings.trajectory.progressOpacity;
+  export let trajectoryOpacity =
+    settings.stylingSettings.trajectory.opacity;
   export let trajectoryPreviewOpacity =
     settings.stylingSettings.trajectory.previewOpacity;
 
   // Trajectory outline styling
   export let trajectoryOutlineColor =
     settings.stylingSettings.trajectory.outline.color;
-  export let trajectoryOutlineWidth =
-    settings.stylingSettings.trajectory.outline.width;
+  export let trajectoryOutlineStrokeWidth =
+    settings.stylingSettings.trajectory.outline.strokeWidth;
   export let trajectoryOutlineOpacity =
     settings.stylingSettings.trajectory.outline.opacity;
   export let showTrajectoryOutline =
@@ -82,7 +83,7 @@
 
   // Interactive sampling
   export let highlightedTrajectoryOpacity = 1.0;
-  export let dimmedTrajectoryOpacity = 0.15;
+  export let dimmedTrajectoryOpacity = 0.08;
   export let maxUserTrajectories =
     settings.interactiveSettings.maxUserTrajectories;
 
@@ -103,14 +104,19 @@
   $: numTimeSteps = isDataValid ? leftTrajectories.length : 1;
   $: numSegments = numTimeSteps - 1;
 
-  // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let leftCanvas: HTMLCanvasElement | null = null;
-  let rightCanvas: HTMLCanvasElement | null = null;
-  const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
-  const rightCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
-  // Tie ctx reactivity to canvas variables so it updates when action runs
-  $: leftCtx = leftCanvas && leftCanvas2d.ctx;
-  $: rightCtx = rightCanvas && rightCanvas2d.ctx;
+  // Background canvas (2D) - for contours and scatter
+  let leftBgCanvas: HTMLCanvasElement | null = null;
+  let rightBgCanvas: HTMLCanvasElement | null = null;
+  const leftBgCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  const rightBgCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  $: leftBgCtx = leftBgCanvas && leftBgCanvas2d.ctx;
+  $: rightBgCtx = rightBgCanvas && rightBgCanvas2d.ctx;
+
+  // Trajectory canvas (WebGPU) - for trajectories only
+  let leftTrajCanvas: HTMLCanvasElement | null = null;
+  let rightTrajCanvas: HTMLCanvasElement | null = null;
+  const leftTrajCanvasGPU = useCanvasWebGPU(canvasWidth, canvasHeight);
+  const rightTrajCanvasGPU = useCanvasWebGPU(canvasWidth, canvasHeight);
 
   // Scales
   let xScale;
@@ -229,14 +235,14 @@
     return {
       strokeWidth: trajectoryStrokeWidth,
       color: trajectoryColor,
-      progressOpacity: opacity,
+      opacity: opacity,
       showPreview: true,
       previewOpacity: trajectoryPreviewOpacity,
       pointRadius: trajectoryPointRadius,
       outline: showTrajectoryOutline
         ? {
             color: trajectoryOutlineColor,
-            width: trajectoryOutlineWidth,
+            strokeWidth: trajectoryOutlineStrokeWidth,
             opacity: trajectoryOutlineOpacity,
           }
         : undefined,
@@ -249,7 +255,7 @@
   // ----------------------------------------------------------------
 
   function runInitialComputation() {
-    if (!leftCanvas || !rightCanvas || !isDataValid) return;
+    if (!leftBgCanvas || !rightBgCanvas || !leftTrajCanvas || !rightTrajCanvas || !isDataValid) return;
 
     initializeScales();
     precomputeCoordinates();
@@ -338,26 +344,13 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  // Draw trajectories (clears and redraws each frame)
-  // Pure renderer: receives pre-computed state, only derives userSegmentIndex from logicalTime + trajectory length
-  function draw(
-    canvas: HTMLCanvasElement,
-    ctx: CanvasRenderingContext2D,
-    scaledTrajectories: number[][][],
-    state: AnimationState,
-    panel: "left" | "right",
-    userTrajectories: number[][][]
-  ) {
-    if (!ctx || !canvas) return;
-
-    const segmentIndex =
-      panel === "left" ? state.leftSegmentIndex : state.rightSegmentIndex;
-    const logicalTime = panel === "left" ? state.leftTime : state.rightTime;
+  // Draw background elements (contours, scatter) on 2D canvas
+  function drawBackground(ctx: CanvasRenderingContext2D | null) {
+    if (!ctx) return;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // --- Static Background ---
     // Draw contour plot if enabled
     if (showTargetContour && computedTargetContours) {
       plotContours(ctx, computedTargetContours, {
@@ -380,43 +373,47 @@
         targetOpacity
       );
     }
+  }
 
-    // --- Dynamic Foreground ---
-    // Draw default trajectories (GPU by default, falls back to CPU)
+  // Draw trajectories on WebGPU canvas
+  function drawForeground(
+    canvas: HTMLCanvasElement | null,
+    scaledTrajectories: number[][][],
+    segmentIndex: number,
+    userTrajectories: number[][][],
+    logicalTime: number
+  ) {
+    if (!canvas) return;
+
+    // Draw default trajectories (GPU rendering) - clear canvas first
     const defaultOpacity = hasUserTrajectory
       ? dimmedTrajectoryOpacity
-      : trajectoryProgressOpacity;
+      : trajectoryOpacity;
     drawTrajectories(
-      ctx,
+      canvas,
       scaledTrajectories,
       segmentIndex,
-      getTrajectoryStyle(defaultOpacity)
+      getTrajectoryStyle(defaultOpacity),
+      { clearCanvas: true }
     );
 
-    // Draw all user-defined trajectories (highlighted) on top
-    // Note: userSegmentIndex derived here because trajectory.length is external reactive state
+    // Draw all user-defined trajectories on top - don't clear
     for (const userTrajectory of userTrajectories) {
       if (userTrajectory && userTrajectory.length > 1) {
         const userNumSegments = userTrajectory.length - 1;
         const userSegmentIndex = Math.floor(logicalTime * userNumSegments);
         drawTrajectories(
-          ctx,
+          canvas,
           [userTrajectory],
           userSegmentIndex,
-          getTrajectoryStyle(highlightedTrajectoryOpacity)
+          getTrajectoryStyle(highlightedTrajectoryOpacity),
+          { clearCanvas: false }
         );
-      } else if (userTrajectory && userTrajectory.length === 1) {
-        // Draw just the starting point for immediate feedback
-        const [x, y] = userTrajectory[0];
-        ctx.globalAlpha = highlightedTrajectoryOpacity;
-        ctx.beginPath();
-        ctx.arc(x, y, trajectoryPointRadius, 0, Math.PI * 2);
-        ctx.fillStyle = trajectoryColor;
-        ctx.fill();
       }
+      // Note: Single-point user trajectories (starting point feedback) are not drawn
+      // in GPU mode since we don't have a 2D context. The trajectory will appear
+      // once it has at least 2 points.
     }
-
-    ctx.globalAlpha = 1.0;
   }
 
   function getCurrentState(): AnimationState {
@@ -429,26 +426,28 @@
   }
 
   function updateLeftVisualization() {
-    if (!isDataValid || !leftCanvas || !leftCtx) return;
-    draw(
-      leftCanvas,
-      leftCtx,
+    if (!isDataValid) return;
+    const state = getCurrentState();
+    drawBackground(leftBgCtx);
+    drawForeground(
+      leftTrajCanvas,
       scaledLeftTrajectories,
-      getCurrentState(),
-      "left",
-      userFlowMatchingTrajectories
+      state.leftSegmentIndex,
+      userFlowMatchingTrajectories,
+      state.leftTime
     );
   }
 
   function updateRightVisualization() {
-    if (!isDataValid || !rightCanvas || !rightCtx) return;
-    draw(
-      rightCanvas,
-      rightCtx,
+    if (!isDataValid) return;
+    const state = getCurrentState();
+    drawBackground(rightBgCtx);
+    drawForeground(
+      rightTrajCanvas,
       scaledRightTrajectories,
-      getCurrentState(),
-      "right",
-      userRectifiedFlowTrajectories
+      state.rightSegmentIndex,
+      userRectifiedFlowTrajectories,
+      state.rightTime
     );
   }
 
@@ -527,7 +526,8 @@
     // Clients are passed as props; check they're available
     if (!flowMatchingClient || !rectifiedFlowClient) return;
 
-    const canvas = side === "left" ? leftCanvas : rightCanvas;
+    const canvas = side === "left" ? leftTrajCanvas : rightTrajCanvas;
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
 
     // Get click position in CSS pixels (account for canvas scaling)
@@ -646,7 +646,7 @@
   // Reactive Blocks
   // ----------------------------------------------------------------
 
-  $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
+  $: if (isDataValid && leftBgCanvas && rightBgCanvas && leftTrajCanvas && rightTrajCanvas && !isInitialized) {
     runInitialComputation();
     setupTimeline();
   }
@@ -682,13 +682,22 @@
         >
           {leftSubtitle}
         </div>
-        <canvas
-          bind:this={leftCanvas}
-          use:leftCanvas2d.bindCanvas
-          class="panel-canvas"
-          onclick={(e) => handleCanvasClick(e, "left")}
-          style="cursor: pointer;"
-        ></canvas>
+        <div class="canvas-stack">
+          <!-- Background layer (2D) - contours and scatter -->
+          <canvas
+            bind:this={leftBgCanvas}
+            use:leftBgCanvas2d.bindCanvas
+            class="panel-canvas bg-layer"
+          ></canvas>
+          <!-- Trajectory layer (WebGPU) -->
+          <canvas
+            bind:this={leftTrajCanvas}
+            use:leftTrajCanvasGPU.bindCanvas
+            class="panel-canvas traj-layer"
+            onclick={(e) => handleCanvasClick(e, "left")}
+            style="cursor: pointer;"
+          ></canvas>
+        </div>
         <div class="slider-wrapper">
           <TimeSlider
             bind:value={leftTime}
@@ -722,13 +731,22 @@
         >
           {rightSubtitle}
         </div>
-        <canvas
-          bind:this={rightCanvas}
-          use:rightCanvas2d.bindCanvas
-          class="panel-canvas"
-          onclick={(e) => handleCanvasClick(e, "right")}
-          style="cursor: pointer;"
-        ></canvas>
+        <div class="canvas-stack">
+          <!-- Background layer (2D) - contours and scatter -->
+          <canvas
+            bind:this={rightBgCanvas}
+            use:rightBgCanvas2d.bindCanvas
+            class="panel-canvas bg-layer"
+          ></canvas>
+          <!-- Trajectory layer (WebGPU) -->
+          <canvas
+            bind:this={rightTrajCanvas}
+            use:rightTrajCanvasGPU.bindCanvas
+            class="panel-canvas traj-layer"
+            onclick={(e) => handleCanvasClick(e, "right")}
+            style="cursor: pointer;"
+          ></canvas>
+        </div>
         <div class="slider-wrapper">
           <TimeSlider
             bind:value={rightTime}
@@ -784,10 +802,27 @@
     margin-top: -14px;
   }
 
+  .canvas-stack {
+    position: relative;
+    width: 100%;
+  }
+
   .panel-canvas {
     width: 100%;
     height: auto;
     display: block;
+  }
+
+  .bg-layer {
+    position: relative;
+    z-index: 0;
+  }
+
+  .traj-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
   }
 
   .slider-wrapper {

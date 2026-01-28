@@ -214,6 +214,11 @@
       loopMultiplier,
     });
 
+    // Initialize the animation with the left canvas
+    if (canvasLeft) {
+      await streamlineAnimation.init(canvasLeft);
+    }
+
     console.log(
       `[DynamicLIC] Created streamline animation with ${streamlineAnimation.data.streamlines.length} streamlines`
     );
@@ -329,7 +334,7 @@
       ctxLeft.fillStyle = "#ffffff";
       ctxLeft.fillRect(0, 0, canvasWidth, canvasHeight);
 
-      streamlineAnimation.draw(ctxLeft, state);
+      streamlineAnimation.draw(state);
     }
 
     // Draw DLIC on right canvas (from cache)

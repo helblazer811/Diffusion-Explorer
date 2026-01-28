@@ -500,9 +500,9 @@
 
     const { theta } = state;
 
-    // 1. Render streamlines to GPU canvas (behind)
+    // 1. Draw streamlines to GPU canvas (behind)
     if (streamlineAnim.initialized) {
-      streamlineAnim.render(state, [0, 0, 0, 0]);
+      streamlineAnim.draw(state, [0, 0, 0, 0]);
     }
 
     // 2. Clear 2D overlay canvas and draw surface/vectors on top

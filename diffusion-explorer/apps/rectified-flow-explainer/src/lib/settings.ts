@@ -130,13 +130,13 @@ export const settings = {
       color: '#f17720',           // Orange
       strokeWidth: 3,
       endpointRadius: 3,          // Endpoint circle radius
-      progressOpacity: 0.8,       // Animated paths
+      opacity: 0.8,               // Animated paths
       previewOpacity: 0.0,        // Preview path opacity (0 = hidden)
       outline: {
         enabled: true,
-        color: '#ffffff',         // Black outline
-        width: 0,                 // Outline width (should be > strokeWidth)
-        opacity: 1.0              // Outline opacity
+        color: '#333333',         // Dark gray outline (visible against light background)
+        strokeWidth: 3,           // Outline stroke width (added to trajectory strokeWidth)
+        opacity: 0.5              // Outline opacity
       }
     },
     // Contour plot styling

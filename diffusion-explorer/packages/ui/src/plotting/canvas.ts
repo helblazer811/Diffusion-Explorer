@@ -56,3 +56,56 @@ export function useCanvas2D(width: number, height: number) {
     get ctx() { return ctx; }
   };
 }
+
+/**
+ * Creates a canvas manager for WebGPU rendering.
+ * Does NOT get a 2D context - canvas remains pristine for WebGPU.
+ *
+ * Usage with Svelte action:
+ *   const canvasGPU = useCanvasWebGPU(width, height);
+ *   <canvas use:canvasGPU.bindCanvas />
+ *
+ * Usage with bind:this:
+ *   const canvasGPU = useCanvasWebGPU(width, height);
+ *   <canvas bind:this={canvasGPU.canvas} />
+ *   // Then call canvasGPU.init() after mount
+ */
+export function useCanvasWebGPU(width: number, height: number) {
+  let canvas: HTMLCanvasElement | null = null;
+
+  function resize(w: number = width, h: number = height) {
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    // Do NOT get context - leave pristine for WebGPU
+  }
+
+  // Svelte action for use:bindCanvas
+  function bindCanvas(el: HTMLCanvasElement) {
+    canvas = el;
+    resize();
+    return {
+      destroy() {
+        canvas = null;
+      }
+    };
+  }
+
+  // Manual init for bind:this pattern
+  function init(el: HTMLCanvasElement) {
+    canvas = el;
+    resize();
+  }
+
+  return {
+    /** Svelte action - use as: <canvas use:canvasGPU.bindCanvas /> */
+    bindCanvas,
+    /** Manual init - call after bind:this */
+    init,
+    /** Resize canvas (call when dimensions change) */
+    resize,
+    /** Get the canvas element */
+    get canvas() { return canvas; },
+  };
+}

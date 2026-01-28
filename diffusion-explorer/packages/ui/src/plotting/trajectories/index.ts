@@ -2,17 +2,18 @@
  * Trajectory rendering module with GPU/CPU backends.
  *
  * This module provides:
- * - `drawTrajectories`: Simple function with automatic GPU/CPU selection
- * - GPU backend (default): Time-based z-ordering, outline support, opacity gradients
- * - CPU backend: Existing canvas-based rendering (fallback when WebGPU unavailable)
+ * - `drawTrajectories`: Unified function with automatic GPU/CPU selection
+ * - GPU backend: Time-based z-ordering, outline support, opacity gradients
+ * - CPU backend: Canvas 2D rendering
  *
  * @example
  * ```typescript
- * // GPU rendering (default) - recommended
+ * // CPU rendering - pass ctx
  * drawTrajectories(ctx, trajectories, segmentIndex, style);
  *
- * // Force CPU rendering
- * drawTrajectories(ctx, trajectories, segmentIndex, style, { backend: 'cpu' });
+ * // GPU rendering - pass canvas element (use useCanvasWebGPU)
+ * const trajCanvas = useCanvasWebGPU(width, height);
+ * await drawTrajectories(trajCanvas.canvas, trajectories, segmentIndex, style);
  * ```
  */
 
@@ -21,27 +22,25 @@ import {
   drawTrajectories as cpuDrawTrajectories,
   drawTrajectoriesWithOpacityGradient,
   drawPartialTrajectory,
-  type TrajectoryStyleOptions as CPUTrajectoryStyleOptions,
 } from './cpu';
 import type {
-  GPUTrajectoryStyleOptions,
+  TrajectoryStyleOptions,
 } from './types';
-import { parseColor } from './types';
 
-// Re-export other CPU functions unchanged
+
+// Re-export CPU functions
 export {
   drawTrajectoriesWithOpacityGradient,
   drawPartialTrajectory,
   type PartialTrajectoryOptions,
-  type TrajectoryOutlineOptions,
-  type HeadStyle,
 } from './cpu';
 
-// Re-export types
+// Re-export types from central location
 export type {
   TrajectoryDomain,
-  TrajectoryRendererOptions,
-  GPUTrajectoryStyleOptions,
+  TrajectoryStyleOptions,
+  TrajectoryOutlineOptions,
+  HeadStyle,
   OpacityGradientOptions,
   GPUTrajectoryData,
 } from './types';
@@ -49,18 +48,6 @@ export type {
 // Re-export GPU renderer for advanced use
 export { GPUTrajectoryRenderer, type GPUTrajectoryRendererOptions } from './gpu';
 
-/**
- * Style options for trajectory rendering.
- */
-export type TrajectoryStyleOptions = CPUTrajectoryStyleOptions;
-
-/**
- * Options for controlling trajectory rendering behavior.
- */
-export interface TrajectoryRenderOptions {
-  /** Backend to use: 'gpu' for WebGPU acceleration (default), 'cpu' for canvas 2D */
-  backend?: 'gpu' | 'cpu';
-}
 
 // Cache GPU renderers per canvas to avoid recreating WebGPU context each frame
 const gpuRendererCache = new WeakMap<HTMLCanvasElement, GPUTrajectoryRenderer>();
@@ -102,83 +89,97 @@ async function getGPURenderer(canvas: HTMLCanvasElement): Promise<GPUTrajectoryR
 }
 
 /**
- * Convert CPU style to GPU style.
+ * Normalize style to ensure opacityGradient is set from legacy perSegmentAlphas if needed.
  */
-function cpuStyleToGPUStyle(style: TrajectoryStyleOptions): GPUTrajectoryStyleOptions {
-  return {
-    strokeWidth: style.strokeWidth,
-    color: style.color,
-    opacity: style.progressOpacity,
-    pointRadius: style.pointRadius,
-    outline: style.outline,
-    headStyle: style.headStyle,
-    opacityGradient: style.perSegmentAlphas
-      ? { mode: 'custom', perSegmentAlphas: style.perSegmentAlphas }
-      : undefined,
-  };
+function normalizeStyle(style: TrajectoryStyleOptions): TrajectoryStyleOptions {
+  // If opacityGradient is already set, use it as-is
+  if (style.opacityGradient) {
+    return style;
+  }
+  // Convert legacy perSegmentAlphas to opacityGradient
+  if (style.perSegmentAlphas) {
+    return {
+      ...style,
+      opacityGradient: { mode: 'custom', perSegmentAlphas: style.perSegmentAlphas },
+    };
+  }
+  return style;
 }
 
 /**
- * Draw trajectories with animated progress.
+ * Options for drawTrajectories.
+ */
+export interface DrawTrajectoriesOptions {
+  /** Whether to clear the canvas before drawing (default: true for GPU, ignored for CPU) */
+  clearCanvas?: boolean;
+}
+
+/**
+ * Draw trajectories with automatic GPU/CPU selection.
  *
- * Supports both GPU and CPU rendering:
- * - GPU (default): Time-based z-ordering, smooth outline support
- * - CPU: Fallback when WebGPU unavailable, or via `{ backend: 'cpu' }`
+ * - Pass a `CanvasRenderingContext2D` → CPU rendering
+ * - Pass an `HTMLCanvasElement` (pristine, no 2D context) → GPU rendering
  *
- * @param ctx - Canvas 2D rendering context
+ * On first GPU call, awaits renderer creation before drawing.
+ * Subsequent calls use cached renderer synchronously.
+ *
+ * @param target - Canvas 2D context (CPU) or HTMLCanvasElement (GPU)
  * @param trajectories - Array of trajectories in pixel coords: [trajectory][timestep][x,y]
  * @param segmentIndex - Current segment index for animation progress
  * @param style - Styling options (strokeWidth, color, opacity, etc.)
- * @param options - Render options (backend selection)
+ * @param options - Additional options (clearCanvas, etc.)
  *
  * @example
  * ```typescript
- * // GPU rendering (default) - recommended
- * drawTrajectories(ctx, trajectories, segmentIndex, {
- *   strokeWidth: 2,
- *   color: '#3b82f6',
- *   progressOpacity: 0.8,
- *   pointRadius: 4,
- * });
+ * // CPU rendering - pass ctx
+ * drawTrajectories(ctx, trajectories, segmentIndex, style);
  *
- * // Force CPU rendering
- * drawTrajectories(ctx, trajectories, segmentIndex, style, { backend: 'cpu' });
+ * // GPU rendering - pass canvas element (use useCanvasWebGPU)
+ * const trajCanvas = useCanvasWebGPU(width, height);
+ * await drawTrajectories(trajCanvas.canvas, trajectories, segmentIndex, style);
+ *
+ * // GPU rendering - draw multiple sets without clearing between calls
+ * await drawTrajectories(canvas, trajectories1, segmentIndex1, style1, { clearCanvas: true });
+ * await drawTrajectories(canvas, trajectories2, segmentIndex2, style2, { clearCanvas: false });
  * ```
  */
-export function drawTrajectories(
-  ctx: CanvasRenderingContext2D,
+export async function drawTrajectories(
+  target: CanvasRenderingContext2D | HTMLCanvasElement,
   trajectories: number[][][],
   segmentIndex: number,
   style: TrajectoryStyleOptions,
-  options?: TrajectoryRenderOptions
-): void {
-  const canvas = ctx.canvas;
-  const useGPU = options?.backend !== 'cpu';
+  options?: DrawTrajectoriesOptions
+): Promise<void> {
+  // Normalize style (convert legacy perSegmentAlphas to opacityGradient)
+  const normalizedStyle = normalizeStyle(style);
+  const shouldClear = options?.clearCanvas ?? true;
 
-  if (useGPU) {
-    // GPU path - async but we don't await (fire-and-forget for animation frames)
+  // Detect if target is canvas element (GPU path) or ctx (CPU path)
+  const isCanvasElement = target instanceof HTMLCanvasElement;
+
+  if (isCanvasElement) {
+    // GPU path - canvas element passed directly (pristine, no 2D context)
+    const canvas = target;
     const cached = gpuRendererCache.get(canvas);
-    if (cached) {
-      // Use GPU renderer
-      cached.setTrajectories(trajectories, segmentIndex, cpuStyleToGPUStyle(style));
-      cached.draw();
-    } else {
-      // Initialize GPU renderer async, fall back to CPU for this frame
-      getGPURenderer(canvas).then(() => {
-        // GPU ready for next frame
-      });
+    const clearColor = shouldClear ? [0, 0, 0, 0] as [number, number, number, number] : undefined;
 
-      // Fall back to CPU for this frame
-      cpuDrawTrajectories(ctx, trajectories, segmentIndex, style);
+    if (cached) {
+      // Use cached GPU renderer
+      cached.draw(trajectories, segmentIndex, normalizedStyle, clearColor);
+      return;
     }
+
+    // First call - await GPU renderer creation
+    const renderer = await getGPURenderer(canvas);
+    if (!renderer) {
+      console.warn('[drawTrajectories] GPU renderer creation failed');
+      return;
+    }
+
+    // Draw with newly created renderer
+    renderer.draw(trajectories, segmentIndex, normalizedStyle, clearColor);
   } else {
-    // CPU path
-    cpuDrawTrajectories(ctx, trajectories, segmentIndex, style);
+    // CPU path - 2D context passed (clearCanvas option ignored, CPU doesn't auto-clear)
+    cpuDrawTrajectories(target, trajectories, segmentIndex, normalizedStyle);
   }
 }
-
-/**
- * Unified trajectory renderer class for advanced use cases.
- * Prefer using `drawTrajectories()` function for simple cases.
- */
-export { TrajectoryRenderer } from './TrajectoryRenderer';

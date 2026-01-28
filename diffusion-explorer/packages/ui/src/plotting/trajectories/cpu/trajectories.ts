@@ -1,4 +1,12 @@
 import { drawArrowHead } from '../../utils';
+import type {
+  TrajectoryStyleOptions,
+  TrajectoryOutlineOptions,
+  HeadStyle,
+} from '../types';
+
+// Re-export types for backwards compatibility
+export type { TrajectoryStyleOptions, TrajectoryOutlineOptions, HeadStyle };
 
 export interface PartialTrajectoryOptions {
   color: string;
@@ -9,33 +17,6 @@ export interface PartialTrajectoryOptions {
   arrowRadius?: number;       // Override arrow head size (default: pointRadius * 3.5)
   xScale: (x: number) => number;  // Domain to pixel scale
   yScale: (y: number) => number;  // Domain to pixel scale
-}
-
-export interface TrajectoryOutlineOptions {
-  color?: string;      // Outline color (default: black)
-  width?: number;      // Outline width in pixels (default: strokeWidth + 2)
-  opacity?: number;    // Outline opacity (default: same as stroke opacity)
-}
-
-export interface HeadStyle {
-  type: 'circle' | 'arrow';  // Shape of head marker (default: 'circle')
-  radius?: number;           // Radius for circle, or size for arrow (default: pointRadius)
-  color?: string;            // Head color (default: same as trajectory color)
-  opacity?: number;          // Head opacity (default: same as trajectory opacity)
-}
-
-export interface TrajectoryStyleOptions {
-  strokeWidth: number;
-  color: string;
-  progressOpacity: number;
-  pointRadius: number;
-  showPreview?: boolean;
-  previewOpacity?: number;
-  showHeadMarker?: boolean; // Whether to show marker at trajectory head (default: true)
-  outline?: TrajectoryOutlineOptions; // Optional outline around trajectory
-  headStyle?: HeadStyle;    // Head marker styling (default: circle)
-  gradientSubdivisions?: number; // Subdivisions per segment for smooth gradient (default: 1)
-  perSegmentAlphas?: number[][]; // Optional per-segment alphas: [trajectory][segment] -> alpha (0-1)
 }
 
 /**
@@ -212,7 +193,7 @@ export function drawTrajectoriesWithOpacityGradient(
           const subProgress = (k + 0.5) / subdivisions;
           const overallProgress = segmentStart + (segmentEnd - segmentStart) * subProgress;
 
-          ctx.globalAlpha = overallProgress * style.progressOpacity;
+          ctx.globalAlpha = overallProgress * style.opacity;
 
           // Draw sub-segment
           const t0 = k / subdivisions;
@@ -239,7 +220,7 @@ export function drawTrajectoriesWithOpacityGradient(
       const radius = style.headStyle?.radius ?? style.pointRadius;
 
       ctx.fillStyle = style.headStyle?.color ?? style.color;
-      ctx.globalAlpha = style.headStyle?.opacity ?? style.progressOpacity;
+      ctx.globalAlpha = style.headStyle?.opacity ?? style.opacity;
 
       if (headType === 'arrow') {
         drawArrowHead(ctx, px, py, mx, my, radius);
@@ -280,9 +261,10 @@ export function drawTrajectories(
   ctx.lineJoin = "round";
 
   const outline = style.outline;
-  const outlineWidth = outline?.width ?? style.strokeWidth + 2;
+  const outlineStrokeWidth = outline?.strokeWidth ?? 2;
+  const outlineWidth = style.strokeWidth + outlineStrokeWidth;
   const outlineColor = outline?.color ?? "#000000";
-  const outlineOpacity = outline?.opacity ?? style.progressOpacity;
+  const outlineOpacity = outline?.opacity ?? style.opacity;
 
   for (let i = 0; i < numTrajectories; i++) {
     const points = trajectories[i]; // [timestep][x,y] in pixel coords
@@ -296,7 +278,7 @@ export function drawTrajectories(
       if (outline) {
         ctx.lineWidth = outlineWidth;
         ctx.strokeStyle = outlineColor;
-        ctx.globalAlpha = (style.previewOpacity ?? 0.15) * (outlineOpacity / style.progressOpacity);
+        ctx.globalAlpha = (style.previewOpacity ?? 0.15) * (outlineOpacity / style.opacity);
         ctx.beginPath();
         for (let j = 0; j < points.length; j++) {
           const [x, y] = points[j];
@@ -350,7 +332,7 @@ export function drawTrajectories(
           if (outline) {
             ctx.lineWidth = outlineWidth;
             ctx.strokeStyle = outlineColor;
-            ctx.globalAlpha = subAlpha * (outlineOpacity / style.progressOpacity);
+            ctx.globalAlpha = subAlpha * (outlineOpacity / style.opacity);
             ctx.beginPath();
             ctx.moveTo(sx1, sy1);
             ctx.lineTo(sx2, sy2);
@@ -384,7 +366,7 @@ export function drawTrajectories(
       // Draw main stroke on top
       ctx.lineWidth = style.strokeWidth;
       ctx.strokeStyle = style.color;
-      ctx.globalAlpha = style.progressOpacity;
+      ctx.globalAlpha = style.opacity;
       ctx.beginPath();
       for (let j = 0; j <= segmentIndex + 1 && j < points.length; j++) {
         const [x, y] = points[j];
@@ -414,7 +396,7 @@ export function drawTrajectories(
 
     // Draw main marker
     ctx.fillStyle = style.headStyle?.color ?? style.color;
-    ctx.globalAlpha = style.headStyle?.opacity ?? style.progressOpacity;
+    ctx.globalAlpha = style.headStyle?.opacity ?? style.opacity;
 
     if (headType === 'arrow') {
       drawArrowHead(ctx, px, py, mx, my, radius);

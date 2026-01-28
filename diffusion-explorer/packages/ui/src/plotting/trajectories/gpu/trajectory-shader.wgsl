@@ -124,7 +124,9 @@ fn vs_main(
 
   // Z-value: map [0, 1] to NDC z [1, 0] (1 = far, 0 = near)
   // Higher zValue = more recent = closer = smaller NDC z
-  let ndcZ = 1.0 - zValue;
+  // Add small offset for outline pass to push it behind main stroke
+  let outlineOffset = select(0.0, 0.001, uniforms.isOutlinePass > 0.5);
+  let ndcZ = 1.0 - zValue + outlineOffset;
 
   output.position = vec4<f32>(ndcX, ndcY, ndcZ, 1.0);
   output.localPos = vec2<f32>(along, across);

@@ -84,6 +84,7 @@
   // Animation state - Timeline system
   let isInitialized = false;
   let timeline: Timeline<AnimationState> | null = null;
+  let displayTime = 0;  // Semantic time for slider display (tracks state.time)
 
   // Visibility-based animation control
   let figureIsActive;
@@ -213,8 +214,17 @@
 
     // Register tick callback
     timeline.onTick((_t, state) => {
+      displayTime = state.time;  // Track semantic time for slider
       draw(state);
     });
+  }
+
+  // Handle seeking by display time - map to forward clip's timeline range
+  function handleSeekByDisplayTime(t: number) {
+    if (!timeline) return;
+    const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
+    const forwardEnd = animationDuration / totalCycleDuration;
+    timeline.seek(t * forwardEnd);
   }
 
   function startAnimation() {
@@ -351,7 +361,7 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider {timeline} color="#f17720" />
+      <TimeSlider {timeline} {displayTime} onSeekByDisplayTime={handleSeekByDisplayTime} color="#f17720" />
     </div>
   {/snippet}
 </Figure>

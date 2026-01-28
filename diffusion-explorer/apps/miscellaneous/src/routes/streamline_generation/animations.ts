@@ -6,7 +6,7 @@
  * - Drawing functions for grid and pathlines
  */
 
-import type { Clip } from "@diffusion-explorer/ui";
+import type { Animation, Clip } from "@diffusion-explorer/ui";
 
 // ----------------------------------------------------------------
 // Types
@@ -56,14 +56,20 @@ export interface FlashFadeOptions {
  * - 0.0-flashPhaseRatio: Rectangle flashes red (multiple on/off cycles)
  * - flashPhaseRatio-1.0: Rectangle fades + trajectory fades out
  */
-export class FlashFadeAnimation<TState extends FlashFadeAnimationState> {
+export class FlashFadeAnimation<TState extends FlashFadeAnimationState>
+  implements Animation<TState>
+{
   readonly clip: Clip<TState>;
 
   private gridCell: [number, number];
   private pathline: number[][];
   private options: FlashFadeOptions;
 
-  constructor(
+  // Context storage
+  private ctx: CanvasRenderingContext2D | null = null;
+  private _initialized = false;
+
+  private constructor(
     gridCell: [number, number],
     pathline: number[][],
     options: FlashFadeOptions
@@ -78,7 +84,31 @@ export class FlashFadeAnimation<TState extends FlashFadeAnimationState> {
     };
   }
 
-  draw(ctx: CanvasRenderingContext2D, state: TState): void {
+  /**
+   * Initialize the animation with a canvas element.
+   */
+  async init(canvas: HTMLCanvasElement): Promise<void> {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to get 2D rendering context');
+    }
+    this.ctx = ctx;
+    this._initialized = true;
+  }
+
+  /**
+   * Check if the animation has been initialized.
+   */
+  get initialized(): boolean {
+    return this._initialized;
+  }
+
+  draw(state: TState): void {
+    if (!this.ctx) {
+      console.warn('FlashFadeAnimation.draw() called before init()');
+      return;
+    }
+    const ctx = this.ctx;
     const { flashFadeProgress } = state;
     const {
       gridNx,
@@ -147,6 +177,14 @@ export class FlashFadeAnimation<TState extends FlashFadeAnimationState> {
     }
 
     ctx.restore();
+  }
+
+  /**
+   * Clean up resources.
+   */
+  destroy(): void {
+    this.ctx = null;
+    this._initialized = false;
   }
 
   static create<TState extends FlashFadeAnimationState>(

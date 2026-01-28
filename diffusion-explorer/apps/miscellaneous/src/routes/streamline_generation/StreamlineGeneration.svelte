@@ -236,7 +236,7 @@
     const flashPhaseRatio =
       (timing.numFlashes * timing.msPerFlash) / totalFlashDurationMs;
 
-    // Create flash fade animations for each collision
+    // Create flash fade animations for each collision (will init later)
     flashFadeAnimations = new Map();
     for (const event of collisionEvents) {
       const pixelPathline = truncatedPathlinesPixel[event.pathlineIndex];
@@ -268,8 +268,17 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline() {
+  async function setupTimeline() {
     console.log("[StreamlineGeneration] Setting up timeline...");
+
+    // Initialize all flash fade animations with the right canvas
+    if (canvasRight) {
+      const initPromises: Promise<void>[] = [];
+      for (const animation of flashFadeAnimations.values()) {
+        initPromises.push(animation.init(canvasRight));
+      }
+      await Promise.all(initPromises);
+    }
 
     // Initial state
     const initialState: AnimationState = {
@@ -541,7 +550,7 @@
     if (collisionActive && collisionPathlineIndex !== null) {
       const animation = flashFadeAnimations.get(collisionPathlineIndex);
       if (animation) {
-        animation.draw(ctxRight, state);
+        animation.draw(state);
       }
     }
   }
@@ -562,14 +571,14 @@
 
   $effect(() => {
     if (!isInitialized && ctxLeft && ctxRight) {
-      runInitialComputation();
-      setupTimeline();
       isInitialized = true;
-
-      if (playingByDefault && timeline) {
-        draw(timeline.initialState);
-        timeline.play();
-      }
+      runInitialComputation();
+      setupTimeline().then(() => {
+        if (playingByDefault && timeline) {
+          draw(timeline.initialState);
+          timeline.play();
+        }
+      });
     }
   });
 

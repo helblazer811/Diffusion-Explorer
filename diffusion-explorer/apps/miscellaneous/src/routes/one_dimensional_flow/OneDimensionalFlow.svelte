@@ -186,7 +186,7 @@
       style: {
         strokeWidth: 2.5,
         color: "#ffffff",
-        progressOpacity: 1.0,
+        opacity: 1.0,
         pointRadius: 3,
       },
     });
@@ -198,8 +198,11 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline() {
-    if (!pathlineAnimation) return;
+  async function setupTimeline() {
+    if (!pathlineAnimation || !fgCanvasElement) return;
+
+    // Initialize animation with the foreground canvas
+    await pathlineAnimation.init(fgCanvasElement);
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { segmentIndex: 0 };
@@ -232,8 +235,8 @@
 
     // --- Draw existing/pre-computed trajectories (dimmed if user has clicked) ---
     if (pathlineAnimation) {
-      pathlineAnimation.draw(fgCanvas2d.canvas, state, {
-        progressOpacity: hasUserTrajectories ? dimmedOpacity : normalOpacity,
+      pathlineAnimation.draw(state, {
+        opacity: hasUserTrajectories ? dimmedOpacity : normalOpacity,
       });
     }
 
@@ -460,7 +463,7 @@
     setupComplete = true;
 
     await runInitialComputation();
-    setupTimeline();
+    await setupTimeline();
 
     if (timeline) {
       draw(timeline.initialState);

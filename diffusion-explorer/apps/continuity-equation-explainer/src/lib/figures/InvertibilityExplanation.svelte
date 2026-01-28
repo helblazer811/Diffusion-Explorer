@@ -470,7 +470,7 @@
     drawTrajectories(ctx, pixelTrajectories, segmentIndex, {
       strokeWidth: trajectoryStrokeWidth,
       color: trajectoryColor,
-      progressOpacity: 1.0,
+      opacity: 1.0,
       pointRadius: trajectoryPointRadius,
       showPreview: true,
       previewOpacity: 0.15,

@@ -349,6 +349,10 @@ export class CreateGridAnimation<TState extends CreateGridAnimationState>
   private readonly strokeWidth: number;
   private readonly lineCap: CanvasLineCap;
 
+  // Context storage
+  private ctx: CanvasRenderingContext2D | null = null;
+  private _initialized = false;
+
   private constructor(options: CreateGridAnimationOptions) {
     const {
       curveFn,
@@ -386,7 +390,32 @@ export class CreateGridAnimation<TState extends CreateGridAnimationState>
     };
   }
 
-  draw(ctx: CanvasRenderingContext2D, state: TState): void {
+  /**
+   * Initialize the animation with a canvas element.
+   */
+  async init(canvas: HTMLCanvasElement): Promise<void> {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to get 2D rendering context');
+    }
+    this.ctx = ctx;
+    this._initialized = true;
+  }
+
+  /**
+   * Check if the animation has been initialized.
+   */
+  get initialized(): boolean {
+    return this._initialized;
+  }
+
+  draw(state: TState): void {
+    if (!this.ctx) {
+      console.warn('CreateGridAnimation.draw() called before init()');
+      return;
+    }
+
+    const ctx = this.ctx;
     const totalSegments = this.segments.length;
     if (totalSegments === 0) return;
 
@@ -400,29 +429,35 @@ export class CreateGridAnimation<TState extends CreateGridAnimationState>
     ctx.lineCap = this.lineCap;
 
     for (let i = 0; i < fullSegments && i < totalSegments; i++) {
-      this.drawSegment(ctx, this.segments[i], 1.0);
+      this.drawSegment(this.segments[i], 1.0);
     }
 
     if (fullSegments < totalSegments && partialProgress > 0) {
-      this.drawSegment(ctx, this.segments[fullSegments], partialProgress);
+      this.drawSegment(this.segments[fullSegments], partialProgress);
     }
   }
 
-  private drawSegment(
-    ctx: CanvasRenderingContext2D,
-    segment: GridSegment,
-    progress: number
-  ): void {
+  private drawSegment(segment: GridSegment, progress: number): void {
+    if (!this.ctx) return;
+
     const [x1, y1] = this.toPixel(segment.start);
     const [x2, y2] = this.toPixel(segment.end);
 
     const endX = x1 + (x2 - x1) * progress;
     const endY = y1 + (y2 - y1) * progress;
 
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(endX, endY);
+    this.ctx.stroke();
+  }
+
+  /**
+   * Clean up resources.
+   */
+  destroy(): void {
+    this.ctx = null;
+    this._initialized = false;
   }
 
   static create<TState extends CreateGridAnimationState>(
@@ -445,6 +480,10 @@ export class SubdivideGridAnimation<TState extends SubdivideGridAnimationState>
   private readonly color: string;
   private readonly strokeWidth: number;
   private readonly lineCap: CanvasLineCap;
+
+  // Context storage
+  private ctx: CanvasRenderingContext2D | null = null;
+  private _initialized = false;
 
   private constructor(options: SubdivideGridAnimationOptions) {
     const {
@@ -493,14 +532,38 @@ export class SubdivideGridAnimation<TState extends SubdivideGridAnimationState>
     };
   }
 
-  draw(ctx: CanvasRenderingContext2D, state: TState): void {
-    ctx.strokeStyle = this.color;
-    ctx.lineWidth = this.strokeWidth;
-    ctx.lineCap = this.lineCap;
+  /**
+   * Initialize the animation with a canvas element.
+   */
+  async init(canvas: HTMLCanvasElement): Promise<void> {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to get 2D rendering context');
+    }
+    this.ctx = ctx;
+    this._initialized = true;
+  }
+
+  /**
+   * Check if the animation has been initialized.
+   */
+  get initialized(): boolean {
+    return this._initialized;
+  }
+
+  draw(state: TState): void {
+    if (!this.ctx) {
+      console.warn('SubdivideGridAnimation.draw() called before init()');
+      return;
+    }
+
+    this.ctx.strokeStyle = this.color;
+    this.ctx.lineWidth = this.strokeWidth;
+    this.ctx.lineCap = this.lineCap;
 
     // 1. Draw ALL base segments at full length (static, assumed complete)
     for (const segment of this.baseSegments) {
-      this.drawSegment(ctx, segment, 1.0);
+      this.drawSegment(segment, 1.0);
     }
 
     // 2. Draw subdivision segments progressively
@@ -513,29 +576,35 @@ export class SubdivideGridAnimation<TState extends SubdivideGridAnimationState>
     const partialProgress = segmentsToDraw - fullSegments;
 
     for (let i = 0; i < fullSegments && i < totalSegments; i++) {
-      this.drawSegment(ctx, this.subdivisionSegments[i], 1.0);
+      this.drawSegment(this.subdivisionSegments[i], 1.0);
     }
 
     if (fullSegments < totalSegments && partialProgress > 0) {
-      this.drawSegment(ctx, this.subdivisionSegments[fullSegments], partialProgress);
+      this.drawSegment(this.subdivisionSegments[fullSegments], partialProgress);
     }
   }
 
-  private drawSegment(
-    ctx: CanvasRenderingContext2D,
-    segment: GridSegment,
-    progress: number
-  ): void {
+  private drawSegment(segment: GridSegment, progress: number): void {
+    if (!this.ctx) return;
+
     const [x1, y1] = this.toPixel(segment.start);
     const [x2, y2] = this.toPixel(segment.end);
 
     const endX = x1 + (x2 - x1) * progress;
     const endY = y1 + (y2 - y1) * progress;
 
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(endX, endY);
+    this.ctx.stroke();
+  }
+
+  /**
+   * Clean up resources.
+   */
+  destroy(): void {
+    this.ctx = null;
+    this._initialized = false;
   }
 
   static create<TState extends SubdivideGridAnimationState>(
