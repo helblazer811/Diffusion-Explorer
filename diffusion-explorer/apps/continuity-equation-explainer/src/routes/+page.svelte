@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { writable } from "svelte/store";
   import { base } from "$app/paths";
   import { ArticleHeader, Katex } from "@diffusion-explorer/ui";
   import { generateClippedGaussianSamples } from "@diffusion-explorer/diffusion";
@@ -13,21 +14,62 @@
   import DivergenceTheoremSquare from "$lib/figures/DivergenceTheoremSquare/DivergenceTheoremSquare.svelte";
   import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
 
+  // Data for ProbabilityPathIntro figure
+  let probabilityPathSourceSamples = [];
+  let probabilityPathTargetSamples = [];
+  const allTimeSamples = writable([]);
+  const isTraining = writable(false);
+
   // Data for FlowInvertibility figure
   let flowInvertibilityData = null;
 
   // Data for ReverseSampling
   let reverseSamplingData = null;
 
+  /**
+   * Transpose trajectories from [sampleIndex][timeStep][x,y] to [timeStep][sampleIndex][x,y]
+   * This converts from per-sample trajectories to per-timestep samples format
+   */
+  function transposeTrajectories(trajectories) {
+    if (!trajectories || trajectories.length === 0) return [];
+    const numSamples = trajectories.length;
+    const numSteps = trajectories[0].length;
+    const result = [];
+    for (let t = 0; t < numSteps; t++) {
+      const samplesAtT = [];
+      for (let s = 0; s < numSamples; s++) {
+        samplesAtT.push(trajectories[s][t]);
+      }
+      result.push(samplesAtT);
+    }
+    return result;
+  }
+
   onMount(async () => {
     // Generate source distribution (Gaussian)
     const sourceDistribution = generateClippedGaussianSamples(300);
+
+    // Load data for ProbabilityPathIntro
+    try {
+      const trajRes = await fetch(`${base}/flow_invertibility/cached_samples/trajectories.json`);
+      if (trajRes.ok) {
+        const trajData = await trajRes.json();
+        // Use source and target from the trajectory data
+        probabilityPathSourceSamples = trajData.sourceDistribution || [];
+        probabilityPathTargetSamples = trajData.targetDistribution || [];
+        // Transpose trajectories: [sample][time][x,y] -> [time][sample][x,y]
+        const transposed = transposeTrajectories(trajData.allTrajectories);
+        allTimeSamples.set(transposed);
+      }
+    } catch (e) {
+      console.warn("Failed to load ProbabilityPathIntro data:", e);
+    }
 
     // Load target distribution and cached trajectories for FlowInvertibility
     try {
       const [targetRes, trajRes] = await Promise.all([
         fetch(`${base}/flow_invertibility/data/smiley_face.json`),
-        fetch(`${base}/flow_invertibility/cached_samples/forward_trajectories.json`),
+        fetch(`${base}/flow_invertibility/cached_samples/trajectories.json`),
       ]);
 
       if (targetRes.ok && trajRes.ok) {
@@ -35,7 +77,7 @@
         const trajData = await trajRes.json();
 
         flowInvertibilityData = {
-          allTrajectories: trajData.trajectories,
+          allTrajectories: trajData.allTrajectories,
           highlightedIndices: trajData.highlightedIndices || [0, 1],
           sourceDistribution,
           targetDistribution: targetData.points,
@@ -131,11 +173,16 @@
 
   <h3 id="what-is-a-flow">What is a flow?</h3>
 
-  <ProbabilityPathIntro>
+  <ProbabilityPathIntro
+    sourceDistributionSamples={probabilityPathSourceSamples}
+    targetDistributionSamples={probabilityPathTargetSamples}
+    {allTimeSamples}
+    {isTraining}
+    backgroundVisible={false}
+  >
     <strong>The probability path of a flow model.</strong>
     Samples from a simple source distribution <Katex math={"p_0"} /> are transformed along
     trajectories to produce samples from a complex target distribution <Katex math={"p_1 = q"} />.
-    A single trajectory <Katex math={"\\psi_t(x)"} /> is highlighted.
   </ProbabilityPathIntro>
 
   <p>
