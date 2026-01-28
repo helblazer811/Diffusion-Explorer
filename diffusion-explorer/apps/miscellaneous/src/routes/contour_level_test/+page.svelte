@@ -98,7 +98,7 @@
       gpuRenderer = await GPUContourRenderer.create(gpuCanvas, {
         gridSize,
         bandwidth,
-        numLevels,
+        thresholds: numLevels,
         dpr: window.devicePixelRatio,
       });
       gpuCanvas.style.width = `${canvasSize}px`;

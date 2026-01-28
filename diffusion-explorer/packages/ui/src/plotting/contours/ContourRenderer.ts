@@ -23,8 +23,13 @@ export interface ContourRendererOptions {
   gridSize?: number;
   /** Bandwidth for kernel density estimation (default: 20) */
   bandwidth?: number;
-  /** Number of contour levels (default: 10) */
-  numLevels?: number;
+  /**
+   * Threshold specification for contour levels.
+   * - If a number: generates that many uniformly-spaced thresholds
+   * - If an array: uses those exact percentile values (should be in [0, 1])
+   * Default: 10
+   */
+  thresholds?: number | number[];
   /** Opacity for contour fill (default: 1.0) */
   opacity?: number;
   /** Color scale function (default: blue scale) */
@@ -46,7 +51,7 @@ type Backend = GPUContourRenderer | CPUContourRenderer;
  * const renderer = await ContourRenderer.create({
  *   canvas: myCanvas,
  *   bandwidth: 15,
- *   numLevels: 10,
+ *   thresholds: 10,  // or [0.2, 0.4, 0.6, 0.8] for explicit percentiles
  *   opacity: 0.5,
  * });
  *

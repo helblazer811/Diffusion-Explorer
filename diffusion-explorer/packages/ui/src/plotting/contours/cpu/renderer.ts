@@ -8,7 +8,7 @@
 import * as d3 from 'd3';
 import { computeContours, plotContours, type ComputedContours } from './contours';
 import type { ContourDomain, ColorScaleFn } from '../types';
-import { defaultColorScale } from '../types';
+import { defaultColorScale, normalizeThresholds } from '../types';
 
 /**
  * Options for creating a CPU contour renderer.
@@ -16,7 +16,13 @@ import { defaultColorScale } from '../types';
 export interface CPUContourRendererOptions {
   gridSize?: number;
   bandwidth?: number;
-  numLevels?: number;
+  /**
+   * Threshold specification for contour levels.
+   * - If a number: generates that many uniformly-spaced thresholds
+   * - If an array: uses those exact percentile values (should be in [0, 1])
+   * Default: 10
+   */
+  thresholds?: number | number[];
   opacity?: number;
   colorScale?: ColorScaleFn;
 }
@@ -31,7 +37,7 @@ export class CPUContourRenderer {
   private ctx: CanvasRenderingContext2D;
   private gridSize: number;
   private bandwidth: number;
-  private numLevels: number;
+  private thresholds: number[];
   private opacity: number;
   private colorScale: ColorScaleFn;
 
@@ -53,7 +59,7 @@ export class CPUContourRenderer {
     this.ctx = ctx;
     this.gridSize = options.gridSize ?? 100;
     this.bandwidth = options.bandwidth ?? 20;
-    this.numLevels = options.numLevels ?? 10;
+    this.thresholds = normalizeThresholds(options.thresholds).values;
     this.opacity = options.opacity ?? 1.0;
     this.colorScale = options.colorScale ?? defaultColorScale;
   }
@@ -80,7 +86,7 @@ export class CPUContourRenderer {
       this.cachedContours = computeContours(this.points, {
         gridSize: this.gridSize,
         bandwidth: this.bandwidth,
-        thresholds: this.numLevels,
+        thresholds: this.thresholds,
         domain: this.domain
           ? [this.domain.xMin, this.domain.xMax, this.domain.yMin, this.domain.yMax]
           : undefined,
@@ -117,7 +123,7 @@ export class CPUContourRenderer {
       const contours = computeContours(points, {
         gridSize: this.gridSize,
         bandwidth: this.bandwidth,
-        thresholds: this.numLevels,
+        thresholds: this.thresholds,
         domain: domain
           ? [domain.xMin, domain.xMax, domain.yMin, domain.yMax]
           : undefined,

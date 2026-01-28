@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, ContourRenderer, createLinearColorScale, parseContourColor, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, ContourRenderer, createLinearColorScale, parseContourColor, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler, shuffleArray } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -57,9 +57,11 @@
   export let showSourceScatter = true;
   export let showTargetScatter = true;
   export let showIntermediateScatter = true;
+  export let numScatterSamples = 100;
 
   // Contour plot options for P_t
   export let showContours = false;
+  export let contourGridSize = 50;
   export let contourBandwidth = settings.stylingSettings.contour.bandwidth;
   export let contourThresholds = settings.stylingSettings.contour.thresholds;
   export let contourOpacity = settings.stylingSettings.contour.opacity;
@@ -92,6 +94,7 @@
   let scales = null;
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
+  let scatterIndices: number[] = [];
 
   // Animation state type
   type AnimationState = {
@@ -133,17 +136,31 @@
   function precomputeScatterCoords() {
     if (!scales) return;
 
-    sourcePixelCoords = sourceDistributionSamples.map((p) => [
-      scales.sourceCenterPixelX +
-        (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
-      scales.yScale(p[1]),
-    ]);
+    // Use first N samples for source/intermediate (data is already randomized from trajectory generation)
+    const numSamples = Math.min(numScatterSamples, sourceDistributionSamples.length);
+    scatterIndices = Array.from({ length: numSamples }, (_, i) => i);
 
-    targetPixelCoords = targetDistributionSamples.map((p) => [
-      scales.targetCenterPixelX +
-        (p[0] - scales.targetMeanX) * scales.xScaleFactor,
-      scales.yScale(p[1]),
-    ]);
+    sourcePixelCoords = scatterIndices.map((i) => {
+      const p = sourceDistributionSamples[i];
+      return [
+        scales.sourceCenterPixelX +
+          (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
+        scales.yScale(p[1]),
+      ];
+    });
+
+    // Randomly sample from target distribution
+    const targetIndices = Array.from({ length: targetDistributionSamples.length }, (_, i) => i);
+    shuffleArray(targetIndices);
+    const numTargetSamples = Math.min(numScatterSamples, targetDistributionSamples.length);
+    targetPixelCoords = targetIndices.slice(0, numTargetSamples).map((i) => {
+      const p = targetDistributionSamples[i];
+      return [
+        scales.targetCenterPixelX +
+          (p[0] - scales.targetMeanX) * scales.xScaleFactor,
+        scales.yScale(p[1]),
+      ];
+    });
   }
 
   // ----------------------------------------------------------------
@@ -241,9 +258,9 @@
       // Note: opacity is controlled via colorScale alpha, so set renderer opacity to 1.0
       contourRenderer = await ContourRenderer.create({
         canvas: contourCanvas,
-        gridSize: 100,
+        gridSize: contourGridSize,
         bandwidth: contourBandwidth,
-        numLevels: contourThresholds,
+        thresholds: contourThresholds,
         opacity: 1.0,  // Alpha is controlled in colorScale, not here
         colorScale,
         dpr,
@@ -451,10 +468,15 @@
 
         // Draw intermediate scatter
         if (showIntermediateScatter) {
-          const coords = samples.map((p) => [
-            getPixelX(p[0], meanX, t),
-            scales.yScale(p[1]),
-          ]);
+          const coords = scatterIndices
+            .filter(i => i < samples.length)
+            .map((i) => {
+              const p = samples[i];
+              return [
+                getPixelX(p[0], meanX, t),
+                scales.yScale(p[1]),
+              ];
+            });
           drawScatterPlot(
             ctx,
             coords,

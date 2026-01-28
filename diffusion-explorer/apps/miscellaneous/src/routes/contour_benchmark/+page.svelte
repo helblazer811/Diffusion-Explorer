@@ -294,7 +294,7 @@
       gpuRenderer = await GPUContourRenderer.create(gpuCanvas, {
         gridSize,
         bandwidth,
-        numLevels,
+        thresholds: numLevels,
         dpr: window.devicePixelRatio,
         opacity: 0.9,
       });
@@ -329,7 +329,7 @@
 
   // Reactively update GPU renderer options
   $: if (gpuRenderer) {
-    gpuRenderer.updateOptions({ gridSize, bandwidth, numLevels });
+    gpuRenderer.updateOptions({ gridSize, bandwidth, thresholds: numLevels });
   }
 </script>
 

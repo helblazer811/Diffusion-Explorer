@@ -19,14 +19,13 @@ import {
   THRESHOLD_FILL_UNIFORM_SIZE,
 } from './types';
 import type { ContourDomain, ColorScaleFn } from '../types';
-import { defaultColorScale } from '../types';
+import { defaultColorScale, normalizeThresholds } from '../types';
 
 import contoursShaderSource from './contours.wgsl?raw';
 
 // Default options
 const DEFAULT_GRID_SIZE = 100;
 const DEFAULT_BANDWIDTH = 20;
-const DEFAULT_NUM_LEVELS = 10;
 const DEFAULT_OPACITY = 1.0;
 
 /**
@@ -134,7 +133,7 @@ export class GPUContourRenderer {
   private dpr: number;
   private gridSize: number;
   private blurRadius: number;
-  private numLevels: number;
+  private thresholds: number[];
   private colorScale: ColorScaleFn;
   private opacity: number;
 
@@ -194,7 +193,7 @@ export class GPUContourRenderer {
     this.dpr = options.dpr ?? (typeof window !== 'undefined' ? window.devicePixelRatio : 1) ?? 1;
     this.gridSize = options.gridSize ?? DEFAULT_GRID_SIZE;
     this.blurRadius = bandwidthToBlurRadius(options.bandwidth ?? DEFAULT_BANDWIDTH);
-    this.numLevels = options.numLevels ?? DEFAULT_NUM_LEVELS;
+    this.thresholds = normalizeThresholds(options.thresholds).values;
     this.colorScale = options.colorScale ?? defaultColorScale;
     this.opacity = options.opacity ?? DEFAULT_OPACITY;
   }
@@ -397,7 +396,8 @@ export class GPUContourRenderer {
     });
 
     // Create threshold buffer
-    const numLevels = options.numLevels ?? DEFAULT_NUM_LEVELS;
+    const thresholdsArray = normalizeThresholds(options.thresholds).values;
+    const numLevels = thresholdsArray.length;
     const thresholdBuffer = device.createBuffer({
       label: 'Contour Thresholds',
       size: numLevels * 4,
@@ -513,7 +513,7 @@ export class GPUContourRenderer {
     const uniformView = new DataView(uniformData);
     uniformView.setUint32(0, this.gridSize, true);
     uniformView.setUint32(4, this.gridSize, true);
-    uniformView.setUint32(8, this.numLevels, true);
+    uniformView.setUint32(8, this.thresholds.length, true);
     uniformView.setUint32(12, this.numPoints, true);
     uniformView.setFloat32(16, this.domain.xMin, true);
     uniformView.setFloat32(20, this.domain.xMax, true);
@@ -531,11 +531,8 @@ export class GPUContourRenderer {
     this.device.queue.writeBuffer(this.maxValueBuffer!, 0, new Uint32Array([0]));
 
     // Update thresholds
-    const thresholds = new Float32Array(this.numLevels);
-    for (let i = 0; i < this.numLevels; i++) {
-      thresholds[i] = (i + 1) / (this.numLevels + 1);
-    }
-    this.device.queue.writeBuffer(this.thresholdBuffer, 0, thresholds);
+    const thresholdData = new Float32Array(this.thresholds);
+    this.device.queue.writeBuffer(this.thresholdBuffer, 0, thresholdData);
 
     // Create bind groups
     this.binningBindGroup = this.device.createBindGroup({
@@ -747,10 +744,11 @@ export class GPUContourRenderer {
       return;
     }
 
-    // Build color LUT from colorScale function
-    const colorLUTData = new Float32Array(this.numLevels * 4);
-    for (let i = 0; i < this.numLevels; i++) {
-      const t = (i + 1) / (this.numLevels + 1);
+    // Build color LUT from colorScale function (index-based normalization)
+    const numLevels = this.thresholds.length;
+    const colorLUTData = new Float32Array(numLevels * 4);
+    for (let i = 0; i < numLevels; i++) {
+      const t = (i + 0.5) / numLevels;
       const color = this.colorScale(t);
       colorLUTData[i * 4 + 0] = color[0];
       colorLUTData[i * 4 + 1] = color[1];
@@ -766,7 +764,7 @@ export class GPUContourRenderer {
     view.setFloat32(4, this.canvasHeight, true);
     view.setUint32(8, this.gridSize, true);
     view.setUint32(12, this.gridSize, true);
-    view.setUint32(16, this.numLevels, true);
+    view.setUint32(16, numLevels, true);
     view.setFloat32(20, this.opacity, true);
     this.device.queue.writeBuffer(this.thresholdFillUniformBuffer, 0, uniformData);
 
@@ -910,7 +908,7 @@ export class GPUContourRenderer {
       const uniformView = new DataView(uniformData);
       uniformView.setUint32(0, this.gridSize, true);
       uniformView.setUint32(4, this.gridSize, true);
-      uniformView.setUint32(8, this.numLevels, true);
+      uniformView.setUint32(8, this.thresholds.length, true);
       uniformView.setUint32(12, points.length / 2, true);
       uniformView.setFloat32(16, domain.xMin, true);
       uniformView.setFloat32(20, domain.xMax, true);
@@ -1097,10 +1095,12 @@ export class GPUContourRenderer {
     const frameData = this.frameBuffers.get(frameIndex);
     if (!frameData) return;
 
-    // Build color LUT
-    const colorLUTData = new Float32Array(this.numLevels * 4);
-    for (let i = 0; i < this.numLevels; i++) {
-      const t = (i + 1) / (this.numLevels + 1);
+    const numLevels = this.thresholds.length;
+
+    // Build color LUT (index-based normalization)
+    const colorLUTData = new Float32Array(numLevels * 4);
+    for (let i = 0; i < numLevels; i++) {
+      const t = (i + 0.5) / numLevels;
       const color = this.colorScale(t);
       colorLUTData[i * 4 + 0] = color[0];
       colorLUTData[i * 4 + 1] = color[1];
@@ -1110,11 +1110,8 @@ export class GPUContourRenderer {
     this.device.queue.writeBuffer(this.colorLUTBuffer, 0, colorLUTData);
 
     // Update thresholds
-    const thresholds = new Float32Array(this.numLevels);
-    for (let i = 0; i < this.numLevels; i++) {
-      thresholds[i] = (i + 1) / (this.numLevels + 1);
-    }
-    this.device.queue.writeBuffer(this.thresholdBuffer, 0, thresholds);
+    const thresholdData = new Float32Array(this.thresholds);
+    this.device.queue.writeBuffer(this.thresholdBuffer, 0, thresholdData);
 
     // Update threshold fill uniforms
     const uniformData = new ArrayBuffer(THRESHOLD_FILL_UNIFORM_SIZE);
@@ -1123,7 +1120,7 @@ export class GPUContourRenderer {
     view.setFloat32(4, this.canvasHeight, true);
     view.setUint32(8, this.gridSize, true);
     view.setUint32(12, this.gridSize, true);
-    view.setUint32(16, this.numLevels, true);
+    view.setUint32(16, numLevels, true);
     view.setFloat32(20, this.opacity, true);
     this.device.queue.writeBuffer(this.thresholdFillUniformBuffer, 0, uniformData);
 
@@ -1196,26 +1193,30 @@ export class GPUContourRenderer {
         this.isDataDirty = true;
       }
     }
-    if (options.numLevels !== undefined && options.numLevels !== this.numLevels) {
-      this.numLevels = options.numLevels;
+    if (options.thresholds !== undefined) {
+      const newThresholds = normalizeThresholds(options.thresholds).values;
+      const sizeChanged = newThresholds.length !== this.thresholds.length;
+      this.thresholds = newThresholds;
 
-      // Recreate threshold and color LUT buffers
-      this.thresholdBuffer.destroy();
-      this.colorLUTBuffer.destroy();
+      if (sizeChanged) {
+        // Recreate threshold and color LUT buffers
+        this.thresholdBuffer.destroy();
+        this.colorLUTBuffer.destroy();
 
-      this.thresholdBuffer = this.device.createBuffer({
-        label: 'Contour Thresholds',
-        size: this.numLevels * 4,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
+        this.thresholdBuffer = this.device.createBuffer({
+          label: 'Contour Thresholds',
+          size: this.thresholds.length * 4,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
 
-      this.colorLUTBuffer = this.device.createBuffer({
-        label: 'Contour Color LUT',
-        size: this.numLevels * 4 * 4,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
+        this.colorLUTBuffer = this.device.createBuffer({
+          label: 'Contour Color LUT',
+          size: this.thresholds.length * 4 * 4,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
 
-      this.isDataDirty = true;
+        this.isDataDirty = true;
+      }
     }
     if (options.colorScale !== undefined) {
       this.colorScale = options.colorScale;

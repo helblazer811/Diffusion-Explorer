@@ -29,7 +29,7 @@ export const settings = {
       color: '#3b82f6',
       yShiftFactor: -0.5,
       scaleFactor: 0.8,
-      clippingRadius: 2.0
+      clippingRadius: 1.8
     },
     // Figure LaTeX styling
     figureLatex: {
@@ -58,7 +58,7 @@ export const settings = {
     // Contour plot styling
     contour: {
       bandwidth: 30,
-      thresholds: 3,
+      thresholds: [0.4, 0.6, 0.8] as number | number[],
       opacity: 0.3,
       fillColor: '#f17720',
       blendMode: undefined as string | undefined
