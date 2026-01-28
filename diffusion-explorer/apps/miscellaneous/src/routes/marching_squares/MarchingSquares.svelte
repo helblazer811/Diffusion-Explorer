@@ -7,16 +7,16 @@
     getCaseCornerStates,
     getCaseIndex,
     type Point,
-  } from '../marching-squares';
-  import { loadVolcanoData, evaluateHeightmap } from '../topography-data';
+  } from './marching-squares';
+  import { loadVolcanoData, evaluateHeightmap } from './topography-data';
   import {
     computeContourCells,
     traceContourLines,
     drawContourLines,
     chainSegments,
     type EdgeSegment,
-  } from '../contour-outlining';
-  import { IncrementalComponentTracker, type CellInfo } from '../union-find-components';
+  } from './contour-outlining';
+  import { IncrementalComponentTracker, type CellInfo } from './union-find-components';
 
   // ================================================================
   // Props - Component interface

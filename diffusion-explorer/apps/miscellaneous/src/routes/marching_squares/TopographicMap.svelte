@@ -2,16 +2,16 @@
   import { onMount, onDestroy } from 'svelte';
   import { Figure, useCanvas2D, Timeline, type Clip } from '@diffusion-explorer/ui';
   import * as d3 from 'd3';
-  import { loadVolcanoData } from '../topography-data';
+  import { loadVolcanoData } from './topography-data';
   import {
     computeContourCells,
     traceContourLines,
     drawContourLines,
     chainSegments,
     type Point,
-  } from '../contour-outlining';
-  import { getAllCasePolygons, getCaseIndex } from '../marching-squares';
-  import { IncrementalComponentTracker, type CellInfo } from '../union-find-components';
+  } from './contour-outlining';
+  import { getAllCasePolygons, getCaseIndex } from './marching-squares';
+  import { IncrementalComponentTracker, type CellInfo } from './union-find-components';
 
   // ================================================================
   // Props

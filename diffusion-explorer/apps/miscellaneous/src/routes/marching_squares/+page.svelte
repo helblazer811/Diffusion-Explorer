@@ -1,11 +1,11 @@
 <script lang="ts">
-  import MarchingSquares from '$lib/figures/MarchingSquares.svelte';
-  import ContourPlot from '$lib/figures/ContourPlot.svelte';
+  import MarchingSquares from './MarchingSquares.svelte';
+  import TopographicMap from './TopographicMap.svelte';
 </script>
 
 <div class="page">
   <MarchingSquares />
-  <ContourPlot />
+  <TopographicMap />
 </div>
 
 <style>
