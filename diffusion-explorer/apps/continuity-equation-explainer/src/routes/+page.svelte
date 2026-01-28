@@ -7,7 +7,7 @@
   import { settings } from "$lib/settings";
 
   // Figure imports
-  import CrownJewel from "$lib/figures/CrownJewel.svelte";
+  import { CrownJewel } from "$lib/figures/CrownJewel";
   import ProbabilityPathIntro from "$lib/figures/ProbabilityPathIntro.svelte";
   import FlowInvertibility from "$lib/figures/FlowInvertibility.svelte";
   import InvertibilityExplanation from "$lib/figures/InvertibilityExplanation.svelte";
@@ -614,50 +614,48 @@
 
 <hr class="section-divider" />
 
-<!-- Acknowledgements Section -->
-<section id="acknowledgements">
-  <h2 id="acknowledgements-heading" class="section-heading">Acknowledgements</h2>
-  <p>
-  </p>
-</section>
+<div class="article-footer">
+  <!-- Acknowledgements Section -->
+  <section id="acknowledgements">
+    <h2 id="acknowledgements-heading" class="section-heading">Acknowledgements</h2>
+    <p>
+    </p>
+  </section>
 
-<hr class="section-divider" />
+  <!-- References Section -->
+  <section id="references">
+    <h2 id="references-heading" class="section-heading">References</h2>
+    <ol>
+      <li>
+        Lipman, Y., Chen, R. T., Ben-Hamu, H., Nickel, M., & Le, M. (2022). Flow matching for
+        generative modeling. <em>arXiv preprint arXiv:2210.02747</em>.
+      </li>
+      <li>
+        Chen, R. T., Rubanova, Y., Bettencourt, J., & Duvenaud, D. K. (2018). Neural ordinary
+        differential equations. <em>Advances in neural information processing systems</em>, 31.
+      </li>
+      <li>
+        Rezende, D., & Mohamed, S. (2015). Variational inference with normalizing flows.
+        <em>International conference on machine learning</em>.
+      </li>
+      <li>
+        Liu, X., Gong, C., & Liu, Q. (2022). Flow straight and fast: Learning to generate and transfer
+        data with rectified flow. <em>arXiv preprint arXiv:2209.03003</em>.
+      </li>
+    </ol>
+  </section>
 
-<!-- References Section -->
-<section id="references" class="references">
-  <h2 id="references-heading" class="section-heading">References</h2>
-  <ol>
-    <li>
-      Lipman, Y., Chen, R. T., Ben-Hamu, H., Nickel, M., & Le, M. (2022). Flow matching for
-      generative modeling. <em>arXiv preprint arXiv:2210.02747</em>.
-    </li>
-    <li>
-      Chen, R. T., Rubanova, Y., Bettencourt, J., & Duvenaud, D. K. (2018). Neural ordinary
-      differential equations. <em>Advances in neural information processing systems</em>, 31.
-    </li>
-    <li>
-      Rezende, D., & Mohamed, S. (2015). Variational inference with normalizing flows.
-      <em>International conference on machine learning</em>.
-    </li>
-    <li>
-      Liu, X., Gong, C., & Liu, Q. (2022). Flow straight and fast: Learning to generate and transfer
-      data with rectified flow. <em>arXiv preprint arXiv:2209.03003</em>.
-    </li>
-  </ol>
-</section>
-
-<hr class="section-divider" />
-
-<!-- How to Cite Section -->
-<section id="cite">
-  <h2 id="cite-heading" class="section-heading">How to Cite</h2>
-  <div class="cite-section">
-    <p>If you found this explainer helpful, please consider citing it:</p>
-    <pre><code>@article{"{"}helbling2025continuityequation,
+  <!-- How to Cite Section -->
+  <section id="cite">
+    <h2 id="cite-heading" class="section-heading">How to Cite</h2>
+    <div class="cite-section">
+      <p>If you found this explainer helpful, please consider citing it:</p>
+      <pre><code>@article{"{"}helbling2025continuityequation,
   title = {"{"}Flow Models: A Visual Introduction to the Continuity Equation and Exact Likelihood Evaluation{"}"},
   author = {"{"}Helbling, Alec{"}"},
   year = {"{"}2025{"}"},
   url = {"{"}https://alechelbling.com/continuity-equation{"}"}
 {"}"}</code></pre>
-  </div>
-</section>
+    </div>
+  </section>
+</div>
