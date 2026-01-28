@@ -1,4 +1,5 @@
 <!-- Mass Conservation visualization with volume (left) and surface normals (right) side by side. -->
+<!-- Uses GPU-accelerated WebGPU streamline rendering on the right canvas. -->
 
 <script lang="ts">
   import { tick, onDestroy } from "svelte";
@@ -55,13 +56,11 @@
   // Streamline settings
   export let density: number | [number, number] = 0.8;
   export let minPathLength = 1.5;
-  export let segmentLength = 0.01;
   export let streamlineColor = "#3b82f6"; // Blue
   export let streamlineWidth = 2.5;
-  export let gradientSubdivisions = 12;
   export let pulseWidthPixels = 30;
   export let pulsePauseWidthPixels = 5;
-  export let streamlineDuration = 8;
+  export let streamlineDuration = 4;
   export let playingByDefault = true;
 
   // Left canvas styling (Volume)
@@ -147,7 +146,8 @@
   let leftCanvas: HTMLCanvasElement | null = null;
   const leftCanvas2d = useCanvas2D(width, height);
 
-  // Right canvas
+  // Right side: GPU canvas for streamlines (behind) + 2D canvas for overlays (front)
+  let gpuCanvas: HTMLCanvasElement | null = null;
   let rightCanvas: HTMLCanvasElement | null = null;
   const rightCanvas2d = useCanvas2D(width, height);
 
@@ -311,8 +311,9 @@
     // Create toPixel function bound to current canvas dimensions
     const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
 
-    // Create streamline animation (for right side only)
+    // Create streamline animation with GPU backend (for right side only)
     streamlineAnim = StreamlineAnimation.create<StreamlineAnimationState>({
+      backend: 'gpu',
       vectorFieldFn: vectorField as VectorFieldFn,
       domain: {
         xMin: boundingBox.xMin - domainMargin,
@@ -323,10 +324,8 @@
       toPixel: toPixelBound,
       density,
       minPathLength,
-      segmentLength,
       color: streamlineColor,
       strokeWidth: streamlineWidth,
-      gradientSubdivisions,
       pulseWidthPixels,
       pulsePauseWidthPixels,
       offsets: "synchronized",
@@ -501,13 +500,16 @@
 
     const { theta } = state;
 
+    // 1. Render streamlines to GPU canvas (behind)
+    if (streamlineAnim.initialized) {
+      streamlineAnim.render(state, [0, 0, 0, 0]);
+    }
+
+    // 2. Clear 2D overlay canvas and draw surface/vectors on top
     ctx.clearRect(0, 0, cWidth, cHeight);
 
     // Create toPixel function bound to current canvas dimensions
     const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
-
-    // Draw streamlines first (behind)
-    streamlineAnim.draw(ctx, state);
 
     // Draw surface outline on top
     drawClosedCurve(ctx, curve, toPixelBound, {
@@ -629,6 +631,7 @@
 
   onDestroy(() => {
     if (timeline) timeline.pause();
+    if (streamlineAnim) streamlineAnim.destroy();
   });
 
   // ----------------------------------------------------------------
@@ -654,15 +657,24 @@
   });
 
   // Initialize and draw when canvases are ready
-  $: if (!isInitialized && leftCanvas && rightCanvas && curveFn && vectorFieldFn) {
+  $: if (!isInitialized && leftCanvas && rightCanvas && gpuCanvas && curveFn && vectorFieldFn) {
     runInitialComputation(curveFn, vectorFieldFn, canvasWidth, canvasHeight);
     setupTimeline(curveFn, vectorFieldFn, canvasWidth, canvasHeight);
     isInitialized = true;
     // Use tick() to ensure the canvas actions have run, then resize and draw
-    tick().then(() => {
+    tick().then(async () => {
       // Resize canvases with correct dimensions
       leftCanvas2d.resize(canvasWidth, canvasHeight);
       rightCanvas2d.resize(canvasWidth, canvasHeight);
+
+      // Initialize GPU renderer for streamlines
+      if (streamlineAnim && gpuCanvas) {
+        const dpr = window.devicePixelRatio || 1;
+        gpuCanvas.width = canvasWidth * dpr;
+        gpuCanvas.height = canvasHeight * dpr;
+        await streamlineAnim.init(gpuCanvas);
+      }
+
       if (timeline) {
         drawLeft(timeline.initialState, canvasWidth, canvasHeight, curveFn);
         drawRight(timeline.initialState, canvasWidth, canvasHeight, curveFn, vectorFieldFn);
@@ -707,11 +719,21 @@
   {/snippet}
 
   {#snippet right()}
-    <canvas
-      bind:this={rightCanvas}
-      use:rightCanvas2d.bindCanvas
-      style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
-    ></canvas>
+    <div class="right-canvas-container" style="width: 100%; aspect-ratio: {canvasWidth}/{canvasHeight};">
+      <!-- GPU canvas for streamlines (behind) -->
+      <canvas
+        bind:this={gpuCanvas}
+        class="gpu-canvas"
+        style="width: 100%; height: 100%;"
+      ></canvas>
+      <!-- 2D canvas for overlays (on top) -->
+      <canvas
+        bind:this={rightCanvas}
+        use:rightCanvas2d.bindCanvas
+        class="overlay-canvas"
+        style="width: 100%; height: 100%;"
+      ></canvas>
+    </div>
   {/snippet}
 
   {#snippet caption()}
@@ -766,5 +788,21 @@
   /* Remove top margin from DoubleFigure */
   .mass-conservation-equation + :global(.double-figure) {
     margin-top: 0;
+  }
+
+  /* Dual-canvas layering for right side (GPU streamlines + 2D overlays) */
+  .right-canvas-container {
+    position: relative;
+  }
+
+  .gpu-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .overlay-canvas {
+    position: relative;
+    z-index: 1;
   }
 </style>
