@@ -129,6 +129,10 @@ export class DivergenceArrowAnimation<
   private readonly padding: number;
   private readonly initialLengthFraction: number;
 
+  // Context storage
+  private ctx: CanvasRenderingContext2D | null = null;
+  private _initialized = false;
+
   private constructor(options: DivergenceArrowAnimationOptions) {
     const {
       curveFn,
@@ -169,30 +173,52 @@ export class DivergenceArrowAnimation<
   }
 
   /**
+   * Initialize the animation with a canvas element.
+   */
+  async init(canvas: HTMLCanvasElement): Promise<void> {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to get 2D rendering context');
+    }
+    this.ctx = ctx;
+    this._initialized = true;
+  }
+
+  /**
+   * Check if the animation has been initialized.
+   */
+  get initialized(): boolean {
+    return this._initialized;
+  }
+
+  /**
    * Draw the divergence arrows at the current animation state.
    */
-  draw(ctx: CanvasRenderingContext2D, state: TState): void {
+  draw(state: TState): void {
+    if (!this.ctx) {
+      console.warn('DivergenceArrowAnimation.draw() called before init()');
+      return;
+    }
+
     const progress = state.arrowProgress;
     if (progress <= 0) return;
 
-    ctx.strokeStyle = this.color;
-    ctx.fillStyle = this.color;
-    ctx.lineWidth = this.strokeWidth;
-    ctx.lineCap = 'round';
+    this.ctx.strokeStyle = this.color;
+    this.ctx.fillStyle = this.color;
+    this.ctx.lineWidth = this.strokeWidth;
+    this.ctx.lineCap = 'round';
 
     for (const cell of this.cells) {
-      this.drawCellArrows(ctx, cell, progress);
+      this.drawCellArrows(cell, progress);
     }
   }
 
   /**
    * Draw 4 arrows from cell center, scaled by progress.
    */
-  private drawCellArrows(
-    ctx: CanvasRenderingContext2D,
-    cell: GridCell,
-    progress: number
-  ): void {
+  private drawCellArrows(cell: GridCell, progress: number): void {
+    if (!this.ctx) return;
+
     const [cx, cy] = this.toPixel(cell.center);
 
     // Arrow length (from center to near edge, with padding)
@@ -217,8 +243,16 @@ export class DivergenceArrowAnimation<
     for (const { dx, dy, len } of directions) {
       const endX = cx + dx * len;
       const endY = cy + dy * len;
-      drawArrow(ctx, cx, cy, endX, endY, this.headRadius);
+      drawArrow(this.ctx, cx, cy, endX, endY, this.headRadius);
     }
+  }
+
+  /**
+   * Clean up resources.
+   */
+  destroy(): void {
+    this.ctx = null;
+    this._initialized = false;
   }
 
   /**

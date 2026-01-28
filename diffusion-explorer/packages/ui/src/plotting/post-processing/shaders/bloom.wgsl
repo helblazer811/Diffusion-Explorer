@@ -82,7 +82,10 @@ struct ThresholdUniforms {
 @fragment
 fn fs_threshold(input: VertexOutput) -> @location(0) vec4<f32> {
   let color = textureSample(sourceTexture, sourceSampler, input.uv);
-  let lum = luminance(color.rgb);
+
+  // Factor in alpha - only opaque bright pixels should bloom
+  // This prevents semi-transparent pixels from creating gray halos
+  let lum = luminance(color.rgb) * color.a;
 
   // Soft threshold with knee
   let threshold = thresholdUniforms.threshold;
@@ -90,11 +93,9 @@ fn fs_threshold(input: VertexOutput) -> @location(0) vec4<f32> {
   let soft = lum - threshold + knee;
   let contribution = clamp(soft / (2.0 * knee + 0.00001), 0.0, 1.0);
 
-  // Linear blend based on luminance
-  let brightness = max(lum - threshold, 0.0) * contribution;
-
-  // Return color scaled by brightness contribution
-  return vec4<f32>(color.rgb * brightness, color.a * brightness);
+  // Use contribution as a mask - preserve original color saturation
+  // This keeps the bloom the same hue as the source
+  return vec4<f32>(color.rgb * contribution, color.a * contribution);
 }
 
 // ============================================================================
@@ -133,14 +134,16 @@ const BLUR_WEIGHTS = array<f32, 5>(
  */
 @fragment
 fn fs_blur(input: VertexOutput) -> @location(0) vec4<f32> {
-  let texelOffset = blurUniforms.texelSize * blurUniforms.direction * blurUniforms.radius;
+  // Divide radius by 4 to get proper sample spacing for smooth blur
+  // Without this, samples are too far apart causing banding artifacts
+  let baseOffset = blurUniforms.texelSize * blurUniforms.direction * (blurUniforms.radius / 4.0);
 
   // Center sample
   var result = textureSample(sourceTexture, sourceSampler, input.uv) * BLUR_WEIGHTS[0];
 
   // Symmetric samples
   for (var i = 1u; i < 5u; i++) {
-    let offset = texelOffset * f32(i);
+    let offset = baseOffset * f32(i);
     let weight = BLUR_WEIGHTS[i];
 
     result += textureSample(sourceTexture, sourceSampler, input.uv + offset) * weight;

@@ -502,7 +502,7 @@
     const style: TrajectoryStyleOptions = {
       strokeWidth: 3,
       color: "#FF6400",
-      progressOpacity: 1.0,
+      opacity: 1.0,
       pointRadius: 5,
       showPreview: !isStreaming && timeIndex < trajectory.length - 1,
       previewOpacity: 0.3,
@@ -514,7 +514,7 @@
       },
     };
 
-    drawTrajectories(ctx, [pixelTrajectory], segmentIndex, style);
+    drawTrajectories(fgCanvas2d.canvas, [pixelTrajectory], segmentIndex, style);
   }
 
   // ----------------------------------------------------------------

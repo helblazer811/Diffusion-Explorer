@@ -207,7 +207,7 @@
   // Setup
   // ----------------------------------------------------------------
 
-  function runInitialComputation() {
+  async function runInitialComputation() {
     if (!canvas) return;
 
     const numSegments = 300;
@@ -235,6 +235,9 @@
       offsets: "random",
       loopMultiplier: 2,
     });
+
+    // Initialize the animation with the canvas
+    await streamlineAnim.init(canvas);
   }
 
   function setupTimeline() {
@@ -404,7 +407,7 @@
     // --- Static Background ---
 
     // Draw streamlines (pulsing vector field)
-    streamlineAnim.draw(ctx, state);
+    streamlineAnim.draw(state);
 
     // Lighten the streamlines a bit
     ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
@@ -443,11 +446,12 @@
 
   // Initialize when canvas is ready
   $: if (!isInitialized && canvas) {
-    runInitialComputation();
-    setupTimeline();
-    isInitialized = true;
-    draw(timeline!.initialState);
-    if (playingByDefault) startAnimation();
+    isInitialized = true; // Set early to prevent re-entry
+    runInitialComputation().then(() => {
+      setupTimeline();
+      draw(timeline!.initialState);
+      if (playingByDefault) startAnimation();
+    });
   }
 
   // Handle visibility changes

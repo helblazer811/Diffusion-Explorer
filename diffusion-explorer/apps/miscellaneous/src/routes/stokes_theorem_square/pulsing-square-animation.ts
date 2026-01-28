@@ -5,7 +5,7 @@
  * similar to the streamline animation approach.
  */
 
-import type { Clip } from "@diffusion-explorer/ui";
+import type { Animation, Clip } from "@diffusion-explorer/ui";
 
 // ===== Types =====
 
@@ -194,17 +194,18 @@ function computeAlphas(
  *   x: 200,
  *   y: 200,
  *   width: 100,
- *   cornerRadius: 8,
  *   clockwise: true,
  *   color: '#3b82f6',
  * });
  *
+ * await anim.init(canvas);
  * timeline.add(anim.clip, { start: 0, end: 1 });
  *
  * // In draw function:
- * anim.draw(ctx, state);
+ * anim.draw(state);
  */
-export class PulsingSquareAnimation<TState extends PulsingSquareState> {
+export class PulsingSquareAnimation<TState extends PulsingSquareState>
+  implements Animation<TState> {
   readonly clip: Clip<TState>;
 
   // Style options
@@ -217,6 +218,10 @@ export class PulsingSquareAnimation<TState extends PulsingSquareState> {
   private readonly data: PulsingSquareData;
   private readonly alphaLUT: Float32Array;
   private readonly alphaBuffer: Float32Array;
+
+  // Context storage
+  private ctx: CanvasRenderingContext2D | null = null;
+  private _initialized = false;
 
   private constructor(options: PulsingSquareOptions) {
     const {
@@ -273,9 +278,33 @@ export class PulsingSquareAnimation<TState extends PulsingSquareState> {
   }
 
   /**
+   * Initialize the animation with a canvas element.
+   */
+  async init(canvas: HTMLCanvasElement): Promise<void> {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to get 2D rendering context');
+    }
+    this.ctx = ctx;
+    this._initialized = true;
+  }
+
+  /**
+   * Check if the animation has been initialized.
+   */
+  get initialized(): boolean {
+    return this._initialized;
+  }
+
+  /**
    * Draw the pulsing square at the current animation state.
    */
-  draw(ctx: CanvasRenderingContext2D, state: TState): void {
+  draw(state: TState): void {
+    if (!this.ctx) {
+      console.warn('PulsingSquareAnimation.draw() called before init()');
+      return;
+    }
+
     const { pathPoints, patternIndices } = this.data;
     if (pathPoints.length < 2) return;
 
@@ -286,9 +315,9 @@ export class PulsingSquareAnimation<TState extends PulsingSquareState> {
     computeAlphas(patternIndices, this.alphaLUT, phase, this.alphaBuffer);
 
     // Draw path segments with varying alpha
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = this.strokeWidth;
+    this.ctx.lineCap = "round";
+    this.ctx.lineJoin = "round";
+    this.ctx.lineWidth = this.strokeWidth;
 
     for (let i = 0; i < pathPoints.length - 1; i++) {
       const alpha = this.alphaBuffer[i];
@@ -297,15 +326,23 @@ export class PulsingSquareAnimation<TState extends PulsingSquareState> {
       const [x1, y1] = pathPoints[i];
       const [x2, y2] = pathPoints[i + 1];
 
-      ctx.strokeStyle = this.color;
-      ctx.globalAlpha = alpha;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
+      this.ctx.strokeStyle = this.color;
+      this.ctx.globalAlpha = alpha;
+      this.ctx.beginPath();
+      this.ctx.moveTo(x1, y1);
+      this.ctx.lineTo(x2, y2);
+      this.ctx.stroke();
     }
 
-    ctx.globalAlpha = 1;
+    this.ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Clean up resources.
+   */
+  destroy(): void {
+    this.ctx = null;
+    this._initialized = false;
   }
 
   /**

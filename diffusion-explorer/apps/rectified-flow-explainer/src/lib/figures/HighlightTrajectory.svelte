@@ -215,7 +215,7 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline() {
+  async function setupTimeline() {
     // Cache numTimesteps for clip closure
     cachedNumTimesteps = allTimeSamples?.length || 1;
 
@@ -227,10 +227,13 @@
           color: settings.stylingSettings.trajectory.color,
           strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
           pointRadius: settings.stylingSettings.trajectory.endpointRadius,
-          progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+          opacity: settings.stylingSettings.trajectory.opacity,
         }
       }
     );
+
+    // Initialize with canvas
+    await pathlineAnimation.init(canvas);
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
@@ -306,7 +309,7 @@
     // --- Dynamic Foreground ---
     // Draw the single trajectory (if exists)
     if (pathlineAnimation) {
-      pathlineAnimation.draw(ctx, state);
+      pathlineAnimation.draw(state);
     }
 
     // Draw in-progress clicked trajectory
@@ -322,7 +325,7 @@
         ctx.lineWidth = settings.stylingSettings.trajectory.strokeWidth;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.globalAlpha = settings.stylingSettings.trajectory.progressOpacity;
+        ctx.globalAlpha = settings.stylingSettings.trajectory.opacity;
 
         ctx.beginPath();
         ctx.moveTo(clickedTrajectory[0][0], clickedTrajectory[0][1]);
@@ -472,7 +475,7 @@
         clickedTrajectory = [...clickedTrajectory, [pixelX, pixelY]];
       }
     );
-    result.promise.then(() => {
+    result.promise.then(async () => {
       if (clickedTrajectory && clickedTrajectory.length > 1) {
         // Replace with user's trajectory
         transformedTrajectories = [clickedTrajectory];
@@ -484,10 +487,11 @@
               color: settings.stylingSettings.trajectory.color,
               strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
               pointRadius: settings.stylingSettings.trajectory.endpointRadius,
-              progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+              opacity: settings.stylingSettings.trajectory.opacity,
             }
           }
         );
+        await pathlineAnimation.init(canvas);
       }
       clickedTrajectory = null;
       isStreamingTrajectory = false;
@@ -516,10 +520,11 @@
     !initialized
   ) {
     runInitialComputation();
-    setupTimeline();
-    initialized = true;
-    draw(timeline!.initialState);
-    if (playingByDefault) startAnimation();
+    setupTimeline().then(() => {
+      initialized = true;
+      draw(timeline!.initialState);
+      if (playingByDefault) startAnimation();
+    });
   }
 
   // Handle visibility changes (separate from initialization)

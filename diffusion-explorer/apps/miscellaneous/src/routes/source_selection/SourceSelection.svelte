@@ -368,7 +368,7 @@
       const style: TrajectoryStyleOptions = {
         color: trajectoryColor,
         strokeWidth: trajectoryStrokeWidth,
-        progressOpacity: trajectoryOpacity,
+        opacity: trajectoryOpacity,
         pointRadius: trajectoryEndpointRadius,
         showPreview: false
       };

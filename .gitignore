@@ -2,6 +2,7 @@
 .DS_Store
 node_modules/
 .svelte-kit/
+build/
 After\ Effects/
 other-visualizations/visualizations/logo/LogoVideoFrames
 other-visualizations/visualizations/ddpm_vs_ddim/plots/*.png

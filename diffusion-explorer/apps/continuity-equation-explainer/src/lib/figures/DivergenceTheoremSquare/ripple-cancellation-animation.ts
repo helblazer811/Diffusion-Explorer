@@ -79,6 +79,10 @@ export class RippleCancellationAnimation<TState extends RippleCancellationState>
   private readonly padding: number;
   private readonly wavefrontWidth: number;
 
+  // Context storage
+  private ctx: CanvasRenderingContext2D | null = null;
+  private _initialized = false;
+
   private constructor(options: RippleCancellationOptions) {
     const {
       curveFn,
@@ -125,6 +129,25 @@ export class RippleCancellationAnimation<TState extends RippleCancellationState>
         return { leftRippleProgress: t } as Partial<TState>;
       },
     };
+  }
+
+  /**
+   * Initialize the animation with a canvas element.
+   */
+  async init(canvas: HTMLCanvasElement): Promise<void> {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to get 2D rendering context');
+    }
+    this.ctx = ctx;
+    this._initialized = true;
+  }
+
+  /**
+   * Check if the animation has been initialized.
+   */
+  get initialized(): boolean {
+    return this._initialized;
   }
 
   /**
@@ -241,7 +264,12 @@ export class RippleCancellationAnimation<TState extends RippleCancellationState>
   /**
    * Draw cell arrows with opacity based on wavefront position.
    */
-  draw(ctx: CanvasRenderingContext2D, state: TState): void {
+  draw(state: TState): void {
+    if (!this.ctx) {
+      console.warn('RippleCancellationAnimation.draw() called before init()');
+      return;
+    }
+
     const { leftRippleProgress } = state;
 
     if (this.cells.length === 0) return;
@@ -250,11 +278,11 @@ export class RippleCancellationAnimation<TState extends RippleCancellationState>
     // When progress = 1, wavefront should have passed all cells
     const wavefrontDistance = leftRippleProgress * (this.maxDistance + this.wavefrontWidth + 1);
 
-    ctx.save();
-    ctx.strokeStyle = this.color;
-    ctx.fillStyle = this.color;
-    ctx.lineWidth = this.strokeWidth;
-    ctx.lineCap = 'round';
+    this.ctx.save();
+    this.ctx.strokeStyle = this.color;
+    this.ctx.fillStyle = this.color;
+    this.ctx.lineWidth = this.strokeWidth;
+    this.ctx.lineCap = 'round';
 
     for (const cell of this.cells) {
       // Calculate how far behind the wavefront this cell is
@@ -274,18 +302,20 @@ export class RippleCancellationAnimation<TState extends RippleCancellationState>
       }
 
       if (opacity > 0) {
-        ctx.globalAlpha = opacity;
-        this.drawCellArrows(ctx, cell);
+        this.ctx.globalAlpha = opacity;
+        this.drawCellArrows(cell);
       }
     }
 
-    ctx.restore();
+    this.ctx.restore();
   }
 
   /**
    * Draw 4 arrows from cell center.
    */
-  private drawCellArrows(ctx: CanvasRenderingContext2D, cell: GridCell): void {
+  private drawCellArrows(cell: GridCell): void {
+    if (!this.ctx) return;
+
     const [cx, cy] = this.toPixel(cell.center);
 
     const maxArrowLenX = this.scaleLength((cell.cellWidth / 2) * (1 - this.padding));
@@ -302,8 +332,16 @@ export class RippleCancellationAnimation<TState extends RippleCancellationState>
     for (const { dx, dy, len } of directions) {
       const endX = cx + dx * len;
       const endY = cy + dy * len;
-      drawArrow(ctx, cx, cy, endX, endY, this.headRadius);
+      drawArrow(this.ctx, cx, cy, endX, endY, this.headRadius);
     }
+  }
+
+  /**
+   * Clean up resources.
+   */
+  destroy(): void {
+    this.ctx = null;
+    this._initialized = false;
   }
 
   /**

@@ -18,6 +18,15 @@ const trainingObjectiveToModelClass: Record<string, typeof FlowModel> = {
 // ===== Request tracking for cancellation =====
 const activeRequests = new Map<string, { cancelled: boolean }>();
 
+// ===== Logging control =====
+let verbose = false;
+
+function log(...args: any[]) {
+  if (verbose) {
+    console.log('[FlowModel Worker]', ...args);
+  }
+}
+
 // Global unhandled rejection handler
 self.addEventListener('unhandledrejection', (event) => {
   console.error('[FlowModel Worker] Unhandled promise rejection:', event.reason);
@@ -170,7 +179,7 @@ async function handleSamplingRequest(
 
   // Check if cancelled or null result
   if (shouldStop() || allSamples === null) {
-    console.log('[FlowModel Worker] Request cancelled:', requestId);
+    log('Request cancelled:', requestId);
     self.postMessage({ requestId, type: 'cancelled' });
     return;
   }
@@ -189,7 +198,7 @@ async function handleSamplingRequest(
     resultMessage.guidance = guidanceData;
   }
 
-  console.log('[FlowModel Worker] Sending result:', { requestId, type: 'result', timestamp: Date.now() });
+  log('Sending result:', { requestId, type: 'result', timestamp: Date.now() });
   self.postMessage(resultMessage);
 }
 
@@ -248,7 +257,7 @@ async function handleTrainRequest(requestId: string, data: any) {
   }
 
   const modelSaveName = await saveModel(ourModel.model, trainingObjective);
-  console.log('[FlowModel Worker] Training complete:', { requestId, timestamp: Date.now() });
+  log('Training complete:', { requestId, timestamp: Date.now() });
   self.postMessage({
     requestId,
     type: "result",
@@ -322,7 +331,7 @@ async function handleRectifiedTrainRequest(requestId: string, data: any) {
   }
 
   const modelSaveName = await saveModel(ourModel.model, trainingObjective);
-  console.log('[FlowModel Worker] Rectified training complete:', { requestId, timestamp: Date.now() });
+  log('Rectified training complete:', { requestId, timestamp: Date.now() });
   self.postMessage({
     requestId,
     type: "result",
@@ -336,13 +345,20 @@ async function handleRectifiedTrainRequest(requestId: string, data: any) {
 self.onmessage = async (e) => {
   const { requestId, type, data } = e.data;
 
+  // Handle verbose toggle
+  if (type === "set_verbose") {
+    verbose = !!data?.verbose;
+    log('Verbose logging:', verbose ? 'enabled' : 'disabled');
+    return;
+  }
+
   // Handle stop/cancellation messages
   if (type === "stop" || type === "stop_training") {
     const req = activeRequests.get(requestId);
     if (req) {
       req.cancelled = true;
     }
-    console.log("[FlowModel Worker] Cancel requested:", requestId || "all");
+    log("Cancel requested:", requestId || "all");
     self.postMessage({ requestId, type: 'cancelled' });
     return;
   }
@@ -351,7 +367,7 @@ self.onmessage = async (e) => {
   activeRequests.set(requestId, { cancelled: false });
 
   try {
-    console.log('[FlowModel Worker] Received message:', { requestId, type, timestamp: Date.now() });
+    log('Received message:', { requestId, type, timestamp: Date.now() });
 
     switch (type) {
       case 'sample':

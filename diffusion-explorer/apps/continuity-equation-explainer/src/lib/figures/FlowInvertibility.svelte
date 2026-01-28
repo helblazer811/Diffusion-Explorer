@@ -275,7 +275,7 @@
       style: {
         strokeWidth: trajectoryStrokeWidth,
         color: trajectoryColor,
-        progressOpacity: 1.0,
+        opacity: 1.0,
         pointRadius: trajectoryPointRadius,
         showHeadMarker: true,
         showPreview: true,
@@ -288,8 +288,11 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline() {
-    if (!pathlineAnim || !data || !scales) return;
+  async function setupTimeline() {
+    if (!pathlineAnim || !data || !scales || !canvas) return;
+
+    // Initialize the animation with the canvas
+    await pathlineAnim.init(canvas);
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
@@ -417,7 +420,7 @@
     }
 
     // Draw pathline animations
-    pathlineAnim.draw(ctx, state);
+    pathlineAnim.draw(state);
 
     // Draw labels for highlighted trajectory points
     if (highlightedTrajPixelCoords.length >= 2) {
@@ -552,13 +555,14 @@
     data.allTrajectories?.length > 0 &&
     canvas
   ) {
-    runInitialComputation();
-    setupTimeline();
     isInitialized = true;
-    if (timeline) {
-      draw(timeline.initialState);
-      if (playingByDefault) startAnimation();
-    }
+    runInitialComputation();
+    setupTimeline().then(() => {
+      if (timeline) {
+        draw(timeline.initialState);
+        if (playingByDefault) startAnimation();
+      }
+    });
   }
 
   // Handle visibility changes

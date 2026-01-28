@@ -62,7 +62,7 @@
   let isActive: ReturnType<typeof import('svelte/store').writable<boolean>> | undefined;
 
   // Compute canvas dimensions
-  $: canvasWidth = Math.floor((width - 2 * gap) / 3);
+  $: canvasWidth = 230;
   $: canvasHeight = height;
 
   // Three canvases
@@ -398,7 +398,7 @@
   }
 </script>
 
-<div style="width: {width}px; position: relative; left: 50%; transform: translateX(-50%);">
+<div style="width: 100%; max-width: {width}px;">
   {#if initError}
     <div style="padding: 20px; text-align: center; color: #e63946;">
       <p>WebGPU Error: {initError}</p>

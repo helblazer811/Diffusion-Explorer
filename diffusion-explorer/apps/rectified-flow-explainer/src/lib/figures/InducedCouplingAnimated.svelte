@@ -271,7 +271,7 @@
   // Cached values for clip closures
   let cachedNumSegments = 0;
 
-  function setupTimeline() {
+  async function setupTimeline() {
     // Create PathlineAnimation for trajectory phase
     pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(
       transformedTrajectories,
@@ -280,10 +280,13 @@
           color: settings.stylingSettings.trajectory.color,
           strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
           pointRadius: settings.stylingSettings.trajectory.endpointRadius,
-          progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+          opacity: settings.stylingSettings.trajectory.opacity,
         }
       }
     );
+
+    // Initialize with canvas
+    await pathlineAnimation.init(canvas);
 
     // Cache values for closures
     cachedNumSegments = pathlineAnimation.data.numSegments;
@@ -459,7 +462,7 @@
 
   function drawAnimatedTrajectories(state: AnimationState) {
     if (!pathlineAnimation) return;
-    pathlineAnimation.draw(ctx!, state);
+    pathlineAnimation.draw(state);
   }
 
   function drawInducedCouplingLines(progress = 1) {
@@ -565,10 +568,11 @@
   ) {
     const success = runInitialComputation();
     if (success) {
-      initialized = true;
-      setupTimeline();
-      draw(timeline!.initialState);
-      startAnimation();
+      setupTimeline().then(() => {
+        initialized = true;
+        draw(timeline!.initialState);
+        startAnimation();
+      });
     }
   }
 

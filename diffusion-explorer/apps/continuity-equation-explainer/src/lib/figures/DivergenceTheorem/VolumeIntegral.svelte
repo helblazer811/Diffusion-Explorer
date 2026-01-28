@@ -220,15 +220,15 @@
     // CreateGridAnimation draws initial grid, SubdivideGridAnimation draws base + subdivision
     if (state.subdivideProgress > 0 && subdivideGridAnim) {
       // Once subdivision starts, it handles drawing both base and new lines
-      subdivideGridAnim.draw(ctx, state);
+      subdivideGridAnim.draw(state);
     } else if (createGridAnim) {
       // Before subdivision, draw the initial grid creation
-      createGridAnim.draw(ctx, state);
+      createGridAnim.draw(state);
     }
 
     // 4. Draw animated arrows (above surface fill)
     if (arrowAnim) {
-      arrowAnim.draw(ctx, state);
+      arrowAnim.draw(state);
     }
 
     // 5. Draw volume label (V)
@@ -373,8 +373,15 @@
     });
   }
 
-  function setupTimeline() {
-    if (!createGridAnim || !subdivideGridAnim || !arrowAnim) return;
+  async function setupTimeline() {
+    if (!createGridAnim || !subdivideGridAnim || !arrowAnim || !canvas) return;
+
+    // Initialize all animations with the canvas
+    await Promise.all([
+      createGridAnim.init(canvas),
+      subdivideGridAnim.init(canvas),
+      arrowAnim.init(canvas),
+    ]);
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
@@ -458,8 +465,7 @@
   // Initialize when canvases are ready
   $: if (!isInitialized && canvas && gpuCanvas && curveFn && vectorFieldFn) {
     runInitialComputation();
-    setupTimeline();
-    initializeGPURenderer().then(() => {
+    Promise.all([setupTimeline(), initializeGPURenderer()]).then(() => {
       isInitialized = true;
       draw(timeline!.initialState);
       if (playingByDefault) startAnimation();

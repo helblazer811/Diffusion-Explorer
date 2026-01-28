@@ -44,7 +44,7 @@
   // ===== TRAJECTORY STYLING =====
   let trajectoryColor = settings.stylingSettings.trajectory.color;
   let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-  let trajectoryOpacity = settings.stylingSettings.trajectory.progressOpacity;
+  let trajectoryOpacity = settings.stylingSettings.trajectory.opacity;
 
   // ===== ANIMATION =====
   let animationDuration = 8000;

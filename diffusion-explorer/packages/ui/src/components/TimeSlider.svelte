@@ -29,6 +29,11 @@
   export let onTogglePlay: (() => void) | null = null;  // Called when play/pause is clicked
   export let onInput: ((value: number) => void) | null = null;  // Called when slider is dragged (receives numeric value)
 
+  // Display time override - when set, shows this instead of timeline's internal time
+  // Useful for animations where semantic time differs from timeline time (e.g., forward-backward animations)
+  export let displayTime: number | null = null;
+  export let onSeekByDisplayTime: ((t: number) => void) | null = null;  // Called when seeking with display time
+
   // Internal state (synced from timeline when provided)
   let sliderValue = 0;
   let playing = false;
@@ -36,20 +41,26 @@
 
   // Subscribe to timeline tick updates when timeline changes
   $: if (timeline) {
-    // Sync initial state
-    sliderValue = timeline.time / timeline.duration;
+    // Sync initial state - use displayTime if provided, otherwise timeline time
+    sliderValue = displayTime ?? timeline.time / timeline.duration;
     playing = timeline.isPlaying;
 
     // Subscribe to updates (replaces any previous subscription)
     unsubscribe?.();
     unsubscribe = timeline.onTick((t) => {
-      sliderValue = t;
+      // Use displayTime prop if provided (it's reactively updated by parent)
+      sliderValue = displayTime ?? t;
       playing = timeline.isPlaying;
     });
   } else {
     // No timeline: use legacy props
     unsubscribe?.();
     unsubscribe = null;
+  }
+
+  // React to displayTime changes when timeline exists
+  $: if (timeline && displayTime !== null) {
+    sliderValue = displayTime;
   }
 
   // Sync legacy props to internal state when not using timeline
@@ -86,8 +97,13 @@
     const newValue = parseFloat(event.currentTarget.value);
 
     if (timeline && 'seek' in timeline) {
-      // Use Timeline's seek method (triggers tick callback, applies clips)
-      timeline.seek(newValue);
+      if (onSeekByDisplayTime) {
+        // Use custom seek handler for display time mapping
+        onSeekByDisplayTime(newValue);
+      } else {
+        // Default: seek directly on timeline
+        timeline.seek(newValue);
+      }
     }
 
     // Call optional user callback with the VALUE (not event)

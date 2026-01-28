@@ -61396,166 +61396,14 @@ function createDiffusionSchedule(T = 1e3, betaStart = 1e-4, betaEnd = 0.02) {
   };
 }
 
-// ../../packages/diffusion/src/networks.ts
-function sinusoidalEmbedding(x, embDim, scale2 = 1) {
-  return tidy(() => {
-    const xFlat = x.rank === 2 ? x.squeeze([1]) : x;
-    const batch = xFlat.shape[0];
-    const halfDim = embDim / 2;
-    const freqIndices = range(0, halfDim);
-    const logTimescale = Math.log(1e4);
-    const frequencies = exp(freqIndices.mul(-logTimescale / halfDim));
-    const xScaled = xFlat.mul(scale2).expandDims(1);
-    const angles = xScaled.mul(frequencies);
-    const sinEmb = sin(angles);
-    const cosEmb = cos(angles);
-    const stacked = stack([sinEmb, cosEmb], 2);
-    const result = stacked.reshape([batch, embDim]);
-    return result;
-  });
-}
-var ImprovedMLP = class {
-  constructor(config) {
-    __publicField(this, "config");
-    __publicField(this, "inputLayer");
-    __publicField(this, "residualLayers");
-    __publicField(this, "outputLayer");
-    this.config = {
-      dim: config.dim,
-      hidden: config.hidden,
-      hiddenLayers: config.hiddenLayers ?? 3,
-      embSize: config.embSize ?? 128,
-      inputScale: config.inputScale ?? 25
-    };
-    const { dim, hidden, hiddenLayers, embSize } = this.config;
-    const inputSize = (dim + 1) * embSize;
-    this.inputLayer = exports_layers_exports.dense({
-      units: hidden,
-      inputShape: [inputSize],
-      useBias: true,
-      kernelInitializer: "glorotNormal"
-    });
-    this.residualLayers = [];
-    for (let i = 0; i < hiddenLayers; i++) {
-      this.residualLayers.push(exports_layers_exports.dense({
-        units: hidden,
-        useBias: true,
-        kernelInitializer: "glorotNormal"
-      }));
-    }
-    this.outputLayer = exports_layers_exports.dense({
-      units: dim,
-      useBias: true,
-      kernelInitializer: "glorotNormal"
-    });
-  }
-  /**
-   * Forward pass through the network.
-   * NOTE: No tf.tidy() here - it would break gradient computation during training.
-   * Memory management is handled by the caller.
-   *
-   * @param x Spatial coordinates [batch, dim]
-   * @param t Time values [batch] in range appropriate for the model
-   * @param tScale Scale factor for time (e.g., 1/T to normalize to [0,1])
-   * @returns Predicted noise/velocity [batch, dim]
-   */
-  forward(x, t, tScale = 1) {
-    const { dim, embSize, inputScale } = this.config;
-    const tFlat = t.rank === 2 ? t.squeeze([1]) : t;
-    const tScaled = tFlat.mul(tScale);
-    const timeEmb = sinusoidalEmbedding(tScaled, embSize, 1);
-    const coordEmbs = [];
-    for (let i = 0; i < dim; i++) {
-      const coord = x.slice([0, i], [-1, 1]).squeeze([1]);
-      coordEmbs.push(sinusoidalEmbedding(coord, embSize, inputScale));
-    }
-    const allEmbs = concat([timeEmb, ...coordEmbs], 1);
-    let h = this.inputLayer.apply(allEmbs);
-    h = this.gelu(h);
-    for (const layer of this.residualLayers) {
-      const hNew = layer.apply(h);
-      const hActivated = this.gelu(hNew);
-      h = add2(h, hActivated);
-    }
-    const output = this.outputLayer.apply(h);
-    return output;
-  }
-  /**
-   * GELU activation function.
-   * GELU(x) = 0.5 * x * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x^3)))
-   * NOTE: No tf.tidy() here - it would break gradient computation during training.
-   */
-  gelu(x) {
-    const cdf = mul(
-      0.5,
-      add2(
-        1,
-        tanh2(
-          mul(
-            Math.sqrt(2 / Math.PI),
-            add2(x, mul(0.044715, pow(x, 3)))
-          )
-        )
-      )
-    );
-    return mul(x, cdf);
-  }
-  /**
-   * Get all trainable weights from the network.
-   */
-  getWeights() {
-    const weights = [];
-    weights.push(...this.inputLayer.getWeights());
-    for (const layer of this.residualLayers) {
-      weights.push(...layer.getWeights());
-    }
-    weights.push(...this.outputLayer.getWeights());
-    return weights;
-  }
-  /**
-   * Set all trainable weights in the network.
-   */
-  setWeights(weights) {
-    let idx = 0;
-    const inputWeights = this.inputLayer.getWeights();
-    this.inputLayer.setWeights(weights.slice(idx, idx + inputWeights.length));
-    idx += inputWeights.length;
-    for (const layer of this.residualLayers) {
-      const layerWeights = layer.getWeights();
-      layer.setWeights(weights.slice(idx, idx + layerWeights.length));
-      idx += layerWeights.length;
-    }
-    const outputWeights = this.outputLayer.getWeights();
-    this.outputLayer.setWeights(weights.slice(idx, idx + outputWeights.length));
-  }
-  /**
-   * Get the configuration used to create this network.
-   */
-  getConfig() {
-    return { ...this.config };
-  }
-};
-
 // ../../packages/diffusion/src/diffusion/diffusion.ts
 var DiffusionModel = class extends Model {
-  constructor(dim = 2, hidden = 128, T = 1e3, betaStart = 1e-4, betaEnd = 0.02, networkType = "simple") {
+  constructor(dim = 2, hidden = 128, T = 1e3, betaStart = 1e-4, betaEnd = 0.02) {
     super(dim, hidden);
     __publicField(this, "T");
     __publicField(this, "scheduleParams");
-    __publicField(this, "networkType");
-    __publicField(this, "improvedNetwork");
     this.T = T;
     this.scheduleParams = createDiffusionSchedule(T, betaStart, betaEnd);
-    this.networkType = networkType;
-    if (networkType === "improved") {
-      this.improvedNetwork = new ImprovedMLP({
-        dim,
-        hidden,
-        hiddenLayers: 3,
-        embSize: 128,
-        inputScale: 25
-      });
-    }
   }
   /**
    * Train the diffusion model with denoising score matching
@@ -61580,32 +61428,27 @@ var DiffusionModel = class extends Model {
       let epochLoss = 0;
       let batchCount = 0;
       for (let batchIdx = 0; batchIdx < numBatches; batchIdx++) {
-        const { x0, noise, tInt, x_t, batchIndices } = tidy(() => {
+        const batchLoss = tidy(() => {
           const batchIndicesArray = indices.slice(
             batchIdx * batchSize,
             Math.min((batchIdx + 1) * batchSize, N)
           );
-          const batchIndices2 = tensor1d(Array.from(batchIndicesArray), "int32");
-          const x02 = gather(data, batchIndices2);
-          const actualBatchSize = x02.shape[0];
-          const noise2 = randomNormal([actualBatchSize, this.dim]);
-          const tInt2 = randomUniform([actualBatchSize], 0, this.T, "int32");
-          const x_t2 = this.addNoise(x02, noise2, tInt2);
-          return { x0: x02, noise: noise2, tInt: tInt2, x_t: x_t2, batchIndices: batchIndices2 };
+          const batchIndices = tensor1d(Array.from(batchIndicesArray), "int32");
+          const x0 = gather(data, batchIndices);
+          const actualBatchSize = x0.shape[0];
+          const noise = randomNormal([actualBatchSize, this.dim]);
+          const tInt = randomUniform([actualBatchSize], 0, this.T, "int32");
+          const x_t = this.addNoise(x0, noise, tInt);
+          let lossValue = 0;
+          optimizer.minimize(() => {
+            const eps = this.forward(x_t, tInt);
+            const loss = mse2(noise, eps);
+            lossValue = loss.dataSync()[0];
+            return loss;
+          });
+          return lossValue;
         });
-        let lossValue = 0;
-        optimizer.minimize(() => {
-          const eps = this.forward(x_t, tInt);
-          const loss = mse2(noise, eps);
-          lossValue = loss.dataSync()[0];
-          return loss;
-        });
-        x0.dispose();
-        noise.dispose();
-        tInt.dispose();
-        x_t.dispose();
-        batchIndices.dispose();
-        epochLoss += lossValue;
+        epochLoss += batchLoss;
         batchCount++;
       }
       const avgEpochLoss = epochLoss / batchCount;
@@ -61654,15 +61497,12 @@ var DiffusionModel = class extends Model {
    * @returns Predicted noise [batch, dim]
    */
   forward(x_t, t) {
-    if (this.networkType === "improved" && this.improvedNetwork) {
-      const tFlat = t.rank === 2 ? t.squeeze([1]) : t;
-      return this.improvedNetwork.forward(x_t, tFlat, 1 / this.T);
-    } else {
+    return tidy(() => {
       const t_expanded = t.reshape([x_t.shape[0], 1]);
       const t_scaled = t_expanded.div(this.T);
       const input2 = concat([x_t, t_scaled], 1);
       return this.model.predict(input2);
-    }
+    });
   }
   /**
    * Perform one reverse diffusion step from timestep t to t-1
@@ -61849,8 +61689,7 @@ async function handleSamplingRequest(requestId, type, data) {
   const T = modelConfig.T ?? 1e3;
   const betaStart = modelConfig.betaStart ?? 1e-4;
   const betaEnd = modelConfig.betaEnd ?? 0.02;
-  const networkType = modelConfig.networkType ?? "simple";
-  const ourModel = new DiffusionModel(modelConfig.dim, modelConfig.hidden, T, betaStart, betaEnd, networkType);
+  const ourModel = new DiffusionModel(modelConfig.dim, modelConfig.hidden, T, betaStart, betaEnd);
   const tfModel = await loadLayersModel(modelJSONPath);
   ourModel.model = tfModel;
   let allSamples = null;
@@ -61906,13 +61745,7 @@ async function handleTrainRequest(requestId, data) {
   const T = modelConfig.T ?? 1e3;
   const betaStart = modelConfig.betaStart ?? 1e-4;
   const betaEnd = modelConfig.betaEnd ?? 0.02;
-  const networkType = modelConfig.networkType ?? "simple";
-  const ourModel = new DiffusionModel(modelConfig.dim, modelConfig.hidden, T, betaStart, betaEnd, networkType);
-  self.postMessage({
-    requestId,
-    type: "status",
-    message: `Training with ${networkType} network architecture`
-  });
+  const ourModel = new DiffusionModel(modelConfig.dim, modelConfig.hidden, T, betaStart, betaEnd);
   const { pointsTensor } = await loadDataset(datasetPath);
   await ourModel.train(
     pointsTensor,

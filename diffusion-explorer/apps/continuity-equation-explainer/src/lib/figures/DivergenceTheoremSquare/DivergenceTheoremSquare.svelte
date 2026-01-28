@@ -212,7 +212,15 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline() {
+  async function setupTimeline() {
+    if (!canvas) return;
+
+    // Initialize all animations with the canvas
+    await Promise.all([
+      ...innerSquareAnimations.map(anim => anim.init(canvas!)),
+      outerSquareAnimation!.init(canvas),
+    ]);
+
     const initialState: AnimationState = { phase: 0 };
 
     timeline = new Timeline<AnimationState>();
@@ -377,12 +385,12 @@
 
     // Draw all inner grid squares (pulsing)
     for (const anim of innerSquareAnimations) {
-      anim.draw(ctx, state);
+      anim.draw(state);
     }
 
     // Draw outer square (pulsing, larger, thicker)
     if (outerSquareAnimation) {
-      outerSquareAnimation.draw(ctx, state);
+      outerSquareAnimation.draw(state);
     }
   }
 
@@ -402,14 +410,14 @@
 
   $effect(() => {
     if (!isInitialized && ctx) {
-      runInitialComputation();
-      setupTimeline();
       isInitialized = true;
-
-      if (playingByDefault && timeline) {
-        draw(timeline.initialState);
-        timeline.play();
-      }
+      runInitialComputation();
+      setupTimeline().then(() => {
+        if (playingByDefault && timeline) {
+          draw(timeline.initialState);
+          timeline.play();
+        }
+      });
     }
   });
 

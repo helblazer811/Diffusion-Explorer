@@ -261,7 +261,7 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline() {
+  async function setupTimeline() {
     // Create PathlineAnimation for trajectories
     pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(
       transformedTrajectories,
@@ -270,10 +270,13 @@
           color: settings.stylingSettings.trajectory.color,
           strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
           pointRadius: settings.stylingSettings.trajectory.endpointRadius ?? settings.stylingSettings.trajectory.pointRadius ?? 3,
-          progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+          opacity: settings.stylingSettings.trajectory.opacity,
         }
       }
     );
+
+    // Initialize with canvas
+    await pathlineAnimation.init(canvas);
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { segmentIndex: 0 };
@@ -334,7 +337,7 @@
     drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
 
     // --- Dynamic Foreground ---
-    pathlineAnimation.draw(ctx, state);
+    pathlineAnimation.draw(state);
   }
 
   // ----------------------------------------------------------------
@@ -359,10 +362,11 @@
     !initialized
   ) {
     initializeData();
-    setupTimeline();
-    initialized = true;
-    draw(timeline.initialState);
-    if (playingByDefault) timeline!.play();
+    setupTimeline().then(() => {
+      initialized = true;
+      draw(timeline!.initialState);
+      if (playingByDefault) timeline!.play();
+    });
   }
 
   // Load trajectories when target distribution becomes available

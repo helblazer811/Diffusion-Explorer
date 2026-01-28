@@ -272,19 +272,23 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let inExtendedRegion = input.localPos.x > input.segmentLength;
 
   // Decode segment flags (1=first, 2=last, 3=both)
+  let isFirstSegment = (input.segmentFlags == 1.0) || (input.segmentFlags == 3.0);
   let isLastSegment = (input.segmentFlags >= 2.0);
+
+  // Clamp bodyStart to 0 for first segment (prevents flat edge at streamline start)
+  let effectiveBodyStart = select(pulseInfo.bodyStart, max(pulseInfo.bodyStart, 0.0), isFirstSegment);
 
   // Clamp bodyEnd to totalLength for last segment (for ownership and SDF)
   let effectiveBodyEnd = select(pulseInfo.bodyEnd, min(pulseInfo.bodyEnd, input.totalLength), isLastSegment);
 
   // Segment owns caps whose center (bodyStart or bodyEnd) falls within its arc length range
-  let ownsTailCap = (pulseInfo.bodyStart >= input.arcLengthStart - 0.001) &&
-                     (pulseInfo.bodyStart <= segmentArcEnd + 0.001);
+  let ownsTailCap = (effectiveBodyStart >= input.arcLengthStart - 0.001) &&
+                     (effectiveBodyStart <= segmentArcEnd + 0.001);
   let ownsHeadCap = (effectiveBodyEnd >= input.arcLengthStart - 0.001) &&
                      (effectiveBodyEnd <= segmentArcEnd + 0.001);
 
   // Check if fragment is in a cap region
-  let inTailCapRegion = arcLength < pulseInfo.bodyStart;
+  let inTailCapRegion = arcLength < effectiveBodyStart;
   let inHeadCapRegion = arcLength > effectiveBodyEnd;
 
   // Discard caps we don't own (prevents double-rendering at segment boundaries)
@@ -308,13 +312,13 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   var sdPulse: f32 = 1e6;  // Start outside all pulses
 
   // Body: rectangle between bodyStart and bodyEnd
-  let inBody = (arcLength >= pulseInfo.bodyStart) && (arcLength <= pulseInfo.bodyEnd);
+  let inBody = (arcLength >= effectiveBodyStart) && (arcLength <= effectiveBodyEnd);
   if (inBody) {
     sdPulse = sdLine(perpDistLogical, halfThicknessLogical);
   }
 
   // Tail cap (at bodyStart): semicircle
-  let tailDist = pulseInfo.bodyStart - arcLength;
+  let tailDist = effectiveBodyStart - arcLength;
   if (tailDist > 0.0 && tailDist < capExtent) {
     let tailSd = length(vec2<f32>(tailDist, perpDistLogical)) - halfThicknessLogical;
     sdPulse = min(sdPulse, tailSd);
@@ -352,8 +356,9 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let alpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
 
   // Linear alpha interpolation along pulse (0.0 at tail/bodyStart, 1.0 at head/bodyEnd)
+  // When binaryPulse=1.0, use solid pulses instead of gradient
   let normalizedPos = saturate((arcLength - pulseInfo.bodyStart) / uniforms.pulseWidth);
-  let pulseAlpha = normalizedPos;
+  let pulseAlpha = mix(normalizedPos, 1.0, uniforms.binaryPulse);
 
   // Combine SDF alpha, pulse alpha, and base opacity
   let finalAlpha = alpha * pulseAlpha * uniforms.baseOpacity;

@@ -43,7 +43,7 @@
     trajectoryColor?: string;
     trajectoryStrokeWidth?: number;
     trajectoryPointRadius?: number;
-    trajectoryProgressOpacity?: number;
+    trajectoryOpacity?: number;
     trajectoryPreviewOpacity?: number;
     animationDuration?: number;
     timing?: { pauseStart: number };
@@ -79,7 +79,7 @@
     trajectoryColor = "#f17720",
     trajectoryStrokeWidth = 2,
     trajectoryPointRadius = 4,
-    trajectoryProgressOpacity = 0.8,
+    trajectoryOpacity = 0.8,
     trajectoryPreviewOpacity = 0.15,
     animationDuration = 11500, // Total cycle duration in ms
     timing = { pauseStart: 0.870 }, // Animation runs 0→0.870, pause 0.870→1.0
@@ -215,13 +215,13 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline() {
+  async function setupTimeline() {
     // Create PathlineAnimation instances for both panels
     const pathlineStyle = {
       color: trajectoryColor,
       strokeWidth: trajectoryStrokeWidth,
       pointRadius: trajectoryPointRadius,
-      progressOpacity: trajectoryProgressOpacity,
+      opacity: trajectoryOpacity,
       showPreview: true,
       previewOpacity: trajectoryPreviewOpacity,
     };
@@ -235,6 +235,12 @@
       scaledRightTrajectories,
       { style: pathlineStyle }
     );
+
+    // Initialize both animations with their canvases
+    await Promise.all([
+      leftPathlineAnimation.init(leftCanvas!),
+      rightPathlineAnimation.init(rightCanvas!),
+    ]);
 
     // Create a clip that includes both segmentIndex and time
     const segmentClip = {
@@ -315,8 +321,8 @@
     // --- Dynamic Foreground ---
     const defaultOpacity = hasUserTrajectory
       ? dimmedTrajectoryOpacity
-      : trajectoryProgressOpacity;
-    pathlineAnimation.draw(ctx, state, { progressOpacity: defaultOpacity });
+      : trajectoryOpacity;
+    pathlineAnimation.draw(state, { opacity: defaultOpacity });
 
     // Draw user trajectories (highlighted)
     if (userTrajectories.length > 0) {
@@ -327,9 +333,8 @@
         const userSegmentIndex = Math.floor(logicalTime * userNumSegments);
 
         pathlineAnimation.draw(
-          ctx,
           { ...state, segmentIndex: userSegmentIndex, pathlines: validUserTrajectories },
-          { progressOpacity: highlightedTrajectoryOpacity }
+          { opacity: highlightedTrajectoryOpacity }
         );
       }
 
@@ -517,7 +522,9 @@
   $effect(() => {
     if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
       runInitialComputation();
-      setupTimeline();
+      setupTimeline().then(() => {
+        if (playingByDefault) startAnimation();
+      });
     }
   });
 

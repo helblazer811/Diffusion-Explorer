@@ -15,10 +15,10 @@
  */
 
 import type {
-  GPUTrajectoryStyleOptions,
+  TrajectoryStyleOptions,
   GPUTrajectoryData,
 } from '../types';
-import { parseColor, prepareGPUTrajectoryData } from '../types';
+import { parseColor, prepareGPUTrajectoryData } from './data';
 import shaderSource from './trajectory-shader.wgsl?raw';
 
 // Default options
@@ -51,7 +51,7 @@ export interface GPUTrajectoryRendererOptions {
  *   color: '#ff6b6b',
  *   opacity: 0.9,
  *   pointRadius: 4,
- *   outline: { color: '#000000', width: 5, opacity: 0.5 },
+ *   outline: { color: '#000000', strokeWidth: 2, opacity: 0.5 },
  *   opacityGradient: { mode: 'recency', timeWindow: 0.8 },
  * });
  *
@@ -200,15 +200,17 @@ export class GPUTrajectoryRenderer {
           {
             format,
             blend: {
+              // Use max blending to prevent darkening at overlapping segments
+              // This ensures constant color regardless of overlap
               color: {
-                srcFactor: 'src-alpha',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
+                srcFactor: 'one',
+                dstFactor: 'one',
+                operation: 'max',
               },
               alpha: {
                 srcFactor: 'one',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
+                dstFactor: 'one',
+                operation: 'max',
               },
             },
           },
@@ -253,16 +255,12 @@ export class GPUTrajectoryRenderer {
   }
 
   /**
-   * Set trajectories to render.
-   *
-   * @param trajectories - Array of trajectories in pixel coords: [trajectory][timestep][x,y]
-   * @param segmentIndex - Current animation progress (which segment to draw up to)
-   * @param style - Styling options
+   * Set trajectories to render (internal).
    */
-  setTrajectories(
+  private setTrajectories(
     trajectories: number[][][],
     segmentIndex: number,
-    style: GPUTrajectoryStyleOptions
+    style: TrajectoryStyleOptions
   ): void {
     // Update cached style
     this.thickness = style.strokeWidth ?? DEFAULT_THICKNESS;
@@ -276,7 +274,8 @@ export class GPUTrajectoryRenderer {
     this.hasOutline = !!style.outline;
     if (style.outline) {
       const outlineColor = parseColor(style.outline.color ?? '#000000');
-      this.outlineThickness = style.outline.width ?? this.thickness + 2;
+      const outlineStrokeWidth = style.outline.strokeWidth ?? 2;
+      this.outlineThickness = this.thickness + outlineStrokeWidth;
       this.outlineColorR = outlineColor[0];
       this.outlineColorG = outlineColor[1];
       this.outlineColorB = outlineColor[2];
@@ -342,11 +341,30 @@ export class GPUTrajectoryRenderer {
   }
 
   /**
-   * Draw the trajectories.
+   * Draw trajectories in a single call.
+   *
+   * @param trajectories - Array of trajectories in pixel coords: [trajectory][timestep][x,y]
+   * @param segmentIndex - Current animation progress (which segment to draw up to)
+   * @param style - Styling options
+   * @param clearColor - Optional background color (RGBA 0-1)
+   */
+  draw(
+    trajectories: number[][][],
+    segmentIndex: number,
+    style: TrajectoryStyleOptions,
+    clearColor?: [number, number, number, number]
+  ): void {
+    // Update data and style
+    this.setTrajectories(trajectories, segmentIndex, style);
+    this.render(clearColor);
+  }
+
+  /**
+   * Render the current trajectories (internal).
    *
    * @param clearColor - Optional background color (RGBA 0-1)
    */
-  draw(clearColor?: [number, number, number, number]): void {
+  private render(clearColor?: [number, number, number, number]): void {
     if (!this.bindGroup || this.segmentCount === 0 || !this.depthTexture) {
       // Nothing to render, but may still need to clear
       if (clearColor) {
@@ -389,7 +407,7 @@ export class GPUTrajectoryRenderer {
       depthStencilAttachment: {
         view: depthView,
         depthClearValue: 1.0,
-        depthLoadOp: 'clear',
+        depthLoadOp: loadOp,  // Match color loadOp - clear only when clearing canvas
         depthStoreOp: 'store',
       },
     });

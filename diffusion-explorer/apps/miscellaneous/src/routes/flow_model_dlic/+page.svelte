@@ -1,5 +1,5 @@
 <script lang="ts">
-  import FlowModelDLIC from "$lib/figures/FlowModelDLIC.svelte";
+  import FlowModelDLIC from "./FlowModelDLIC.svelte";
 </script>
 
 <svelte:head>

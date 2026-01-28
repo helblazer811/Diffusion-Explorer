@@ -122,7 +122,7 @@ export const settings = {
       color: '#f17720',           // Orange
       strokeWidth: 3,
       pointRadius: 3,
-      progressOpacity: 0.8,       // Animated paths
+      opacity: 0.8,               // Animated paths
       previewOpacity: 0.0,        // Preview path opacity (0 = hidden)
       outline: {
         enabled: true,

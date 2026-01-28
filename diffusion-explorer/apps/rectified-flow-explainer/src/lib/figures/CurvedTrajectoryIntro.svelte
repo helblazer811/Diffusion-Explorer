@@ -178,16 +178,19 @@
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline() {
+  async function setupTimeline() {
     // Create PathlineAnimation for regular trajectories with settings-based style
     pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(regularTrajectories, {
       style: {
         color: settings.stylingSettings.trajectory.color,
         strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
         pointRadius: settings.stylingSettings.trajectory.endpointRadius,
-        progressOpacity: settings.stylingSettings.trajectory.progressOpacity,
+        opacity: settings.stylingSettings.trajectory.opacity,
       }
     });
+
+    // Initialize the animation with the canvas
+    await pathlineAnimation.init(canvas);
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = { segmentIndex: 0 };
@@ -242,7 +245,7 @@
     drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont, opacity: labelOpacity });
 
     // --- Dynamic Foreground ---
-    const normalOpacity = settings.stylingSettings.trajectory.progressOpacity;
+    const normalOpacity = settings.stylingSettings.trajectory.opacity;
     const dimmedOpacity = 0.15;
 
     // Combine completed and in-progress user trajectories
@@ -251,14 +254,14 @@
     const hasUserTrajectories = allUserTrajectories.length > 0;
 
     // Draw regular trajectories (dimmed if user has clicked)
-    pathlineAnimation.draw(ctx, state, {
-      progressOpacity: hasUserTrajectories ? dimmedOpacity : normalOpacity,
+    pathlineAnimation.draw(state, {
+      opacity: hasUserTrajectories ? dimmedOpacity : normalOpacity,
     });
 
     // Draw user trajectories (full opacity)
     if (hasUserTrajectories) {
-      pathlineAnimation.draw(ctx, { ...state, pathlines: allUserTrajectories }, {
-        progressOpacity: 1.0,
+      pathlineAnimation.draw({ ...state, pathlines: allUserTrajectories }, {
+        opacity: 1.0,
       });
     }
   }
@@ -380,10 +383,11 @@
     !initialized
   ) {
     runInitialComputation();
-    setupTimeline();
-    initialized = true;
-    draw(timeline!.initialState);
-    if (playingByDefault) timeline!.play();
+    setupTimeline().then(() => {
+      initialized = true;
+      draw(timeline!.initialState);
+      if (playingByDefault) timeline!.play();
+    });
   }
 
   // Handle visibility changes (pause when off-screen, resume when back)

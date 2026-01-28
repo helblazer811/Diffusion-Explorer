@@ -465,7 +465,7 @@
         color: approximationColor,
         strokeWidth: trajectoryStrokeWidth + 0.5,
         pointRadius: endpointRadius,
-        progressOpacity: approximationOpacity,
+        opacity: approximationOpacity,
         headStyle: { type: 'arrow', radius: endpointRadius * 2 }
       });
     }

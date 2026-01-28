@@ -85,6 +85,10 @@ export class ArrowCancellationAnimation<TState extends ArrowCancellationState>
   private readonly dimmedOpacity: number;
   private readonly highlightOpacity: number;
 
+  // Context storage
+  private ctx: CanvasRenderingContext2D | null = null;
+  private _initialized = false;
+
   private constructor(options: ArrowCancellationOptions) {
     const {
       cells,
@@ -113,6 +117,25 @@ export class ArrowCancellationAnimation<TState extends ArrowCancellationState>
         return {} as Partial<TState>;
       },
     };
+  }
+
+  /**
+   * Initialize the animation with a canvas element.
+   */
+  async init(canvas: HTMLCanvasElement): Promise<void> {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to get 2D rendering context');
+    }
+    this.ctx = ctx;
+    this._initialized = true;
+  }
+
+  /**
+   * Check if the animation has been initialized.
+   */
+  get initialized(): boolean {
+    return this._initialized;
   }
 
   /**
@@ -248,42 +271,55 @@ export class ArrowCancellationAnimation<TState extends ArrowCancellationState>
   /**
    * Draw all arrows with appropriate opacities based on cancellation state.
    */
-  draw(ctx: CanvasRenderingContext2D, state: TState): void {
+  draw(state: TState): void {
+    if (!this.ctx) {
+      console.warn('ArrowCancellationAnimation.draw() called before init()');
+      return;
+    }
+
     const { rightCancellationPhase, rightCancellationProgress } = state;
 
     if (rightCancellationPhase === 'none') {
       // Before cancellation, draw all arrows at full opacity
-      ctx.save();
-      ctx.strokeStyle = this.color;
-      ctx.fillStyle = this.color;
-      ctx.lineWidth = this.strokeWidth;
-      ctx.lineCap = 'round';
+      this.ctx.save();
+      this.ctx.strokeStyle = this.color;
+      this.ctx.fillStyle = this.color;
+      this.ctx.lineWidth = this.strokeWidth;
+      this.ctx.lineCap = 'round';
 
       for (const arrow of this.arrows) {
-        drawArrow(ctx, arrow.startX, arrow.startY, arrow.endX, arrow.endY, this.headRadius);
+        drawArrow(this.ctx, arrow.startX, arrow.startY, arrow.endX, arrow.endY, this.headRadius);
       }
 
-      ctx.restore();
+      this.ctx.restore();
       return;
     }
 
     const opacities = this.computeOpacities(rightCancellationPhase, rightCancellationProgress);
 
-    ctx.save();
-    ctx.strokeStyle = this.color;
-    ctx.fillStyle = this.color;
-    ctx.lineWidth = this.strokeWidth;
-    ctx.lineCap = 'round';
+    this.ctx.save();
+    this.ctx.strokeStyle = this.color;
+    this.ctx.fillStyle = this.color;
+    this.ctx.lineWidth = this.strokeWidth;
+    this.ctx.lineCap = 'round';
 
     for (const arrow of this.arrows) {
       const opacity = opacities[arrow.category];
       if (opacity <= 0) continue;
 
-      ctx.globalAlpha = opacity;
-      drawArrow(ctx, arrow.startX, arrow.startY, arrow.endX, arrow.endY, this.headRadius);
+      this.ctx.globalAlpha = opacity;
+      drawArrow(this.ctx, arrow.startX, arrow.startY, arrow.endX, arrow.endY, this.headRadius);
     }
 
-    ctx.restore();
+    this.ctx.restore();
+  }
+
+  /**
+   * Clean up resources.
+   */
+  destroy(): void {
+    this.ctx = null;
+    this._initialized = false;
   }
 
   /**

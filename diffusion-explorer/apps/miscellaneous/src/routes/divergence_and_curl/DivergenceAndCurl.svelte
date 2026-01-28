@@ -149,8 +149,8 @@
   // Setup
   // ----------------------------------------------------------------
 
-  function runInitialComputation() {
-    if (!ctx1 || !ctx2 || !ctx3) return;
+  async function runInitialComputation() {
+    if (!ctx1 || !ctx2 || !ctx3 || !canvas1 || !canvas2 || !canvas3) return;
 
     const toPixel = createToPixel(canvasWidth, canvasHeight);
     const domain = {
@@ -192,6 +192,13 @@
       vectorFieldFn: combinedField(0.5, 1.0),
       ...commonOptions,
     });
+
+    // Initialize all animations with their respective canvases
+    await Promise.all([
+      anim1.init(canvas1),
+      anim2.init(canvas2),
+      anim3.init(canvas3),
+    ]);
   }
 
   function setupTimeline() {
@@ -238,9 +245,9 @@
     ctx2.clearRect(0, 0, canvasWidth, canvasHeight);
     ctx3.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    anim1.draw(ctx1, state);
-    anim2.draw(ctx2, state);
-    anim3.draw(ctx3, state);
+    anim1.draw(state);
+    anim2.draw(state);
+    anim3.draw(state);
   }
 
   // ----------------------------------------------------------------
@@ -271,14 +278,15 @@
   // ----------------------------------------------------------------
 
   // Initialize when canvases are ready
-  $: if (!isInitialized && ctx1 && ctx2 && ctx3) {
-    runInitialComputation();
-    setupTimeline();
-    isInitialized = true;
-    if (timeline) {
-      draw(timeline.initialState);
-      if (playingByDefault) startAnimation();
-    }
+  $: if (!isInitialized && ctx1 && ctx2 && ctx3 && canvas1 && canvas2 && canvas3) {
+    isInitialized = true; // Set early to prevent re-entry
+    runInitialComputation().then(() => {
+      setupTimeline();
+      if (timeline) {
+        draw(timeline.initialState);
+        if (playingByDefault) startAnimation();
+      }
+    });
   }
 
   // Handle visibility changes
