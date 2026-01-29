@@ -246,11 +246,6 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Combine SDF alpha, pulse alpha, and base opacity
   let finalAlpha = alpha * pulseAlpha * uniforms.baseOpacity;
 
-  // Early discard for fully transparent pixels
-  if (finalAlpha < 0.001) {
-    discard;
-  }
-
   // Output pre-multiplied color for max blend
   let color = vec3<f32>(uniforms.colorR, uniforms.colorG, uniforms.colorB);
   let outAlpha = finalAlpha * uniforms.colorA;

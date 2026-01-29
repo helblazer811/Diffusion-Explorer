@@ -50,19 +50,48 @@ fn computePulseInfo(
   let posInPattern = fract((arcLength - phasePixels) / pulseSpacing) * pulseSpacing;
 
   // The pulse body spans [0, pulseWidth] in pattern space
-  // Convert to arc length of the pulse that contains/nearest this fragment
-  let patternStart = arcLength - posInPattern;
-
-  info.bodyStart = patternStart;
-  info.bodyEnd = patternStart + pulseWidth;
-  info.posInPattern = posInPattern;
+  // Convert to arc length of the pulse whose pattern contains this fragment
+  let currentPatternStart = arcLength - posInPattern;
 
   // Check if in potential render area (body + caps + AA margin)
   let aaMargin = 1.0;
   let capExtent = halfThickness + aaMargin;
 
+  // Calculate distances to current, next, and previous pulses
+  let currentBodyStart = currentPatternStart;
+  let currentBodyEnd = currentPatternStart + pulseWidth;
+  let nextBodyStart = currentPatternStart + pulseSpacing;
+  let prevBodyEnd = currentPatternStart - pulseSpacing + pulseWidth;
+
+  // Distance to nearest point on each pulse body
+  let distToCurrent = max(currentBodyStart - arcLength, arcLength - currentBodyEnd);
+  let distToNext = nextBodyStart - arcLength;  // Always positive (next is ahead)
+  let distToPrev = arcLength - prevBodyEnd;    // Always positive (prev is behind)
+
+  // Find which pulse is closest
+  // For current pulse, use the clamped distance (0 if inside body)
+  let clampedDistToCurrent = max(0.0, distToCurrent);
+
+  // Select the nearest pulse's bounds
+  if (distToNext < clampedDistToCurrent && distToNext < distToPrev) {
+    // Next pulse is closest (we're in the gap, closer to next pulse's tail)
+    info.bodyStart = nextBodyStart;
+    info.bodyEnd = nextBodyStart + pulseWidth;
+  } else if (distToPrev < clampedDistToCurrent) {
+    // Previous pulse is closest (we're in the gap, closer to prev pulse's head)
+    info.bodyStart = currentPatternStart - pulseSpacing;
+    info.bodyEnd = prevBodyEnd;
+  } else {
+    // Current pulse is closest or we're inside it
+    info.bodyStart = currentBodyStart;
+    info.bodyEnd = currentBodyEnd;
+  }
+
+  info.posInPattern = posInPattern;
+
+  // Check if we're within cap extent of the selected pulse
   info.inPulseRegion = (arcLength >= info.bodyStart - capExtent) &&
-                        (arcLength <= info.bodyEnd + capExtent);
+                       (arcLength <= info.bodyEnd + capExtent);
 
   return info;
 }
@@ -83,32 +112,15 @@ fn computePulseSDF(
   pulseInfo: PulseInfo,
   halfThicknessLogical: f32
 ) -> f32 {
-  var sdPulse: f32 = 1e6;  // Start outside all pulses
+  // Capsule SDF: clamp arc length to [bodyStart, bodyEnd], then compute distance
+  // This naturally creates rounded caps at both ends
+  let clampedArc = clamp(arcLength, pulseInfo.bodyStart, pulseInfo.bodyEnd);
+  let alongDist = arcLength - clampedArc;  // Distance along path from clamped point
 
-  let aaMargin = 1.0;
-  let capExtent = halfThicknessLogical + aaMargin;
+  // Distance from the capsule centerline
+  let dist = length(vec2<f32>(alongDist, perpDistLogical));
 
-  // Body: rectangle between bodyStart and bodyEnd
-  let inBody = (arcLength >= pulseInfo.bodyStart) && (arcLength <= pulseInfo.bodyEnd);
-  if (inBody) {
-    sdPulse = sdLine(perpDistLogical, halfThicknessLogical);
-  }
-
-  // Tail cap (at bodyStart): semicircle
-  let tailDist = pulseInfo.bodyStart - arcLength;
-  if (tailDist > 0.0 && tailDist < capExtent) {
-    let tailSd = length(vec2<f32>(tailDist, perpDistLogical)) - halfThicknessLogical;
-    sdPulse = min(sdPulse, tailSd);
-  }
-
-  // Head cap (at bodyEnd): semicircle
-  let headDist = arcLength - pulseInfo.bodyEnd;
-  if (headDist > 0.0 && headDist < capExtent) {
-    let headSd = length(vec2<f32>(headDist, perpDistLogical)) - halfThicknessLogical;
-    sdPulse = min(sdPulse, headSd);
-  }
-
-  return sdPulse;
+  return dist - halfThicknessLogical;
 }
 
 /**
