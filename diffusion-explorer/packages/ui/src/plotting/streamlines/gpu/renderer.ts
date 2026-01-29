@@ -21,7 +21,16 @@ import type {
 } from './types';
 import { parseColor } from './types';
 import { computeStreamlineLengths } from '../lengths';
-import shaderSource from './streamline-shader.wgsl?raw';
+
+// Import shader sources for runtime composition
+import shaderBase from './streamline-shader.wgsl?raw';
+import sdfUtils from '../../shared/shaders/sdf-utils.wgsl?raw';
+import pulsePattern from '../../shared/shaders/pulse-pattern.wgsl?raw';
+
+// Compose shader at runtime by replacing placeholder comments
+const shaderSource = shaderBase
+  .replace('// SDF_UTILS_PLACEHOLDER', sdfUtils)
+  .replace('// PULSE_PATTERN_PLACEHOLDER', pulsePattern);
 
 // Default options
 const DEFAULT_THICKNESS = 2.5;
@@ -301,7 +310,8 @@ export class StreamlineRenderer {
       bindGroupLayouts: [bindGroupLayout],
     });
 
-    // Create render pipeline
+    // Create render pipeline with max blending
+    // Max blend makes overlapping renders idempotent - no ownership logic needed
     const pipeline = device.createRenderPipeline({
       label: 'Streamline Render Pipeline',
       layout: pipelineLayout,
@@ -317,14 +327,14 @@ export class StreamlineRenderer {
             format,
             blend: {
               color: {
-                srcFactor: 'src-alpha',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
+                srcFactor: 'one',
+                dstFactor: 'one',
+                operation: 'max',
               },
               alpha: {
                 srcFactor: 'one',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
+                dstFactor: 'one',
+                operation: 'max',
               },
             },
           },
@@ -387,7 +397,7 @@ export class StreamlineRenderer {
     });
     this.device.queue.writeBuffer(this.segmentBuffer, 0, gpuData.segments);
 
-    // Create bind group
+    // Create bind group (both pipelines share the same layout)
     this.bindGroup = this.device.createBindGroup({
       label: 'Streamline Bind Group',
       layout: this.pipeline.getBindGroupLayout(0),
@@ -427,7 +437,7 @@ export class StreamlineRenderer {
     });
     this.device.queue.writeBuffer(this.segmentBuffer, 0, gpuData.segments);
 
-    // Create bind group
+    // Create bind group (both pipelines share the same layout)
     this.bindGroup = this.device.createBindGroup({
       label: 'Streamline Bind Group',
       layout: this.pipeline.getBindGroupLayout(0),
@@ -542,6 +552,7 @@ export class StreamlineRenderer {
       ],
     });
 
+    // Use max blend pipeline (SDF rendering is idempotent with max blend)
     renderPass.setPipeline(this.pipeline);
     renderPass.setBindGroup(0, this.bindGroup);
     // 6 vertices per instance (2 triangles), segmentCount instances
@@ -603,6 +614,7 @@ export class StreamlineRenderer {
     uniformData[10] = color[1];
     uniformData[11] = color[2];
     uniformData[12] = color[3];
+    // Padding (indices 13-15 unused)
 
     this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
@@ -625,6 +637,7 @@ export class StreamlineRenderer {
       ],
     });
 
+    // Use max blend pipeline (SDF rendering is idempotent with max blend)
     renderPass.setPipeline(this.pipeline);
     renderPass.setBindGroup(0, this.bindGroup);
     renderPass.draw(6, this.segmentCount, 0, 0);
