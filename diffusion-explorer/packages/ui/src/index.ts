@@ -121,6 +121,12 @@ export {
 } from './animation/animations/pathline-animation';
 
 export {
+  PulsingPathlineAnimation,
+  type PulsingPathlineAnimationState,
+  type PulsingPathlineAnimationOptions,
+} from './animation/animations/pulsing-pathline-animation';
+
+export {
   TimelineBuilder,
   type TimelineBuilderAddOptions,
   type TimelineBuilderAddAtOptions,
