@@ -39,13 +39,13 @@
 
   // Styling
   export let streamlineColor = "#3b82f6";
-  export let streamlineWidth = 3.0;
+  export let streamlineWidth = 4.0;
   export let edgeFadeSize = 10; // Size of edge fade in pixels
 
   // Animation pulse settings (pixel-based)
   export let pulseWidthPixels = 40;       // Width of pulse in pixels
   export let pulsePauseWidthPixels = 10;  // Gap between pulses in pixels
-  export let animationDuration = 4;       // Seconds for one animation cycle
+  export let animationDuration = 6;       // Seconds for one animation cycle
   export let binaryPulse = false;         // true = solid pulses, false = gradient alpha
 
   // Bloom settings
@@ -204,6 +204,7 @@
         baseOpacity: 0.8,
         color: streamlineColor,
         binaryPulse: binaryPulse ? 1.0 : 0.0,
+        useSimpleSDF: true,
       };
 
       // Create renderers with shared device
