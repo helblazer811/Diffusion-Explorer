@@ -1,7 +1,8 @@
 export { default as CrownJewel } from "./CrownJewel.svelte";
+export { default as CustomTimeSlider } from "./CustomTimeSlider.svelte";
 export {
-  PulsingRegionAnimation,
-  type PulsingRegionAnimationState,
-  type PulsingRegion,
-  type PulsingRegionAnimationOptions,
-} from "./PulsingRegionAnimation";
+  Pulsing2DAnimation,
+  type Pulsing2DAnimationState,
+  type Pulsing2DRegion,
+  type Pulsing2DAnimationOptions,
+} from "./Pulsing2DAnimation";
