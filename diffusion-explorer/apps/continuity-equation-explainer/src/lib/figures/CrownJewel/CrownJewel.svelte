@@ -1,160 +1,391 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import * as d3 from "d3";
   import {
     Figure,
     Timeline,
     useVisibilityHandler,
     useCanvas2D,
-    drawHeatmap,
-    precomputeHeatmap,
-    type PrecomputedHeatmap,
+    useCanvasWebGPU,
+    ContourRenderer,
+    createLinearColorScale,
+    createSourceTargetScales,
+    drawScatterPlot,
+    drawMathjax,
   } from "@diffusion-explorer/ui";
-  import { FlowModelClient } from "@diffusion-explorer/diffusion";
+  import type { ColorScaleFn, ContourDomain } from "@diffusion-explorer/ui";
+  import { clipTrajectoriesToStartingRadius, loadCachedTrajectories, FlowModelClient, cancelAllPendingRequests } from "@diffusion-explorer/diffusion";
   import { base } from "$app/paths";
-  import {
-    PulsingRegionAnimation,
-    type PulsingRegion,
-    type PulsingRegionAnimationState,
-  } from "./PulsingRegionAnimation";
+  import { settings } from "$lib/settings";
+  import { Pulsing2DAnimation, type Pulsing2DRegion } from "./Pulsing2DAnimation";
+  import { Katex } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
-  export let trajectories: number[][][] = []; // [step][sample][dim=1]
-  export let width = 1100;
-  export let height = 250;
-  export let heatmapResolution = 500;
-  export let animationDuration = 10; // Total cycle duration in seconds
-  export let colorScale: (t: number) => string = d3.interpolateBlues;
+  // Caption slot (passed as default children)
+  export let children = undefined;
 
-  // Interactivity settings
-  export let numSamplingSteps = 300; // Match pre-cached trajectory steps
-  export let workerUrl = "/crown_jewel/workers/flow_model.worker.js";
-  export let modelPath = "/crown_jewel/models/flow_model.json";
+  export let width = 800;
+  export let height = 350;
+
+  // Layout props (matching ProbabilityPathIntro)
+  export let sourceCenterX = 0.15; // Spread distributions wider
+  export let targetCenterX = 0.85;
+  export let marginWidth = 50;
+  export let marginHeight = 20;
+  export let distributionScaleFactor = 0.8;
+  export let yShiftFactor = 0;
+
+  // Contour settings
+  export let contourGridSize = 80;
+  export let contourBandwidth = 4;
+  export let contourThresholds: number | number[] = 5;
+  export let contourOpacity = 1.0;
+
+  // Animation
+  export let animationDuration = 3; // Seconds for one full pulse cycle
+  export let timeRange: [number, number] = [0, 1.0]; // Full range for trajectory computation
+  export let pulsingTimeRange: [number, number] = [0, 1.0]; // Full trajectories from t=0 to t=1
+
+  // Sample time - which timestep to use for filtering trajectories through the box
+  const SAMPLE_TIME = 0.5;
+  // Display position - where to render the contour in the layout (0.5 = centered between source and target)
+  const DISPLAY_POSITION = 0.5;
+  // Contour time - which timestep's samples to use for the contour (0.9 for smiley face appearance)
+  const CONTOUR_TIME = 0.9;
 
   // Pulsing region settings
-  export let clickRadius = 0.15; // Vertical radius in domain units
-  export let numClickSamples = 3; // Number of points to sample uniformly
-  export let pulseTimeWindow = 0.3; // Time window width (±0.15 around click)
-  export let pulseWidthPixels = 100; // Width of each pulse
-  export let pulsePauseWidthPixels = 100; // Gap between pulses
-  export let maxPulsingRegions = 3; // Maximum concurrent pulsing regions
-  export let clickDotRadius = 6; // Radius of the orange dot at click location
-  export let pulseColor = "#ff8c00"; // Orange color for pulses and click dot
+  export let clickRadius = 0.35; // Domain units (half-width of sampling region)
+  export let numTrajectories = 3; // Number of random sample points
+  export let gridPaddingFraction = 0.15; // Padding inside region as fraction of clickRadius
+  export let pulseWidthPixels = 40;
+  export let pulsePauseWidthPixels = 60;
+  export let pulseColor = "#f17720"; // Orange (matching ProbabilityPathIntro)
+
+  // Region box settings
+  export let showRegionBox = true;
+  export let regionBoxColor = "#f17720"; // Orange
+  export let regionBoxLineWidth = 3; // Thicker stroke
+  export let regionBoxPadding = 5; // Padding around the click radius in pixels
+  export let disableDrag = true; // Disable box dragging
+
+  // Source distribution scatter plot settings
+  export let sourceScatterColor = settings.stylingSettings.scatterPlot.color;
+  export let sourceScatterOpacity = settings.stylingSettings.scatterPlot.opacity;
+
+  // Target distribution scatter plot settings
+  export let scatterRadius = settings.stylingSettings.scatterPlot.radius;
+  export let scatterColor = settings.stylingSettings.scatterPlot.color;
+  export let scatterOpacity = settings.stylingSettings.scatterPlot.opacity;
+  export let numScatterSamples = 100;
+
+  // LaTeX label settings
+  export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
+  export let latexLabelOffsetY = 20;
+  export let latexColor = settings.stylingSettings.figureLatex.color;
+
+  // Text label settings
+  export let labelFontSize = 28;
+  export let labelColor = "#666666"; // Same gray as figure captions
+  export let labelLineSpacing = 36;
+
+  // ----------------------------------------------------------------
+  // Data URLs and Model Configuration
+  // ----------------------------------------------------------------
+
+  const trajectoriesUrl = "/flow_invertibility/cached_samples/flow_matching_trajectories.json";
+
+  // FlowModel configuration for runtime sampling
+  const MODEL_CONFIG = { dim: 2, hidden: 64 };
+  const MODEL_PATH = "/crown_jewel/models/flow_model.json";
+  const WORKER_URL = "/crown_jewel/workers/flow_model.worker.js";
+
+  // Hard-coded sample points in domain space (starting points at t=0.5)
+  const HARDCODED_POINTS: [number, number][] = [
+    [0.0, 0.1],   // Center-ish
+    [-0.15, 0.0], // Left
+    [0.15, 0.2],  // Right-bottom
+  ];
 
   // ----------------------------------------------------------------
   // State
   // ----------------------------------------------------------------
 
-  // Background canvas (static heatmap)
-  let bgCanvasElement: HTMLCanvasElement | null = null;
-  const bgCanvas2d = useCanvas2D(width, height);
+  // Data (loaded from files)
+  let allTimeSamples: number[][][] = []; // [timestep][sample][x,y]
+  let targetPoints: number[][] = []; // [[x,y], ...]
 
-  // Foreground canvas (animated pathlines)
+  // Source samples (from t=0)
+  let sourcePoints: number[][] = [];
+
+  // FlowModelClient for runtime sampling
+  let flowModelClient: FlowModelClient | null = null;
+  let isLoadingModel = true;
+
+  // Sampled trajectories from hard-coded points (computed at runtime)
+  let sampledTrajectories: number[][][] = [];  // [sample][step][x,y]
+  let sampledTimeValues: number[] = [];
+
+  // Background canvas (GPU contours for flow)
+  let contourCanvasElement: HTMLCanvasElement | null = null;
+  const contourCanvas = useCanvasWebGPU(width, height);
+
+  // Scatter distribution canvas (source + target scatter plots)
+  let scatterCanvasElement: HTMLCanvasElement | null = null;
+  const scatterCanvas = useCanvas2D(width, height);
+
+  // Foreground canvas (pulses + click dot)
   let fgCanvasElement: HTMLCanvasElement | null = null;
   const fgCanvas2d = useCanvas2D(width, height);
+
+  // Caption derived from children
+  $: caption = children;
 
   let timeline: Timeline<AnimationState> | null = null;
   let figureIsActive: Writable<boolean> | undefined;
   let setupComplete = false;
   let unsubscribeVisibility: (() => void) | null = null;
 
-  // Layout constants
-  const margin = { top: 0, right: 0, bottom: 0, left: 0 };
+  // Scales for dual-panel layout
+  type ScalesType = ReturnType<typeof createSourceTargetScales>;
+  let scales: ScalesType | null = null;
 
-  // Scales (set during setup)
-  let xScale: d3.ScaleLinear<number, number> | null = null;
-  let yScale: d3.ScaleLinear<number, number> | null = null;
+  // Pre-computed scatter plot pixel coords
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
 
-  // Pulsing region state
-  interface PulsingRegionState extends PulsingRegion {
-    isComplete: boolean;
-    backwardRequestId: string | null;
-    forwardRequestId: string | null;
-  }
-  let pulsingRegions: PulsingRegionState[] = [];
-  let pulsingAnimations: Map<string, PulsingRegionAnimation<AnimationState>> =
-    new Map();
-  let clickDotPosition: { x: number; y: number } | null = null;
+  // Contour renderer
+  let contourRenderer: ContourRenderer | null = null;
+  let numFrames = 0;
 
-  // FlowModelClient for dynamic sampling
-  let flowModelClient: FlowModelClient | null = null;
+  // Display time (fixed at SAMPLE_TIME)
+  let displayTime = SAMPLE_TIME;
 
-  type AnimationState = PulsingRegionAnimationState;
+  // Clicked region center point (domain coordinates)
+  let regionCenterDomain: [number, number] | null = null;
+
+  // Sample points within the region (domain coordinates)
+  let regionSamplePoints: number[][] = [];
+
+  // Drag state
+  let isDragging = false;
+  let isHoveringBox = false;
+  let dragStartPos: { x: number; y: number } | null = null;
+  let regionCenterAtDragStart: [number, number] | null = null;
+
+
+  // Animation state
+  type AnimationState = {
+    contourFrameIndex: number;
+    pulsePhase: number;
+  };
+
+  // Pulsing animation
+  let pulsingAnimation: Pulsing2DAnimation<AnimationState> | null = null;
+
+  // Orange color scale for flow contours
+  const orangeColorScale: ColorScaleFn = createLinearColorScale(
+    [1.0, 0.6, 0.0, 0.05], // outer: transparent orange
+    [1.0, 0.35, 0.0, 0.7]  // inner: opaque dark orange
+  );
 
   // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
 
-  function computeValueDomain(trajectories: number[][][]): [number, number] {
-    let min = Infinity;
-    let max = -Infinity;
-    for (const step of trajectories) {
-      for (const sample of step) {
-        const val = sample[0];
-        if (val < min) min = val;
-        if (val > max) max = val;
-      }
-    }
-    const padding = (max - min) * 0.05;
-    return [min - padding, max + padding];
+  /**
+   * Convert domain coordinates to pixel coordinates at a given time t.
+   * At t=0, point is at source center; at t=1, at target center.
+   */
+  function domainToPixelAtTime(x: number, y: number, t: number): [number, number] {
+    if (!scales) return [0, 0];
+
+    // Interpolate the center position based on time
+    const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+
+    // Interpolate the mean position (for proper centering)
+    const meanX = scales.sourceMeanX + t * (scales.targetMeanX - scales.sourceMeanX);
+
+    const pixelX = centerPixelX + (x - meanX) * scales.xScaleFactor;
+    const pixelY = scales.yScale(y);
+
+    return [pixelX, pixelY];
   }
 
-  function toHeatmapPoints(trajectories: number[][][]): number[][] {
-    const points: number[][] = [];
-    const numSteps = trajectories.length;
-    for (let t = 0; t < numSteps; t++) {
-      const time = t / (numSteps - 1);
-      for (const sample of trajectories[t]) {
-        points.push([time, sample[0]]);
+  /**
+   * Convert pixel coordinates back to domain coordinates at a given time t.
+   */
+  function pixelToDomainAtTime(pixelX: number, pixelY: number, t: number): [number, number] {
+    if (!scales) return [0, 0];
+
+    const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    const meanX = scales.sourceMeanX + t * (scales.targetMeanX - scales.sourceMeanX);
+
+    const domainX = (pixelX - centerPixelX) / scales.xScaleFactor + meanX;
+    const domainY = scales.yScale.invert(pixelY);
+
+    return [domainX, domainY];
+  }
+
+  /**
+   * Sample trajectories from hard-coded points using FlowModelClient.
+   * Performs reverse sampling (t=0.5→0) and forward sampling (t=0.5→1),
+   * then combines them into full trajectories.
+   */
+  async function sampleTrajectoriesFromHardcodedPoints(): Promise<void> {
+    if (!flowModelClient) return;
+
+    const NUM_STEPS = 50;  // Steps for each half (reverse and forward)
+
+    try {
+      // Reverse sampling: t=0.5 → t=0
+      const { promise: reversePromise } = flowModelClient.sampleFromInitialPoints(
+        HARDCODED_POINTS,
+        NUM_STEPS,
+        { reverse: true, t_start: 0.5, t_end: 0, scheduler: 'euler_midpoint' }
+      );
+      const reverseTrajectories = await reversePromise; // [step][sample][x,y]
+
+      // Forward sampling: t=0.5 → t=1
+      const { promise: forwardPromise } = flowModelClient.sampleFromInitialPoints(
+        HARDCODED_POINTS,
+        NUM_STEPS,
+        { t_start: 0.5, t_end: 1, scheduler: 'euler_midpoint' }
+      );
+      const forwardTrajectories = await forwardPromise; // [step][sample][x,y]
+
+      // Reverse the reverse trajectories to go t=0 → t=0.5
+      const reversedReverse = reverseTrajectories.slice().reverse();
+
+      // Combine: [t=0 → t=0.5] + [t=0.5 → t=1] (skip first step of forward to avoid duplicate)
+      const fullTrajectories = [...reversedReverse, ...forwardTrajectories.slice(1)];
+
+      // Transpose from [step][sample][x,y] to [sample][step][x,y]
+      const numSteps = fullTrajectories.length;
+      const numSamples = HARDCODED_POINTS.length;
+      sampledTrajectories = [];
+
+      for (let sample = 0; sample < numSamples; sample++) {
+        const traj: number[][] = [];
+        for (let step = 0; step < numSteps; step++) {
+          traj.push(fullTrajectories[step][sample]);
+        }
+        sampledTrajectories.push(traj);
       }
+
+      // Create time values array
+      const totalSteps = numSteps;
+      sampledTimeValues = Array.from({ length: totalSteps }, (_, i) => i / (totalSteps - 1));
+
+      console.log(`Sampled ${sampledTrajectories.length} trajectories with ${numSteps} steps each`);
+    } catch (e) {
+      console.error("Failed to sample trajectories:", e);
     }
-    return points;
   }
 
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
 
-  // Precomputed heatmap density (for GPU acceleration)
-  let precomputedHeatmap: PrecomputedHeatmap | null = null;
-
   async function runInitialComputation() {
-    const bgCtx = bgCanvas2d.ctx;
-    if (!bgCtx || trajectories.length === 0) return;
+    if (allTimeSamples.length === 0 || targetPoints.length === 0) return;
 
-    const numSteps = trajectories.length;
-    const numSamples = trajectories[0].length;
-    const valueDomain = computeValueDomain(trajectories);
+    numFrames = allTimeSamples.length;
 
-    // Create scales
-    xScale = d3.scaleLinear().domain([0, 1]).range([margin.left, margin.left + plotWidth]);
-    yScale = d3.scaleLinear().domain(valueDomain).range([margin.top + plotHeight, margin.top]);
+    // Create dual-panel scales
+    scales = createSourceTargetScales(
+      sourcePoints as [number, number][],
+      targetPoints as [number, number][],
+      { width, height, marginWidth, marginHeight, sourceCenterX, targetCenterX, yShiftFactor, distributionScaleFactor }
+    );
 
-    // Draw static heatmap on background canvas (GPU-accelerated)
-    const heatmapPoints = toHeatmapPoints(trajectories);
-    const domain: [number, number, number, number] = [0, 1, valueDomain[0], valueDomain[1]];
+    // Randomly subsample and pre-compute pixel coordinates for source (left panel)
+    const sampledSourcePoints = sourcePoints.length <= numScatterSamples
+      ? sourcePoints
+      : sourcePoints
+          .map((pt) => ({ pt, sort: Math.random() }))
+          .sort((a, b) => a.sort - b.sort)
+          .slice(0, numScatterSamples)
+          .map(({ pt }) => pt);
 
-    // Precompute density on GPU (falls back to CPU if unavailable)
-    const startTime = performance.now();
-    precomputedHeatmap = await precomputeHeatmap(heatmapPoints, {
-      resolution: heatmapResolution,
-      bandwidth: 5,
-      domain,
-    });
-    const endTime = performance.now();
-    console.log(`Heatmap precomputed on ${precomputedHeatmap.backend} in ${(endTime - startTime).toFixed(1)}ms`);
+    sourcePixelCoords = sampledSourcePoints.map(([x, y]) => [
+      scales!.sourceCenterPixelX + (x - scales!.sourceMeanX) * scales!.xScaleFactor,
+      scales!.yScale(y)
+    ]);
 
-    // Draw using precomputed density
-    drawHeatmap(bgCtx, heatmapPoints, {
-      precomputed: precomputedHeatmap,
-      colorScale,
-      opacity: 0.9,
-      bounds: { x: margin.left, y: margin.top, width: plotWidth, height: plotHeight },
-    });
+    // Randomly subsample and pre-compute pixel coordinates for target (right panel)
+    const sampledTargetPoints = targetPoints.length <= numScatterSamples
+      ? targetPoints
+      : targetPoints
+          .map((pt) => ({ pt, sort: Math.random() }))
+          .sort((a, b) => a.sort - b.sort)
+          .slice(0, numScatterSamples)
+          .map(({ pt }) => pt);
+
+    targetPixelCoords = sampledTargetPoints.map(([x, y]) => [
+      scales!.targetCenterPixelX + (x - scales!.targetMeanX) * scales!.xScaleFactor,
+      scales!.yScale(y)
+    ]);
+
+    // Create contour renderer for flow animation
+    if (contourCanvasElement) {
+      // Compute domain from all samples
+      let xMin = Infinity, xMax = -Infinity;
+      let yMin = Infinity, yMax = -Infinity;
+      for (const samples of allTimeSamples) {
+        for (const [x, y] of samples) {
+          if (x < xMin) xMin = x;
+          if (x > xMax) xMax = x;
+          if (y < yMin) yMin = y;
+          if (y > yMax) yMax = y;
+        }
+      }
+      const padding = 0.1;
+      const xPad = (xMax - xMin) * padding;
+      const yPad = (yMax - yMin) * padding;
+      const contourDomain: ContourDomain = {
+        xMin: xMin - xPad,
+        xMax: xMax + xPad,
+        yMin: yMin - yPad,
+        yMax: yMax + yPad,
+      };
+
+      contourRenderer = await ContourRenderer.create({
+        canvas: contourCanvasElement,
+        gridSize: contourGridSize,
+        bandwidth: contourBandwidth,
+        thresholds: contourThresholds,
+        opacity: contourOpacity,
+        colorScale: orangeColorScale,
+        preferGPU: true,
+      });
+
+      // Load all frames with time-based positioning
+      for (let t = 0; t < numFrames; t++) {
+        const normalizedT = t / (numFrames - 1);
+
+        // Transform points to pixel space - always display at center position
+        // Flip y for GPU contour renderer (GPU uses bottom-left origin)
+        const pixelPoints = allTimeSamples[t].map(([x, y]) => {
+          const [px, py] = domainToPixelAtTime(x, y, DISPLAY_POSITION);
+          return [px, height - py];
+        });
+
+        // Create a pixel-space domain for the contour renderer
+        const pixelDomain: ContourDomain = {
+          xMin: 0,
+          xMax: width,
+          yMin: 0,
+          yMax: height,
+        };
+
+        contourRenderer.setPointsForFrame(t, pixelPoints, pixelDomain);
+      }
+      await contourRenderer.computeAllFrames();
+      console.log(`ContourRenderer: ${numFrames} frames computed (backend: ${contourRenderer.backend})`);
+    }
   }
 
   // ----------------------------------------------------------------
@@ -163,20 +394,29 @@
 
   function setupTimeline() {
     timeline = new Timeline<AnimationState>();
-    timeline.initialState = { pulsePhase: 0 };
+
+    // Fixed frame at CONTOUR_TIME (0.9 for smiley face appearance)
+    const fixedFrameIndex = Math.round(CONTOUR_TIME * (numFrames - 1));
+
+    timeline.initialState = {
+      pulsePhase: 0,
+      contourFrameIndex: fixedFrameIndex, // Fixed, no animation
+    };
     timeline.looping = true;
     timeline.duration = animationDuration;
 
-    // Add a clip for the pulse phase (continuous loop)
+    // Only pulse phase animation (2 loops per timeline cycle)
     timeline.add(
       {
         name: "PulsePhase",
-        reduce: (t: number) => ({ pulsePhase: (t * 2) % 1 }), // 2x speed for pulses
+        reduce: (t: number) => ({ pulsePhase: (t * 2) % 1 }),
       },
       { start: 0, end: 1 }
     );
 
-    timeline.onTick((_, state) => draw(state));
+    timeline.onTick((t, state) => {
+      draw(state);
+    });
   }
 
   // ----------------------------------------------------------------
@@ -184,21 +424,125 @@
   // ----------------------------------------------------------------
 
   function draw(state: AnimationState) {
-    const ctx = fgCanvas2d.ctx;
-    if (!ctx || !xScale || !yScale) return;
-    ctx.clearRect(0, 0, width, height);
+    if (!scales) return;
 
-    // --- Draw pulsing region animations ---
-    for (const animation of pulsingAnimations.values()) {
-      animation.draw(state);
+    // 1. Draw flow contour frame on WebGPU canvas
+    if (contourRenderer && numFrames > 0) {
+      const frameIdx = Math.max(0, Math.min(state.contourFrameIndex, numFrames - 1));
+      contourRenderer.drawFrame(frameIdx);
     }
 
-    // --- Draw orange dot at click location ---
-    if (clickDotPosition) {
+    // 2. Draw source + target scatter on scatter canvas
+    const scatterCtx = scatterCanvas.ctx;
+    if (scatterCtx) {
+      scatterCtx.clearRect(0, 0, width, height);
+      // Source (left)
+      drawScatterPlot(scatterCtx, sourcePixelCoords, scatterRadius, sourceScatterColor, sourceScatterOpacity);
+      // Target (right)
+      drawScatterPlot(scatterCtx, targetPixelCoords, scatterRadius, scatterColor, scatterOpacity);
+    }
+
+    // 3. Draw dynamic foreground on Canvas2D
+    const ctx = fgCanvas2d.ctx;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw LaTeX labels (p_0, p_1) at the bottom of their distributions
+    const yDomain = scales.yScale.domain();
+    const yBottom = yDomain[1];
+    const textLabelY = scales.yScale(yBottom) + 15; // Below the distribution
+
+    // Source distribution label (p_0) - using MathJax
+    drawMathjax(
+      ctx,
+      "p_0",
+      scales.sourceCenterPixelX,
+      textLabelY,
+      latexFontSize,
+      0, 0,
+      { color: labelColor },
+      () => timeline?.tick(timeline.time)
+    );
+
+    // Target distribution label (p_1) - using MathJax
+    drawMathjax(
+      ctx,
+      "p_1",
+      scales.targetCenterPixelX,
+      textLabelY,
+      latexFontSize,
+      0, 0,
+      { color: labelColor },
+      () => timeline?.tick(timeline.time)
+    );
+
+    // Center distribution label (p_t) - using MathJax
+    const centerPixelX = (scales.sourceCenterPixelX + scales.targetCenterPixelX) / 2;
+    drawMathjax(
+      ctx,
+      "p_t",
+      centerPixelX,
+      textLabelY,
+      latexFontSize,
+      0, 0,
+      { color: labelColor },
+      () => timeline?.tick(timeline.time)
+    );
+
+    // Draw dashed region box around clicked area
+    if (showRegionBox && regionCenterDomain) {
+      const [cx, cy] = regionCenterDomain;
+      const centerPixel = domainToPixelAtTime(cx, cy, DISPLAY_POSITION);
+
+      // Convert clickRadius from domain to pixel space (approximate)
+      const radiusPixels = clickRadius * scales.xScaleFactor + regionBoxPadding;
+
+      ctx.save();
+      ctx.strokeStyle = regionBoxColor;
+      ctx.lineWidth = regionBoxLineWidth;
+      ctx.setLineDash([4, 4]); // Dashed line pattern
+
+      ctx.strokeRect(
+        centerPixel[0] - radiusPixels,
+        centerPixel[1] - radiusPixels,
+        radiusPixels * 2,
+        radiusPixels * 2
+      );
+
+      ctx.restore();
+
+      // Draw "S" label above the box
+      drawMathjax(
+        ctx,
+        "S",
+        centerPixel[0],
+        centerPixel[1] - radiusPixels - 15,
+        latexFontSize,
+        0, 0,
+        { color: regionBoxColor },
+        () => timeline?.tick(timeline.time)
+      );
+    }
+
+    // Draw pulsing trajectories
+    if (pulsingAnimation) {
+      pulsingAnimation.draw(state);
+    }
+
+    // Draw dots at sample points within the region
+    if (regionSamplePoints.length > 0) {
       ctx.fillStyle = pulseColor;
-      ctx.beginPath();
-      ctx.arc(clickDotPosition.x, clickDotPosition.y, clickDotRadius, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.globalAlpha = 0.9;
+      const dotRadius = 2.5;
+
+      for (const [sx, sy] of regionSamplePoints) {
+        const [px, py] = domainToPixelAtTime(sx, sy, DISPLAY_POSITION);
+        ctx.beginPath();
+        ctx.arc(px, py, dotRadius, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -208,192 +552,159 @@
 
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
-  function cancelAllActiveRequests() {
-    // Cancel all in-progress trajectory requests
-    for (const region of pulsingRegions) {
-      if (region.backwardRequestId && flowModelClient) {
-        flowModelClient.stopRequest(region.backwardRequestId);
-      }
-      if (region.forwardRequestId && flowModelClient) {
-        flowModelClient.stopRequest(region.forwardRequestId);
-      }
-    }
+
+  /**
+   * Check if a pixel coordinate is inside the region box.
+   */
+  function isPointInBox(pixelX: number, pixelY: number): boolean {
+    if (!regionCenterDomain || !scales) return false;
+    const [cx, cy] = regionCenterDomain;
+    const centerPixel = domainToPixelAtTime(cx, cy, DISPLAY_POSITION);
+    const radiusPixels = clickRadius * scales.xScaleFactor + regionBoxPadding;
+
+    return (
+      pixelX >= centerPixel[0] - radiusPixels &&
+      pixelX <= centerPixel[0] + radiusPixels &&
+      pixelY >= centerPixel[1] - radiusPixels &&
+      pixelY <= centerPixel[1] + radiusPixels
+    );
   }
 
-  function handleCanvasClick(event: MouseEvent) {
-    if (!flowModelClient || !fgCanvasElement || !xScale || !yScale) return;
-
-    // Get click position in pixel coordinates
+  function handleMouseDown(event: MouseEvent) {
+    if (!fgCanvasElement || disableDrag) return;
     const rect = fgCanvasElement.getBoundingClientRect();
     const scaleX = width / rect.width;
     const scaleY = height / rect.height;
-    const clickX = (event.clientX - rect.left) * scaleX;
-    const clickY = (event.clientY - rect.top) * scaleY;
+    const mouseX = (event.clientX - rect.left) * scaleX;
+    const mouseY = (event.clientY - rect.top) * scaleY;
 
-    // Get time and value from click position
-    const t_click = xScale.invert(clickX);
-    const domainY = yScale.invert(clickY);
+    if (isPointInBox(mouseX, mouseY)) {
+      isDragging = true;
+      dragStartPos = { x: mouseX, y: mouseY };
+      regionCenterAtDragStart = regionCenterDomain ? [...regionCenterDomain] : null;
 
-    // Clamp t_click to valid range (avoid exact 0 or 1)
-    const clampedT = Math.max(0.01, Math.min(0.99, t_click));
-
-    // Sample multiple points in vertical radius
-    const sampleYValues: number[] = [];
-    for (let i = 0; i < numClickSamples; i++) {
-      const offset =
-        numClickSamples > 1
-          ? clickRadius * (2 * i / (numClickSamples - 1) - 1)
-          : 0;
-      sampleYValues.push(domainY + offset);
+      // Clear current trajectories while dragging
+      pulsingAnimation = null;
+      regionSamplePoints = [];
     }
-
-    // Start pulsing region sampling
-    startPulsingRegionSampling(clampedT, domainY, sampleYValues);
   }
 
-  function startPulsingRegionSampling(
-    t_click: number,
-    clickY: number,
-    sampleYValues: number[]
-  ) {
-    if (!flowModelClient || !xScale || !yScale) return;
-    const ctx = fgCanvas2d.ctx;
-    if (!ctx) return;
+  function handleMouseMove(event: MouseEvent) {
+    if (!fgCanvasElement) return;
 
-    // Calculate steps proportional to time distance
-    const backwardSteps = Math.max(10, Math.round(numSamplingSteps * t_click));
-    const forwardSteps = Math.max(
-      10,
-      Math.round(numSamplingSteps * (1 - t_click))
+    // Don't update hover state when dragging is disabled
+    if (disableDrag) {
+      isHoveringBox = false;
+      return;
+    }
+
+    const rect = fgCanvasElement.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const mouseX = (event.clientX - rect.left) * scaleX;
+    const mouseY = (event.clientY - rect.top) * scaleY;
+
+    // Update hover state
+    isHoveringBox = isPointInBox(mouseX, mouseY);
+
+    // Handle dragging
+    if (isDragging && dragStartPos && regionCenterAtDragStart && scales) {
+      const deltaX = mouseX - dragStartPos.x;
+      const deltaY = mouseY - dragStartPos.y;
+
+      // Convert pixel delta to domain delta
+      const domainDeltaX = deltaX / scales.xScaleFactor;
+      // Y scale: pixel Y increases downward, but yScale maps domain to pixel correctly
+      // We need to use the same scale factor as X (assuming uniform scaling)
+      const domainDeltaY = deltaY / scales.xScaleFactor;
+
+      // Update region center
+      regionCenterDomain = [
+        regionCenterAtDragStart[0] + domainDeltaX,
+        regionCenterAtDragStart[1] + domainDeltaY
+      ];
+
+      // Redraw to show updated box position
+      if (timeline) {
+        draw(timeline.state);
+      }
+    }
+  }
+
+  function handleMouseUp() {
+    if (isDragging && regionCenterDomain) {
+      isDragging = false;
+      dragStartPos = null;
+      regionCenterAtDragStart = null;
+
+      // Trajectories are fixed from hard-coded points, just redraw
+      if (timeline) {
+        draw(timeline.state);
+      }
+    }
+  }
+
+  function handleMouseLeave() {
+    isHoveringBox = false;
+    if (isDragging) {
+      isDragging = false;
+      dragStartPos = null;
+      regionCenterAtDragStart = null;
+    }
+  }
+
+
+  /**
+   * Update trajectories for the region using sampled trajectories from hard-coded points.
+   * Creates a Pulsing2DAnimation from the runtime-sampled trajectories.
+   */
+  function updateTrajectoriesForRegion() {
+    if (!scales || sampledTrajectories.length === 0) return;
+
+    // Compute the region center from hard-coded points
+    const meanX = HARDCODED_POINTS.reduce((sum, p) => sum + p[0], 0) / HARDCODED_POINTS.length;
+    const meanY = HARDCODED_POINTS.reduce((sum, p) => sum + p[1], 0) / HARDCODED_POINTS.length;
+    regionCenterDomain = [meanX, meanY];
+
+    // Use the hard-coded points as the sample points for drawing dots in the box
+    regionSamplePoints = HARDCODED_POINTS.map(p => [p[0], p[1]]);
+
+    // Convert full trajectories to pixel coordinates (t=0 to t=1)
+    const pixelTrajectories = sampledTrajectories.map(traj =>
+      traj.map((pt, idx) => {
+        const t = sampledTimeValues[idx] ?? 0;
+        return domainToPixelAtTime(pt[0], pt[1], t);
+      })
     );
 
-    // Generate stable ID for this region
-    const regionId = crypto.randomUUID();
+    console.log(`Using ${sampledTrajectories.length} sampled trajectories with ${sampledTrajectories[0]?.length || 0} steps`);
 
-    // Initialize trajectories for each sample point
-    const backwardTrajectories: number[][][] = sampleYValues.map((y) => [
-      [xScale!(t_click), yScale!(y)],
-    ]);
-    const forwardTrajectories: number[][][] = sampleYValues.map((y) => [
-      [xScale!(t_click), yScale!(y)],
-    ]);
-
-    // Initialize new region
-    const newRegion: PulsingRegionState = {
-      id: regionId,
-      clickTime: t_click,
-      clickY: clickY,
-      backwardTrajectories,
-      forwardTrajectories,
-      isComplete: false,
-      backwardRequestId: null,
-      forwardRequestId: null,
+    // Create Pulsing2DAnimation with arrow heads
+    const region: Pulsing2DRegion = {
+      id: crypto.randomUUID(),
+      clickPoint: [0, 0],
+      trajectories: pixelTrajectories,
     };
 
-    // Clear all previous regions and animations (one click overwrites the old one)
-    cancelAllActiveRequests();
-    for (const anim of pulsingAnimations.values()) {
-      anim.destroy();
-    }
-    pulsingAnimations.clear();
-    pulsingRegions = [newRegion];
-
-    // Store click position for drawing orange dot
-    clickDotPosition = { x: xScale!(t_click), y: yScale!(clickY) };
-
-    // Helper to find region by ID
-    const findRegion = () => pulsingRegions.find((r) => r.id === regionId);
-
-    // Create and initialize the pulsing animation
-    const animation = new PulsingRegionAnimation<AnimationState>({
-      region: newRegion,
-      xScale: xScale!,
-      pulseTimeWindow,
+    pulsingAnimation = new Pulsing2DAnimation({
+      region,
       pulseWidthPixels,
       pulsePauseWidthPixels,
+      baseOpacity: 0.8,
       color: pulseColor,
       strokeWidth: 2.5,
-      baseOpacity: 0.8,
+      showPreview: true,
+      previewOpacity: 0.3,
+      showHeadMarker: false,
+      showArrowHeads: true,
+      arrowHeadRadius: 6,
     });
-    animation.init(ctx);
-    pulsingAnimations.set(regionId, animation);
 
-    // Prepare initial points for batch sampling
-    const initialPoints = sampleYValues.map((y) => [y]);
-
-    // Start BACKWARD sampling (t_click → 0) with streaming
-    const backwardResult = flowModelClient.sampleFromInitialPoints(
-      initialPoints,
-      backwardSteps,
-      { t_start: t_click, t_end: 0 },
-      (step: number, x_t: number[][]) => {
-        const region = findRegion();
-        if (!region || !xScale || !yScale) return;
-        const t = t_click - (t_click * (step + 1)) / backwardSteps;
-        // Prepend to each sample's backward trajectory
-        for (let i = 0; i < sampleYValues.length; i++) {
-          region.backwardTrajectories[i] = [
-            [xScale(t), yScale(x_t[i][0])],
-            ...region.backwardTrajectories[i],
-          ];
-        }
-        // Update animation with new data
-        const anim = pulsingAnimations.get(regionId);
-        if (anim) anim.updateRegion(region);
-        pulsingRegions = [...pulsingRegions];
-      }
-    );
-
-    // Store request ID
-    const region = findRegion();
-    if (region) region.backwardRequestId = backwardResult.requestId;
-
-    // Start FORWARD sampling (t_click → 1) with streaming
-    const forwardResult = flowModelClient.sampleFromInitialPoints(
-      initialPoints,
-      forwardSteps,
-      { t_start: t_click, t_end: 1 },
-      (step: number, x_t: number[][]) => {
-        const region = findRegion();
-        if (!region || !xScale || !yScale) return;
-        const t = t_click + ((1 - t_click) * (step + 1)) / forwardSteps;
-        // Append to each sample's forward trajectory
-        for (let i = 0; i < sampleYValues.length; i++) {
-          region.forwardTrajectories[i] = [
-            ...region.forwardTrajectories[i],
-            [xScale(t), yScale(x_t[i][0])],
-          ];
-        }
-        // Update animation with new data
-        const anim = pulsingAnimations.get(regionId);
-        if (anim) anim.updateRegion(region);
-        pulsingRegions = [...pulsingRegions];
-      }
-    );
-
-    if (region) region.forwardRequestId = forwardResult.requestId;
-    pulsingRegions = [...pulsingRegions];
-
-    // Mark complete when both finish
-    Promise.all([backwardResult.promise, forwardResult.promise])
-      .then(() => {
-        const region = findRegion();
-        if (region) {
-          region.isComplete = true;
-          region.backwardRequestId = null;
-          region.forwardRequestId = null;
-          pulsingRegions = [...pulsingRegions];
-        }
-      })
-      .catch((error) => {
-        console.error("Pulsing region sampling failed:", error);
-        const region = findRegion();
-        if (region) {
-          region.backwardRequestId = null;
-          region.forwardRequestId = null;
-          pulsingRegions = [...pulsingRegions];
-        }
-      });
+    // Initialize with canvas context
+    const ctx = fgCanvas2d.ctx;
+    if (ctx) {
+      pulsingAnimation.init(ctx);
+    }
   }
 
   // ----------------------------------------------------------------
@@ -403,9 +714,9 @@
   async function trySetup() {
     if (setupComplete) return;
 
-    const bgCtx = bgCanvas2d.ctx;
     const fgCtx = fgCanvas2d.ctx;
-    if (!bgCtx || !fgCtx || trajectories.length === 0) return;
+    if (!fgCtx || !contourCanvasElement || !scatterCanvasElement || allTimeSamples.length === 0 || targetPoints.length === 0) return;
+    if (sampledTrajectories.length === 0) return; // Wait for sampling to complete
 
     setupComplete = true;
 
@@ -415,26 +726,60 @@
     if (timeline) {
       draw(timeline.initialState);
       timeline.play();
+
+      // Use sampled trajectories from hard-coded points
+      console.log("Setting up trajectories from hard-coded points");
+      updateTrajectoriesForRegion();
     }
   }
 
-  onMount(() => {
-    if (bgCanvasElement) {
-      bgCanvas2d.init(bgCanvasElement);
-      bgCanvas2d.resize(width, height);
+  onMount(async () => {
+    if (contourCanvasElement) {
+      contourCanvas.init(contourCanvasElement);
+      contourCanvas.resize(width, height);
+    }
+    if (scatterCanvasElement) {
+      scatterCanvas.init(scatterCanvasElement);
+      scatterCanvas.resize(width, height);
     }
     if (fgCanvasElement) {
       fgCanvas2d.init(fgCanvasElement);
       fgCanvas2d.resize(width, height);
     }
 
-    // Initialize FlowModelClient for user trajectory sampling
-    flowModelClient = new FlowModelClient(
-      `${base}${workerUrl}`,
-      `${base}${modelPath}`,
-      "Flow Matching",
-      { dim: 1, hidden: 64 }
-    );
+    // Load trajectory data for contour animation (from flow_invertibility)
+    try {
+      const result = await loadCachedTrajectories(`${base}${trajectoriesUrl}`);
+      if (result) {
+        // Clip trajectories to samples starting within radius (same as ProbabilityPathIntro)
+        const clippingRadius = settings.stylingSettings.scatterPlot.clippingRadius;
+        const clippedTrajectories = clipTrajectoriesToStartingRadius(result.trajectories, clippingRadius);
+        allTimeSamples = clippedTrajectories;
+        // Extract source (t=0) and target (t=1) from clipped trajectories
+        sourcePoints = clippedTrajectories[0] || [];
+        targetPoints = clippedTrajectories[clippedTrajectories.length - 1] || [];
+      }
+    } catch (e) {
+      console.warn("Failed to load CrownJewel data:", e);
+    }
+
+    // Initialize FlowModelClient and sample trajectories from hard-coded points
+    try {
+      isLoadingModel = true;
+      flowModelClient = new FlowModelClient(
+        `${base}${WORKER_URL}`,
+        `${base}${MODEL_PATH}`,
+        'Flow Matching',
+        MODEL_CONFIG
+      );
+
+      await sampleTrajectoriesFromHardcodedPoints();
+      isLoadingModel = false;
+      console.log("FlowModelClient initialized and trajectories sampled");
+    } catch (e) {
+      console.warn("Failed to initialize FlowModelClient:", e);
+      isLoadingModel = false;
+    }
 
     trySetup();
   });
@@ -442,22 +787,15 @@
   onDestroy(() => {
     timeline?.dispose();
     unsubscribeVisibility?.();
-    cancelAllActiveRequests();
-    // Clean up pulsing animations
-    for (const anim of pulsingAnimations.values()) {
-      anim.destroy();
-    }
-    pulsingAnimations.clear();
+    contourRenderer?.destroy();
+    cancelAllPendingRequests();
   });
 
   // ----------------------------------------------------------------
   // Reactive Blocks
   // ----------------------------------------------------------------
 
-  $: plotWidth = width - margin.left - margin.right;
-  $: plotHeight = height - margin.top - margin.bottom;
-
-  $: if (trajectories.length > 0 && !setupComplete) {
+  $: if (allTimeSamples.length > 0 && targetPoints.length > 0 && sampledTrajectories.length > 0 && !setupComplete) {
     trySetup();
   }
 
@@ -468,53 +806,44 @@
   }
 </script>
 
-<Figure bind:isActive={figureIsActive} backgroundVisible={false}>
-  <div class="plot-container">
-    <div class="vertical-label left-label">Source Distribution</div>
+<div class="crown-jewel-equation">
+  <Katex math={"\\frac{d}{dt} \\int_V p_t(x) \\, dx = - \\oint_S v_t p_t \\cdot dS"} displayMode={true} />
+</div>
+
+<Figure {caption} bind:isActive={figureIsActive} backgroundVisible={false}>
+  <div class="crown-jewel-wrapper">
     <div class="canvas-stack" style="width: {width}px; height: {height}px;">
-      <canvas class="bg-canvas" bind:this={bgCanvasElement}></canvas>
+      <!-- Scatter plots layer (bottom) -->
+      <canvas class="scatter-canvas" bind:this={scatterCanvasElement} style="pointer-events: none;"></canvas>
+      <!-- Flow contours layer (middle) -->
+      <canvas class="contour-canvas" bind:this={contourCanvasElement} style="pointer-events: none;"></canvas>
+      <!-- Foreground: pulsing trajectories (top layer, handles drag events) -->
       <canvas
         class="fg-canvas"
         bind:this={fgCanvasElement}
-        on:click={handleCanvasClick}
-        style="cursor: pointer;"
+        on:mousedown={handleMouseDown}
+        on:mousemove={handleMouseMove}
+        on:mouseup={handleMouseUp}
+        on:mouseleave={handleMouseLeave}
+        style="cursor: {disableDrag ? 'default' : isDragging ? 'grabbing' : isHoveringBox ? 'grab' : 'default'};"
       ></canvas>
     </div>
-    <div class="vertical-label right-label">Target Distribution</div>
   </div>
 </Figure>
 
 <style>
-  :global(.figure-content) {
-    flex-direction: column;
+  .crown-jewel-equation {
+    text-align: center;
+    margin-bottom: 1rem;
+    font-size: 1.4rem;
+    color: #374151;
   }
 
-  .plot-container {
+  .crown-jewel-wrapper {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
     width: 100%;
-    padding: 24px 24px 0 24px;
-    box-sizing: border-box;
-  }
-
-  .vertical-label {
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-weight: 300;
-    font-size: 24px;
-    color: #555;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    white-space: nowrap;
-  }
-
-  .left-label {
-    transform: rotate(180deg);
-  }
-
-  .right-label {
-    /* Already oriented correctly with vertical-rl */
   }
 
   .canvas-stack {
@@ -522,6 +851,7 @@
     border-radius: 8px;
     overflow: hidden;
     background: transparent;
+    margin: 0 auto;
   }
 
   .canvas-stack canvas {
@@ -532,12 +862,18 @@
     height: 100%;
   }
 
-  .bg-canvas {
+  .scatter-canvas {
     background: transparent;
+    z-index: 1;
+  }
+
+  .contour-canvas {
+    background: transparent;
+    z-index: 2;
   }
 
   .fg-canvas {
     background: transparent;
+    z-index: 3;
   }
-
 </style>
