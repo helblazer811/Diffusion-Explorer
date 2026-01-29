@@ -142,11 +142,13 @@ fn boxBlurHorizontal(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let invWindow = 1.0 / f32(windowSize);
   let width = i32(blurUniforms.gridWidth);
 
-  // Accumulate window sum with clamped edge handling
+  // Accumulate window sum with zero-padding (out-of-bounds samples contribute 0)
   var sum = 0.0;
   for (var dx = -radius; dx <= radius; dx++) {
-    let sx = clamp(i32(x) + dx, 0, width - 1);
-    sum += inputGrid[y * blurUniforms.gridWidth + u32(sx)];
+    let sx = i32(x) + dx;
+    if (sx >= 0 && sx < width) {
+      sum += inputGrid[y * blurUniforms.gridWidth + u32(sx)];
+    }
   }
 
   outputGrid[idx] = sum * invWindow;
@@ -172,11 +174,13 @@ fn boxBlurVertical(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let invWindow = 1.0 / f32(windowSize);
   let height = i32(blurUniforms.gridHeight);
 
-  // Accumulate window sum with clamped edge handling
+  // Accumulate window sum with zero-padding (out-of-bounds samples contribute 0)
   var sum = 0.0;
   for (var dy = -radius; dy <= radius; dy++) {
-    let sy = clamp(i32(y) + dy, 0, height - 1);
-    sum += inputGrid[u32(sy) * blurUniforms.gridWidth + x];
+    let sy = i32(y) + dy;
+    if (sy >= 0 && sy < height) {
+      sum += inputGrid[u32(sy) * blurUniforms.gridWidth + x];
+    }
   }
 
   outputGrid[idx] = sum * invWindow;
