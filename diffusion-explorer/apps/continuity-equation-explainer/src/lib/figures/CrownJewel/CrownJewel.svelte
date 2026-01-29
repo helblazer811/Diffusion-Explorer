@@ -17,7 +17,7 @@
   import { clipTrajectoriesToStartingRadius, loadCachedTrajectories, FlowModelClient, cancelAllPendingRequests } from "@diffusion-explorer/diffusion";
   import { base } from "$app/paths";
   import { settings } from "$lib/settings";
-  import { Pulsing2DAnimation, type Pulsing2DRegion } from "./Pulsing2DAnimation";
+  import { PulsingPathlineAnimation, type PulsingPathlineAnimationState } from "@diffusion-explorer/ui";
   import { Katex } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
@@ -136,9 +136,12 @@
   let scatterCanvasElement: HTMLCanvasElement | null = null;
   const scatterCanvas = useCanvas2D(width, height);
 
-  // Foreground canvas (pulses + click dot)
+  // Foreground canvas (pulses + click dot + labels)
   let fgCanvasElement: HTMLCanvasElement | null = null;
   const fgCanvas2d = useCanvas2D(width, height);
+
+  // Pulsing canvas (WebGPU for GPU-accelerated pulse animation)
+  let pulsingCanvasElement: HTMLCanvasElement | null = null;
 
   // Caption derived from children
   $: caption = children;
@@ -177,13 +180,13 @@
 
 
   // Animation state
-  type AnimationState = {
+  type AnimationState = PulsingPathlineAnimationState & {
     contourFrameIndex: number;
     pulsePhase: number;
   };
 
-  // Pulsing animation
-  let pulsingAnimation: Pulsing2DAnimation<AnimationState> | null = null;
+  // Pulsing animation (GPU-accelerated)
+  let pulsingAnimation: PulsingPathlineAnimation<AnimationState> | null = null;
 
   // Orange color scale for flow contours
   const orangeColorScale: ColorScaleFn = createLinearColorScale(
@@ -399,17 +402,22 @@
     const fixedFrameIndex = Math.round(CONTOUR_TIME * (numFrames - 1));
 
     timeline.initialState = {
+      pulsingPathlinePhase: 0,
       pulsePhase: 0,
       contourFrameIndex: fixedFrameIndex, // Fixed, no animation
     };
     timeline.looping = true;
     timeline.duration = animationDuration;
 
-    // Only pulse phase animation (2 loops per timeline cycle)
+    // Pulse phase animation (2 loops per timeline cycle)
+    // Update both pulsePhase (legacy) and pulsingPathlinePhase (GPU animation)
     timeline.add(
       {
         name: "PulsePhase",
-        reduce: (t: number) => ({ pulsePhase: (t * 2) % 1 }),
+        reduce: (t: number) => ({
+          pulsePhase: (t * 2) % 1,
+          pulsingPathlinePhase: (t * 2) % 1,
+        }),
       },
       { start: 0, end: 1 }
     );
@@ -524,9 +532,9 @@
       );
     }
 
-    // Draw pulsing trajectories
+    // Draw pulsing trajectories (GPU - on separate canvas)
     if (pulsingAnimation) {
-      pulsingAnimation.draw(state);
+      pulsingAnimation.draw(state, [0, 0, 0, 0]); // Clear with transparent
     }
 
     // Draw dots at sample points within the region
@@ -656,10 +664,10 @@
 
   /**
    * Update trajectories for the region using sampled trajectories from hard-coded points.
-   * Creates a Pulsing2DAnimation from the runtime-sampled trajectories.
+   * Creates a PulsingPathlineAnimation (GPU) from the runtime-sampled trajectories.
    */
-  function updateTrajectoriesForRegion() {
-    if (!scales || sampledTrajectories.length === 0) return;
+  async function updateTrajectoriesForRegion() {
+    if (!scales || sampledTrajectories.length === 0 || !pulsingCanvasElement) return;
 
     // Compute the region center from hard-coded points
     const meanX = HARDCODED_POINTS.reduce((sum, p) => sum + p[0], 0) / HARDCODED_POINTS.length;
@@ -679,32 +687,24 @@
 
     console.log(`Using ${sampledTrajectories.length} sampled trajectories with ${sampledTrajectories[0]?.length || 0} steps`);
 
-    // Create Pulsing2DAnimation with arrow heads
-    const region: Pulsing2DRegion = {
-      id: crypto.randomUUID(),
-      clickPoint: [0, 0],
-      trajectories: pixelTrajectories,
-    };
+    // Destroy existing animation if any
+    if (pulsingAnimation) {
+      pulsingAnimation.destroy();
+    }
 
-    pulsingAnimation = new Pulsing2DAnimation({
-      region,
-      pulseWidthPixels,
-      pulsePauseWidthPixels,
+    // Create GPU-accelerated PulsingPathlineAnimation
+    pulsingAnimation = PulsingPathlineAnimation.create<AnimationState>({
+      paths: pixelTrajectories,
+      pulseWidth: pulseWidthPixels,
+      pulseGap: pulsePauseWidthPixels,
       baseOpacity: 0.8,
       color: pulseColor,
-      strokeWidth: 2.5,
-      showPreview: true,
-      previewOpacity: 0.3,
-      showHeadMarker: false,
-      showArrowHeads: true,
-      arrowHeadRadius: 6,
+      thickness: 2.5,
+      loopMultiplier: 1, // Timeline already does 2x
     });
 
-    // Initialize with canvas context
-    const ctx = fgCanvas2d.ctx;
-    if (ctx) {
-      pulsingAnimation.init(ctx);
-    }
+    // Initialize with WebGPU canvas
+    await pulsingAnimation.init(pulsingCanvasElement);
   }
 
   // ----------------------------------------------------------------
@@ -715,7 +715,7 @@
     if (setupComplete) return;
 
     const fgCtx = fgCanvas2d.ctx;
-    if (!fgCtx || !contourCanvasElement || !scatterCanvasElement || allTimeSamples.length === 0 || targetPoints.length === 0) return;
+    if (!fgCtx || !contourCanvasElement || !scatterCanvasElement || !pulsingCanvasElement || allTimeSamples.length === 0 || targetPoints.length === 0) return;
     if (sampledTrajectories.length === 0) return; // Wait for sampling to complete
 
     setupComplete = true;
@@ -727,9 +727,9 @@
       draw(timeline.initialState);
       timeline.play();
 
-      // Use sampled trajectories from hard-coded points
+      // Use sampled trajectories from hard-coded points (GPU animation)
       console.log("Setting up trajectories from hard-coded points");
-      updateTrajectoriesForRegion();
+      await updateTrajectoriesForRegion();
     }
   }
 
@@ -745,6 +745,12 @@
     if (fgCanvasElement) {
       fgCanvas2d.init(fgCanvasElement);
       fgCanvas2d.resize(width, height);
+    }
+    if (pulsingCanvasElement) {
+      // Set canvas dimensions for WebGPU
+      const dpr = window.devicePixelRatio || 1;
+      pulsingCanvasElement.width = width * dpr;
+      pulsingCanvasElement.height = height * dpr;
     }
 
     // Load trajectory data for contour animation (from flow_invertibility)
@@ -788,6 +794,7 @@
     timeline?.dispose();
     unsubscribeVisibility?.();
     contourRenderer?.destroy();
+    pulsingAnimation?.destroy();
     cancelAllPendingRequests();
   });
 
@@ -815,9 +822,11 @@
     <div class="canvas-stack" style="width: {width}px; height: {height}px;">
       <!-- Scatter plots layer (bottom) -->
       <canvas class="scatter-canvas" bind:this={scatterCanvasElement} style="pointer-events: none;"></canvas>
-      <!-- Flow contours layer (middle) -->
+      <!-- Flow contours layer -->
       <canvas class="contour-canvas" bind:this={contourCanvasElement} style="pointer-events: none;"></canvas>
-      <!-- Foreground: pulsing trajectories (top layer, handles drag events) -->
+      <!-- Pulsing trajectories layer (WebGPU) -->
+      <canvas class="pulsing-canvas" bind:this={pulsingCanvasElement} style="pointer-events: none;"></canvas>
+      <!-- Foreground: labels + dots (top layer, handles drag events) -->
       <canvas
         class="fg-canvas"
         bind:this={fgCanvasElement}
@@ -872,8 +881,13 @@
     z-index: 2;
   }
 
-  .fg-canvas {
+  .pulsing-canvas {
     background: transparent;
     z-index: 3;
+  }
+
+  .fg-canvas {
+    background: transparent;
+    z-index: 4;
   }
 </style>
