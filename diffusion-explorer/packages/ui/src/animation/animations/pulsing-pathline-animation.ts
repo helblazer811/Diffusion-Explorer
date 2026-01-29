@@ -83,6 +83,12 @@ export interface PulsingPathlineAnimationOptions {
 
   /** Device pixel ratio. Default: window.devicePixelRatio */
   dpr?: number;
+
+  /** Show a static preview line behind the pulses. Default: false */
+  showPreview?: boolean;
+
+  /** Opacity of the preview line (0-1). Default: 0.3 */
+  previewOpacity?: number;
 }
 
 // ============================================================================
@@ -139,6 +145,8 @@ export class PulsingPathlineAnimation<TState extends PulsingPathlineAnimationSta
       offsets = 'synchronized',
       loopMultiplier = 1,
       dpr,
+      showPreview = false,
+      previewOpacity = 0.3,
     } = options;
 
     // Create the animation clip
@@ -158,6 +166,8 @@ export class PulsingPathlineAnimation<TState extends PulsingPathlineAnimationSta
       baseOpacity,
       binaryPulse,
       dpr,
+      showPreview,
+      previewOpacity,
     };
 
     return new PulsingPathlineAnimation<TState>(paths, clip, rendererOptions, offsets);
@@ -200,6 +210,10 @@ export class PulsingPathlineAnimation<TState extends PulsingPathlineAnimationSta
   /**
    * Draw the animation at the current state.
    *
+   * If showPreview is enabled, this renders:
+   * 1. The preview line (static, low opacity)
+   * 2. The animated pulses on top
+   *
    * @param state - The current animation state (must include pulsingPathlinePhase)
    * @param clearColor - Optional background color to clear with (RGBA 0-1)
    */
@@ -212,7 +226,22 @@ export class PulsingPathlineAnimation<TState extends PulsingPathlineAnimationSta
       return;
     }
 
-    this.renderer.render({ phase: state.pulsingPathlinePhase }, clearColor);
+    const showPreview = this.rendererOptions.showPreview ?? false;
+
+    if (showPreview) {
+      // First pass: render preview line (clear canvas)
+      this.renderer.render(
+        { phase: state.pulsingPathlinePhase, showPreview: true },
+        clearColor
+      );
+      // Second pass: render pulses on top (no clear)
+      this.renderer.render(
+        { phase: state.pulsingPathlinePhase, showPreview: false }
+      );
+    } else {
+      // Single pass: just render pulses
+      this.renderer.render({ phase: state.pulsingPathlinePhase }, clearColor);
+    }
   }
 
   /**

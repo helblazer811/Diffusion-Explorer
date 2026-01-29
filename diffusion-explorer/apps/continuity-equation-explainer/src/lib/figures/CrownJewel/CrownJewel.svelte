@@ -701,6 +701,8 @@
       color: pulseColor,
       thickness: 2.5,
       loopMultiplier: 1, // Timeline already does 2x
+      showPreview: true,
+      previewOpacity: 0.25,
     });
 
     // Initialize with WebGPU canvas

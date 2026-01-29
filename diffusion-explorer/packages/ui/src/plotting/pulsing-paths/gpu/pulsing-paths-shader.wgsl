@@ -37,6 +37,9 @@ struct Uniforms {
   colorG: f32,
   colorB: f32,
   colorA: f32,
+  // Preview mode
+  showPreview: f32,   // 0.0 = no preview, 1.0 = show preview
+  previewOpacity: f32, // Opacity for preview line
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -180,9 +183,57 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Arc length at this fragment (logical pixels)
   let arcLength = input.arcLengthStart + input.localPos.x / dpr;
 
-  // Determine pulse region
+  // Common calculations for both preview and pulse modes
   let halfThicknessLogical = uniforms.thickness * 0.5;
   let perpDistLogical = perpDist / dpr;
+
+  // Path capsule SDF: clips to [0, totalLength] with rounded ends
+  var pathCapsuleSd = computePathCapsuleSDF(
+    arcLength,
+    perpDistLogical,
+    input.totalLength,
+    halfThicknessLogical
+  );
+  pathCapsuleSd = pathCapsuleSd * dpr; // Convert to physical pixels
+
+  // Anti-aliasing
+  let aaWidth = 0.75 * dpr;
+
+  // Preview mode: render solid line at preview opacity
+  if (uniforms.showPreview > 0.5) {
+    // Segment ownership check to prevent double-rendering at segment boundaries
+    let inExtendedRegion = input.localPos.x > input.segmentLength;
+    let inPreStartRegion = input.localPos.x < 0.0;
+
+    // Decode segment flags (1=first, 2=last, 3=both)
+    let isFirstSegment = (input.segmentFlags == 1.0) || (input.segmentFlags == 3.0);
+    let isLastSegment = (input.segmentFlags >= 2.0);
+
+    // Only first segment renders the start cap, only last segment renders the end cap
+    // This prevents overlap at internal segment boundaries
+    if (inPreStartRegion && !isFirstSegment) {
+      discard;
+    }
+    if (inExtendedRegion && !isLastSegment) {
+      discard;
+    }
+
+    let previewAlpha = 1.0 - smoothstep(-aaWidth, aaWidth, pathCapsuleSd);
+    let finalPreviewAlpha = previewAlpha * uniforms.previewOpacity;
+
+    if (finalPreviewAlpha < 0.001) {
+      discard;
+    }
+
+    return vec4<f32>(
+      uniforms.colorR,
+      uniforms.colorG,
+      uniforms.colorB,
+      finalPreviewAlpha * uniforms.colorA
+    );
+  }
+
+  // Pulse mode: animated pulses along path
   let pulseInfo = computePulseInfo(
     arcLength,
     uniforms.phase,
@@ -251,20 +302,10 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Convert pulse SDF to physical pixels
   sdPulse = sdPulse * dpr;
 
-  // Path capsule SDF: clips pulses to [0, totalLength] with rounded ends
-  var pathCapsuleSd = computePathCapsuleSDF(
-    arcLength,
-    perpDistLogical,
-    input.totalLength,
-    halfThicknessLogical
-  );
-  pathCapsuleSd = pathCapsuleSd * dpr; // Convert to physical pixels
-
   // Intersect pulse SDF with path capsule
   let sd = max(sdPulse, pathCapsuleSd);
 
   // Anti-aliased alpha from signed distance
-  let aaWidth = 0.75 * dpr;
   let alpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
 
   // Linear alpha interpolation along pulse (0.0 at tail/bodyStart, 1.0 at head/bodyEnd)
