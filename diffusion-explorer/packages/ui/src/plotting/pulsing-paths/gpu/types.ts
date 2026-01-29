@@ -96,6 +96,10 @@ export interface PulsingPathsRendererOptions {
   color?: string | [number, number, number];
   /** Phase offsets: 'random' or 'synchronized' (default: 'synchronized') */
   offsets?: 'random' | 'synchronized';
+  /** Show a static preview line behind the pulses (default: false) */
+  showPreview?: boolean;
+  /** Opacity of the preview line (default: 0.3) */
+  previewOpacity?: number;
 }
 
 /**
@@ -112,6 +116,10 @@ export interface PulsingPathsRenderStyle {
   color?: string | [number, number, number];
   /** Optional override for base opacity */
   baseOpacity?: number;
+  /** Optional override for showing preview line */
+  showPreview?: boolean;
+  /** Optional override for preview opacity */
+  previewOpacity?: number;
 }
 
 /**
