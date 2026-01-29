@@ -1,42 +1,33 @@
 /**
  * Type definitions for GPU-accelerated streamline rendering.
  *
- * The rendering approach:
- * 1. Streamlines are decomposed into segments
- * 2. Each segment is rendered as a quad (instanced rendering)
- * 3. Vertex shader expands segments into quads with rounded cap margins
- * 4. Fragment shader uses SDF for smooth edges and computes pulse animation
+ * This module re-exports from pulsing-paths with streamline-specific aliases
+ * for backwards compatibility. The StreamlineRenderer is now a wrapper around
+ * PulsingPathsRenderer.
  */
 
-import type { WebGPUContext } from '../../line-integral-convolution/types';
+// Re-export core types from pulsing-paths
+export type {
+  WebGPUContext,
+  RGBAColor,
+  PathSegment as StreamlineSegment,
+  PulsingPathsGPUData,
+  PulsingPathsUniforms as StreamlineUniforms,
+} from '../../pulsing-paths/gpu/types';
 
-export type { WebGPUContext };
+// Re-export parseColor function
+export { parseColor } from '../../pulsing-paths/gpu/types';
 
-/**
- * A single segment within a streamline.
- * Packed for GPU buffer upload (32 bytes per segment).
- */
-export interface StreamlineSegment {
-  /** Start point x coordinate (pixels) */
-  x0: number;
-  /** Start point y coordinate (pixels) */
-  y0: number;
-  /** End point x coordinate (pixels) */
-  x1: number;
-  /** End point y coordinate (pixels) */
-  y1: number;
-  /** Cumulative arc length at start of this segment (pixels) */
-  cumulativeLengthStart: number;
-  /** Total length of the parent streamline (pixels) */
-  totalLength: number;
-  /** Phase offset for this streamline (0-1) */
-  phaseOffset: number;
-  /** Padding for alignment */
-  _padding: number;
-}
+// Import for local type aliases
+import type {
+  PulsingPathsGPUData,
+  PulsingPathsRendererOptions,
+  PulsingPathsRenderStyle,
+} from '../../pulsing-paths/gpu/types';
 
 /**
  * Prepared GPU data for a set of streamlines.
+ * Alias for PulsingPathsGPUData with streamline terminology.
  */
 export interface StreamlineGPUData {
   /** Segment data packed for GPU upload */
@@ -48,29 +39,15 @@ export interface StreamlineGPUData {
 }
 
 /**
- * Uniforms for the streamline shader.
+ * Convert PulsingPathsGPUData to StreamlineGPUData.
+ * @internal
  */
-export interface StreamlineUniforms {
-  /** Canvas width in physical pixels */
-  width: number;
-  /** Canvas height in physical pixels */
-  height: number;
-  /** Device pixel ratio */
-  dpr: number;
-  /** Animation phase (0-1) */
-  phase: number;
-  /** Line thickness in logical/CSS pixels */
-  thickness: number;
-  /** Pulse width in logical/CSS pixels */
-  pulseWidth: number;
-  /** Total spacing (pulse + gap) in logical/CSS pixels */
-  pulseSpacing: number;
-  /** Base opacity at pulse peak (0-1) */
-  baseOpacity: number;
-  /** Whether to use binary (non-gradient) pulses */
-  binaryPulse: number;
-  /** Line color (RGBA) */
-  color: [number, number, number, number];
+export function toStreamlineGPUData(data: PulsingPathsGPUData): StreamlineGPUData {
+  return {
+    segments: data.segments,
+    segmentCount: data.segmentCount,
+    streamlineCount: data.pathCount,
+  };
 }
 
 /**
@@ -96,6 +73,10 @@ export interface StreamlineRendererOptions {
   color?: string | [number, number, number];
   /** Phase offsets: 'random' or 'synchronized' (default: 'synchronized') */
   offsets?: 'random' | 'synchronized';
+  /** Show a static preview line behind the pulses (default: false) */
+  showPreview?: boolean;
+  /** Opacity of the preview line (default: 0.3) */
+  previewOpacity?: number;
 }
 
 /**
@@ -112,35 +93,24 @@ export interface StreamlineRenderStyle {
   color?: string | [number, number, number];
   /** Optional override for base opacity */
   baseOpacity?: number;
+  /** Optional override for showing preview line */
+  showPreview?: boolean;
+  /** Optional override for preview opacity */
+  previewOpacity?: number;
 }
 
 /**
- * Parsed color as normalized RGBA values.
+ * Convert StreamlineRendererOptions to PulsingPathsRendererOptions.
+ * @internal
  */
-export type RGBAColor = [number, number, number, number];
+export function toPulsingPathsOptions(options: StreamlineRendererOptions): PulsingPathsRendererOptions {
+  return options;
+}
 
 /**
- * Parse a color string or array to RGBA values [0-1].
+ * Convert StreamlineRenderStyle to PulsingPathsRenderStyle.
+ * @internal
  */
-export function parseColor(color: string | [number, number, number]): RGBAColor {
-  if (Array.isArray(color)) {
-    return [color[0] / 255, color[1] / 255, color[2] / 255, 1.0];
-  }
-
-  // Parse hex color
-  const hex = color.replace('#', '');
-  if (hex.length === 3) {
-    const r = parseInt(hex[0] + hex[0], 16) / 255;
-    const g = parseInt(hex[1] + hex[1], 16) / 255;
-    const b = parseInt(hex[2] + hex[2], 16) / 255;
-    return [r, g, b, 1.0];
-  } else if (hex.length === 6) {
-    const r = parseInt(hex.slice(0, 2), 16) / 255;
-    const g = parseInt(hex.slice(2, 4), 16) / 255;
-    const b = parseInt(hex.slice(4, 6), 16) / 255;
-    return [r, g, b, 1.0];
-  }
-
-  // Default to blue
-  return [0.231, 0.510, 0.965, 1.0]; // #3b82f6
+export function toPulsingPathsStyle(style: StreamlineRenderStyle): PulsingPathsRenderStyle {
+  return style;
 }

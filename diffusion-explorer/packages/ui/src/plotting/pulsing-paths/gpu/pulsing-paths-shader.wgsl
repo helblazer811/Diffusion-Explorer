@@ -5,6 +5,7 @@
  * - Instanced rendering (one instance per segment)
  * - Vertex shader expands segments into quads
  * - Fragment shader uses SDF for smooth edges and sawtooth pulse animation
+ * - Max blending for idempotent overlapping renders (no ownership logic needed)
  *
  * Each segment is defined by:
  * - p0, p1: Start and end points
@@ -12,6 +13,10 @@
  * - totalLength: Total path length
  * - phaseOffset: Per-path phase offset (0-1)
  * - segmentFlags: 1=first, 2=last, 3=both
+ *
+ * Supports two render modes:
+ * - Pulse mode (showPreview=0): Animated pulses along the path
+ * - Preview mode (showPreview=1): Solid line at specified opacity
  */
 
 // ============================================================================
@@ -139,10 +144,9 @@ fn vs_main(
   // quadPos.x: 0 = start, 1 = end
   // quadPos.y: -1 to 1 perpendicular extent
   // Extend quad for capsule cap rendering:
-  // - First segment: extend backward for path start cap
-  // - All segments: extend forward for pulse caps at segment boundaries
-  let startExtend = select(0.0, margin, isFirstSegment);
-  let along = mix(-startExtend, segmentLength + margin, quadPos.x);
+  // - All segments: extend both directions for pulse tail/head caps
+  // - With max blend, overlapping renders are idempotent so double-coverage is fine
+  let along = mix(-margin, segmentLength + margin, quadPos.x);
   let across = quadPos.y * margin;
 
   let worldPos = p0 + dir * along + perp * across;
@@ -200,37 +204,15 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let aaWidth = 0.75 * dpr;
 
   // Preview mode: render solid line at preview opacity
+  // Pure SDF intersection with max blend - no ownership logic needed
   if (uniforms.showPreview > 0.5) {
-    // Segment ownership check to prevent double-rendering at segment boundaries
-    let inExtendedRegion = input.localPos.x > input.segmentLength;
-    let inPreStartRegion = input.localPos.x < 0.0;
-
-    // Decode segment flags (1=first, 2=last, 3=both)
-    let isFirstSegment = (input.segmentFlags == 1.0) || (input.segmentFlags == 3.0);
-    let isLastSegment = (input.segmentFlags >= 2.0);
-
-    // Only first segment renders the start cap, only last segment renders the end cap
-    // This prevents overlap at internal segment boundaries
-    if (inPreStartRegion && !isFirstSegment) {
-      discard;
-    }
-    if (inExtendedRegion && !isLastSegment) {
-      discard;
-    }
-
     let previewAlpha = 1.0 - smoothstep(-aaWidth, aaWidth, pathCapsuleSd);
     let finalPreviewAlpha = previewAlpha * uniforms.previewOpacity;
 
-    if (finalPreviewAlpha < 0.001) {
-      discard;
-    }
-
-    return vec4<f32>(
-      uniforms.colorR,
-      uniforms.colorG,
-      uniforms.colorB,
-      finalPreviewAlpha * uniforms.colorA
-    );
+    // Output pre-multiplied color for max blend
+    let color = vec3<f32>(uniforms.colorR, uniforms.colorG, uniforms.colorB);
+    let outAlpha = finalPreviewAlpha * uniforms.colorA;
+    return vec4<f32>(color * outAlpha, outAlpha);
   }
 
   // Pulse mode: animated pulses along path
@@ -256,45 +238,10 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     discard;
   }
 
-  // Segment ownership check to prevent double-rendering of caps at segment boundaries
-  let segmentLengthLogical = input.segmentLength / dpr;
-  let segmentArcEnd = input.arcLengthStart + segmentLengthLogical;
-  let inExtendedRegion = input.localPos.x > input.segmentLength;
-
-  // Decode segment flags (1=first, 2=last, 3=both)
-  let isFirstSegment = (input.segmentFlags == 1.0) || (input.segmentFlags == 3.0);
-  let isLastSegment = (input.segmentFlags >= 2.0);
-
-  // Allow pulse body to extend past path boundaries; capsule SDF handles rounding
-  let effectiveBodyStart = pulseInfo.bodyStart;
-  let effectiveBodyEnd = pulseInfo.bodyEnd;
-
-  // Segment owns caps whose center (bodyStart or bodyEnd) falls within its arc length range
-  let ownsTailCap = (effectiveBodyStart >= input.arcLengthStart - 0.001) &&
-                     (effectiveBodyStart <= segmentArcEnd + 0.001);
-  let ownsHeadCap = (effectiveBodyEnd >= input.arcLengthStart - 0.001) &&
-                     (effectiveBodyEnd <= segmentArcEnd + 0.001);
-
-  // Check if fragment is in a cap region
-  let inTailCapRegion = arcLength < effectiveBodyStart;
-  let inHeadCapRegion = arcLength > effectiveBodyEnd;
-
-  // Discard caps we don't own (prevents double-rendering at segment boundaries)
-  if (inTailCapRegion && !ownsTailCap) {
-    discard;
-  }
-  if (inHeadCapRegion && !ownsHeadCap) {
-    discard;
-  }
-
-  // In extended region, only render if we own a cap that extends there
-  if (inExtendedRegion) {
-    let inOwnedTailCap = ownsTailCap && inTailCapRegion;
-    let inOwnedHeadCap = ownsHeadCap && inHeadCapRegion;
-    if (!inOwnedTailCap && !inOwnedHeadCap) {
-      discard;
-    }
-  }
+  // Pure SDF intersection with max blend
+  // No ownership logic needed - max blend makes overlapping renders idempotent.
+  // Multiple segments may render the same pixel, but they compute the same
+  // alpha based on arc length, and max(a, a) = a.
 
   // Compute pulse SDF using shared function
   var sdPulse = computePulseSDF(arcLength, perpDistLogical, pulseInfo, halfThicknessLogical);
@@ -320,15 +267,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Combine SDF alpha, pulse alpha, and base opacity
   let finalAlpha = alpha * pulseAlpha * uniforms.baseOpacity;
 
-  // Early discard for fully transparent pixels
-  if (finalAlpha < 0.001) {
-    discard;
-  }
-
-  return vec4<f32>(
-    uniforms.colorR,
-    uniforms.colorG,
-    uniforms.colorB,
-    finalAlpha * uniforms.colorA
-  );
+  // Output pre-multiplied color for max blend
+  let color = vec3<f32>(uniforms.colorR, uniforms.colorG, uniforms.colorB);
+  let outAlpha = finalAlpha * uniforms.colorA;
+  return vec4<f32>(color * outAlpha, outAlpha);
 }

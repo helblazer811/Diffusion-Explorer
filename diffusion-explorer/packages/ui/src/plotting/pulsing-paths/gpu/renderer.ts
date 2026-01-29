@@ -319,7 +319,8 @@ export class PulsingPathsRenderer {
       bindGroupLayouts: [bindGroupLayout],
     });
 
-    // Create render pipeline
+    // Create render pipeline with max blending
+    // Max blend makes overlapping renders idempotent - no ownership logic needed
     const pipeline = device.createRenderPipeline({
       label: 'Pulsing Paths Render Pipeline',
       layout: pipelineLayout,
@@ -335,14 +336,14 @@ export class PulsingPathsRenderer {
             format,
             blend: {
               color: {
-                srcFactor: 'src-alpha',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
+                srcFactor: 'one',
+                dstFactor: 'one',
+                operation: 'max',
               },
               alpha: {
                 srcFactor: 'one',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
+                dstFactor: 'one',
+                operation: 'max',
               },
             },
           },
