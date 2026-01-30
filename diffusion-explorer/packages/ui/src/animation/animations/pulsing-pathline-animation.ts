@@ -15,6 +15,8 @@
  * @example
  * const anim = PulsingPathlineAnimation.create<MyState>({
  *   paths: trajectories,  // [path][point][x,y] in pixel coords
+ *   duration: 4,          // seconds (should match timeline duration)
+ *   pulseFrequency: 1,    // pulses per second
  *   color: '#f17720',
  *   pulseWidth: 40,
  *   pulseGap: 60,
@@ -78,8 +80,11 @@ export interface PulsingPathlineAnimationOptions {
   /** Phase offsets per path. Default: 'synchronized' */
   offsets?: 'random' | 'synchronized';
 
-  /** How many times the animation loops per timeline cycle. Default: 1 */
-  loopMultiplier?: number;
+  /** Duration of the animation in seconds. Should match the timeline duration. */
+  duration: number;
+
+  /** Pulse frequency in pulses per second. Default: 1 */
+  pulseFrequency?: number;
 
   /** Device pixel ratio. Default: window.devicePixelRatio */
   dpr?: number;
@@ -89,6 +94,12 @@ export interface PulsingPathlineAnimationOptions {
 
   /** Opacity of the preview line (0-1). Default: 0.3 */
   previewOpacity?: number;
+
+  /** Show arrowheads at the front of each pulse. Default: false */
+  showArrowhead?: boolean;
+
+  /** Arrowhead size as multiple of thickness. Default: 2.0 */
+  arrowheadSize?: number;
 }
 
 // ============================================================================
@@ -143,11 +154,17 @@ export class PulsingPathlineAnimation<TState extends PulsingPathlineAnimationSta
       baseOpacity = 0.8,
       binaryPulse = false,
       offsets = 'synchronized',
-      loopMultiplier = 1,
+      duration,
+      pulseFrequency = 1,
       dpr,
       showPreview = false,
       previewOpacity = 0.3,
+      showArrowhead = false,
+      arrowheadSize = 2.0,
     } = options;
+
+    // Compute loop multiplier from frequency and duration
+    const loopMultiplier = pulseFrequency * duration;
 
     // Create the animation clip
     const clip: Clip<TState> = {
@@ -168,6 +185,8 @@ export class PulsingPathlineAnimation<TState extends PulsingPathlineAnimationSta
       dpr,
       showPreview,
       previewOpacity,
+      showArrowhead,
+      arrowheadSize,
     };
 
     return new PulsingPathlineAnimation<TState>(paths, clip, rendererOptions, offsets);
