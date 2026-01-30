@@ -256,7 +256,8 @@
       pulseWidthPixels,
       pulsePauseWidthPixels,
       offsets: "synchronized",
-      loopMultiplier: 1,
+      duration: streamlineDuration,
+      pulseFrequency: 1 / streamlineDuration,
     });
 
     // Initialize the animation with the canvas

@@ -47,7 +47,7 @@
     streamlineColor = "#3b82f6",
     strokeWidth = 3.5,
     baseOpacity = 0.9,
-    loopMultiplier = 1.5,
+    pulseFrequency = 1,  // pulses per second
     gridSize = 16,
     subdivisionFactor = 16,
     minPathLength = 0.5,
@@ -211,7 +211,8 @@
       color: streamlineColor,
       strokeWidth,
       subdivisionFactor,
-      loopMultiplier,
+      duration: animationDurationMs / 1000,
+      pulseFrequency,
     });
 
     // Initialize the animation with the left canvas

@@ -163,7 +163,8 @@
       pulseWidthPixels,
       pulsePauseWidthPixels,
       offsets: "synchronized",
-      loopMultiplier: totalDuration / streamlineDuration,
+      duration: totalDuration,
+      pulseFrequency: 1 / streamlineDuration,
     });
 
     // Initialize the animation with the canvas
