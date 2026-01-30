@@ -45,6 +45,9 @@ struct Uniforms {
   // Preview mode
   showPreview: f32,   // 0.0 = no preview, 1.0 = show preview
   previewOpacity: f32, // Opacity for preview line
+  // Arrowhead options
+  showArrowhead: f32,  // 0.0 = no arrowhead, 1.0 = show arrowhead
+  arrowheadSize: f32,  // Size multiplier relative to thickness (default: 2.0)
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -138,7 +141,19 @@ fn vs_main(
   // Scale thickness by DPR for physical pixels
   let physicalThickness = uniforms.thickness * dpr;
   let halfThickness = physicalThickness * 0.5;
-  let margin = halfThickness + 2.0 * dpr; // Cap radius + AA margin
+
+  // Calculate arrowhead extent for margin extension (in physical pixels)
+  // Length multiplier 1.5 makes arrowhead longer than wide for better appearance
+  let arrowheadLength = uniforms.thickness * uniforms.arrowheadSize * 1.5 * dpr;
+  let arrowheadLengthMargin = select(0.0, arrowheadLength, uniforms.showArrowhead > 0.5);
+
+  // Arrowhead perpendicular extent (halfBase is wider than halfThickness)
+  let arrowheadHalfBase = uniforms.thickness * uniforms.arrowheadSize * 0.75 * dpr;
+  let arrowheadWidthMargin = select(0.0, arrowheadHalfBase - halfThickness, uniforms.showArrowhead > 0.5);
+
+  // Separate margins for along (length) and across (width)
+  let alongMargin = halfThickness + 2.0 * dpr + arrowheadLengthMargin;
+  let acrossMargin = halfThickness + 2.0 * dpr + max(0.0, arrowheadWidthMargin);
 
   // Compute world position (in physical pixels)
   // quadPos.x: 0 = start, 1 = end
@@ -146,8 +161,8 @@ fn vs_main(
   // Extend quad for capsule cap rendering:
   // - All segments: extend both directions for pulse tail/head caps
   // - With max blend, overlapping renders are idempotent so double-coverage is fine
-  let along = mix(-margin, segmentLength + margin, quadPos.x);
-  let across = quadPos.y * margin;
+  let along = mix(-alongMargin, segmentLength + alongMargin, quadPos.x);
+  let across = quadPos.y * acrossMargin;
 
   let worldPos = p0 + dir * along + perp * across;
 
@@ -191,12 +206,21 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let halfThicknessLogical = uniforms.thickness * 0.5;
   let perpDistLogical = perpDist / dpr;
 
+  // Calculate arrowhead dimensions (in logical pixels) - needed for clipping
+  // Arrowhead is wider than pulse body (0.75 makes base 1.5x pulse width)
+  // Length multiplier 1.5 makes arrowhead longer than wide for better appearance
+  let arrowheadLength = uniforms.thickness * uniforms.arrowheadSize * 1.5;
+  let arrowheadHalfBase = uniforms.thickness * uniforms.arrowheadSize * 0.75;
+
+  // Use wider clipping width when arrowheads enabled (allows arrowhead to extend beyond pulse width)
+  let clipHalfWidth = select(halfThicknessLogical, arrowheadHalfBase, uniforms.showArrowhead > 0.5);
+
   // Path capsule SDF: clips to [0, totalLength] with rounded ends
   var pathCapsuleSd = computePathCapsuleSDF(
     arcLength,
     perpDistLogical,
     input.totalLength,
-    halfThicknessLogical
+    clipHalfWidth
   );
   pathCapsuleSd = pathCapsuleSd * dpr; // Convert to physical pixels
 
@@ -206,7 +230,15 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Preview mode: render solid line at preview opacity
   // Pure SDF intersection with max blend - no ownership logic needed
   if (uniforms.showPreview > 0.5) {
-    let previewAlpha = 1.0 - smoothstep(-aaWidth, aaWidth, pathCapsuleSd);
+    // Preview uses pulse width, not arrowhead width
+    var previewCapsuleSd = computePathCapsuleSDF(
+      arcLength,
+      perpDistLogical,
+      input.totalLength,
+      halfThicknessLogical
+    );
+    previewCapsuleSd = previewCapsuleSd * dpr;
+    let previewAlpha = 1.0 - smoothstep(-aaWidth, aaWidth, previewCapsuleSd);
     let finalPreviewAlpha = previewAlpha * uniforms.previewOpacity;
 
     // Output pre-multiplied color for max blend
@@ -214,24 +246,28 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let outAlpha = finalPreviewAlpha * uniforms.colorA;
     return vec4<f32>(color * outAlpha, outAlpha);
   }
+  let arrowheadExtent = select(0.0, arrowheadLength, uniforms.showArrowhead > 0.5);
 
   // Pulse mode: animated pulses along path
-  let pulseInfo = computePulseInfo(
+  // Use extended pulse info if arrowheads enabled
+  let pulseInfo = computePulseInfoWithArrowhead(
     arcLength,
     uniforms.phase,
     input.phaseOffset,
     uniforms.pulseSpacing,
     uniforms.pulseWidth,
-    halfThicknessLogical
+    halfThicknessLogical,
+    arrowheadExtent
   );
 
   // Compute extents for early discard and SDF calculations
   let aaMarginLogical = 1.0;
   let capExtent = halfThicknessLogical + aaMarginLogical;
+  let totalCapExtent = capExtent + arrowheadExtent;
 
-  // Path cap regions
+  // Path cap regions (extended for arrowhead at end)
   let inPathStartCap = arcLength < capExtent;
-  let inPathEndCap = arcLength > input.totalLength - capExtent;
+  let inPathEndCap = arcLength > input.totalLength - totalCapExtent;
 
   // Early discard if not in pulse region AND not in path cap region
   if (!pulseInfo.inPulseRegion && !inPathStartCap && !inPathEndCap) {
@@ -243,8 +279,16 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Multiple segments may render the same pixel, but they compute the same
   // alpha based on arc length, and max(a, a) = a.
 
-  // Compute pulse SDF using shared function
-  var sdPulse = computePulseSDF(arcLength, perpDistLogical, pulseInfo, halfThicknessLogical);
+  // Compute pulse SDF with optional arrowhead
+  var sdPulse = computePulseWithArrowheadSDF(
+    arcLength,
+    perpDistLogical,
+    pulseInfo,
+    halfThicknessLogical,
+    uniforms.showArrowhead,
+    arrowheadLength,
+    arrowheadHalfBase
+  );
 
   // Convert pulse SDF to physical pixels
   sdPulse = sdPulse * dpr;

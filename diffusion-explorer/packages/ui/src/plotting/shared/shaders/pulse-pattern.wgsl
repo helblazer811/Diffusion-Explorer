@@ -97,6 +97,50 @@ fn computePulseInfo(
 }
 
 /**
+ * Compute pulse bounds with extended region for arrowhead.
+ * Same as computePulseInfo but extends inPulseRegion to include arrowhead.
+ *
+ * @param arcLength - Position along the path (logical pixels)
+ * @param phase - Animation phase (0-1)
+ * @param phaseOffset - Per-path phase offset (0-1)
+ * @param pulseSpacing - Total spacing (pulse + gap) in logical pixels
+ * @param pulseWidth - Width of pulse body in logical pixels
+ * @param halfThickness - Half thickness for cap extent calculation (logical pixels)
+ * @param arrowheadLength - Additional extent for arrowhead (logical pixels)
+ * @returns PulseInfo struct with body bounds and extended region info
+ */
+fn computePulseInfoWithArrowhead(
+  arcLength: f32,
+  phase: f32,
+  phaseOffset: f32,
+  pulseSpacing: f32,
+  pulseWidth: f32,
+  halfThickness: f32,
+  arrowheadLength: f32
+) -> PulseInfo {
+  // Get base pulse info
+  var info = computePulseInfo(
+    arcLength,
+    phase,
+    phaseOffset,
+    pulseSpacing,
+    pulseWidth,
+    halfThickness
+  );
+
+  // Extend the region to include arrowhead
+  let aaMargin = 1.0;
+  let capExtent = halfThickness + aaMargin;
+  let totalExtent = capExtent + arrowheadLength;
+
+  // Re-check if we're within extended render area
+  info.inPulseRegion = (arcLength >= info.bodyStart - capExtent) &&
+                       (arcLength <= info.bodyEnd + totalExtent);
+
+  return info;
+}
+
+/**
  * Compute the SDF for a pulse capsule (body + head/tail caps).
  * Returns the signed distance to the pulse shape in logical pixels.
  *
@@ -141,6 +185,52 @@ fn computePulseAlpha(
 ) -> f32 {
   let normalizedPos = saturate((arcLength - bodyStart) / pulseWidth);
   return mix(normalizedPos, 1.0, binaryPulse);
+}
+
+/**
+ * Compute the SDF for a pulse with optional arrowhead.
+ * Returns union of pulse capsule and arrowhead triangle.
+ *
+ * @param arcLength - Position along path (logical pixels)
+ * @param perpDistLogical - Perpendicular distance (logical pixels)
+ * @param pulseInfo - Pulse bounds from computePulseInfo
+ * @param halfThicknessLogical - Half thickness (logical pixels)
+ * @param showArrowhead - Whether to render arrowhead (0.0 or 1.0)
+ * @param arrowheadLength - Length of arrowhead (logical pixels)
+ * @param arrowheadHalfBase - Half-width of arrowhead base (logical pixels)
+ * @returns Signed distance in logical pixels
+ */
+fn computePulseWithArrowheadSDF(
+  arcLength: f32,
+  perpDistLogical: f32,
+  pulseInfo: PulseInfo,
+  halfThicknessLogical: f32,
+  showArrowhead: f32,
+  arrowheadLength: f32,
+  arrowheadHalfBase: f32
+) -> f32 {
+  // Base pulse capsule SDF
+  let pulseSd = computePulseSDF(arcLength, perpDistLogical, pulseInfo, halfThicknessLogical);
+
+  // If arrowheads disabled, return base pulse
+  if (showArrowhead < 0.5) {
+    return pulseSd;
+  }
+
+  // Arrowhead is positioned at bodyEnd (pulse head)
+  // Transform to arrowhead local coordinates:
+  // - Origin at bodyEnd on centerline
+  // - +X points in direction of travel (along path)
+  let arrowheadPos = vec2<f32>(
+    arcLength - pulseInfo.bodyEnd,  // x: distance from arrowhead base
+    perpDistLogical                 // y: perpendicular distance
+  );
+
+  // Compute arrowhead SDF
+  let arrowSd = sdArrowhead(arrowheadPos, arrowheadLength, arrowheadHalfBase);
+
+  // Union: minimum of both SDFs (inside either shape)
+  return min(pulseSd, arrowSd);
 }
 
 /**
