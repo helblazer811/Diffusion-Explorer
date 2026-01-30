@@ -68,12 +68,12 @@ export function drawPartialTrajectory(
     prevY = yScale(prevPt[1]);
   }
 
-  // For arrows, calculate where line should stop (behind arrow base so line end is hidden)
+  // For arrows, calculate where line should stop (at arrow base so line connects cleanly)
   let lineEndX = endX, lineEndY = endY;
   if (headType === 'arrow') {
     const dist = Math.hypot(endX - prevX, endY - prevY);
-    // Stop line a bit further back than arrow base to hide rectangular line end behind arrow
-    const lineStopDistance = arrowRadius + strokeWidth * 0.5;
+    // For equilateral triangle centered at endpoint, base is 0.5 * radius behind center
+    const lineStopDistance = arrowRadius * 0.5;
     if (dist > lineStopDistance) {
       const angle = Math.atan2(endY - prevY, endX - prevX);
       lineEndX = endX - lineStopDistance * Math.cos(angle);
@@ -375,35 +375,37 @@ export function drawTrajectories(
       ctx.stroke();
     }
 
-    // 3. Draw marker at head position
-    const markerIdx = Math.min(segmentIndex + 1, points.length - 1);
-    const [mx, my] = points[markerIdx];
-    const prevIdx = Math.max(0, markerIdx - 1);
-    const [px, py] = points[prevIdx];
+    // 3. Draw marker at head position (unless disabled)
+    if (style.showHeadMarker !== false) {
+      const markerIdx = Math.min(segmentIndex + 1, points.length - 1);
+      const [mx, my] = points[markerIdx];
+      const prevIdx = Math.max(0, markerIdx - 1);
+      const [px, py] = points[prevIdx];
 
-    // Draw marker
-    const headType = style.headStyle?.type ?? 'circle';
-    const radius = style.headStyle?.radius ?? style.pointRadius;
+      // Draw marker
+      const headType = style.headStyle?.type ?? 'circle';
+      const radius = style.headStyle?.radius ?? style.pointRadius;
 
-    // Draw outline for marker if specified (only for circle type)
-    if (outline && headType === 'circle') {
-      ctx.beginPath();
-      ctx.arc(mx, my, style.pointRadius + (outlineWidth - style.strokeWidth) / 2, 0, 2 * Math.PI);
-      ctx.fillStyle = outlineColor;
-      ctx.globalAlpha = outlineOpacity;
-      ctx.fill();
-    }
+      // Draw outline for marker if specified (only for circle type)
+      if (outline && headType === 'circle') {
+        ctx.beginPath();
+        ctx.arc(mx, my, style.pointRadius + (outlineWidth - style.strokeWidth) / 2, 0, 2 * Math.PI);
+        ctx.fillStyle = outlineColor;
+        ctx.globalAlpha = outlineOpacity;
+        ctx.fill();
+      }
 
-    // Draw main marker
-    ctx.fillStyle = style.headStyle?.color ?? style.color;
-    ctx.globalAlpha = style.headStyle?.opacity ?? style.opacity;
+      // Draw main marker
+      ctx.fillStyle = style.headStyle?.color ?? style.color;
+      ctx.globalAlpha = style.headStyle?.opacity ?? style.opacity;
 
-    if (headType === 'arrow') {
-      drawArrowHead(ctx, px, py, mx, my, radius);
-    } else {
-      ctx.beginPath();
-      ctx.arc(mx, my, radius, 0, 2 * Math.PI);
-      ctx.fill();
+      if (headType === 'arrow') {
+        drawArrowHead(ctx, px, py, mx, my, radius);
+      } else {
+        ctx.beginPath();
+        ctx.arc(mx, my, radius, 0, 2 * Math.PI);
+        ctx.fill();
+      }
     }
   }
 

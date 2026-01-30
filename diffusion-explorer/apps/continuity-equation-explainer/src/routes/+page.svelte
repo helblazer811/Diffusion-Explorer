@@ -15,6 +15,7 @@
   import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
   import DivergenceTheoremSquare from "$lib/figures/DivergenceTheoremSquare/DivergenceTheoremSquare.svelte";
   import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
+  import LikelihoodIntegration from "$lib/figures/LikelihoodIntegration.svelte";
 
   // Data for ProbabilityPathIntro figure
   let probabilityPathSourceSamples = [];
@@ -387,14 +388,13 @@
     <Katex math={"\\hat{n}"} /> at the boundary.
   </MassConservation>
 
-  <h3 id="divergence">Divergence and the Divergence Theorem</h3>
+  <h3 id="divergence">What is Divergence?</h3>
   <p>
     Now that we have a formal description of the conservation of mass property of our flow, we still
     need to demonstrate how it can be converted into the continuity equation. This requires
     introducing the concept of divergence and the divergence theorem.
   </p>
 
-  <h4>Divergence</h4>
   <p>
     Divergence is a quantity that describes how much a vector field is outwardly flowing at a point.
     A <em>source</em> is a location with net outward flow, and a <em>sink</em> is a location with net
@@ -422,7 +422,7 @@
     />).
   </DivergenceIntro>
 
-  <h4 id="divergence-theorem">Divergence Theorem</h4>
+  <h3 id="divergence-theorem">Divergence Theorem</h3>
   <p>
     Using something called the divergence theorem, we can directly relate divergence to the
     probability <em>flux</em> through a boundary. This helps us convert our statement about the
@@ -586,6 +586,15 @@
       source distribution (left) by integrating <Katex math={"-v_t(x)"} />. This reverse process is
       used to compute exact likelihoods.
     </ReverseSampling>
+  {/if}
+
+  {#if reverseSamplingData}
+    <LikelihoodIntegration data={reverseSamplingData} selectedIndices={[5, 15]}>
+      <strong>Likelihood integration via reverse trajectories.</strong>
+      Starting from points <Katex math={"x_1"} /> and <Katex math={"x_2"} /> in the target distribution,
+      the model traces paths backward to the source. The log-likelihood is computed by integrating the
+      divergence of the velocity field along these paths.
+    </LikelihoodIntegration>
   {/if}
 
   <h3 id="computational-concerns">Computational Concerns</h3>
