@@ -39,7 +39,7 @@
   export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
   export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
   export let yShiftFactor = -1.0;
-  export let distributionScaleFactor = 0.6;
+  export let distributionScaleFactor = 0.9;
 
   // Animation settings
   export let animationDuration = 8000;
@@ -62,7 +62,7 @@
   // Contour plot options for P_t
   export let showContours = false;
   export let contourGridSize = 50;
-  export let contourBandwidth = settings.stylingSettings.contour.bandwidth;
+  export let contourBandwidth = 14;
   export let contourThresholds = settings.stylingSettings.contour.thresholds;
   export let contourOpacity = settings.stylingSettings.contour.opacity;
   export let contourFillColor = settings.stylingSettings.contour.fillColor;

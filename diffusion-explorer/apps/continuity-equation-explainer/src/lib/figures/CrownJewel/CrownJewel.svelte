@@ -31,17 +31,17 @@
   export let height = 350;
 
   // Layout props (matching ProbabilityPathIntro)
-  export let sourceCenterX = 0.15; // Spread distributions wider
+  export let sourceCenterX = 0.15; // 0.2
   export let targetCenterX = 0.85;
   export let marginWidth = 50;
   export let marginHeight = 20;
-  export let distributionScaleFactor = 0.8;
-  export let yShiftFactor = 0;
+  export let distributionScaleFactor = 1.1;
+  export let yShiftFactor = -0.5;
 
   // Contour settings
   export let contourGridSize = 80;
   export let contourBandwidth = 4;
-  export let contourThresholds: number | number[] = 5;
+  export let contourThresholds: number | number[] = 3;
   export let contourOpacity = 1.0;
 
   // Animation
@@ -53,11 +53,11 @@
   const SAMPLE_TIME = 0.5;
   // Display position - where to render the contour in the layout (0.5 = centered between source and target)
   const DISPLAY_POSITION = 0.5;
-  // Contour time - which timestep's samples to use for the contour (0.9 for smiley face appearance)
-  const CONTOUR_TIME = 0.9;
+  // Contour time - which timestep's samples to use for the contour (0.95 for smiley face appearance)
+  const CONTOUR_TIME = 0.95;
 
   // Pulsing region settings
-  export let clickRadius = 0.35; // Domain units (half-width of sampling region)
+  export let clickRadius = 0.825; // Domain units (half-width of sampling region)
   export let numTrajectories = 3; // Number of random sample points
   export let gridPaddingFraction = 0.15; // Padding inside region as fraction of clickRadius
   export let pulseWidthPixels = 40;
@@ -66,20 +66,20 @@
 
   // Region box settings
   export let showRegionBox = true;
-  export let regionBoxColor = "#f17720"; // Orange
+  export let regionBoxColor = "#3b82f6"; // Blue (matching scatter plot)
   export let regionBoxLineWidth = 3; // Thicker stroke
   export let regionBoxPadding = 5; // Padding around the click radius in pixels
   export let disableDrag = true; // Disable box dragging
 
   // Source distribution scatter plot settings
-  export let sourceScatterColor = settings.stylingSettings.scatterPlot.color;
+  export let sourceScatterColor = "#888888"; // Gray
   export let sourceScatterOpacity = settings.stylingSettings.scatterPlot.opacity;
 
   // Target distribution scatter plot settings
   export let scatterRadius = settings.stylingSettings.scatterPlot.radius;
-  export let scatterColor = settings.stylingSettings.scatterPlot.color;
+  export let scatterColor = "#888888"; // Gray
   export let scatterOpacity = settings.stylingSettings.scatterPlot.opacity;
-  export let numScatterSamples = 100;
+  export let numScatterSamples = 150;
 
   // LaTeX label settings
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
@@ -91,23 +91,24 @@
   export let labelColor = "#666666"; // Same gray as figure captions
   export let labelLineSpacing = 36;
 
+  // Sample point coordinates (domain space, starting points at t=0.5)
+  export let samplePoints: [number, number][] = [
+    [0.9, 1.2],    // Center
+    [-0.2, 0.6],   // Left-bottom
+    [0.6, 1.68],    // Right-top
+  ];
+
   // ----------------------------------------------------------------
   // Data URLs and Model Configuration
   // ----------------------------------------------------------------
 
-  const trajectoriesUrl = "/flow_invertibility/cached_samples/flow_matching_trajectories.json";
+  const trajectoriesUrl = "/cached_samples/trajectories.json";
+  const groundTruthUrl = "/data/smiley_face.json";
 
   // FlowModel configuration for runtime sampling
   const MODEL_CONFIG = { dim: 2, hidden: 64 };
-  const MODEL_PATH = "/crown_jewel/models/flow_model.json";
-  const WORKER_URL = "/crown_jewel/workers/flow_model.worker.js";
-
-  // Hard-coded sample points in domain space (starting points at t=0.5)
-  const HARDCODED_POINTS: [number, number][] = [
-    [0.0, 0.1],   // Center-ish
-    [-0.15, 0.0], // Left
-    [0.15, 0.2],  // Right-bottom
-  ];
+  const MODEL_PATH = "/models/flow_model.json";
+  const WORKER_URL = "/workers/flow_model.worker.js";
 
   // ----------------------------------------------------------------
   // State
@@ -115,10 +116,13 @@
 
   // Data (loaded from files)
   let allTimeSamples: number[][][] = []; // [timestep][sample][x,y]
-  let targetPoints: number[][] = []; // [[x,y], ...]
+  let targetPoints: number[][] = []; // [[x,y], ...] - ground truth smiley face points
 
   // Source samples (from t=0)
   let sourcePoints: number[][] = [];
+
+  // Ground truth target distribution (loaded from smiley_face.json)
+  let groundTruthPoints: number[][] = [];
 
   // FlowModelClient for runtime sampling
   let flowModelClient: FlowModelClient | null = null;
@@ -245,7 +249,7 @@
     try {
       // Reverse sampling: t=0.5 → t=0
       const { promise: reversePromise } = flowModelClient.sampleFromInitialPoints(
-        HARDCODED_POINTS,
+        samplePoints,
         NUM_STEPS,
         { reverse: true, t_start: 0.5, t_end: 0, scheduler: 'euler_midpoint' }
       );
@@ -253,7 +257,7 @@
 
       // Forward sampling: t=0.5 → t=1
       const { promise: forwardPromise } = flowModelClient.sampleFromInitialPoints(
-        HARDCODED_POINTS,
+        samplePoints,
         NUM_STEPS,
         { t_start: 0.5, t_end: 1, scheduler: 'euler_midpoint' }
       );
@@ -267,7 +271,7 @@
 
       // Transpose from [step][sample][x,y] to [sample][step][x,y]
       const numSteps = fullTrajectories.length;
-      const numSamples = HARDCODED_POINTS.length;
+      const numSamples = samplePoints.length;
       sampledTrajectories = [];
 
       for (let sample = 0; sample < numSamples; sample++) {
@@ -508,14 +512,33 @@
       ctx.save();
       ctx.strokeStyle = regionBoxColor;
       ctx.lineWidth = regionBoxLineWidth;
-      ctx.setLineDash([4, 4]); // Dashed line pattern
 
-      ctx.strokeRect(
-        centerPixel[0] - radiusPixels,
-        centerPixel[1] - radiusPixels,
-        radiusPixels * 2,
-        radiusPixels * 2
-      );
+      // Draw rounded rectangle (solid, not dashed)
+      const cornerRadius = 8;
+      const x = centerPixel[0] - radiusPixels;
+      const y = centerPixel[1] - radiusPixels;
+      const w = radiusPixels * 2;
+      const h = radiusPixels * 2;
+
+      ctx.beginPath();
+      ctx.moveTo(x + cornerRadius, y);
+      ctx.lineTo(x + w - cornerRadius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + cornerRadius);
+      ctx.lineTo(x + w, y + h - cornerRadius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - cornerRadius, y + h);
+      ctx.lineTo(x + cornerRadius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - cornerRadius);
+      ctx.lineTo(x, y + cornerRadius);
+      ctx.quadraticCurveTo(x, y, x + cornerRadius, y);
+      ctx.closePath();
+
+      // Fill with blue at 0.5 opacity
+      ctx.fillStyle = regionBoxColor;
+      ctx.globalAlpha = 0.5;
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+
+      ctx.stroke();
 
       ctx.restore();
 
@@ -530,6 +553,18 @@
         { color: regionBoxColor },
         () => timeline?.tick(timeline.time)
       );
+
+      // Draw "V" label in the center of the box (offset down slightly)
+      drawMathjax(
+        ctx,
+        "V",
+        centerPixel[0],
+        centerPixel[1] + 15,
+        latexFontSize,
+        0, 0,
+        { color: "#ffffff", stroke: regionBoxColor, strokeWidth: 2 },
+        () => timeline?.tick(timeline.time)
+      );
     }
 
     // Draw pulsing trajectories (GPU - on separate canvas)
@@ -537,21 +572,7 @@
       pulsingAnimation.draw(state, [0, 0, 0, 0]); // Clear with transparent
     }
 
-    // Draw dots at sample points within the region
-    if (regionSamplePoints.length > 0) {
-      ctx.fillStyle = pulseColor;
-      ctx.globalAlpha = 0.9;
-      const dotRadius = 2.5;
-
-      for (const [sx, sy] of regionSamplePoints) {
-        const [px, py] = domainToPixelAtTime(sx, sy, DISPLAY_POSITION);
-        ctx.beginPath();
-        ctx.arc(px, py, dotRadius, 0, 2 * Math.PI);
-        ctx.fill();
-      }
-
-      ctx.globalAlpha = 1;
-    }
+    // Sample points dots disabled (keeping regionSamplePoints array for trajectory generation)
   }
 
   // ----------------------------------------------------------------
@@ -670,12 +691,12 @@
     if (!scales || sampledTrajectories.length === 0 || !pulsingCanvasElement) return;
 
     // Compute the region center from hard-coded points
-    const meanX = HARDCODED_POINTS.reduce((sum, p) => sum + p[0], 0) / HARDCODED_POINTS.length;
-    const meanY = HARDCODED_POINTS.reduce((sum, p) => sum + p[1], 0) / HARDCODED_POINTS.length;
+    const meanX = samplePoints.reduce((sum, p) => sum + p[0], 0) / samplePoints.length;
+    const meanY = samplePoints.reduce((sum, p) => sum + p[1], 0) / samplePoints.length;
     regionCenterDomain = [meanX, meanY];
 
     // Use the hard-coded points as the sample points for drawing dots in the box
-    regionSamplePoints = HARDCODED_POINTS.map(p => [p[0], p[1]]);
+    regionSamplePoints = samplePoints.map(p => [p[0], p[1]]);
 
     // Convert full trajectories to pixel coordinates (t=0 to t=1)
     const pixelTrajectories = sampledTrajectories.map(traj =>
@@ -699,7 +720,7 @@
       pulseGap: pulsePauseWidthPixels,
       baseOpacity: 0.8,
       color: pulseColor,
-      thickness: 2.5,
+      thickness: 3.5,
       loopMultiplier: 1, // Timeline already does 2x
       showPreview: true,
       previewOpacity: 0.25,
@@ -755,20 +776,26 @@
       pulsingCanvasElement.height = height * dpr;
     }
 
-    // Load trajectory data for contour animation (from flow_invertibility)
+    // Load trajectory data for contour animation
     try {
       const result = await loadCachedTrajectories(`${base}${trajectoriesUrl}`);
       if (result) {
-        // Clip trajectories to samples starting within radius (same as ProbabilityPathIntro)
-        const clippingRadius = settings.stylingSettings.scatterPlot.clippingRadius;
-        const clippedTrajectories = clipTrajectoriesToStartingRadius(result.trajectories, clippingRadius);
-        allTimeSamples = clippedTrajectories;
-        // Extract source (t=0) and target (t=1) from clipped trajectories
-        sourcePoints = clippedTrajectories[0] || [];
-        targetPoints = clippedTrajectories[clippedTrajectories.length - 1] || [];
+        allTimeSamples = result.trajectories;
+        sourcePoints = result.trajectories[0] || [];
       }
     } catch (e) {
-      console.warn("Failed to load CrownJewel data:", e);
+      console.warn("Failed to load CrownJewel trajectory data:", e);
+    }
+
+    // Load ground truth target distribution (smiley face)
+    try {
+      const response = await fetch(`${base}${groundTruthUrl}`);
+      const data = await response.json();
+      groundTruthPoints = data.points || [];
+      targetPoints = groundTruthPoints;
+      console.log(`Loaded ${groundTruthPoints.length} ground truth target points`);
+    } catch (e) {
+      console.warn("Failed to load ground truth data:", e);
     }
 
     // Initialize FlowModelClient and sample trajectories from hard-coded points
@@ -816,7 +843,7 @@
 </script>
 
 <div class="crown-jewel-equation">
-  <Katex math={"\\frac{d}{dt} \\int_V p_t(x) \\, dx = - \\oint_S v_t p_t \\cdot dS"} displayMode={true} />
+  <Katex math={"\\frac{d}{dt} \\int_{\\color{#3b82f6} V} {\\color{#f17720} p_t(x)} \\, dx = - \\oint_{\\color{#3b82f6} S} {\\color{#f17720} v_t p_t} \\cdot d{\\color{#3b82f6} S}"} displayMode={true} />
 </div>
 
 <Figure {caption} bind:isActive={figureIsActive} backgroundVisible={false}>
@@ -847,7 +874,7 @@
     text-align: center;
     margin-bottom: 1rem;
     font-size: 1.4rem;
-    color: #374151;
+    color: #666666;
   }
 
   .crown-jewel-wrapper {

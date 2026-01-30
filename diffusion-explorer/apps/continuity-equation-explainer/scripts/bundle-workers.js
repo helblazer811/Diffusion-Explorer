@@ -16,6 +16,10 @@ async function bundleWorkers() {
     {
       entry: '../../packages/diffusion/src/workers/flow_model.worker.ts',
       output: 'static/workers/sampling.worker.js'
+    },
+    {
+      entry: '../../packages/diffusion/src/workers/flow_model.worker.ts',
+      output: 'static/workers/flow_model.worker.js'
     }
   ];
 
