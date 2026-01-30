@@ -28,8 +28,6 @@
   // Data for ReverseSampling
   let reverseSamplingData = null;
 
-  // Data for CrownJewel
-  let crownJewelTrajectories = [];
 
   /**
    * Transpose trajectories from [sampleIndex][timeStep][x,y] to [timeStep][sampleIndex][x,y]
@@ -56,15 +54,20 @@
 
     // Load data for ProbabilityPathIntro (same cached samples as ProbabilityPath in rectified-flow-explainer)
     try {
-      const result = await loadCachedTrajectories(`${base}/flow_invertibility/cached_samples/flow_matching_trajectories.json`);
-      if (result) {
-        // Clip trajectories to only include samples starting within radius
-        const clippingRadius = settings.stylingSettings.scatterPlot.clippingRadius;
-        const clippedTrajectories = clipTrajectoriesToStartingRadius(result.trajectories, clippingRadius);
-        allTimeSamples.set(clippedTrajectories);
-        // Use clipped source and target from trajectories
-        probabilityPathSourceSamples = clippedTrajectories[0] || [];
-        probabilityPathTargetSamples = clippedTrajectories[clippedTrajectories.length - 1] || [];
+      const [trajResult, targetRes] = await Promise.all([
+        loadCachedTrajectories(`${base}/cached_samples/trajectories.json`),
+        fetch(`${base}/data/smiley_face.json`),
+      ]);
+
+      if (trajResult) {
+        allTimeSamples.set(trajResult.trajectories);
+        probabilityPathSourceSamples = trajResult.trajectories[0] || [];
+      }
+
+      // Use ground truth target distribution (not synthetic trajectory endpoints)
+      if (targetRes.ok) {
+        const targetData = await targetRes.json();
+        probabilityPathTargetSamples = targetData.points || [];
       }
     } catch (e) {
       console.warn("Failed to load ProbabilityPathIntro data:", e);
@@ -73,8 +76,8 @@
     // Load target distribution and cached trajectories for FlowInvertibility
     try {
       const [targetRes, trajRes] = await Promise.all([
-        fetch(`${base}/flow_invertibility/data/smiley_face.json`),
-        fetch(`${base}/flow_invertibility/cached_samples/trajectories.json`),
+        fetch(`${base}/data/smiley_face.json`),
+        fetch(`${base}/cached_samples/trajectories.json`),
       ]);
 
       if (targetRes.ok && trajRes.ok) {
@@ -97,7 +100,7 @@
     // Use the normalized targetDistribution from trajectories.json (loaded above for flowInvertibilityData)
     // to ensure the rendered distribution matches what was used to compute the trajectories
     try {
-      const trajRes = await fetch(`${base}/flow_invertibility/cached_samples/reverse_trajectories.json`);
+      const trajRes = await fetch(`${base}/cached_samples/reverse_trajectories.json`);
 
       if (trajRes.ok && flowInvertibilityData) {
         const trajData = await trajRes.json();
@@ -113,20 +116,11 @@
       console.warn("Failed to load ReverseSampling data:", e);
     }
 
-    // Load data for CrownJewel
-    try {
-      const res = await fetch(`${base}/crown_jewel/cached_samples/trajectories.json`);
-      if (res.ok) {
-        crownJewelTrajectories = await res.json();
-      }
-    } catch (e) {
-      console.warn("Failed to load CrownJewel data:", e);
-    }
   });
 </script>
 
 <svelte:head>
-  <title>Flow Models: The Continuity Equation</title>
+  <title>A Visual Intro to the Continuity Equation</title>
   <meta
     name="description"
     content="A visual introduction to the continuity equation and exact likelihood evaluation in flow-based generative models"
@@ -134,15 +128,18 @@
 </svelte:head>
 
 <ArticleHeader
-  title="Flow Models: A Visual Introduction to the Continuity Equation and Exact Likelihood Evaluation"
+  title="A Visual Intro to the Continuity Equation"
   author="Alec Helbling"
   authorLink="https://alechelbling.com"
   date="2025"
 />
 
-{#if crownJewelTrajectories.length > 0}
-  <CrownJewel trajectories={crownJewelTrajectories} height={400} />
-{/if}
+<CrownJewel contourBandwidth={10} numScatterSamples={300}>
+  <strong>Flow model transforming noise to data.</strong>
+  The orange contours show the evolving probability density as samples flow from a Gaussian source distribution to the two moons target distribution (blue points). Click anywhere to trace backward trajectories showing where samples originated.
+</CrownJewel>
+
+<hr class="section-divider" />
 
 <!-- Introduction Section -->
 <section id="introduction">
@@ -198,8 +195,7 @@
     backgroundVisible={false}
     showContours={true}
     height={450}
-    distributionScaleFactor={0.7}
-    yShiftFactor={-0.6}
+    yShiftFactor={-1.6}
     numScatterSamples={150}
   >
     <strong>The probability path of a flow model.</strong>
