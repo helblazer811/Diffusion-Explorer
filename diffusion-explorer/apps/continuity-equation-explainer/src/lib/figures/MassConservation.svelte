@@ -57,10 +57,10 @@
   export let density: number | [number, number] = 0.8;
   export let minPathLength = 1.5;
   export let streamlineColor = "#3b82f6"; // Blue
-  export let streamlineWidth = 2.5;
+  export let streamlineWidth = 4.0;
   export let pulseWidthPixels = 30;
   export let pulsePauseWidthPixels = 5;
-  export let streamlineDuration = 4;
+  export let streamlineDuration = 0.8;
   export let playingByDefault = true;
 
   // Left canvas styling (Volume)
@@ -311,6 +311,9 @@
     // Create toPixel function bound to current canvas dimensions
     const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
 
+    // Compute total duration (same as in setupTimeline)
+    const totalDuration = Math.max(streamlineDuration, rotationDuration, contourAnimationDuration);
+
     // Create streamline animation with GPU backend (for right side only)
     streamlineAnim = StreamlineAnimation.create<StreamlineAnimationState>({
       backend: 'gpu',
@@ -329,7 +332,8 @@
       pulseWidthPixels,
       pulsePauseWidthPixels,
       offsets: "synchronized",
-      loopMultiplier: 1,
+      duration: totalDuration,
+      pulseFrequency: 0.5,
     });
 
     // Generate gaussian samples and compute contours for all animation frames
@@ -780,9 +784,9 @@
 
   .equation-equals {
     display: flex;
-    align-items: center;
-    align-self: flex-end;
-    padding-bottom: 0.5rem;
+    align-items: flex-end;
+    min-height: 3rem;
+    font-size: 1.4rem;
   }
 
   /* Remove top margin from DoubleFigure */

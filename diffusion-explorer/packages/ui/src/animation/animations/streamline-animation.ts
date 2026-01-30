@@ -18,6 +18,8 @@
  *   vectorFieldFn,
  *   domain: { xMin: -2, xMax: 2, yMin: -2, yMax: 2 },
  *   toPixel,
+ *   duration: 4,          // seconds (should match timeline duration)
+ *   pulseFrequency: 1,    // pulses per second
  *   color: '#3b82f6',
  *   backend: 'cpu', // or 'gpu'
  * });
@@ -103,7 +105,12 @@ export interface StreamlineAnimationBaseOptions {
   baseOpacity?: number;
   offsets?: 'random' | 'synchronized';
   binaryPulse?: boolean;
-  loopMultiplier?: number;
+
+  /** Duration of the animation in seconds. Should match the timeline duration. */
+  duration: number;
+
+  /** Pulse frequency in pulses per second. Default: 1 */
+  pulseFrequency?: number;
 
   // Style (optional)
   color?: string | [number, number, number];
@@ -193,6 +200,7 @@ type CPULengthData = StreamlineLengthData & {
  *   vectorFieldFn,
  *   domain: { xMin: -2, xMax: 2, yMin: -2, yMax: 2 },
  *   toPixel,
+ *   duration: 4,
  *   density: 0.8,
  *   color: '#3b82f6',
  * });
@@ -501,13 +509,17 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       baseOpacity = 0.8,
       offsets: offsetMode = 'synchronized',
       binaryPulse = false,
-      // Clip defaults
-      loopMultiplier = 1,
+      // Timing
+      duration,
+      pulseFrequency = 1,
       // Style defaults
       color = '#3b82f6',
       strokeWidth = 2.5,
       gradientSubdivisions = 12,
     } = options;
+
+    // Compute loop multiplier from frequency and duration
+    const loopMultiplier = pulseFrequency * duration;
 
     // Generate streamlines in domain coordinates
     const rawStreamlines = generateStreamlines(vectorFieldFn, {
@@ -613,14 +625,18 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       baseOpacity = 0.8,
       offsets: offsetMode = 'synchronized',
       binaryPulse = false,
-      // Clip defaults
-      loopMultiplier = 1,
+      // Timing
+      duration,
+      pulseFrequency = 1,
       // Style defaults
       color = '#3b82f6',
       strokeWidth = 2.5,
       // GPU-specific
       dpr,
     } = options;
+
+    // Compute loop multiplier from frequency and duration
+    const loopMultiplier = pulseFrequency * duration;
 
     // Generate streamlines in domain coordinates
     const rawStreamlines = generateStreamlines(vectorFieldFn, {

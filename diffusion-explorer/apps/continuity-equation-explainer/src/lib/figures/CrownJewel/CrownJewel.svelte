@@ -568,7 +568,7 @@
     }
 
     // Draw pulsing trajectories (GPU - on separate canvas)
-    if (pulsingAnimation) {
+    if (pulsingAnimation?.initialized) {
       pulsingAnimation.draw(state, [0, 0, 0, 0]); // Clear with transparent
     }
 
@@ -716,14 +716,17 @@
     // Create GPU-accelerated PulsingPathlineAnimation
     pulsingAnimation = PulsingPathlineAnimation.create<AnimationState>({
       paths: pixelTrajectories,
+      duration: animationDuration,
+      pulseFrequency: 1 / animationDuration,  // 1 pulse cycle per animation duration
       pulseWidth: pulseWidthPixels,
       pulseGap: pulsePauseWidthPixels,
       baseOpacity: 0.8,
       color: pulseColor,
       thickness: 3.5,
-      loopMultiplier: 1, // Timeline already does 2x
       showPreview: true,
       previewOpacity: 0.25,
+      showArrowhead: true,
+      arrowheadSize: 2.0,
     });
 
     // Initialize with WebGPU canvas
@@ -842,13 +845,13 @@
   }
 </script>
 
-<div class="crown-jewel-equation">
+<div class="crown-jewel-equation" style="width: 100%; max-width: {width}px;">
   <Katex math={"\\frac{d}{dt} \\int_{\\color{#3b82f6} V} {\\color{#f17720} p_t(x)} \\, dx = - \\oint_{\\color{#3b82f6} S} {\\color{#f17720} v_t p_t} \\cdot d{\\color{#3b82f6} S}"} displayMode={true} />
 </div>
 
 <Figure {caption} bind:isActive={figureIsActive} backgroundVisible={false}>
-  <div class="crown-jewel-wrapper">
-    <div class="canvas-stack" style="width: {width}px; height: {height}px;">
+  <div class="crown-jewel-wrapper" style="width: 100%; max-width: {width}px;">
+    <div class="canvas-stack" style="aspect-ratio: {width} / {height};">
       <!-- Scatter plots layer (bottom) -->
       <canvas class="scatter-canvas" bind:this={scatterCanvasElement} style="pointer-events: none;"></canvas>
       <!-- Flow contours layer -->
@@ -872,7 +875,7 @@
 <style>
   .crown-jewel-equation {
     text-align: center;
-    margin-bottom: 1rem;
+    margin: 0 auto 1rem auto;
     font-size: 1.4rem;
     color: #666666;
   }
@@ -890,6 +893,7 @@
     overflow: hidden;
     background: transparent;
     margin: 0 auto;
+    width: 100%;
   }
 
   .canvas-stack canvas {

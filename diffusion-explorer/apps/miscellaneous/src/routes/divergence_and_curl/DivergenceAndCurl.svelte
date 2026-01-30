@@ -172,6 +172,8 @@
       pulseWidthPixels,
       pulsePauseWidthPixels,
       offsets: 'random' as const,
+      duration: 8,  // matches animationDuration in setupTimeline
+      pulseFrequency: 1 / 8,
     };
 
     // Pure divergence uses uniform grid seeding for better coverage

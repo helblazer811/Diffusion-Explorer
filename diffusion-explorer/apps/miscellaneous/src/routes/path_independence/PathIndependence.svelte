@@ -233,7 +233,8 @@
       pulsePauseWidthPixels,
       binaryPulse,
       offsets: "random",
-      loopMultiplier: 2,
+      duration: animationDuration,
+      pulseFrequency: 2 / animationDuration,
     });
 
     // Initialize the animation with the canvas
