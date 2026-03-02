@@ -5,12 +5,10 @@
     DoubleFigure,
     TimeSlider,
     drawScatterPlot,
-    drawTrajectories,
-    computeContours,
-    plotContours,
     Timeline,
     useCanvas2D,
-    useCanvasWebGPU,
+    PathlineAnimation,
+    type PathlineAnimationState,
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
@@ -64,18 +62,7 @@
     settings.stylingSettings.trajectory.endpointRadius;
   export let trajectoryOpacity =
     settings.stylingSettings.trajectory.opacity;
-  export let trajectoryPreviewOpacity =
-    settings.stylingSettings.trajectory.previewOpacity;
-
-  // Trajectory outline styling
-  export let trajectoryOutlineColor =
-    settings.stylingSettings.trajectory.outline.color;
-  export let trajectoryOutlineStrokeWidth =
-    settings.stylingSettings.trajectory.outline.strokeWidth;
-  export let trajectoryOutlineOpacity =
-    settings.stylingSettings.trajectory.outline.opacity;
-  export let showTrajectoryOutline =
-    settings.stylingSettings.trajectory.outline.enabled;
+  export let endpointRadius = settings.stylingSettings.trajectory.endpointRadius;
 
   // Animation
   export let animationDuration = 10000; // Total cycle duration (ms)
@@ -104,19 +91,17 @@
   $: numTimeSteps = isDataValid ? leftTrajectories.length : 1;
   $: numSegments = numTimeSteps - 1;
 
-  // Background canvas (2D) - for contours and scatter
-  let leftBgCanvas: HTMLCanvasElement | null = null;
-  let rightBgCanvas: HTMLCanvasElement | null = null;
-  const leftBgCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
-  const rightBgCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
-  $: leftBgCtx = leftBgCanvas && leftBgCanvas2d.ctx;
-  $: rightBgCtx = rightBgCanvas && rightBgCanvas2d.ctx;
+  // Single 2D canvas per panel
+  let leftCanvas: HTMLCanvasElement | null = null;
+  let rightCanvas: HTMLCanvasElement | null = null;
+  const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  const rightCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
+  $: leftCtx = leftCanvas && leftCanvas2d.ctx;
+  $: rightCtx = rightCanvas && rightCanvas2d.ctx;
 
-  // Trajectory canvas (WebGPU) - for trajectories only
-  let leftTrajCanvas: HTMLCanvasElement | null = null;
-  let rightTrajCanvas: HTMLCanvasElement | null = null;
-  const leftTrajCanvasGPU = useCanvasWebGPU(canvasWidth, canvasHeight);
-  const rightTrajCanvasGPU = useCanvasWebGPU(canvasWidth, canvasHeight);
+  // PathlineAnimation instances (CPU rendering)
+  let leftPathlineAnimation: PathlineAnimation<PathlineAnimationState> | null = null;
+  let rightPathlineAnimation: PathlineAnimation<PathlineAnimationState> | null = null;
 
   // Scales
   let xScale;
@@ -152,7 +137,6 @@
   let scaledTargetDistribution = []; // [point][x,y] in pixels - target distribution
   let scaledLeftTrajectories = []; // [trajectory][timestep][x,y] in pixels
   let scaledRightTrajectories = []; // [trajectory][timestep][x,y] in pixels
-  let computedTargetContours = null; // Pre-computed contour data
 
   // Visibility
   let figureIsActive;
@@ -212,50 +196,14 @@
       xScale(p[0]),
       yScale(p[1]),
     ]);
-
-    // Pre-compute contours if needed
-    if (showTargetContour && targetDistribution.length > 0) {
-      computedTargetContours = computeContours(targetDistribution, {
-        bandwidth: settings.stylingSettings.contour.bandwidth,
-        thresholds: 8, // More contour lines for CrownJewel
-        domain: [
-          domainRange.xMin,
-          domainRange.xMax,
-          domainRange.yMin,
-          domainRange.yMax,
-        ],
-      });
-    } else {
-      computedTargetContours = null;
-    }
   }
-
-  // Build style object for CPU trajectory drawing
-  function getTrajectoryStyle(opacity: number) {
-    return {
-      strokeWidth: trajectoryStrokeWidth,
-      color: trajectoryColor,
-      opacity: opacity,
-      showPreview: true,
-      previewOpacity: trajectoryPreviewOpacity,
-      pointRadius: trajectoryPointRadius,
-      outline: showTrajectoryOutline
-        ? {
-            color: trajectoryOutlineColor,
-            strokeWidth: trajectoryOutlineStrokeWidth,
-            opacity: trajectoryOutlineOpacity,
-          }
-        : undefined,
-    };
-  }
-
 
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
 
   function runInitialComputation() {
-    if (!leftBgCanvas || !rightBgCanvas || !leftTrajCanvas || !rightTrajCanvas || !isDataValid) return;
+    if (!leftCanvas || !rightCanvas || !isDataValid) return;
 
     initializeScales();
     precomputeCoordinates();
@@ -264,6 +212,32 @@
     updateRightVisualization();
     isInitialized = true;
     onInitialized?.();
+  }
+
+  async function initPathlineAnimations() {
+    if (!leftCanvas || !rightCanvas) return;
+
+    const pathlineStyle = {
+      color: trajectoryColor,
+      strokeWidth: trajectoryStrokeWidth,
+      pointRadius: endpointRadius,
+      opacity: trajectoryOpacity,
+    };
+
+    leftPathlineAnimation = PathlineAnimation.fromTrajectories<PathlineAnimationState>(
+      scaledLeftTrajectories,
+      { style: pathlineStyle }
+    );
+
+    rightPathlineAnimation = PathlineAnimation.fromTrajectories<PathlineAnimationState>(
+      scaledRightTrajectories,
+      { style: pathlineStyle }
+    );
+
+    await Promise.all([
+      leftPathlineAnimation.init(leftCanvas),
+      rightPathlineAnimation.init(rightCanvas),
+    ]);
   }
 
   // ----------------------------------------------------------------
@@ -344,111 +318,70 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  // Draw background elements (contours, scatter) on 2D canvas
-  function drawBackground(ctx: CanvasRenderingContext2D | null) {
-    if (!ctx) return;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    // Draw contour plot if enabled
-    if (showTargetContour && computedTargetContours) {
-      plotContours(ctx, computedTargetContours, {
-        fillColor: targetColor,
-        fill: true,
-        stroke: false,
-        opacity: 0.15, // Lower opacity for CrownJewel contours
-        xScale,
-        yScale,
-      });
-    }
-
-    // Draw scatter plot if enabled
-    if (showTargetScatter) {
-      drawScatterPlot(
-        ctx,
-        scaledTargetDistribution,
-        targetPointRadius,
-        targetColor,
-        targetOpacity
-      );
-    }
-  }
-
-  // Draw trajectories on WebGPU canvas
-  function drawForeground(
-    canvas: HTMLCanvasElement | null,
-    scaledTrajectories: number[][][],
+  function draw(
+    ctx: CanvasRenderingContext2D | null,
+    pathlineAnimation: PathlineAnimation<PathlineAnimationState> | null,
     segmentIndex: number,
     userTrajectories: number[][][],
     logicalTime: number
   ) {
-    if (!canvas) return;
+    if (!ctx) return;
 
-    // Draw default trajectories (GPU rendering) - clear canvas first
-    const defaultOpacity = hasUserTrajectory
-      ? dimmedTrajectoryOpacity
-      : trajectoryOpacity;
-    drawTrajectories(
-      canvas,
-      scaledTrajectories,
-      segmentIndex,
-      getTrajectoryStyle(defaultOpacity),
-      { clearCanvas: true }
-    );
+    // Clear previous frame
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw all user-defined trajectories on top - don't clear
-    for (const userTrajectory of userTrajectories) {
-      if (userTrajectory && userTrajectory.length > 1) {
-        const userNumSegments = userTrajectory.length - 1;
-        const userSegmentIndex = Math.floor(logicalTime * userNumSegments);
-        drawTrajectories(
-          canvas,
-          [userTrajectory],
-          userSegmentIndex,
-          getTrajectoryStyle(highlightedTrajectoryOpacity),
-          { clearCanvas: false }
-        );
-      }
-      // Note: Single-point user trajectories (starting point feedback) are not drawn
-      // in GPU mode since we don't have a 2D context. The trajectory will appear
-      // once it has at least 2 points.
+    // --- Static Background ---
+    if (showTargetScatter) {
+      drawScatterPlot(ctx, scaledTargetDistribution, targetPointRadius, targetColor, targetOpacity);
     }
-  }
 
-  function getCurrentState(): AnimationState {
-    return {
-      leftTime,
-      leftSegmentIndex: leftCurrentSegmentIndex,
-      rightTime,
-      rightSegmentIndex: rightCurrentSegmentIndex,
-    };
+    // --- Dynamic Foreground ---
+    if (pathlineAnimation) {
+      // Draw default trajectories (dimmed if user has clicked)
+      const defaultOpacity = hasUserTrajectory ? dimmedTrajectoryOpacity : trajectoryOpacity;
+      const state: PathlineAnimationState = { segmentIndex };
+      pathlineAnimation.draw(state, { opacity: defaultOpacity });
+
+      // Draw all user-defined trajectories (highlighted) on top
+      if (userTrajectories.length > 0) {
+        const validUserTrajectories = userTrajectories.filter(t => t && t.length >= 2);
+
+        if (validUserTrajectories.length > 0) {
+          const userNumSegments = validUserTrajectories[0].length - 1;
+          const userSegmentIndex = Math.min(
+            Math.floor(logicalTime * userNumSegments),
+            userNumSegments - 1
+          );
+
+          pathlineAnimation.draw(
+            { segmentIndex: userSegmentIndex, pathlines: validUserTrajectories },
+            { opacity: highlightedTrajectoryOpacity }
+          );
+        }
+
+        // Draw starting points for trajectories with only 1 point (immediate feedback)
+        for (const userTrajectory of userTrajectories) {
+          if (userTrajectory && userTrajectory.length === 1) {
+            const [x, y] = userTrajectory[0];
+            ctx.globalAlpha = 1.0;
+            ctx.beginPath();
+            ctx.arc(x, y, endpointRadius, 0, Math.PI * 2);
+            ctx.fillStyle = trajectoryColor;
+            ctx.fill();
+          }
+        }
+      }
+    }
   }
 
   function updateLeftVisualization() {
     if (!isDataValid) return;
-    const state = getCurrentState();
-    drawBackground(leftBgCtx);
-    drawForeground(
-      leftTrajCanvas,
-      scaledLeftTrajectories,
-      state.leftSegmentIndex,
-      userFlowMatchingTrajectories,
-      state.leftTime
-    );
+    draw(leftCtx, leftPathlineAnimation, leftCurrentSegmentIndex, userFlowMatchingTrajectories, leftTime);
   }
 
   function updateRightVisualization() {
     if (!isDataValid) return;
-    const state = getCurrentState();
-    drawBackground(rightBgCtx);
-    drawForeground(
-      rightTrajCanvas,
-      scaledRightTrajectories,
-      state.rightSegmentIndex,
-      userRectifiedFlowTrajectories,
-      state.rightTime
-    );
+    draw(rightCtx, rightPathlineAnimation, rightCurrentSegmentIndex, userRectifiedFlowTrajectories, rightTime);
   }
 
   // ----------------------------------------------------------------
@@ -526,7 +459,7 @@
     // Clients are passed as props; check they're available
     if (!flowMatchingClient || !rectifiedFlowClient) return;
 
-    const canvas = side === "left" ? leftTrajCanvas : rightTrajCanvas;
+    const canvas = side === "left" ? leftCanvas : rightCanvas;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
 
@@ -633,6 +566,10 @@
     // Dispose timeline (stops animation and cleans up)
     timeline?.dispose();
 
+    // Destroy PathlineAnimation instances
+    leftPathlineAnimation?.destroy();
+    rightPathlineAnimation?.destroy();
+
     // Cancel any pending worker requests to prevent orphaned promises
     if (activeFlowMatchingRequestId && flowMatchingClient) {
       flowMatchingClient.stopRequest(activeFlowMatchingRequestId);
@@ -646,9 +583,11 @@
   // Reactive Blocks
   // ----------------------------------------------------------------
 
-  $: if (isDataValid && leftBgCanvas && rightBgCanvas && leftTrajCanvas && rightTrajCanvas && !isInitialized) {
+  $: if (isDataValid && leftCanvas && rightCanvas && !isInitialized) {
     runInitialComputation();
-    setupTimeline();
+    initPathlineAnimations().then(() => {
+      setupTimeline();
+    });
   }
 
   $: if (isPlaying && pathsInitialized && timeline && !timeline.isPlaying)
@@ -682,22 +621,13 @@
         >
           {leftSubtitle}
         </div>
-        <div class="canvas-stack">
-          <!-- Background layer (2D) - contours and scatter -->
-          <canvas
-            bind:this={leftBgCanvas}
-            use:leftBgCanvas2d.bindCanvas
-            class="panel-canvas bg-layer"
-          ></canvas>
-          <!-- Trajectory layer (WebGPU) -->
-          <canvas
-            bind:this={leftTrajCanvas}
-            use:leftTrajCanvasGPU.bindCanvas
-            class="panel-canvas traj-layer"
-            onclick={(e) => handleCanvasClick(e, "left")}
-            style="cursor: pointer;"
-          ></canvas>
-        </div>
+        <canvas
+          bind:this={leftCanvas}
+          use:leftCanvas2d.bindCanvas
+          class="panel-canvas"
+          onclick={(e) => handleCanvasClick(e, "left")}
+          style="cursor: pointer;"
+        ></canvas>
         <div class="slider-wrapper">
           <TimeSlider
             bind:value={leftTime}
@@ -731,22 +661,13 @@
         >
           {rightSubtitle}
         </div>
-        <div class="canvas-stack">
-          <!-- Background layer (2D) - contours and scatter -->
-          <canvas
-            bind:this={rightBgCanvas}
-            use:rightBgCanvas2d.bindCanvas
-            class="panel-canvas bg-layer"
-          ></canvas>
-          <!-- Trajectory layer (WebGPU) -->
-          <canvas
-            bind:this={rightTrajCanvas}
-            use:rightTrajCanvasGPU.bindCanvas
-            class="panel-canvas traj-layer"
-            onclick={(e) => handleCanvasClick(e, "right")}
-            style="cursor: pointer;"
-          ></canvas>
-        </div>
+        <canvas
+          bind:this={rightCanvas}
+          use:rightCanvas2d.bindCanvas
+          class="panel-canvas"
+          onclick={(e) => handleCanvasClick(e, "right")}
+          style="cursor: pointer;"
+        ></canvas>
         <div class="slider-wrapper">
           <TimeSlider
             bind:value={rightTime}
@@ -802,27 +723,10 @@
     margin-top: -14px;
   }
 
-  .canvas-stack {
-    position: relative;
-    width: 100%;
-  }
-
   .panel-canvas {
     width: 100%;
     height: auto;
     display: block;
-  }
-
-  .bg-layer {
-    position: relative;
-    z-index: 0;
-  }
-
-  .traj-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 1;
   }
 
   .slider-wrapper {
