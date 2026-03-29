@@ -59,6 +59,17 @@
   background: #fff;
 }
 
+/* Bottom reference citation */
+.reveal .slides section .bottom-reference {
+  position: absolute;
+  bottom: 60px;
+  left: 50px;
+  right: 50px;
+  font-size: 0.55em;
+  color: #999;
+  line-height: 1.4;
+}
+
 /* Override reveal.js defaults for better figure embedding */
 .reveal .slides section {
   height: 100%;
