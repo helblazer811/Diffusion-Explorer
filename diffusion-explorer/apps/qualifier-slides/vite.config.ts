@@ -9,6 +9,7 @@ export default defineConfig({
       '$rectified-flow': path.resolve('../rectified-flow-explainer/src/lib'),
       '$continuity': path.resolve('../continuity-equation-explainer/src/lib'),
       '$flow-matching': path.resolve('../flow-matching-explainer/src/lib'),
+      '$miscellaneous': path.resolve('../miscellaneous/src/routes'),
     }
   },
   server: {
@@ -18,6 +19,7 @@ export default defineConfig({
         path.resolve('../rectified-flow-explainer/src/lib'),
         path.resolve('../continuity-equation-explainer/src/lib'),
         path.resolve('../flow-matching-explainer/src/lib'),
+        path.resolve('../miscellaneous/src/routes'),
       ]
     }
   },
