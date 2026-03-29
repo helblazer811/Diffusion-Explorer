@@ -42,12 +42,14 @@
   import FlowProbabilityPath from '$lib/figures/FlowProbabilityPath.svelte';
   import Slide from '$lib/components/Slide.svelte';
   import NormalizingFlowStages from '$lib/figures/NormalizingFlowStages.svelte';
+  import ChangeOfVariables from '$lib/figures/ChangeOfVariables.svelte';
 
   let flowerFigure: FlowerImageDistribution;
   let noiseFigure: TransformingNoiseIntoData;
   let diffFlowFigure: DiffusionVsFlow;
   let flowPathFigure: FlowProbabilityPath;
   let normFlowFigure: NormalizingFlowStages;
+  let covFigure: ChangeOfVariables;
 
   // Provide reveal instance to Slide components via context
   setContext('getReveal', () => revealInstance);
@@ -316,7 +318,7 @@
       <div class="roadmap">
         <div class="roadmap-item">
           <p class="roadmap-title"><strong>I. What is a flow?</strong></p>
-          <p class="roadmap-desc">Definition, discrete vs continuous flows, continuity equation</p>
+          <p class="roadmap-desc">Normalizing flows, CNFs, continuity equation</p>
         </div>
         <div class="roadmap-item">
           <p class="roadmap-title"><strong>II. How to train flows?</strong></p>
@@ -353,33 +355,24 @@
       </p>
     </Slide>
 
-    <!-- Slide 4: Generative modeling goal (with figure) -->
-    <section>
-      <h2 class="slide-title">The Generative Modeling Goal</h2>
-      <p style="font-size: 0.85em;">
-        Source distribution <Katex math={"p"} /> &rarr; target distribution <Katex math={"q"} />. Learn the bridge.
+    <!-- Slide 8: Change of Variables Formula -->
+    <Slide figure={covFigure}>
+      <h2 class="slide-title">Change of Variables Formula</h2>
+      <p style="margin-top: 0.5em;">
+        The Change of Variables Formula connects the density of <Katex math={"p(x)"} /> to <Katex math={"p(z)"} />.
       </p>
-      <div class="figure-container">
-        {#if dataLoaded}
-          <ProbabilityPathIntro
-            sourceDistributionSamples={ceSourceSamples}
-            targetDistributionSamples={ceTargetSamples}
-            allTimeSamples={ceAllTimeSamples}
-            isTraining={ceIsTraining}
-            backgroundVisible={false}
-            showContours={true}
-            height={450}
-            yShiftFactor={-1.6}
-            numScatterSamples={150}
-          />
-        {/if}
+      <p>
+        This leverages the differentiability and invertibility of <Katex math={"f(z)"} />.
+      </p>
+      <div style="margin-top: 0.5em;">
+        <Katex math={"p(z) \\left| \\det \\frac{\\partial f}{\\partial z} \\right|^{-1} = p(x)"} displayMode={true} />
       </div>
-      <aside class="notes">
-        Density contours morphing over time. Source to target. This is the probability path.
-      </aside>
-    </section>
+      <div class="figure-container" style="margin-top: -10px; height: 580px;">
+        <ChangeOfVariables bind:this={covFigure} width={1720} height={580} numSamples={300} contourThresholds={3} />
+      </div>
+    </Slide>
 
-    <!-- Slide 4: Flows and velocity fields -->
+    <!-- Slide: Flows and velocity fields -->
     <section>
       <h2 class="slide-title">Flows and Velocity Fields</h2>
       <p style="font-size: 0.8em;">
