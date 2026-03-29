@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, setContext } from 'svelte';
   import { writable, type Writable } from 'svelte/store';
   import { base } from '$app/paths';
   import {
@@ -40,11 +40,17 @@
   import TransformingNoiseIntoData from '$lib/figures/TransformingNoiseIntoData.svelte';
   import DiffusionVsFlow from '$lib/figures/DiffusionVsFlow.svelte';
   import FlowProbabilityPath from '$lib/figures/FlowProbabilityPath.svelte';
+  import Slide from '$lib/components/Slide.svelte';
+  import NormalizingFlowStages from '$lib/figures/NormalizingFlowStages.svelte';
 
   let flowerFigure: FlowerImageDistribution;
   let noiseFigure: TransformingNoiseIntoData;
   let diffFlowFigure: DiffusionVsFlow;
   let flowPathFigure: FlowProbabilityPath;
+  let normFlowFigure: NormalizingFlowStages;
+
+  // Provide reveal instance to Slide components via context
+  setContext('getReveal', () => revealInstance);
 
   // ========== REVEAL.JS ==========
 
@@ -120,31 +126,6 @@
     });
 
     await revealInstance.initialize();
-
-    // Manage animations on slide change
-    revealInstance.on('slidechanged', (event: any) => {
-      if (event.indexh === 1) {
-        flowerFigure?.restart();
-      }
-      // Play/pause transforming noise animation based on slide visibility
-      if (event.indexh === 2) {
-        noiseFigure?.restart();
-      } else {
-        noiseFigure?.pause?.();
-      }
-      // Play/pause diffusion vs flow animation
-      if (event.indexh === 3) {
-        diffFlowFigure?.restart();
-      } else {
-        diffFlowFigure?.pause?.();
-      }
-      // Play/pause flow probability path animation
-      if (event.indexh === 4) {
-        flowPathFigure?.restart();
-      } else {
-        flowPathFigure?.pause?.();
-      }
-    });
 
     // ========== LOAD DATA ==========
 
@@ -293,7 +274,7 @@
     </section>
 
     <!-- Slide 2: The Goal of Generative Modeling -->
-    <section onclick={() => flowerFigure?.restart()} style="cursor: pointer;">
+    <Slide figure={flowerFigure}>
       <h2 class="slide-title">The Goal of Generative Modeling</h2>
       <p style="margin-top: 0.5em;">
         Model a complex data distribution <Katex math={"p(x)"} /> and efficiently generate novel samples <Katex math={"x \\sim p(x)"} />.
@@ -306,28 +287,28 @@
           <FlowerImageDistribution bind:this={flowerFigure} width={1495} height={750} />
         </div>
       </div>
-    </section>
+    </Slide>
 
     <!-- Slide 3: Transforming Noise into Data -->
-    <section>
+    <Slide figure={noiseFigure}>
       <h2 class="slide-title">Transforming Noise into Data</h2>
       <div class="figure-container" style="margin-top: 140px;">
         <TransformingNoiseIntoData bind:this={noiseFigure} width={1720} height={975} />
       </div>
-    </section>
+    </Slide>
 
     <!-- Slide 4: Diffusion vs Flow -->
-    <section>
+    <Slide figure={diffFlowFigure}>
       <DiffusionVsFlow bind:this={diffFlowFigure} width={1720} height={520} animationDuration={24000} />
-    </section>
+    </Slide>
 
     <!-- Slide 5: Flow-based Generative Models -->
-    <section>
+    <Slide figure={flowPathFigure}>
       <h2 class="slide-title">Flow-based Generative Models</h2>
       <div class="figure-container" style="margin-top: 120px;">
         <FlowProbabilityPath bind:this={flowPathFigure} width={1720} height={850} contourBandwidth={20} contourGridSize={50} contourThresholds={3} />
       </div>
-    </section>
+    </Slide>
 
     <!-- Slide 6: Roadmap -->
     <section class="roadmap-slide">
@@ -354,6 +335,23 @@
         Four-part narrative thread through flows, training, pathologies, and fixes.
       </aside>
     </section>
+
+    <!-- Slide 7: What is a Normalizing Flow? -->
+    <Slide figure={normFlowFigure}>
+      <h2 class="slide-title">What is a Normalizing Flow?</h2>
+      <p style="margin-top: 0.5em;">
+        A <strong>Normalizing Flow</strong> is a transformation of a simple
+        probability distribution (e.g., a standard normal) into a more
+        complex distribution by a sequence of <strong>invertible</strong> and
+        <strong>differentiable</strong> mappings.
+      </p>
+      <div class="figure-container" style="margin-top: -20px;">
+        <NormalizingFlowStages bind:this={normFlowFigure} width={1720} height={500} numStages={4} />
+      </div>
+      <p class="bottom-reference">
+        Rezende, D. &amp; Mohamed, S. (2015). Variational Inference with Normalizing Flows. <em>Proceedings of the 32nd International Conference on Machine Learning</em>, in <em>Proceedings of Machine Learning Research</em> 37:1530-1538.
+      </p>
+    </Slide>
 
     <!-- Slide 4: Generative modeling goal (with figure) -->
     <section>
