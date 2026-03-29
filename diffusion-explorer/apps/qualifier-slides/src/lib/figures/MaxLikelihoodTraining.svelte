@@ -17,12 +17,14 @@
   let {
     width = 1720,
     height = 580,
-    numStages = 5,
+    numStages = 4,
     numSamples = 200,
-    animationDuration = 8000,
+    animationDuration = 10000,
     contourBandwidth = 8,
     contourThresholds = 5 as number | number[],
     contourFillColor = '#f17720',
+    highlightColor = '#3b82f6',
+    highlightPointIndex = 15,
   }: {
     width?: number;
     height?: number;
@@ -32,6 +34,8 @@
     contourBandwidth?: number;
     contourThresholds?: number | number[];
     contourFillColor?: string;
+    highlightColor?: string;
+    highlightPointIndex?: number;
   } = $props();
 
   // ----------------------------------------------------------------
@@ -42,24 +46,23 @@
   let ctx: CanvasRenderingContext2D | null = $state(null);
   let isInitialized = $state(false);
 
-  // Per-stage data: samples in data coords and pixel coords
   type StageData = {
-    samples: number[][];       // [sample][x,y] in data space
-    pixelCoords: number[][];   // [sample][x,y] in pixel space
-    centerX: number;           // pixel center X for this stage
-    contours: any;             // pre-computed ComputedContours
+    samples: number[][];
+    pixelCoords: number[][];
+    centerX: number;
+    contours: any;
   };
 
   let stages: StageData[] = $state([]);
 
-  // Animation state: opacity per stage + per arrow
+  // Animation: first reveal all stages (left to right), then animate point (right to left)
+  // State keys: stage0..stageN for reveal, pointStage for which stage the point is at (N-1 to 0)
   type AnimState = Record<string, number>;
 
   // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
 
-  // Seeded RNG
   function mulberry32(seed: number) {
     return function () {
       seed |= 0; seed = seed + 0x6D2B79F5 | 0;
@@ -77,15 +80,6 @@
     return [r * Math.cos(theta), r * Math.sin(theta)];
   }
 
-  function generateGaussianSamples(n: number, rng: () => number, meanX = 0, meanY = 0, std = 1): number[][] {
-    const samples: number[][] = [];
-    for (let i = 0; i < n; i++) {
-      const [gx, gy] = gaussianPair(rng);
-      samples.push([meanX + gx * std, meanY + gy * std]);
-    }
-    return samples;
-  }
-
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
@@ -93,12 +87,14 @@
   function generateStageData() {
     const rng = mulberry32(42);
 
-    // Stage 0: Standard Gaussian
-    const sourceSamples = generateGaussianSamples(numSamples, rng, 0, 0, 1);
+    const sourceSamples: number[][] = [];
+    for (let i = 0; i < numSamples; i++) {
+      const [gx, gy] = gaussianPair(rng);
+      sourceSamples.push([gx, gy]);
+    }
 
-    // Stage K (final): 2 vertically spaced Gaussians
     const targetSamples: number[][] = [];
-    const centers = [-1.5, 1.5]; // vertical centers
+    const centers = [-1.5, 1.5];
     const samplesPerMode = Math.floor(numSamples / 2);
     for (let m = 0; m < 2; m++) {
       for (let i = 0; i < samplesPerMode; i++) {
@@ -106,27 +102,23 @@
         targetSamples.push([gx * 0.35, centers[m] + gy * 0.35]);
       }
     }
-    // Fill remaining
     while (targetSamples.length < numSamples) {
       const [gx, gy] = gaussianPair(rng);
       targetSamples.push([gx * 0.35, gy * 0.35]);
     }
 
-    // Layout: evenly spaced centers
     const margin = 180;
     const usableWidth = width - 2 * margin;
     const spacing = usableWidth / (numStages - 1);
     const vertCenter = height * 0.42;
-    const scaleFactor = 70; // data units to pixel units
+    const scaleFactor = 70;
 
-    // Generate intermediate stages via linear interpolation
     const allStages: StageData[] = [];
 
     for (let s = 0; s < numStages; s++) {
       const t = s / (numStages - 1);
       const centerX = margin + s * spacing;
 
-      // Interpolate samples
       const samples = sourceSamples.map((src, i) => {
         const tgt = targetSamples[i];
         return [
@@ -135,13 +127,11 @@
         ];
       });
 
-      // Convert to pixel coords
       const pixelCoords = samples.map((p) => [
         centerX + p[0] * scaleFactor,
-        vertCenter - p[1] * scaleFactor, // flip y
+        vertCenter - p[1] * scaleFactor,
       ]);
 
-      // Pre-compute contours
       const contours = computeContours(samples as [number, number][], {
         bandwidth: contourBandwidth,
         thresholds: contourThresholds,
@@ -160,31 +150,37 @@
   const timeline = new Timeline<AnimState>();
   timeline.duration = animationDuration / 1000;
   timeline.looping = true;
-  timeline.setEndPause(5.0);
+  timeline.setEndPause(3.0);
 
   function setupTimeline() {
     const initState: AnimState = {};
     for (let s = 0; s < numStages; s++) {
-      initState[`stage${s}`] = 0;
+      initState[`stage${s}`] = 1; // always visible
+    }
+    // Per-stage point reveal: point0 = last stage (appears first), pointN-1 = first stage (appears last)
+    for (let s = 0; s < numStages; s++) {
+      initState[`point${s}`] = 0;
     }
     timeline.initialState = initState;
 
-    const animPhase = 0.85;
+    // Stagger point appearances right-to-left
+    const animPhase = 0.7;
     const slotDuration = animPhase / numStages;
 
     for (let s = 0; s < numStages; s++) {
-      const stageKey = `stage${s}`;
-      const stageStart = s * slotDuration;
-      const stageEnd = stageStart + slotDuration;
+      // s=0 → last stage (rightmost), s=N-1 → first stage (leftmost)
+      const key = `point${s}`;
+      const start = 0.05 + s * slotDuration;
+      const end = start + slotDuration * 0.5; // quick fade-in
       timeline.add({
-        name: `Stage_${s}`,
+        name: `Point_${s}`,
         reduce(t: number) {
-          return { [stageKey]: t } as Partial<AnimState>;
+          return { [key]: t } as Partial<AnimState>;
         },
-      }, { start: stageStart, end: stageEnd });
+      }, { start, end });
     }
 
-    timeline.add(createPauseClip(), { start: animPhase, end: 1.0 });
+    timeline.add(createPauseClip(), { start: 0.05 + animPhase, end: 1.0 });
 
     timeline.onTick((_t: number, state: Readonly<AnimState>) => {
       draw(state);
@@ -195,13 +191,18 @@
   // Drawing
   // ----------------------------------------------------------------
 
+  let lastState: AnimState = {};
+  function requestRedraw() { draw(lastState); }
+
   function draw(state: AnimState) {
+    lastState = state;
     if (!ctx || stages.length === 0) return;
     ctx.clearRect(0, 0, width, height);
 
     const vertCenter = height * 0.42;
     const scaleFactor = 70;
 
+    // Draw all stages
     for (let s = 0; s < stages.length; s++) {
       const stage = stages[s];
       const opacity = state[`stage${s}`] ?? 0;
@@ -210,33 +211,30 @@
       ctx.save();
       ctx.globalAlpha = opacity;
 
-      // Draw contours
       const xScale = (dataX: number) => stage.centerX + dataX * scaleFactor;
       const yScale = (dataY: number) => vertCenter - dataY * scaleFactor;
 
       plotContours(ctx, stage.contours, {
-        xScale,
-        yScale,
+        xScale, yScale,
         fillColor: contourFillColor,
-        opacity: 0.3 * opacity,
-        fill: true,
-        stroke: false,
+        opacity: 0.08 * opacity,
+        fill: true, stroke: false,
       });
 
-      // Draw scatter (same color as contour)
-      drawScatterPlot(ctx, stage.pixelCoords, 5, contourFillColor, 0.4 * opacity);
+      drawScatterPlot(ctx, stage.pixelCoords, 5, contourFillColor, 0.1 * opacity);
 
-      // Label below: z_i ~ p(z_i)
+      // Labels: z_i ~ p(z_i)
       const labelY = height - 30;
-      drawMathjax(ctx, `z_{${s}} \\sim p(z_{${s}})`, stage.centerX, labelY, 34, 0, 0, { color: '#333' });
+      drawMathjax(ctx, `z_{${s}} \\sim p(z_{${s}})`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
 
       ctx.restore();
 
-      // Draw arrow to next stage (visible once this stage is fully revealed)
+      // Draw reversed arrows (pointing right to left: f^{-1})
       if (s < stages.length - 1 && opacity >= 1) {
         const nextStage = stages[s + 1];
-        const arrowFromX = stage.centerX + 165;
-        const arrowToX = nextStage.centerX - 165;
+        // Arrow goes FROM next stage TO this stage (reverse direction)
+        const arrowFromX = nextStage.centerX - 165;
+        const arrowToX = stage.centerX + 165;
         const arrowY = vertCenter;
 
         ctx.save();
@@ -246,12 +244,38 @@
 
         drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, 7);
 
-        // Label above arrow: f_i
         const arrowMidX = (arrowFromX + arrowToX) / 2;
-        drawMathjax(ctx, `f_{${s}}`, arrowMidX, arrowY - 20, 34, 0, 0, { color: '#555' });
+        drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, 34, 0, 0, { color: '#555' }, requestRedraw);
 
         ctx.restore();
       }
+    }
+
+    // Draw highlight points appearing one at a time, right to left
+    const lastIdx = stages.length - 1;
+    const ptIdx = highlightPointIndex % stages[0].pixelCoords.length;
+
+    for (let s = 0; s < numStages; s++) {
+      const opacity = state[`point${s}`] ?? 0;
+      if (opacity <= 0) continue;
+
+      // s=0 → last stage (rightmost), s=1 → second-to-last, etc.
+      const stageIdx = lastIdx - s;
+      const pt = stages[stageIdx].pixelCoords[ptIdx];
+      const isLatest = s === numStages - 1 || (state[`point${s + 1}`] ?? 0) <= 0;
+
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.beginPath();
+      ctx.arc(pt[0], pt[1], isLatest ? 14 : 10, 0, Math.PI * 2);
+      ctx.fillStyle = highlightColor;
+      ctx.fill();
+      if (isLatest) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.restore();
     }
   }
 
