@@ -1,74 +1,881 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { writable, type Writable } from 'svelte/store';
+  import { base } from '$app/paths';
+  import {
+    FlowModelClient,
+    clipSamplesToRadius,
+    clipTrajectoriesToStartingRadius,
+    generateClippedGaussianSamples,
+    loadCachedTrajectories as loadCachedTraj,
+    loadTargetDistribution as loadTargetDist,
+    loadCachedVectorField as loadCachedVF,
+    loadCachedRectifiedFlowTrajectories as loadCachedRFTraj,
+  } from '@diffusion-explorer/diffusion';
+  import { Katex } from '@diffusion-explorer/ui';
+  import { settings } from '$lib/settings';
 
-	let revealInstance: any = null;
-	let deckEl: HTMLElement;
+  // ========== FIGURE IMPORTS ==========
 
-	onMount(async () => {
-		const Reveal = (await import('reveal.js')).default;
-		const RevealNotes = (await import('reveal.js/plugin/notes/notes')).default;
+  // From continuity-equation-explainer
+  import ProbabilityPathIntro from '$continuity/figures/ProbabilityPathIntro.svelte';
+  import { CrownJewel } from '$continuity/figures/CrownJewel';
+  import MassConservation from '$continuity/figures/MassConservation.svelte';
+  import InvertibilityExplanation from '$continuity/figures/InvertibilityExplanation.svelte';
+  import FlowInvertibility from '$continuity/figures/FlowInvertibility.svelte';
+  import DivergenceIntro from '$continuity/figures/DivergenceIntro.svelte';
+  import LikelihoodIntegration from '$continuity/figures/LikelihoodIntegration.svelte';
 
-		revealInstance = new Reveal(deckEl, {
-			hash: true,
-			slideNumber: true,
-			controls: true,
-			progress: true,
-			center: true,
-			transition: 'slide',
-			width: 1920,
-			height: 1080,
-			plugins: [RevealNotes],
-		});
+  // From rectified-flow-explainer
+  import ProbabilityPath from '$rectified-flow/figures/ProbabilityPath.svelte';
+  import CurvedTrajectorySuperimposed from '$rectified-flow/figures/CurvedTrajectorySuperimposed.svelte';
+  import EulerStepComparison from '$rectified-flow/figures/EulerStepComparison.svelte';
+  import IndependentCoupling from '$rectified-flow/figures/IndependentCoupling.svelte';
+  import OTCoupling from '$rectified-flow/figures/OTCoupling.svelte';
+  import RectifiedFlowSuperimposed from '$rectified-flow/figures/RectifiedFlowSuperimposed.svelte';
+  import VectorFieldCurvatureComparison from '$rectified-flow/figures/VectorFieldCurvatureComparison.svelte';
 
-		await revealInstance.initialize();
-	});
+  // Local figures
+  import FlowerImageDistribution from '$lib/figures/FlowerImageDistribution.svelte';
+  import TransformingNoiseIntoData from '$lib/figures/TransformingNoiseIntoData.svelte';
+  import DiffusionVsFlow from '$lib/figures/DiffusionVsFlow.svelte';
+  import FlowProbabilityPath from '$lib/figures/FlowProbabilityPath.svelte';
 
-	onDestroy(() => {
-		revealInstance?.destroy();
-	});
+  let flowerFigure: FlowerImageDistribution;
+  let noiseFigure: TransformingNoiseIntoData;
+  let diffFlowFigure: DiffusionVsFlow;
+  let flowPathFigure: FlowProbabilityPath;
+
+  // ========== REVEAL.JS ==========
+
+  let revealInstance: any = null;
+  let deckEl: HTMLElement;
+
+  // ========== DATA STATE ==========
+
+  // Shared data for rectified-flow figures
+  const sourceDistributionSamples: Writable<number[][]> = writable([]);
+  const targetDistributionSamples: Writable<number[][]> = writable([]);
+  const allTimeSamples: Writable<number[][][]> = writable([]);
+  const isTraining: Writable<boolean> = writable(false);
+
+  let flowMatchingClient: FlowModelClient | null = null;
+  let rectifiedFlowClient: FlowModelClient | null = null;
+
+  let vectorFieldData: any = null;
+  let rectifiedFlowVectorFieldData: any = null;
+  let flowMatchingGridTrajectories: number[][][] | null = null;
+  let rectifiedFlowGridTrajectories: number[][][][] | null = null;
+  let otCouplingData: any = null;
+
+  // Diffusion vs Flow comparison data
+  let ddpmTrajectories: number[][][] = [];
+  let comparisonTargetDist: number[][] = [];
+
+  // Continuity equation data
+  let ceSourceSamples: number[][] = [];
+  let ceTargetSamples: number[][] = [];
+  const ceAllTimeSamples = writable<number[][][]>([]);
+  const ceIsTraining = writable(false);
+  let flowInvertibilityData: any = null;
+  let reverseSamplingData: any = null;
+
+  let dataLoaded = false;
+
+  // ========== HELPERS ==========
+
+  function transposeTrajectories(trajectories: number[][][]) {
+    if (!trajectories || trajectories.length === 0) return [];
+    const numSamples = trajectories.length;
+    const numSteps = trajectories[0].length;
+    const result: number[][][] = [];
+    for (let t = 0; t < numSteps; t++) {
+      const samplesAtT: number[][] = [];
+      for (let s = 0; s < numSamples; s++) {
+        samplesAtT.push(trajectories[s][t]);
+      }
+      result.push(samplesAtT);
+    }
+    return result;
+  }
+
+  // ========== LIFECYCLE ==========
+
+  onMount(async () => {
+    // Initialize reveal.js
+    const Reveal = (await import('reveal.js')).default;
+    const RevealNotes = (await import('reveal.js/plugin/notes/notes')).default;
+    revealInstance = new Reveal(deckEl, {
+      hash: false,
+      history: false,
+      slideNumber: true,
+      controls: false,
+      progress: true,
+      center: true,
+      transition: 'slide',
+      width: 1920,
+      height: 1200,
+      margin: 0.02,
+      plugins: [RevealNotes],
+    });
+
+    await revealInstance.initialize();
+
+    // Manage animations on slide change
+    revealInstance.on('slidechanged', (event: any) => {
+      if (event.indexh === 1) {
+        flowerFigure?.restart();
+      }
+      // Play/pause transforming noise animation based on slide visibility
+      if (event.indexh === 2) {
+        noiseFigure?.restart();
+      } else {
+        noiseFigure?.pause?.();
+      }
+      // Play/pause diffusion vs flow animation
+      if (event.indexh === 3) {
+        diffFlowFigure?.restart();
+      } else {
+        diffFlowFigure?.pause?.();
+      }
+      // Play/pause flow probability path animation
+      if (event.indexh === 4) {
+        flowPathFigure?.restart();
+      } else {
+        flowPathFigure?.pause?.();
+      }
+    });
+
+    // ========== LOAD DATA ==========
+
+    const sourceDistribution = generateClippedGaussianSamples(300);
+
+    // --- Rectified flow data ---
+    flowMatchingClient = new FlowModelClient(
+      `${base}${settings.rf.workerUrl}`,
+      `${base}${settings.rf.flowMatchingModelPath}`,
+      'Flow Matching',
+      { dim: settings.modelSettings.dim, hidden: settings.modelSettings.hidden },
+      null
+    );
+    rectifiedFlowClient = new FlowModelClient(
+      `${base}${settings.rf.workerUrl}`,
+      `${base}${settings.rf.rectifiedFlowModelPath}`,
+      'Rectified Flow',
+      { dim: settings.modelSettings.dim, hidden: settings.modelSettings.hidden },
+      null
+    );
+
+    // Load target distribution
+    try {
+      const targetRes = await fetch(`${base}/${settings.rf.targetDistributionPath}`);
+      if (targetRes.ok) {
+        const data = await targetRes.json();
+        const samples = data.points?.slice(0, 150) || [];
+        targetDistributionSamples.set(samples);
+      }
+    } catch (e) { console.warn('Failed to load RF target distribution:', e); }
+
+    // Load flow matching trajectories
+    try {
+      const result = await loadCachedTraj(`${base}/${settings.rf.cachedFlowMatchingTrajectoriesPath}`);
+      if (result) {
+        allTimeSamples.set(result.trajectories);
+        sourceDistributionSamples.set(
+          clipSamplesToRadius(result.sourceDistribution, 2.0)
+        );
+      }
+    } catch (e) { console.warn('Failed to load FM trajectories:', e); }
+
+    // Load flow matching grid trajectories
+    try {
+      const result = await loadCachedTraj(`${base}/${settings.rf.cachedFlowMatchingGridTrajectoriesPath}`);
+      if (result) {
+        flowMatchingGridTrajectories = result.trajectories;
+      }
+    } catch (e) { console.warn('Failed to load FM grid trajectories:', e); }
+
+    // Load rectified flow grid trajectories
+    try {
+      const result = await loadCachedRFTraj(`${base}/${settings.rf.cachedRectifiedFlowGridTrajectoriesPath}`);
+      if (result) {
+        rectifiedFlowGridTrajectories = result.allRectifiedTrajectories;
+      }
+    } catch (e) { console.warn('Failed to load RF grid trajectories:', e); }
+
+    // Load vector fields
+    try {
+      const result = await loadCachedVF(`${base}/${settings.rf.cachedFlowMatchingVectorFieldPath}`);
+      if (result) vectorFieldData = result;
+    } catch (e) { console.warn('Failed to load FM vector field:', e); }
+
+    try {
+      const result = await loadCachedVF(`${base}/${settings.rf.cachedRectifiedFlowVectorFieldPath}`);
+      if (result) rectifiedFlowVectorFieldData = result;
+    } catch (e) { console.warn('Failed to load RF vector field:', e); }
+
+    // Load OT coupling
+    try {
+      const res = await fetch(`${base}/${settings.rf.cachedOTCouplingPath}`);
+      if (res.ok) otCouplingData = await res.json();
+    } catch (e) { console.warn('Failed to load OT coupling:', e); }
+
+    // --- Continuity equation data ---
+    ceSourceSamples = sourceDistribution;
+
+    try {
+      const [trajResult, targetRes] = await Promise.all([
+        loadCachedTraj(`${base}/${settings.ce.cachedTrajectoriesPath}`),
+        fetch(`${base}/${settings.ce.targetDistributionPath}`),
+      ]);
+
+      if (trajResult) {
+        ceAllTimeSamples.set(trajResult.trajectories);
+        ceSourceSamples = trajResult.trajectories[0] || [];
+      }
+
+      if (targetRes.ok) {
+        const targetData = await targetRes.json();
+        ceTargetSamples = targetData.points || [];
+      }
+
+      // FlowInvertibility data
+      const trajRes2 = await fetch(`${base}/${settings.ce.cachedTrajectoriesPath}`);
+      if (trajRes2.ok) {
+        const trajData = await trajRes2.json();
+        flowInvertibilityData = {
+          allTrajectories: trajData.allTrajectories,
+          highlightedIndices: trajData.highlightedIndices || [0, 1],
+          sourceDistribution,
+          targetDistribution: ceTargetSamples,
+          config: trajData.config,
+        };
+      }
+
+      // Reverse trajectories for LikelihoodIntegration
+      const revTrajRes = await fetch(`${base}/${settings.ce.cachedReverseTrajectoriesPath}`);
+      if (revTrajRes.ok) {
+        const revTrajData = await revTrajRes.json();
+        reverseSamplingData = {
+          trajectories: revTrajData.trajectories,
+          sourceDistribution,
+          targetDistribution: ceTargetSamples,
+          config: revTrajData.config,
+        };
+      }
+    } catch (e) { console.warn('Failed to load CE data:', e); }
+
+    dataLoaded = true;
+  });
+
+  onDestroy(() => {
+    revealInstance?.destroy();
+  });
 </script>
 
 <div class="reveal" bind:this={deckEl}>
-	<div class="slides">
-		<!-- Title Slide -->
-		<section>
-			<h1>Qualifier Presentation</h1>
-			<p>Interactive figures powered by Diffusion Explorer</p>
-		</section>
+  <div class="slides">
 
-		<!-- Example: Embedding a figure -->
-		<section>
-			<h2>Embedded Figure Example</h2>
-			<div class="figure-container">
-				<p style="color: #888;">
-					Import a figure component here, e.g.:<br/>
-					<code>import MyFigure from '$rectified-flow/figures/MyFigure.svelte';</code>
-				</p>
-			</div>
-		</section>
+    <!-- ============================================================ -->
+    <!-- PART 1: What is a Flow? -->
+    <!-- ============================================================ -->
 
-		<!-- Example: Vertical slides (sub-sections) -->
-		<section>
-			<section>
-				<h2>Vertical Slide 1</h2>
-				<p>Use vertical slides for drilling into a topic</p>
-			</section>
-			<section>
-				<h2>Vertical Slide 2</h2>
-				<p>Press down arrow to navigate</p>
-			</section>
-		</section>
+    <!-- Slide 1: Title -->
+    <section class="title-slide">
+      <div class="title-content">
+        <h1>A Visual Survey of Flow Based Generative Models</h1>
+        <p style="font-size: 1.8em; color: #666; margin-top: 1em;">Alec Helbling</p>
+        <p style="font-size: 1.2em; color: #666; margin-top: 0.3em;">ML PhD Qualifier</p>
+      </div>
+      <aside class="notes">
+        Qualifier presentation. Focus on building intuition through interactive visualizations.
+      </aside>
+    </section>
 
-		<!-- Closing slide -->
-		<section>
-			<h2>Thank You</h2>
-		</section>
-	</div>
+    <!-- Slide 2: The Goal of Generative Modeling -->
+    <section onclick={() => flowerFigure?.restart()} style="cursor: pointer;">
+      <h2 class="slide-title">The Goal of Generative Modeling</h2>
+      <p style="margin-top: 0.5em;">
+        Model a complex data distribution <Katex math={"p(x)"} /> and efficiently generate novel samples <Katex math={"x \\sim p(x)"} />.
+      </p>
+      <div class="figure-container" style="position: relative;">
+        <div style="position: absolute; top: -70px; left: 50%; transform: translateX(-50%); z-index: 200;">
+          <Katex math={"p(x)"} displayMode={true} />
+        </div>
+        <div style="margin-top: 30px;">
+          <FlowerImageDistribution bind:this={flowerFigure} width={1495} height={750} />
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 3: Transforming Noise into Data -->
+    <section>
+      <h2 class="slide-title">Transforming Noise into Data</h2>
+      <div class="figure-container" style="margin-top: 140px;">
+        <TransformingNoiseIntoData bind:this={noiseFigure} width={1720} height={975} />
+      </div>
+    </section>
+
+    <!-- Slide 4: Diffusion vs Flow -->
+    <section>
+      <DiffusionVsFlow bind:this={diffFlowFigure} width={1720} height={520} animationDuration={24000} />
+    </section>
+
+    <!-- Slide 5: Flow-based Generative Models -->
+    <section>
+      <h2 class="slide-title">Flow-based Generative Models</h2>
+      <div class="figure-container" style="margin-top: 120px;">
+        <FlowProbabilityPath bind:this={flowPathFigure} width={1720} height={850} contourBandwidth={20} contourGridSize={50} contourThresholds={3} />
+      </div>
+    </section>
+
+    <!-- Slide 6: Roadmap -->
+    <section class="roadmap-slide">
+      <h2 class="slide-title">Presentation Roadmap and Scope</h2>
+      <div class="roadmap">
+        <div class="roadmap-item">
+          <p class="roadmap-title"><strong>I. What is a flow?</strong></p>
+          <p class="roadmap-desc">Definition, discrete vs continuous flows, continuity equation</p>
+        </div>
+        <div class="roadmap-item">
+          <p class="roadmap-title"><strong>II. How to train flows?</strong></p>
+          <p class="roadmap-desc">Flow Matching, probability paths, connection to SiTs</p>
+        </div>
+        <div class="roadmap-item">
+          <p class="roadmap-title"><strong>III. What can go wrong?</strong></p>
+          <p class="roadmap-desc">Training pathologies, sampling latency, path curvature</p>
+        </div>
+        <div class="roadmap-item">
+          <p class="roadmap-title"><strong>IV. How to fix it?</strong></p>
+          <p class="roadmap-desc">Rectified flows, Reflow, couplings, mini-batch OT</p>
+        </div>
+      </div>
+      <aside class="notes">
+        Four-part narrative thread through flows, training, pathologies, and fixes.
+      </aside>
+    </section>
+
+    <!-- Slide 4: Generative modeling goal (with figure) -->
+    <section>
+      <h2 class="slide-title">The Generative Modeling Goal</h2>
+      <p style="font-size: 0.85em;">
+        Source distribution <Katex math={"p"} /> &rarr; target distribution <Katex math={"q"} />. Learn the bridge.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded}
+          <ProbabilityPathIntro
+            sourceDistributionSamples={ceSourceSamples}
+            targetDistributionSamples={ceTargetSamples}
+            allTimeSamples={ceAllTimeSamples}
+            isTraining={ceIsTraining}
+            backgroundVisible={false}
+            showContours={true}
+            height={450}
+            yShiftFactor={-1.6}
+            numScatterSamples={150}
+          />
+        {/if}
+      </div>
+      <aside class="notes">
+        Density contours morphing over time. Source to target. This is the probability path.
+      </aside>
+    </section>
+
+    <!-- Slide 4: Flows and velocity fields -->
+    <section>
+      <h2 class="slide-title">Flows and Velocity Fields</h2>
+      <p style="font-size: 0.8em;">
+        Learn <Katex math={"v_t(x)"} />, simulate the ODE
+        <Katex math={"\\frac{d}{dt}\\psi_t(x) = v_t(\\psi_t(x))"} /> via Euler's method.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded}
+          <CrownJewel contourBandwidth={10} numScatterSamples={300} />
+        {/if}
+      </div>
+      <aside class="notes">
+        CrownJewel: trajectories + density contours on two moons. Click to trace backward trajectories.
+      </aside>
+    </section>
+
+    <!-- Slide 5: Discrete vs. continuous normalizing flows -->
+    <section>
+      <h2 class="slide-title">Discrete vs. Continuous Normalizing Flows</h2>
+      <div style="display: flex; gap: 2em; justify-content: center; margin-top: 1em;">
+        <div style="flex: 1; max-width: 45%; text-align: left;">
+          <h3 style="font-size: 0.9em;">Discrete NFs</h3>
+          <ul style="font-size: 0.75em;">
+            <li>Compose invertible layers</li>
+            <li>Tractable Jacobians (coupling layers)</li>
+            <li>Architectural constraints</li>
+          </ul>
+        </div>
+        <div style="flex: 1; max-width: 45%; text-align: left;">
+          <h3 style="font-size: 0.9em;">Continuous NFs</h3>
+          <ul style="font-size: 0.75em;">
+            <li>Replace layer stack with an ODE</li>
+            <li>Free architecture choice</li>
+            <li>Simulation cost &rarr; flow matching removes it</li>
+          </ul>
+        </div>
+      </div>
+      <p style="font-size: 0.85em; color: #555; margin-top: 1.5em;">
+        We focus on the <strong>continuous</strong> side for the rest of this talk.
+      </p>
+      <aside class="notes">
+        Conceptual contrast. Discrete NFs have architectural constraints. CNFs free the architecture but introduce simulation cost. Flow matching then removes that cost.
+      </aside>
+    </section>
+
+    <!-- Slide 6: The continuity equation -->
+    <section>
+      <h2 class="slide-title">The Continuity Equation</h2>
+      <div style="margin: 1em 0;">
+        <Katex math={"\\frac{\\partial p_t}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0"} displayMode={true} />
+      </div>
+      <p style="font-size: 0.85em;">
+        Two views of the same object: the ODE moves <em>particles</em>, the continuity equation moves <em>density</em>.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded}
+          <MassConservation />
+        {/if}
+      </div>
+      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">
+        We'll come back to this later.
+      </p>
+      <aside class="notes">
+        Plant the flag. State the PDE. Two views of the same object. We'll return to unpack this in Part 5.
+      </aside>
+    </section>
+
+    <!-- Slide 7: Invertibility -->
+    <section>
+      <h2 class="slide-title">Invertibility</h2>
+      <p style="font-size: 0.85em;">
+        Flows are deterministic and invertible &rarr; trajectories can't merge &rarr; mass is conserved.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded}
+          <InvertibilityExplanation />
+        {/if}
+      </div>
+      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">
+        This property will matter twice — once for likelihood, once for rectified flows.
+      </p>
+      <aside class="notes">
+        Non-invertible counterexample. This will matter twice: for likelihood computation and for why rectified flows work.
+      </aside>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PART 2: How Do You Train One? -->
+    <!-- ============================================================ -->
+
+    <!-- Slide 8: Flow matching -->
+    <section>
+      <h2 class="slide-title">Flow Matching: The Problem It Solves</h2>
+      <ul style="font-size: 0.85em; text-align: left; max-width: 70%; margin: 0 auto;">
+        <li>Can't compute <Katex math={"v_t"} /> directly</li>
+        <li>Simulation-based training is expensive</li>
+        <li>Flow matching: regress the velocity field with a simple MSE loss</li>
+      </ul>
+      <div style="margin-top: 1em;">
+        <Katex math={"\\mathcal{L}(\\theta) = \\mathbb{E}_{t, X_0, X_1} \\left[ \\| v_t^\\theta(X_t) - (X_1 - X_0) \\|^2 \\right]"} displayMode={true} />
+      </div>
+      <aside class="notes">
+        Flow matching lets us regress the velocity field directly without simulation. Simple MSE loss.
+      </aside>
+    </section>
+
+    <!-- Slide 9: Linear path + conditional flow matching -->
+    <section>
+      <h2 class="slide-title">The Linear Path</h2>
+      <p style="font-size: 0.85em;">
+        <Katex math={"X_t = (1-t)X_0 + tX_1"} />. Condition on <Katex math={"x_1"} /> for a tractable loss.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded}
+          <ProbabilityPath
+            width={900}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            {allTimeSamples}
+            {isTraining}
+            playingByDefault={true}
+            backgroundVisible={false}
+            showContours={true}
+          />
+        {/if}
+      </div>
+      <p style="font-size: 0.75em; color: #888;">
+        Key subtlety: the model only sees <Katex math={"x_t"} />, not <Katex math={"x_1"} />.
+      </p>
+      <aside class="notes">
+        Linear interpolation path. Condition on x_1 for tractable loss. Model only sees x_t, not x_1.
+      </aside>
+    </section>
+
+    <!-- Slide 10: Stochastic interpolants -->
+    <section>
+      <h2 class="slide-title">Stochastic Interpolants</h2>
+      <p style="font-size: 0.85em;">
+        Albergo &amp; Vanden-Eijnden define <Katex math={"I_t = \\alpha_t X_0 + \\beta_t X_1"} />
+      </p>
+      <ul style="font-size: 0.8em; text-align: left; max-width: 65%; margin: 0.5em auto;">
+        <li>Derive a velocity field from the interpolant</li>
+        <li>Recover the same continuity equation</li>
+        <li>The linear path <Katex math={"(1-t)X_0 + tX_1"} /> is a special case</li>
+      </ul>
+      <p style="font-size: 0.85em; margin-top: 1em;">
+        Two communities, same destination.
+      </p>
+      <aside class="notes">
+        Stochastic interpolants: a unifying framework. Two derivation paths converging to the same velocity field and continuity equation.
+      </aside>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PART 3: What Goes Wrong? -->
+    <!-- ============================================================ -->
+
+    <!-- Slide 11: The paradox -->
+    <section>
+      <h2 class="slide-title">The Paradox</h2>
+      <p style="font-size: 0.85em;">
+        We trained on <strong>straight-line</strong> targets. Why are the learned trajectories <strong>curved</strong>?
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded && flowMatchingGridTrajectories}
+          <CurvedTrajectorySuperimposed
+            {flowMatchingClient}
+            trajectories={flowMatchingGridTrajectories}
+            sourceDistribution={$sourceDistributionSamples}
+            targetDistribution={$targetDistributionSamples}
+            playingByDefault={true}
+            backgroundVisible={false}
+          />
+        {/if}
+      </div>
+      <aside class="notes">
+        Superimposed curved trajectories. We trained on straight lines but learned curves. Why?
+      </aside>
+    </section>
+
+    <!-- Slide 12: Curvature is the enemy of speed -->
+    <section>
+      <h2 class="slide-title">Curvature is the Enemy of Speed</h2>
+      <p style="font-size: 0.85em;">
+        Euler steps on curved paths miss. More curvature &rarr; more steps &rarr; more cost.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded}
+          <EulerStepComparison
+            {flowMatchingClient}
+            {rectifiedFlowClient}
+            targetDistribution={$targetDistributionSamples}
+            backgroundVisible={false}
+            maxUserTrajectories={1}
+          />
+        {/if}
+      </div>
+      <aside class="notes">
+        Euler step accuracy comparison. More curvature = more steps = more neural network calls = more cost.
+      </aside>
+    </section>
+
+    <!-- Slide 13: What is a coupling? -->
+    <section>
+      <h2 class="slide-title">What is a Coupling?</h2>
+      <p style="font-size: 0.85em;">
+        Independent coupling: draw <Katex math={"(X_0, X_1)"} /> independently. Lots of crossing paths.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded}
+          <IndependentCoupling
+            width={900}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            backgroundVisible={false}
+          />
+        {/if}
+      </div>
+      <aside class="notes">
+        Independent coupling with crossing lines. Random pairings lead to crossed paths.
+      </aside>
+    </section>
+
+    <!-- Slide 14: The mechanism -->
+    <section>
+      <h2 class="slide-title">Crossing Paths &rarr; Curvature</h2>
+      <p style="font-size: 0.8em;">
+        Crossing paths &rarr; conflicting velocities at same <Katex math={"(x, t)"} /> &rarr; model averages &rarr; curvature.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded && otCouplingData}
+          <OTCoupling
+            width={900}
+            sourceDistributionSamples={otCouplingData.sourcePoints}
+            targetDistributionSamples={otCouplingData.targetPoints}
+            matching={otCouplingData.matching}
+            backgroundVisible={false}
+          />
+        {/if}
+      </div>
+      <p style="font-size: 0.75em; color: #888;">
+        OT coupling: fewer crossings &rarr; straighter. But hard to compute in high dimensions.
+      </p>
+      <aside class="notes">
+        The mechanism: crossing paths cause conflicting velocities, model averages them, spatial variation of the average produces curvature. OT coupling as contrast.
+      </aside>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PART 4: Rectified Flows — The Fix -->
+    <!-- ============================================================ -->
+
+    <!-- Slide 15: The idea -->
+    <section>
+      <h2 class="slide-title">Rectified Flows: The Idea</h2>
+      <p style="font-size: 0.85em;">
+        Replace the independent coupling with one <strong>induced by the model itself</strong>.
+      </p>
+      <ol style="font-size: 0.8em; text-align: left; max-width: 65%; margin: 0.5em auto;">
+        <li>Train a flow matching model with independent coupling</li>
+        <li>Flow source samples through the model &rarr; get new <Katex math={"(X_0, X_1)"} /> pairs</li>
+        <li>Retrain on the induced coupling</li>
+      </ol>
+      <p style="font-size: 0.85em; margin-top: 1em;">
+        The <strong>reflow</strong> procedure.
+      </p>
+      <aside class="notes">
+        The idea: train, flow, retrain. Replace independent coupling with model-induced coupling.
+      </aside>
+    </section>
+
+    <!-- Slide 16: The reflow algorithm + result -->
+    <section>
+      <h2 class="slide-title">Reflow: Before and After</h2>
+      <div class="figure-container">
+        {#if dataLoaded && flowMatchingGridTrajectories && rectifiedFlowGridTrajectories}
+          <RectifiedFlowSuperimposed
+            width={900}
+            {flowMatchingClient}
+            {rectifiedFlowClient}
+            leftTrajectories={flowMatchingGridTrajectories}
+            rightTrajectories={rectifiedFlowGridTrajectories[rectifiedFlowGridTrajectories.length - 1]
+              ? clipTrajectoriesToStartingRadius(
+                  rectifiedFlowGridTrajectories[rectifiedFlowGridTrajectories.length - 1],
+                  2.5
+                )
+              : []}
+            targetDistribution={$targetDistributionSamples}
+            playingByDefault={true}
+            backgroundVisible={false}
+          />
+        {/if}
+      </div>
+      <aside class="notes">
+        Side-by-side trajectory comparison: flow matching vs. rectified flow. Notice how much straighter the rectified flow trajectories are.
+      </aside>
+    </section>
+
+    <!-- Slide 17: Why it works -->
+    <section>
+      <h2 class="slide-title">Why Rectified Flows Work</h2>
+      <p style="font-size: 0.85em;">
+        Deterministic ODE trajectories can't cross (uniqueness / invertibility).
+      </p>
+      <p style="font-size: 0.85em;">
+        Induced coupling is non-crossing &rarr; no conflicting velocities &rarr; straighter.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded && flowInvertibilityData}
+          <FlowInvertibility data={flowInvertibilityData} />
+        {/if}
+      </div>
+      <aside class="notes">
+        This is where invertibility from Slide 7 pays off. ODE trajectories can't cross, so the induced coupling is non-crossing.
+      </aside>
+    </section>
+
+    <!-- Slide 18: Vector field comparison -->
+    <section>
+      <h2 class="slide-title">Vector Field Comparison</h2>
+      <p style="font-size: 0.85em;">
+        Rectified model's field is more temporally consistent &rarr; lower curvature.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded && vectorFieldData && rectifiedFlowVectorFieldData}
+          <VectorFieldCurvatureComparison
+            flowMatchingVectorField={vectorFieldData}
+            rectifiedFlowVectorField={rectifiedFlowVectorFieldData}
+            playingByDefault={true}
+            backgroundVisible={false}
+            normalizeVectors={false}
+            showArrowHeads={true}
+            animationDuration={4000}
+          />
+        {/if}
+      </div>
+      <aside class="notes">
+        Vector field comparison over time. Flow matching field changes rapidly. Rectified flow field is stable — indicating straighter paths.
+      </aside>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PART 5: The Continuity Equation — Coming Back to It -->
+    <!-- ============================================================ -->
+
+    <!-- Slide 19: Returning to the continuity equation -->
+    <section>
+      <h2 class="slide-title">Returning to the Continuity Equation</h2>
+      <p style="font-size: 0.85em;">
+        Flows conserve mass because they're invertible. The divergence theorem converts flux into the PDE.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded}
+          <DivergenceIntro />
+        {/if}
+      </div>
+      <aside class="notes">
+        We planted the flag in Slide 6. Now we unpack it. Source/sink/incompressible fields. Divergence theorem connects flux to the PDE.
+      </aside>
+    </section>
+
+    <!-- Slide 20: Exact likelihood -->
+    <section>
+      <h2 class="slide-title">Exact Likelihood</h2>
+      <div style="margin: 0.5em 0;">
+        <Katex math={"\\log p(x(t_1), t_1) = \\log p(x(t_0), t_0) - \\int_{t_0}^{t_1} \\nabla \\cdot v(x(t), t)\\, dt"} displayMode={true} />
+      </div>
+      <p style="font-size: 0.85em;">
+        Run the flow backward, integrate divergence along the path. A defining capability of CNFs.
+      </p>
+      <div class="figure-container">
+        {#if dataLoaded && reverseSamplingData}
+          <LikelihoodIntegration data={reverseSamplingData} selectedIndices={[5, 15]} />
+        {/if}
+      </div>
+      <aside class="notes">
+        The continuity equation gives us log-likelihood. Run flow backward, integrate divergence. Something diffusion models can't do natively.
+      </aside>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PART 6: Wrap-Up -->
+    <!-- ============================================================ -->
+
+    <!-- Slide 21: Summary -->
+    <section>
+      <h2 class="slide-title">Summary</h2>
+      <ol style="font-size: 0.8em; text-align: left; max-width: 70%; margin: 0 auto;">
+        <li><strong>Flows</strong> transform simple distributions to complex ones via learned velocity fields</li>
+        <li><strong>Flow matching</strong> enables simulation-free training with a simple regression loss</li>
+        <li><strong>Independent coupling</strong> &rarr; crossing paths &rarr; curvature &rarr; slow sampling</li>
+        <li><strong>Rectified flows</strong> induce a non-crossing coupling &rarr; straight paths &rarr; fast sampling</li>
+        <li>The <strong>continuity equation</strong> provides the density-side view, unlocking exact likelihood</li>
+        <li><strong>Stochastic interpolants</strong> unify the framework</li>
+      </ol>
+      <aside class="notes">
+        The thread: flows, flow matching, curvature from independent coupling, rectified flows fix it. Continuity equation as density-side view. Stochastic interpolants as unifying framework.
+      </aside>
+    </section>
+
+    <!-- Slide 22: References -->
+    <section>
+      <h2 class="slide-title">Diffusion Explorer</h2>
+      <p style="font-size: 0.85em;">
+        All visualizations are interactive — play with these ideas yourself!
+      </p>
+      <p style="font-size: 0.8em; color: #666;">
+        github.com/helblazer811/Diffusion-Explorer
+      </p>
+      <div style="margin-top: 1.5em; text-align: left; max-width: 65%; margin-left: auto; margin-right: auto;">
+        <h3 style="font-size: 0.8em;">Key References</h3>
+        <ul style="font-size: 0.65em;">
+          <li>Lipman et al. (2022) — Flow Matching for Generative Modeling</li>
+          <li>Liu et al. (2022) — Flow Straight and Fast: Rectified Flow</li>
+          <li>Albergo &amp; Vanden-Eijnden (2023) — Stochastic Interpolants</li>
+          <li>Chen et al. (2018) — Neural ODEs</li>
+        </ul>
+      </div>
+      <aside class="notes">
+        Plug the interactive tool. References and acknowledgements.
+      </aside>
+    </section>
+
+  </div>
 </div>
 
 <style>
-	.reveal {
-		height: 100vh;
-		width: 100vw;
-	}
+  .reveal {
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Left-align everything and add 50px padding */
+  :global(.reveal .slides section) {
+    text-align: left;
+    padding: 50px 50px 80px 50px;
+  }
+
+  :global(.reveal .slides section h1),
+  :global(.reveal .slides section h2),
+  :global(.reveal .slides section h3) {
+    text-align: left;
+  }
+
+  .figure-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0.5em auto;
+  }
+
+  :global(.title-slide) {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    text-align: center !important;
+  }
+
+  :global(.title-slide h1) {
+    text-align: center !important;
+  }
+
+  .title-content {
+    text-align: center;
+  }
+
+  :global(.slide-title) {
+    font-size: 1.87em !important;
+  }
+
+  :global(.roadmap-slide) {
+    display: flex !important;
+    flex-direction: column;
+  }
+
+  .roadmap {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.8em;
+    flex: 1;
+  }
+
+  .roadmap-item {
+  }
+
+  .roadmap-title {
+    font-size: 1.44em;
+    margin: 0;
+  }
+
+  .roadmap-desc {
+    font-size: 1.06em;
+    color: #888;
+    margin: 0.15em 0 0 0;
+  }
 </style>
