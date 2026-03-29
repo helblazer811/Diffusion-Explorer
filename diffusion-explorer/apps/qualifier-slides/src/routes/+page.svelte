@@ -43,6 +43,7 @@
   import Slide from '$lib/components/Slide.svelte';
   import NormalizingFlowStages from '$lib/figures/NormalizingFlowStages.svelte';
   import ChangeOfVariables from '$lib/figures/ChangeOfVariables.svelte';
+  import MaxLikelihoodTraining from '$lib/figures/MaxLikelihoodTraining.svelte';
 
   let flowerFigure: FlowerImageDistribution;
   let noiseFigure: TransformingNoiseIntoData;
@@ -50,6 +51,8 @@
   let flowPathFigure: FlowProbabilityPath;
   let normFlowFigure: NormalizingFlowStages;
   let covFigure: ChangeOfVariables;
+  let composeFigure: NormalizingFlowStages;
+  let mlFigure: MaxLikelihoodTraining;
 
   // Provide reveal instance to Slide components via context
   setContext('getReveal', () => revealInstance);
@@ -348,7 +351,7 @@
         <strong>differentiable</strong> mappings.
       </p>
       <div class="figure-container" style="margin-top: -20px;">
-        <NormalizingFlowStages bind:this={normFlowFigure} width={1720} height={500} numStages={4} />
+        <NormalizingFlowStages bind:this={normFlowFigure} width={1720} height={580} numStages={4} />
       </div>
       <p class="bottom-reference">
         Rezende, D. &amp; Mohamed, S. (2015). Variational Inference with Normalizing Flows. <em>Proceedings of the 32nd International Conference on Machine Learning</em>, in <em>Proceedings of Machine Learning Research</em> 37:1530-1538.
@@ -369,6 +372,34 @@
       </div>
       <div class="figure-container" style="margin-top: -10px; height: 580px;">
         <ChangeOfVariables bind:this={covFigure} width={1720} height={580} numSamples={300} contourThresholds={3} />
+      </div>
+    </Slide>
+
+    <!-- Slide: Composing Multiple Transformations -->
+    <Slide figure={composeFigure}>
+      <h2 class="slide-title">Composing Multiple Transformations</h2>
+      <p style="margin-top: 0.3em;">
+        Chain multiple invertible transformations to build expressive mappings from simple distributions.
+      </p>
+      <div style="margin-top: 0.15em;">
+        <Katex math={"\\log p(x) = \\log p(z_0) - \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|"} displayMode={true} />
+      </div>
+      <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: hidden;">
+        <NormalizingFlowStages bind:this={composeFigure} width={1720} height={580} numStages={4} />
+      </div>
+    </Slide>
+
+    <!-- Slide: Maximum Likelihood Training -->
+    <Slide figure={mlFigure}>
+      <h2 class="slide-title">Maximum Likelihood Training</h2>
+      <p style="margin-top: 0.3em;">
+        Map data <Katex math={"x"} /> backward through the inverse flow to evaluate <Katex math={"p(z_0)"} /> and train via maximum likelihood:
+      </p>
+      <div style="margin-top: 0.15em;">
+        <Katex math={"-\\log p(x) = -\\log p(f^{-1}(x)) - \\log \\left| \\det J_{f^{-1}}(x) \\right|"} displayMode={true} />
+      </div>
+      <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: hidden;">
+        <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={580} numStages={4} />
       </div>
     </Slide>
 
