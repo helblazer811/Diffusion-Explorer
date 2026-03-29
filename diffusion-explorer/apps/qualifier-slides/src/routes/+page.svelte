@@ -403,6 +403,19 @@
       </div>
     </Slide>
 
+    <!-- Slide: Limitations of Normalizing Flows -->
+    <section>
+      <h2 class="slide-title">Limitations of Normalizing Flows</h2>
+      <ol style="margin-top: 1.5em;">
+        <li>Architectural constraints for tractable Jacobians.
+          <br/><span style="color: #777;">Restricted to coupling layers and autoregressive transforms, limiting expressivity per layer.</span></li>
+        <li style="margin-top: 0.8em;">Expressivity requires depth.
+          <br/><span style="color: #777;">Many layers needed with alternating splits, making models parameter-heavy and hard to optimize.</span></li>
+        <li style="margin-top: 0.8em;">No free-form density paths.
+          <br/><span style="color: #777;">Fixed composition of layers with no continuous trajectory through density space.</span></li>
+      </ol>
+    </section>
+
     <!-- Slide: Flows and velocity fields -->
     <section>
       <h2 class="slide-title">Flows and Velocity Fields</h2>
