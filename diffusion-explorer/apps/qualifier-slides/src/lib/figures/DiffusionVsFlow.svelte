@@ -256,7 +256,7 @@
         segProg,
         {
           color: '#f17720',
-          strokeWidth: 3,
+          strokeWidth: 5,
           pointRadius: isComplete ? 0 : 5,
           opacity,
           xScale: (x: number) => x,

@@ -250,8 +250,8 @@
     });
 
     // LaTeX labels
-    drawMathjax(ctx, 'p(z)', scales.sourceCenterPixelX, 150, 36, 0, 0, { color: '#333' });
-    drawMathjax(ctx, 'p(x)', scales.targetCenterPixelX, 150, 36, 0, 0, { color: '#333' });
+    drawMathjax(ctx, 'p(z)', scales.sourceCenterPixelX, 170, 48, 0, 0, { color: '#333' });
+    drawMathjax(ctx, 'p(x)', scales.targetCenterPixelX, 170, 48, 0, 0, { color: '#333' });
 
     // --- Dynamic Foreground ---
     const t = state.time;
@@ -322,7 +322,7 @@
     // p_t label following the intermediate distribution
     if (t >= 0.05 && t <= 0.95) {
       const centerX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
-      drawMathjax(ctx, 'p_t', centerX, 150, 36, 0, 0, { color: '#f17720' });
+      drawMathjax(ctx, 'p_t', centerX, 170, 48, 0, 0, { color: '#f17720' });
     }
   }
 
