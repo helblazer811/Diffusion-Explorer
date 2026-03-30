@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
   import { writable } from "svelte/store";
   import { base } from "$app/paths";
@@ -14,33 +14,45 @@
   import MassConservation from "$lib/figures/MassConservation.svelte";
   import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
   import DivergenceTheoremSquare from "$lib/figures/DivergenceTheoremSquare/DivergenceTheoremSquare.svelte";
+  import DivergenceTheorem from "$lib/figures/DivergenceTheorem/DivergenceTheorem.svelte";
   import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
   import LikelihoodIntegration from "$lib/figures/LikelihoodIntegration.svelte";
 
   // Data for ProbabilityPathIntro figure
-  let probabilityPathSourceSamples = [];
-  let probabilityPathTargetSamples = [];
-  const allTimeSamples = writable([]);
-  const isTraining = writable(false);
+  let probabilityPathSourceSamples: number[][] = [];
+  let probabilityPathTargetSamples: number[][] = [];
+  const allTimeSamples = writable<number[][][]>([]);
+  const isTraining = writable<boolean>(false);
 
   // Data for FlowInvertibility figure
-  let flowInvertibilityData = null;
+  let flowInvertibilityData: {
+    allTrajectories: number[][][];
+    highlightedIndices: number[];
+    sourceDistribution: number[][];
+    targetDistribution: number[][];
+    config: { numSteps: number; gaussianStd: number; clipRadius: number };
+  } | null = null;
 
   // Data for ReverseSampling
-  let reverseSamplingData = null;
+  let reverseSamplingData: {
+    trajectories: number[][][];
+    sourceDistribution: number[][];
+    targetDistribution: number[][];
+    config: { numSamples: number; numSteps: number };
+  } | null = null;
 
 
   /**
    * Transpose trajectories from [sampleIndex][timeStep][x,y] to [timeStep][sampleIndex][x,y]
    * This converts from per-sample trajectories to per-timestep samples format
    */
-  function transposeTrajectories(trajectories) {
+  function transposeTrajectories(trajectories: number[][][]): number[][][] {
     if (!trajectories || trajectories.length === 0) return [];
-    const numSamples = trajectories.length;
-    const numSteps = trajectories[0].length;
-    const result = [];
+    const numSamples: number = trajectories.length;
+    const numSteps: number = trajectories[0].length;
+    const result: number[][][] = [];
     for (let t = 0; t < numSteps; t++) {
-      const samplesAtT = [];
+      const samplesAtT: number[][] = [];
       for (let s = 0; s < numSamples; s++) {
         samplesAtT.push(trajectories[s][t]);
       }
@@ -67,10 +79,10 @@
 
       // Use ground truth target distribution (not synthetic trajectory endpoints)
       if (targetRes.ok) {
-        const targetData = await targetRes.json();
+        const targetData: { points?: number[][] } = await targetRes.json();
         probabilityPathTargetSamples = targetData.points || [];
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn("Failed to load ProbabilityPathIntro data:", e);
     }
 
@@ -82,8 +94,12 @@
       ]);
 
       if (targetRes.ok && trajRes.ok) {
-        const targetData = await targetRes.json();
-        const trajData = await trajRes.json();
+        const targetData: { points: number[][] } = await targetRes.json();
+        const trajData: {
+          allTrajectories: number[][][];
+          highlightedIndices?: number[];
+          config: { numSteps: number; gaussianStd: number; clipRadius: number };
+        } = await trajRes.json();
 
         flowInvertibilityData = {
           allTrajectories: trajData.allTrajectories,
@@ -93,7 +109,7 @@
           config: trajData.config,
         };
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn("Failed to load FlowInvertibility data:", e);
     }
 
@@ -104,7 +120,10 @@
       const trajRes = await fetch(`${base}/cached_samples/reverse_trajectories.json`);
 
       if (trajRes.ok && flowInvertibilityData) {
-        const trajData = await trajRes.json();
+        const trajData: {
+          trajectories: number[][][];
+          config: { numSamples: number; numSteps: number };
+        } = await trajRes.json();
 
         reverseSamplingData = {
           trajectories: trajData.trajectories,
@@ -113,7 +132,7 @@
           config: trajData.config,
         };
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn("Failed to load ReverseSampling data:", e);
     }
 
@@ -445,7 +464,7 @@
     interior counteract each other, this leaves a net component of divergence that is outward.
   </p>
 
-  <DivergenceTheoremSquare />
+  <!-- <DivergenceTheorem /> -->
 
   <p>We can apply this theorem to our conservation of mass equation to arrive at</p>
   <Katex

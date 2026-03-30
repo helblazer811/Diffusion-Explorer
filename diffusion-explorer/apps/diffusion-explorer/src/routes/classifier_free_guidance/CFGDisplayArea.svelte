@@ -7,10 +7,23 @@
     import CFGVectors from './CFGVectors.svelte';
     import { onMount, getContext } from 'svelte';
     import { interfaceSettings } from '$lib/settings';
+    import type { Writable, Readable } from 'svelte/store';
 
-    const pageState = getContext("pageState");
+    interface CFGPageState {
+        currentTime: Writable<number>;
+        sourceDistributionSamples: Writable<number[][] | undefined>;
+        targetDistributionSamples: Writable<number[][] | undefined>;
+        currentDistributionSamples: Writable<number[][] | undefined>;
+        allTimeSamples: Writable<number[][][] | undefined>;
+        activePlotTypes: Readable<string[]>;
+        numberOfSteps: Readable<number>;
+        distributionVisiblity: Readable<{ target: boolean; source: boolean; current: boolean; training: boolean }>;
+        isEditing: Writable<boolean>;
+    }
+
+    const pageState = getContext<CFGPageState>("pageState");
     const {
-        currentTime, 
+        currentTime,
         sourceDistributionSamples,
         targetDistributionSamples,
         currentDistributionSamples,

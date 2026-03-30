@@ -61,10 +61,10 @@
         // Convert data to plain 2d array
         // data = await data.arraySync() as number[][];
         // Comptue the range of the data
-        let xMin = d3.min(data, d => d[0]);
-        let xMax = d3.max(data, d => d[0]);
-        let yMin = d3.min(data, d => d[1]);
-        let yMax = d3.max(data, d => d[1]);
+        let xMin: number = d3.min(data, d => d[0]) ?? 0;
+        let xMax: number = d3.max(data, d => d[0]) ?? 0;
+        let yMin: number = d3.min(data, d => d[1]) ?? 0;
+        let yMax: number = d3.max(data, d => d[1]) ?? 0;
         const margin = 0.2;
         const xRange = xMax - xMin;
         const yRange = yMax - yMin;
@@ -78,7 +78,7 @@
         const svg = d3.select(svgElement); 
         // Select the group by ID, or create if not exists
         // NOTE: This prevents unwanted recreation of the group
-        let group = svg.select(`#mini_${distributionId}`);
+        let group = svg.select<SVGGElement>(`#mini_${distributionId}`);
         if (group.empty()) {
             group = svg.append("g").attr("id", "mini_" + distributionId);
         } else {
