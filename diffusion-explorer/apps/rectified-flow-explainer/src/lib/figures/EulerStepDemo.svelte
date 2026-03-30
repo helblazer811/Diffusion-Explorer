@@ -1,7 +1,7 @@
 <!-- Demonstrates Euler sampler trajectory with ground truth, approximation, error, and time-dependent vector field -->
 
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, type Snippet } from "svelte";
   import * as d3 from "d3";
   import {
     Figure,
@@ -14,18 +14,19 @@
     useCanvas2D,
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
-  import { settings } from "$lib/settings";
+  import type { FlowModelClient } from "@diffusion-explorer/diffusion";
+  import { settings, type VectorFieldData } from "$lib/settings";
 
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
   // FlowModelClient instance (passed from parent, created with correct base path)
-  export let flowMatchingClient = null;
+  export let flowMatchingClient: FlowModelClient | null = null;
 
   // Data
-  export let targetDistribution = [];
-  export let flowMatchingVectorField = null;
+  export let targetDistribution: number[][] = [];
+  export let flowMatchingVectorField: VectorFieldData | null = null;
 
   // Layout
   export let canvasWidth = 450;
@@ -66,14 +67,14 @@
   export let centerQuiver = true;
 
   // Starting points
-  export let defaultStartPoints = [[-1.5, -0.2]];
+  export let defaultStartPoints: number[][] = [[-1.5, -0.2]];
   export let startPointRadius = endpointRadius;
   export let maxUserTrajectories =
     settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
   export let backgroundVisible = true;
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Show/hide options
   export let showGroundTruth = true;
@@ -102,36 +103,36 @@
   // ----------------------------------------------------------------
 
   // Canvas
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(canvasWidth, canvasHeight);
   $: ctx = canvas && canvas2d.ctx;
 
   // Scales
-  let xScale;
-  let yScale;
+  let xScale: d3.ScaleLinear<number, number>;
+  let yScale: d3.ScaleLinear<number, number>;
 
   // Pre-computed pixel coordinates
-  let scaledTargetDistribution = [];
-  let gridPositions = [];
+  let scaledTargetDistribution: number[][] = [];
+  let gridPositions: number[][] = [];
 
   // User-defined start points (domain coordinates)
-  let userStartPoints = [...defaultStartPoints];
+  let userStartPoints: number[][] = [...defaultStartPoints];
 
   // Trajectories
-  let groundTruthTrajectories = [];
-  let approximationTrajectories = [];
+  let groundTruthTrajectories: number[][][] = [];
+  let approximationTrajectories: number[][][] = [];
 
   // Request ID tracking for cancellation
-  let groundTruthRequestId = null;
-  let activeRequestId = null;
-  let isStreamingTrajectory = false;
+  let groundTruthRequestId: string | null = null;
+  let activeRequestId: string | null = null;
+  let isStreamingTrajectory: boolean = false;
 
   // Loading state
-  let isLoading = true;
-  let isInitialized = false;
+  let isLoading: boolean = true;
+  let isInitialized: boolean = false;
 
   // Visibility
-  let figureIsActive;
+  let figureIsActive: boolean;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Animation state type
@@ -328,13 +329,13 @@
   // ----------------------------------------------------------------
 
   function drawTrajectoryOnCtx(
-    ctx,
-    trajectory,
-    color,
-    lineWidth,
-    showEndpoint = true,
-    scaleX = xScale,
-    scaleY = yScale
+    ctx: CanvasRenderingContext2D,
+    trajectory: number[][],
+    color: string,
+    lineWidth: number,
+    showEndpoint: boolean = true,
+    scaleX: d3.ScaleLinear<number, number> = xScale,
+    scaleY: d3.ScaleLinear<number, number> = yScale
   ) {
     if (!trajectory || trajectory.length < 2) return;
 
@@ -366,7 +367,7 @@
     }
   }
 
-  function drawStartPointsOnCtx(ctx, scaleX = xScale, scaleY = yScale) {
+  function drawStartPointsOnCtx(ctx: CanvasRenderingContext2D, scaleX: d3.ScaleLinear<number, number> = xScale, scaleY: d3.ScaleLinear<number, number> = yScale) {
     for (const point of userStartPoints) {
       const [x, y] = [scaleX(point[0]), scaleY(point[1])];
 
@@ -475,7 +476,7 @@
   // Event Handlers
   // ----------------------------------------------------------------
 
-  function handleCanvasClick(event) {
+  function handleCanvasClick(event: MouseEvent) {
     if (isLoading) return;
 
     stopAnimation();

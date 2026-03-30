@@ -5,19 +5,30 @@
   import * as d3 from "d3";
   import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, ContourRenderer, createLinearColorScale, parseContourColor, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
+  import type { Writable } from "svelte/store";
+  import type { Snippet } from "svelte";
+
+  type SourceTargetScales = {
+    yScale: d3.ScaleLinear<number, number>;
+    xScaleFactor: number;
+    sourceCenterPixelX: number;
+    targetCenterPixelX: number;
+    sourceMeanX: number;
+    targetMeanX: number;
+  };
 
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
   // Caption slot (passed as default children)
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Data props (from parent +page.svelte)
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
-  export let allTimeSamples;
-  export let isTraining;
+  export let sourceDistributionSamples: number[][] = [];
+  export let targetDistributionSamples: number[][] = [];
+  export let allTimeSamples: Writable<number[][][]>;
+  export let isTraining: Writable<boolean>;
 
   // Props/Configuration
   export let width = 800;
@@ -75,7 +86,7 @@
   // ----------------------------------------------------------------
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
@@ -89,9 +100,9 @@
   let contourDataDomain: { xMin: number; xMax: number; yMin: number; yMax: number } | null = null;
 
   // Scales and pre-computed coordinates
-  let scales = null;
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];
+  let scales: SourceTargetScales | null = null;
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
 
   // Animation state type
   type AnimationState = {
@@ -107,7 +118,7 @@
   let cachedNumSteps = 1;
 
   // Visibility-based animation control
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
   let isInitialized = false;
 
@@ -122,7 +133,7 @@
    * Compute pixel x position for a point at a given time
    * At t=0, centered at source; at t=1, centered at target
    */
-  function getPixelX(dataX, dataMeanX, t) {
+  function getPixelX(dataX: number, dataMeanX: number, t: number): number {
     if (!scales) return 0;
     const centerPixelX =
       scales.sourceCenterPixelX +
@@ -429,8 +440,8 @@
             ctx.restore();
           } else {
             // Fallback: CPU-based contour computation (original approach)
-            const xScaleForContour = (dataX) => getPixelX(dataX, meanX, t);
-            const yScaleForContour = (dataY) => scales.yScale(dataY);
+            const xScaleForContour = (dataX: number) => getPixelX(dataX, meanX, t);
+            const yScaleForContour = (dataY: number) => scales.yScale(dataY);
 
             const contourData = computeContours(samples, {
               bandwidth: contourBandwidth,
