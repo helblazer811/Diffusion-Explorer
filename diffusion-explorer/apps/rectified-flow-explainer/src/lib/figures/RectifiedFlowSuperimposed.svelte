@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
   import * as d3 from "d3";
   import { DoubleFigure, TimeSlider, drawScatterPlot, Timeline, createPauseClip, useCanvas2D, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { type FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -9,58 +10,58 @@
   // ----------------------------------------------------------------
 
   // FlowModelClient instances (passed from parent, created with correct base path)
-  export let flowMatchingClient = null;
-  export let rectifiedFlowClient = null;
+  export let flowMatchingClient: FlowModelClient | null = null;
+  export let rectifiedFlowClient: FlowModelClient | null = null;
 
   // Data
-  export let leftTrajectories = [];  // [timestep][sample][dim]
-  export let rightTrajectories = []; // [timestep][sample][dim]
-  export let targetDistribution = [];
+  export let leftTrajectories: number[][][] = [];  // [timestep][sample][dim]
+  export let rightTrajectories: number[][][] = []; // [timestep][sample][dim]
+  export let targetDistribution: number[][] = [];
 
   // Layout
-  export let canvasWidth = 400;
-  export let canvasHeight = 400;
-  export let marginWidth = 10;
-  export let marginHeight = 10;
-  export let gap = 20;
-  export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
+  export let canvasWidth: number = 400;
+  export let canvasHeight: number = 400;
+  export let marginWidth: number = 10;
+  export let marginHeight: number = 10;
+  export let gap: number = 20;
+  export let domainRange: { xMin: number; xMax: number; yMin: number; yMax: number } = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
 
   // Labels
-  export let leftLabel = "Flow Matching";
-  export let rightLabel = "Rectified Flow";
-  export let labelFontSize = 26;
-  export let labelColor = settings.stylingSettings.label.color;
-  export let labelOpacity = settings.stylingSettings.label.opacity;
+  export let leftLabel: string = "Flow Matching";
+  export let rightLabel: string = "Rectified Flow";
+  export let labelFontSize: number = 26;
+  export let labelColor: string = settings.stylingSettings.label.color;
+  export let labelOpacity: number = settings.stylingSettings.label.opacity;
 
   // Target distribution styling
-  export let targetColor = "#3b82f6";
-  export let targetOpacity = 0.35;
-  export let targetPointRadius = 5;
+  export let targetColor: string = "#3b82f6";
+  export let targetOpacity: number = 0.35;
+  export let targetPointRadius: number = 5;
 
   // Trajectory styling
-  export let trajectoryColor = settings.stylingSettings.trajectory.color;
-  export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-  export let trajectoryPointRadius = settings.stylingSettings.trajectory.endpointRadius;
-  export let trajectoryOpacity = settings.stylingSettings.trajectory.opacity;
-  export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
-  export let showTrajectoryPreview = false;
-  export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory visible with fade
-  export let endpointRadius = settings.stylingSettings.trajectory.endpointRadius;
+  export let trajectoryColor: string = settings.stylingSettings.trajectory.color;
+  export let trajectoryStrokeWidth: number = settings.stylingSettings.trajectory.strokeWidth;
+  export let trajectoryPointRadius: number = settings.stylingSettings.trajectory.endpointRadius;
+  export let trajectoryOpacity: number = settings.stylingSettings.trajectory.opacity;
+  export let trajectoryFullOpacity: number = settings.stylingSettings.trajectory.fullOpacity;
+  export let showTrajectoryPreview: boolean = false;
+  export let alphaTimeWindow: number = 0.8; // Fraction (0-1) of trajectory visible with fade
+  export let endpointRadius: number = settings.stylingSettings.trajectory.endpointRadius;
 
   // Animation timing (normalized 0-1, scaled by animationDuration)
-  export let animationDuration = 10000; // Total cycle duration in ms
-  export let timing = {
+  export let animationDuration: number = 10000; // Total cycle duration in ms
+  export let timing: { pauseStart: number } = {
     pauseStart: 0.8,  // Animation runs 0→0.8, pause 0.8→1.0
   };
-  export let playingByDefault = true;
+  export let playingByDefault: boolean = true;
 
   // Interactive sampling
-  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
+  export let maxUserTrajectories: number = settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
-  export let onInitialized = undefined;
-  export let backgroundVisible = true;
-  export let children = undefined;
+  export let onInitialized: (() => void) | undefined = undefined;
+  export let backgroundVisible: boolean = true;
+  export let children: Snippet | undefined = undefined;
 
   // ----------------------------------------------------------------
   // State
@@ -76,8 +77,8 @@
   $: msPerSegment = numSegments > 0 ? animationDuration / numSegments : animationDuration;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let leftCanvas = null;
-  let rightCanvas = null;
+  let leftCanvas: HTMLCanvasElement | null = null;
+  let rightCanvas: HTMLCanvasElement | null = null;
   const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
   const rightCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
   // Tie ctx reactivity to canvas variables so it updates when action runs
@@ -85,14 +86,14 @@
   $: rightCtx = rightCanvas && rightCanvas2d.ctx;
 
   // Scales
-  let xScale;
-  let yScale;
+  let xScale: d3.ScaleLinear<number, number>;
+  let yScale: d3.ScaleLinear<number, number>;
 
   // Animation state type - extends PathlineAnimationState
   type AnimationState = PathlineAnimationState;
 
   // Animation - Timeline system
-  let currentSegmentIndex = 0;
+  let currentSegmentIndex: number = 0;
   let timeline: Timeline<AnimationState> | null = null;
 
   // PathlineAnimation instances for left and right panels
@@ -100,26 +101,26 @@
   let rightPathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Initialization
-  let isInitialized = false;
-  let pathsInitialized = false;
+  let isInitialized: boolean = false;
+  let pathsInitialized: boolean = false;
 
   // Pre-computed pixel coordinates (scaled once upfront)
-  let scaledTargetDistribution = [];  // [point][x,y] in pixels
-  let scaledLeftTrajectories = [];    // [trajectory][timestep][x,y] in pixels
-  let scaledRightTrajectories = [];   // [trajectory][timestep][x,y] in pixels
+  let scaledTargetDistribution: number[][] = [];  // [point][x,y] in pixels
+  let scaledLeftTrajectories: number[][][] = [];    // [trajectory][timestep][x,y] in pixels
+  let scaledRightTrajectories: number[][][] = [];   // [trajectory][timestep][x,y] in pixels
 
   // User-defined trajectory state (supports multiple trajectories)
-  let userStartPoints = []; // Array of [x, y] domain coordinates
-  let userFlowMatchingTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
-  let userRectifiedFlowTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
-  let hasUserTrajectory = false;
-  let isStreamingTrajectory = false;
-  let streamingCompleteCount = 0;
-  let activeFlowMatchingRequestId = null; // Track active request for cancellation
-  let activeRectifiedFlowRequestId = null; // Track active request for cancellation
+  let userStartPoints: number[][] = []; // Array of [x, y] domain coordinates
+  let userFlowMatchingTrajectories: number[][][] = []; // Array of trajectories, each is [timestep][x,y] in pixels
+  let userRectifiedFlowTrajectories: number[][][] = []; // Array of trajectories, each is [timestep][x,y] in pixels
+  let hasUserTrajectory: boolean = false;
+  let isStreamingTrajectory: boolean = false;
+  let streamingCompleteCount: number = 0;
+  let activeFlowMatchingRequestId: string | null = null; // Track active request for cancellation
+  let activeRectifiedFlowRequestId: string | null = null; // Track active request for cancellation
 
   // Visibility
-  let figureIsActive;
+  let figureIsActive: boolean;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // ----------------------------------------------------------------
@@ -145,7 +146,7 @@
 
 
   // Transpose trajectories from [timestep][sample][dim] to [sample][timestep][x,y] and scale to pixels
-  function transposeAndScale(trajectories) {
+  function transposeAndScale(trajectories: number[][][]): number[][][] {
     if (!xScale || !yScale || !trajectories || trajectories.length === 0) return [];
     const numSamples = trajectories[0]?.length || 0;
     return Array.from({ length: numSamples }, (_, i) =>
@@ -300,7 +301,7 @@
   // ----------------------------------------------------------------
 
   // Handle canvas click - convert to domain coordinates and sample
-  function handleCanvasClick(event, side) {
+  function handleCanvasClick(event: MouseEvent, side: string) {
     // Clients are passed as props; check they're available
     if (!flowMatchingClient || !rectifiedFlowClient) return;
 
@@ -320,7 +321,7 @@
   }
 
   // Sample trajectories from all user start points using both models (streaming)
-  function sampleFromPoint(point) {
+  function sampleFromPoint(point: number[]) {
     // Ensure clients are initialized
     if (!flowMatchingClient || !rectifiedFlowClient) return;
 
@@ -371,7 +372,7 @@
       numTimeSteps,
       {},
       // onStep callback - append new points for all trajectories
-      (_step, x_t) => {
+      (_step: number, x_t: number[][]) => {
         userFlowMatchingTrajectories = userFlowMatchingTrajectories.map((traj, i) => [
           ...traj,
           [xScale(x_t[i][0]), yScale(x_t[i][1])]
@@ -387,7 +388,7 @@
       numTimeSteps,
       {},
       // onStep callback - append new points for all trajectories
-      (_step, x_t) => {
+      (_step: number, x_t: number[][]) => {
         userRectifiedFlowTrajectories = userRectifiedFlowTrajectories.map((traj, i) => [
           ...traj,
           [xScale(x_t[i][0]), yScale(x_t[i][1])]

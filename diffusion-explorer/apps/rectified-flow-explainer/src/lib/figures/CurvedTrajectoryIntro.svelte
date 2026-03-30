@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
   import { Figure, TimeSlider, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import type { FlowModelClient } from "@diffusion-explorer/diffusion";
+  import type { Writable } from "svelte/store";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -8,31 +10,31 @@
   // ----------------------------------------------------------------
 
   // FlowModelClient instance (passed from parent, created with correct base path)
-  export let flowMatchingClient = null;
+  export let flowMatchingClient: FlowModelClient | null = null;
 
   // Data props
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
-  export let allTimeSamples; // [timestep][sample][dim]
+  export let sourceDistributionSamples: number[][] = [];
+  export let targetDistributionSamples: number[][] = [];
+  export let allTimeSamples: number[][][]; // [timestep][sample][dim]
 
   // Animation settings
-  export let animationDuration = 6000;
-  export let playingByDefault = true;
-  export let pauseBeforeRestart = 1000;
+  export let animationDuration: number = 6000;
+  export let playingByDefault: boolean = true;
+  export let pauseBeforeRestart: number = 1000;
 
   // Layout
-  export let width = 750;
-  export let height = 375;
-  export let marginWidth = 50;
-  export let marginHeight = 20;
+  export let width: number = 750;
+  export let height: number = 375;
+  export let marginWidth: number = 50;
+  export let marginHeight: number = 20;
 
   // Trajectory settings
-  export let numTrajectoriesToShow = 10;
-  export let maxTrajectories = 30;
-  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
+  export let numTrajectoriesToShow: number = 10;
+  export let maxTrajectories: number = 30;
+  export let maxUserTrajectories: number = settings.interactiveSettings.maxUserTrajectories;
 
   // Caption slot (passed as default children)
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // ----------------------------------------------------------------
   // State
@@ -40,8 +42,10 @@
 
   $: caption = children;
 
+  type SourceTargetScales = ReturnType<typeof createSourceTargetScales>;
+
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
@@ -57,22 +61,22 @@
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Visibility tracking
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Pre-computed data (computed once on mount/data change)
-  let scales = null;
-  let regularTrajectories = []; // [trajectory][timestep][x,y in pixels] - fixed pre-computed
-  let sourcePixelCoords = []; // [point][x,y] in pixel space
-  let targetPixelCoords = []; // [point][x,y] in pixel space
-  let selectedTrajectoryIndices = [];
-  let combinedMeanX = 0;
+  let scales: SourceTargetScales | null = null;
+  let regularTrajectories: number[][][] = []; // [trajectory][timestep][x,y in pixels] - fixed pre-computed
+  let sourcePixelCoords: number[][] = []; // [point][x,y] in pixel space
+  let targetPixelCoords: number[][] = []; // [point][x,y] in pixel space
+  let selectedTrajectoryIndices: number[] = [];
+  let combinedMeanX: number = 0;
 
   // User-defined trajectory state
-  let userStartPoints = []; // Array of [x, y] domain coordinates
-  let inProgressUserTrajectories = []; // Currently streaming [trajectory][timestep][x,y]
-  let completedUserTrajectories = []; // Completed user trajectories (capped at maxUserTrajectories)
-  let activeRequestId = null;
+  let userStartPoints: number[][] = []; // Array of [x, y] domain coordinates
+  let inProgressUserTrajectories: number[][][] = []; // Currently streaming [trajectory][timestep][x,y]
+  let completedUserTrajectories: number[][][] = []; // Completed user trajectories (capped at maxUserTrajectories)
+  let activeRequestId: string | null = null;
 
   // Derived values
   $: numTimeSteps = allTimeSamples?.length || 1;
@@ -88,7 +92,7 @@
 
     // Filter to only include trajectories with starting points within clipping radius
     const clippingRadius = settings.stylingSettings.scatterPlot.clippingRadius;
-    const validIndices = [];
+    const validIndices: number[] = [];
 
     for (let i = 0; i < allTimeSamples[0].length && validIndices.length < numTrajectoriesToShow; i++) {
       const startPoint = allTimeSamples[0][i];
@@ -101,7 +105,7 @@
     selectedTrajectoryIndices = validIndices;
   }
 
-  function getPixelX(dataX, meanX, t) {
+  function getPixelX(dataX: number, meanX: number, t: number): number {
     const centerPixelX =
       scales.sourceCenterPixelX +
       t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
@@ -271,7 +275,7 @@
   // ----------------------------------------------------------------
 
   // Handle canvas click - restricted to source distribution region
-  function handleCanvasClick(event) {
+  function handleCanvasClick(event: MouseEvent) {
     if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
     if (!scales || !canvas) return;
 
