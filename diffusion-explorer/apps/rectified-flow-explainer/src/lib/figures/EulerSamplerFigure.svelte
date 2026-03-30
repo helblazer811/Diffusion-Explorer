@@ -1,9 +1,31 @@
-<script>
+<script lang="ts">
   import * as tf from "@tensorflow/tfjs";
   import { onMount, onDestroy } from "svelte";
+  import type { Writable } from "svelte/store";
   import * as d3 from "d3";
   import { DoubleFigure, PlayButton } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
+
+  // ----------------------------------------------------------------
+  // Types
+  // ----------------------------------------------------------------
+
+  interface EulerResult {
+    t: number[];
+    y: number[];
+  }
+
+  interface GroundTruthPoint {
+    t: number;
+    y: number;
+  }
+
+  interface AnimationData {
+    highCurvatureGT: GroundTruthPoint[];
+    highCurvatureEuler: EulerResult;
+    lowCurvatureGT: GroundTruthPoint[];
+    lowCurvatureEuler: EulerResult;
+  }
 
   // ----------------------------------------------------------------
   // Props
@@ -44,7 +66,7 @@
   export let lowCurvatureLabel = "Almost Straight Function";
 
   // Caption
-  export let children = undefined;
+  export let children: any = undefined;
 
   // ----------------------------------------------------------------
   // State
@@ -66,44 +88,44 @@
   const lowCurvatureYScaleFactor = 5;
 
   // SVG element references
-  let leftSvg;
-  let rightSvg;
+  let leftSvg: SVGSVGElement | undefined;
+  let rightSvg: SVGSVGElement | undefined;
 
   // Visibility-based animation control
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   let isInitialized = false;
   let wasAnimatingBeforeHidden = false;
   let shouldAnimate = true;
-  let activeTimeoutIds = [];
+  let activeTimeoutIds: ReturnType<typeof setTimeout>[] = [];
 
   // Play button state
   let isPlaying = true;
   let normalizedTime = 0;
   let animationStartTime = 0;
-  let timeTrackingFrameId = null;
+  let timeTrackingFrameId: number | null = null;
 
   // Store animation data for restart
-  let animationData = null;
+  let animationData: AnimationData | null = null;
 
   // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
 
   // ODE Functions
-  function highCurvatureODE(t, y) {
+  function highCurvatureODE(t: number, y: number): number {
     // Downward parabola: y = 0.1 * t * (4*PI - t)
     // dy/dt = 0.1 * (4*PI - 2*t)
     const dydt = 0.1 * (4 * Math.PI - 2 * t);
     return dydt;
   }
 
-  function highCurvatureGroundTruth(t) {
+  function highCurvatureGroundTruth(t: number): number {
     // Parabola peaking at t = 2*PI, passing through (0,0) and (4*PI, 0)
     // y = 0.1 * t * (4*PI - t)
     return 0.1 * t * (4 * Math.PI - t);
   }
 
-  function lowCurvatureODE(t, y) {
+  function lowCurvatureODE(t: number, y: number): number {
     return tf.tidy(() => {
       const tTensor = tf.scalar(t);
 
@@ -114,15 +136,15 @@
     });
   }
 
-  function lowCurvatureGroundTruth(t) {
+  function lowCurvatureGroundTruth(t: number): number {
     // y(t) = 0.05 * t^2
     return 0.01 * t * t;
   }
 
   // Euler Method
-  function eulerMethod(odeFunc, t0, y0, tEnd, dt) {
-    const tValues = [];
-    const yValues = [];
+  function eulerMethod(odeFunc: (t: number, y: number) => number, t0: number, y0: number, tEnd: number, dt: number): EulerResult {
+    const tValues: number[] = [];
+    const yValues: number[] = [];
 
     let t = t0;
     let y = y0;
@@ -141,12 +163,12 @@
 
   // Create Scales
   function createScales(
-    data,
-    groundTruth,
-    svgWidth,
-    svgHeight,
-    yScaleFactor = 1
-  ) {
+    data: EulerResult,
+    groundTruth: GroundTruthPoint[],
+    svgWidth: number,
+    svgHeight: number,
+    yScaleFactor: number = 1
+  ): { xScale: d3.ScaleLinear<number, number>; yScale: d3.ScaleLinear<number, number> } {
     const allT = [...data.t, ...groundTruth.map((d) => d.t)];
     const allY = [...data.y, ...groundTruth.map((d) => d.y)];
 
@@ -175,8 +197,8 @@
   }
 
   // Generate Ground Truth Points
-  function generateGroundTruthPoints(groundTruthFunc, t0, tEnd, dt) {
-    const points = [];
+  function generateGroundTruthPoints(groundTruthFunc: (t: number) => number, t0: number, tEnd: number, dt: number): GroundTruthPoint[] {
+    const points: GroundTruthPoint[] = [];
     let t = t0;
     while (t <= tEnd) {
       points.push({ t, y: groundTruthFunc(t) });
@@ -185,7 +207,7 @@
     return points;
   }
 
-  function scheduleTimeout(fn, delay) {
+  function scheduleTimeout(fn: () => void, delay: number): ReturnType<typeof setTimeout> {
     const id = setTimeout(() => {
       // Remove from active list when executed
       activeTimeoutIds = activeTimeoutIds.filter((tid) => tid !== id);
@@ -349,12 +371,12 @@
 
   // Animate individual Euler line segments
   function animateEulerSegments(
-    svg,
-    eulerPoints,
-    xScale,
-    yScale,
-    delay = fullAnimationDelay
-  ) {
+    svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+    eulerPoints: GroundTruthPoint[],
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>,
+    delay: number = fullAnimationDelay
+  ): void {
     // Clear existing segments and arrows
     svg.selectAll(".euler-segment").remove();
     svg.selectAll(".euler-arrow").remove();
@@ -452,7 +474,7 @@
   // ----------------------------------------------------------------
 
   // Plot Labels
-  function plotLabels(svg, label, xScale, yScale) {
+  function plotLabels(svg: SVGSVGElement | undefined, label: string, xScale: d3.ScaleLinear<number, number>, yScale: d3.ScaleLinear<number, number>): void {
     if (!svg) return;
 
     const d3Svg = d3.select(svg);
@@ -485,13 +507,13 @@
 
   // Plot Curves
   function plotCurves(
-    svg,
-    groundTruth,
-    eulerData,
-    yScaleFactor = 1,
-    label = "",
-    animDelay = fullAnimationDelay
-  ) {
+    svg: SVGSVGElement | undefined,
+    groundTruth: GroundTruthPoint[],
+    eulerData: EulerResult,
+    yScaleFactor: number = 1,
+    label: string = "",
+    animDelay: number = fullAnimationDelay
+  ): void {
     if (!svg) return;
 
     const d3Svg = d3.select(svg);
@@ -548,7 +570,7 @@
     }
   }
 
-  function handleVisibilityChange(isActive) {
+  function handleVisibilityChange(isActive: boolean): void {
     if (!isActive && shouldAnimate) {
       wasAnimatingBeforeHidden = true;
       shouldAnimate = false;

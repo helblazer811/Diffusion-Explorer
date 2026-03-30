@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
+  import type { Writable } from "svelte/store";
+  import type { FlowModelClient } from "@diffusion-explorer/diffusion";
   import {
     Figure,
     TimeSlider,
@@ -14,17 +16,19 @@
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
+  type SourceTargetScales = ReturnType<typeof createSourceTargetScales>;
+
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
   // FlowModelClient instance (passed from parent, created with correct base path)
-  export let flowMatchingClient = null;
+  export let flowMatchingClient: FlowModelClient | null = null;
 
   // Data props
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
-  export let allTimeSamples; // [timestep][sample][dim]
+  export let sourceDistributionSamples: [number, number][] = [];
+  export let targetDistributionSamples: [number, number][] = [];
+  export let allTimeSamples: number[][][] = []; // [timestep][sample][dim]
 
   // Animation settings
   export let animationDuration = 6000;
@@ -47,7 +51,7 @@
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
   // Caption slot (passed as default children)
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // ----------------------------------------------------------------
   // State
@@ -56,7 +60,7 @@
   $: caption = children;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
@@ -78,20 +82,20 @@
   let cachedNumTimesteps = 1;
 
   // Pre-computed data
-  let scales = null;
-  let selectedTrajectoryIndices = [];
-  let transformedTrajectories = []; // [trajectory][timestep][x,y in pixels]
-  let trajectoryLengths = []; // Total path length for each trajectory
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];
+  let scales: SourceTargetScales | null = null;
+  let selectedTrajectoryIndices: number[] = [];
+  let transformedTrajectories: number[][][] = []; // [trajectory][timestep][x,y in pixels]
+  let trajectoryLengths: number[] = []; // Total path length for each trajectory
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
   let combinedMeanX = 0;
 
   // In-progress clicked trajectory state
-  let clickedTrajectory = null; // [[x,y], ...] in pixel coordinates being built
+  let clickedTrajectory: number[][] | null = null; // [[x,y], ...] in pixel coordinates being built
   let isStreamingTrajectory = false;
 
   // Visibility tracking
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // ----------------------------------------------------------------
@@ -106,7 +110,7 @@
     );
   }
 
-  function getPixelX(dataX, meanX, t) {
+  function getPixelX(dataX: number, meanX: number, t: number) {
     const centerPixelX =
       scales.sourceCenterPixelX +
       t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
@@ -167,7 +171,7 @@
   }
 
   // Get point at a specific progress (0-1) along a trajectory
-  function getPointAtProgress(trajectoryIndex, progress) {
+  function getPointAtProgress(trajectoryIndex: number, progress: number) {
     const traj = transformedTrajectories[trajectoryIndex];
     const totalLength = trajectoryLengths[trajectoryIndex];
     const targetLength = progress * totalLength;
@@ -420,7 +424,7 @@
   // ----------------------------------------------------------------
 
   // Handle canvas click - restricted to source distribution region
-  function handleCanvasClick(event) {
+  function handleCanvasClick(event: MouseEvent) {
     // Ignore clicks while sampling is in progress
     if (isStreamingTrajectory) return;
     if (!settings.flowModelWorkerUrl || !settings.flowMatchingModelPath) return;
@@ -446,7 +450,7 @@
   }
 
   // Sample from a clicked point using streaming
-  function sampleFromPoint(point) {
+  function sampleFromPoint(point: [number, number]) {
     isStreamingTrajectory = true;
 
     // Initialize with click point scaled to t=0 position
@@ -468,7 +472,7 @@
       samplingSteps,
       {},
       // onStep - append each new point, transformed to pixel space
-      (step, x_t) => {
+      (step: number, x_t: number[][]) => {
         const t = (step + 1) / samplingSteps;
         const pixelX = getPixelX(x_t[0][0], combinedMeanX, t);
         const pixelY = scales.yScale(x_t[0][1]);

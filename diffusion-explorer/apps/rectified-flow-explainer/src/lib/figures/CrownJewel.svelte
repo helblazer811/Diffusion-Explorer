@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
+  import { type Writable } from "svelte/store";
   import {
     DoubleFigure,
     TimeSlider,
@@ -11,6 +12,7 @@
     type PathlineAnimationState,
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
+  import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -18,13 +20,13 @@
   // ----------------------------------------------------------------
 
   // FlowModelClient instances (passed from parent, created with correct base path)
-  export let flowMatchingClient = null;
-  export let rectifiedFlowClient = null;
+  export let flowMatchingClient: FlowModelClient | null = null;
+  export let rectifiedFlowClient: FlowModelClient | null = null;
 
   // Data
-  export let leftTrajectories = []; // [timestep][sample][dim]
-  export let rightTrajectories = []; // [timestep][sample][dim]
-  export let targetDistribution = [];
+  export let leftTrajectories: number[][][] = []; // [timestep][sample][dim]
+  export let rightTrajectories: number[][][] = []; // [timestep][sample][dim]
+  export let targetDistribution: number[][] = [];
 
   // Layout
   export let canvasWidth = 400;
@@ -75,9 +77,9 @@
     settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
-  export let onInitialized = undefined;
-  export let backgroundVisible = true;
-  export let children = undefined;
+  export let onInitialized: (() => void) | undefined = undefined;
+  export let backgroundVisible: boolean = true;
+  export let children: unknown = undefined;
 
   // ----------------------------------------------------------------
   // State
@@ -104,8 +106,8 @@
   let rightPathlineAnimation: PathlineAnimation<PathlineAnimationState> | null = null;
 
   // Scales
-  let xScale;
-  let yScale;
+  let xScale: d3.ScaleLinear<number, number>;
+  let yScale: d3.ScaleLinear<number, number>;
 
   // Animation state (combined for single Timeline)
   type AnimationState = {
@@ -134,23 +136,23 @@
   let pathsInitialized = false;
 
   // Pre-computed pixel coordinates (scaled once upfront)
-  let scaledTargetDistribution = []; // [point][x,y] in pixels - target distribution
-  let scaledLeftTrajectories = []; // [trajectory][timestep][x,y] in pixels
-  let scaledRightTrajectories = []; // [trajectory][timestep][x,y] in pixels
+  let scaledTargetDistribution: number[][] = []; // [point][x,y] in pixels - target distribution
+  let scaledLeftTrajectories: number[][][] = []; // [trajectory][timestep][x,y] in pixels
+  let scaledRightTrajectories: number[][][] = []; // [trajectory][timestep][x,y] in pixels
 
   // Visibility
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // User-defined trajectory state (supports multiple trajectories)
-  let userStartPoints = []; // Array of [x, y] domain coordinates
-  let userFlowMatchingTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
-  let userRectifiedFlowTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
-  let hasUserTrajectory = false;
-  let isStreamingTrajectory = false;
-  let activeFlowMatchingRequestId = null; // Track active request for cancellation
-  let activeRectifiedFlowRequestId = null; // Track active request for cancellation
-  let streamingCompleteCount = 0;
+  let userStartPoints: number[][] = []; // Array of [x, y] domain coordinates
+  let userFlowMatchingTrajectories: number[][][] = []; // Array of trajectories, each is [timestep][x,y] in pixels
+  let userRectifiedFlowTrajectories: number[][][] = []; // Array of trajectories, each is [timestep][x,y] in pixels
+  let hasUserTrajectory: boolean = false;
+  let isStreamingTrajectory: boolean = false;
+  let activeFlowMatchingRequestId: string | null = null; // Track active request for cancellation
+  let activeRectifiedFlowRequestId: string | null = null; // Track active request for cancellation
+  let streamingCompleteCount: number = 0;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -174,7 +176,7 @@
   }
 
   // Transpose trajectories from [timestep][sample][dim] to [sample][timestep][x,y] and scale to pixels
-  function transposeAndScale(trajectories) {
+  function transposeAndScale(trajectories: number[][][]) {
     if (!xScale || !yScale || !trajectories || trajectories.length === 0)
       return [];
     const numSamples = trajectories[0]?.length || 0;
@@ -396,7 +398,7 @@
   }
 
   // Handler for when user drags the left (slow) slider
-  function handleLeftTimeInput(newTime) {
+  function handleLeftTimeInput(newTime: number) {
     if (!pathsInitialized || numSegments === 0) return;
 
     // Snap to discrete segment and update left side
@@ -424,7 +426,7 @@
   }
 
   // Handler for when user drags the right (fast) slider
-  function handleRightTimeInput(newTime) {
+  function handleRightTimeInput(newTime: number) {
     if (!pathsInitialized || numSegments === 0) return;
 
     // Snap to discrete segment and update right side
@@ -455,7 +457,7 @@
   }
 
   // Handle canvas click - convert to domain coordinates and sample
-  function handleCanvasClick(event, side) {
+  function handleCanvasClick(event: MouseEvent, side: "left" | "right") {
     // Clients are passed as props; check they're available
     if (!flowMatchingClient || !rectifiedFlowClient) return;
 
@@ -478,7 +480,7 @@
   }
 
   // Sample trajectories from all user start points using both models (streaming)
-  function sampleFromPoint(point) {
+  function sampleFromPoint(point: number[]) {
     // Ensure clients are initialized
     if (!flowMatchingClient || !rectifiedFlowClient) return;
 
