@@ -14,62 +14,64 @@
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
+  import type { FlowModelClient } from "@diffusion-explorer/diffusion";
+  import type { Snippet } from "svelte";
 
   // ===== PROPS =====
 
   // FlowModelClient instances (passed from parent, created with correct base path)
-  export let flowMatchingClient = null;
-  export let rectifiedFlowClient = null;
+  export let flowMatchingClient: FlowModelClient | null = null;
+  export let rectifiedFlowClient: FlowModelClient | null = null;
 
   // Data
-  export let targetDistribution = [];
+  export let targetDistribution: number[][] = [];
 
   // Layout
-  export let canvasWidth = 400;
-  export let canvasHeight = 400;
-  export let marginWidth = 10;
-  export let marginHeight = 10;
-  export let gap = 20;
-  export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.5, yMax: 1.7 };
+  export let canvasWidth: number = 400;
+  export let canvasHeight: number = 400;
+  export let marginWidth: number = 10;
+  export let marginHeight: number = 10;
+  export let gap: number = 20;
+  export let domainRange: { xMin: number; xMax: number; yMin: number; yMax: number } = { xMin: -1.7, xMax: 1.7, yMin: -1.5, yMax: 1.7 };
 
   // Labels
-  export let leftLabel = "Flow Matching";
-  export let rightLabel = "Rectified Flow";
-  export let labelFontSize = settings.stylingSettings.label.fontSize;
-  export let labelColor = settings.stylingSettings.label.color;
-  export let labelOpacity = settings.stylingSettings.label.opacity;
+  export let leftLabel: string = "Flow Matching";
+  export let rightLabel: string = "Rectified Flow";
+  export let labelFontSize: number = settings.stylingSettings.label.fontSize;
+  export let labelColor: string = settings.stylingSettings.label.color;
+  export let labelOpacity: number = settings.stylingSettings.label.opacity;
 
   // Subtitles
-  export let leftSubtitle = "High Error with Few Steps";
-  export let rightSubtitle = "Low Error with Few Steps";
-  export let subtitleFontSize = 26;
-  export let subtitleColor = settings.stylingSettings.label.color;
+  export let leftSubtitle: string = "High Error with Few Steps";
+  export let rightSubtitle: string = "Low Error with Few Steps";
+  export let subtitleFontSize: number = 26;
+  export let subtitleColor: string = settings.stylingSettings.label.color;
 
   // Target distribution styling
-  export let targetColor = "#3b82f6";
-  export let targetOpacity = 0.2;
-  export let targetPointRadius = 5;
+  export let targetColor: string = "#3b82f6";
+  export let targetOpacity: number = 0.2;
+  export let targetPointRadius: number = 5;
 
   // Trajectory styling
-  export let groundTruthColor = "#22c55e";
-  export let groundTruthOpacity = 0.8;
-  export let approximationColor = "#f17720";
-  export let approximationOpacity = 0.8;
-  export let errorColor = "#dc2626"; // Red for error line
-  export let trajectoryStrokeWidth = 3;
-  export let endpointRadius =
+  export let groundTruthColor: string = "#22c55e";
+  export let groundTruthOpacity: number = 0.8;
+  export let approximationColor: string = "#f17720";
+  export let approximationOpacity: number = 0.8;
+  export let errorColor: string = "#dc2626"; // Red for error line
+  export let trajectoryStrokeWidth: number = 3;
+  export let endpointRadius: number =
     settings.stylingSettings.trajectory.endpointRadius;
 
   // Starting points (supports multiple)
-  export let defaultStartPoints = [
+  export let defaultStartPoints: number[][] = [
     [-1.5, -0.2],
   ];
-  export let startPointRadius = endpointRadius;
-  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
+  export let startPointRadius: number = endpointRadius;
+  export let maxUserTrajectories: number = settings.interactiveSettings.maxUserTrajectories;
 
   // Callbacks & misc
-  export let backgroundVisible = true;
-  export let children = undefined;
+  export let backgroundVisible: boolean = true;
+  export let children: Snippet | undefined = undefined;
 
   // ===== CONSTANTS =====
 
@@ -85,8 +87,8 @@
   // ===== STATE =====
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let leftCanvas = null;
-  let rightCanvas = null;
+  let leftCanvas: HTMLCanvasElement | null = null;
+  let rightCanvas: HTMLCanvasElement | null = null;
   const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
   const rightCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
   // Tie ctx reactivity to canvas variables so it updates when action runs
@@ -94,39 +96,39 @@
   $: rightCtx = rightCanvas && rightCanvas2d.ctx;
 
   // Scales
-  let xScale;
-  let yScale;
+  let xScale: d3.ScaleLinear<number, number>;
+  let yScale: d3.ScaleLinear<number, number>;
 
   // Pre-computed pixel coordinates
-  let scaledTargetDistribution = [];
+  let scaledTargetDistribution: number[][] = [];
 
   // Current slider index
-  let currentStepIndex = defaultStepIndex;
+  let currentStepIndex: number = defaultStepIndex;
 
   // Starting points (domain coordinates) - supports multiple
-  let userStartPoints = [...defaultStartPoints];
+  let userStartPoints: number[][] = [...defaultStartPoints];
 
   // Request ID tracking for cancellation (4 separate requests)
-  let fmGroundTruthRequestId = null;
-  let fmApproxRequestId = null;
-  let rfGroundTruthRequestId = null;
-  let rfApproxRequestId = null;
+  let fmGroundTruthRequestId: string | null = null;
+  let fmApproxRequestId: string | null = null;
+  let rfGroundTruthRequestId: string | null = null;
+  let rfApproxRequestId: string | null = null;
 
   // Pre-computed trajectories for all step counts
   // Format: { steps: [traj1, traj2, ...] } where each traj is [[x,y], ...]
-  let flowMatchingTrajectories = {};
-  let rectifiedFlowTrajectories = {};
-  let flowMatchingGroundTruths = []; // Array of trajectories
-  let rectifiedFlowGroundTruths = [];
+  let flowMatchingTrajectories: Record<number, number[][][]> = {};
+  let rectifiedFlowTrajectories: Record<number, number[][][]> = {};
+  let flowMatchingGroundTruths: number[][][] = []; // Array of trajectories
+  let rectifiedFlowGroundTruths: number[][][] = [];
 
   // Loading state
-  let isLoading = true;
+  let isLoading: boolean = true;
 
   // Initialization
-  let isInitialized = false;
+  let isInitialized: boolean = false;
 
   // Visibility
-  let figureIsActive;
+  let figureIsActive: boolean;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Animation timing config (in ms)
@@ -284,7 +286,7 @@
   }
 
   // Sample trajectories using batch mode (for background loading of remaining step counts)
-  async function sampleTrajectoriesBatch(client, points, numSteps) {
+  async function sampleTrajectoriesBatch(client: FlowModelClient, points: number[][], numSteps: number) {
     const { promise } = client.sampleFromInitialPoints(points, numSteps, { scheduler: "euler" });
     const allSamples = await promise;
     return points.map((point, pointIdx) => [
@@ -413,11 +415,11 @@
 
   // Draw a full trajectory path (respects ctx.globalAlpha set by caller)
   function drawTrajectory(
-    ctx,
-    trajectory,
-    color,
-    lineWidth,
-    showEndpoint = true
+    ctx: CanvasRenderingContext2D,
+    trajectory: number[][],
+    color: string,
+    lineWidth: number,
+    showEndpoint: boolean = true
   ) {
     if (!trajectory || trajectory.length < 2) return;
 
@@ -451,7 +453,7 @@
   }
 
   // Draw start point markers for all start points
-  function drawStartPoints(ctx) {
+  function drawStartPoints(ctx: CanvasRenderingContext2D) {
     for (const point of userStartPoints) {
       const [x, y] = [xScale(point[0]), yScale(point[1])];
 
@@ -474,11 +476,11 @@
 
   // Draw error line (dashed) from ground truth endpoint to approximation endpoint
   function drawErrorLine(
-    ctx,
-    groundTruthEndpoint,
-    approxEndpoint,
-    color,
-    lineWidth
+    ctx: CanvasRenderingContext2D,
+    groundTruthEndpoint: number[],
+    approxEndpoint: number[],
+    color: string,
+    lineWidth: number
   ) {
     if (!groundTruthEndpoint || !approxEndpoint) return;
 
@@ -592,7 +594,7 @@
   }
 
   // Draw approximation trajectories with current animation state
-  function drawApproximation(ctx, trajectories, state) {
+  function drawApproximation(ctx: HTMLCanvasElement | null, trajectories: number[][][], state: { segmentIndex: number; segmentProgress: number; inEndPause: boolean }) {
     // Convert domain coordinates to pixel coordinates
     const scaledTrajectories = trajectories.map(traj =>
       traj.map(point => [xScale(point[0]), yScale(point[1])])
@@ -743,7 +745,7 @@
   }
 
   // Handle canvas click - convert to domain coordinates and add/replace start point
-  function handleCanvasClick(event, side) {
+  function handleCanvasClick(event: MouseEvent, side: "left" | "right") {
     // Stop current animation and reset
     stopApproxAnimation();
     if (timeline) timeline.reset();

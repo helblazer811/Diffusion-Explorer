@@ -5,8 +5,9 @@ TODO:
 2. Cache the uniform grid trajectories/pull from the cache rather than running every time.
 -->
 
-<script>
-  import { onDestroy } from "svelte";
+<script lang="ts">
+  import { onDestroy, type Snippet } from "svelte";
+  import type { Writable } from "svelte/store";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import {
     Figure,
@@ -19,7 +20,8 @@ TODO:
     createPauseClip,
     useCanvas2D,
     computeContours,
-    plotContours
+    plotContours,
+    type ComputedContours
   } from "@diffusion-explorer/ui";
   import * as d3 from "d3";
   import { settings } from "$lib/settings";
@@ -29,98 +31,101 @@ TODO:
   // ----------------------------------------------------------------
 
   // Caption slot (passed as default children)
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Data props (passed from page)
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
+  export let sourceDistributionSamples: [number, number][] = [];
+  export let targetDistributionSamples: [number, number][] = [];
 
   // Mesh grid styling props
-  export let meshGridColor = "#666666";
-  export let meshGridOpacity = 0.8;
-  export let meshGridStrokeWidth = 2;
+  export let meshGridColor: string = "#666666";
+  export let meshGridOpacity: number = 0.8;
+  export let meshGridStrokeWidth: number = 2;
 
   // Layout/sizing
-  export let width = 800;
-  export let height = 450;
-  export let marginWidth = 50;
-  export let marginHeight = 20;
+  export let width: number = 800;
+  export let height: number = 450;
+  export let marginWidth: number = 50;
+  export let marginHeight: number = 20;
 
   // Animation
-  export let animationDuration = 6000;
-  export let pauseDuration = 1000;
-  export let playingByDefault = true;
+  export let animationDuration: number = 6000;
+  export let pauseDuration: number = 1000;
+  export let playingByDefault: boolean = true;
 
   // Grid sampling
-  export let gridResolution = 10;
-  export let numSteps = settings.samplingSettings.flowMatchingGrid.numSteps;
+  export let gridResolution: number = 10;
+  export let numSteps: number = settings.samplingSettings.flowMatchingGrid.numSteps;
 
   // Scatter plot styling
-  export let scatterPointRadius = settings.stylingSettings.scatterPlot.radius;
-  export let scatterPointOpacity = 0.3;
-  export let scatterPointColor = settings.stylingSettings.scatterPlot.color;
+  export let scatterPointRadius: number = settings.stylingSettings.scatterPlot.radius;
+  export let scatterPointOpacity: number = 0.3;
+  export let scatterPointColor: string = settings.stylingSettings.scatterPlot.color;
 
   // Label styling
-  export let labelFontSize = settings.stylingSettings.label.fontSize;
-  export let labelFontWeight = settings.stylingSettings.label.fontWeight;
-  export let labelColor = settings.stylingSettings.label.color;
-  export let sourceLabelText = "Source Distribution";
-  export let targetLabelText = "Target Distribution";
+  export let labelFontSize: number = settings.stylingSettings.label.fontSize;
+  export let labelFontWeight: number = settings.stylingSettings.label.fontWeight;
+  export let labelColor: string = settings.stylingSettings.label.color;
+  export let sourceLabelText: string = "Source Distribution";
+  export let targetLabelText: string = "Target Distribution";
 
   // Background visibility
-  export let backgroundVisible = false;
+  export let backgroundVisible: boolean = false;
 
   // Contour props
-  export let showContours = true;
-  export let contourOpacity = 0.7;
-  export let contourGridSize = 100;
-  export let contourBandwidth = 15;
-  export let contourLevels = 15;
-  export let contourColorScale = (t) => d3.interpolateRgb("white", "orange")(t);
-  export let contourNumSamples = 5000;
+  export let showContours: boolean = true;
+  export let contourOpacity: number = 0.7;
+  export let contourGridSize: number = 100;
+  export let contourBandwidth: number = 15;
+  export let contourLevels: number = 15;
+  export let contourColorScale: (t: number) => string = (t: number) => d3.interpolateRgb("white", "orange")(t);
+  export let contourNumSamples: number = 5000;
 
   // ----------------------------------------------------------------
   // State
   // ----------------------------------------------------------------
 
+  type AnimationState = { time: number };
+  type Scales = ReturnType<typeof createSourceTargetScales>;
+
   $: caption = children;
 
   // Canvas state - using useCanvas2D for DPR handling
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   $: ctx = canvas && canvas2d.ctx;
 
   // Scales and coordinates
-  let scales = null;
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];
+  let scales: Scales | null = null;
+  let sourcePixelCoords: [number, number][] = [];
+  let targetPixelCoords: [number, number][] = [];
 
   // Grid trajectory data
   // Shape: [timesteps][gridResolution][gridResolution][2]
-  let allGridStates = [];
-  let isLoading = true;
+  let allGridStates: number[][][][] = [];
+  let isLoading: boolean = true;
 
   // Animation state - Timeline system
-  let isInitialized = false;
-  let timeline = null;
-  let displayTime = 0;  // Semantic time for slider display (tracks state.time)
+  let isInitialized: boolean = false;
+  let timeline: Timeline<AnimationState> | null = null;
+  let displayTime: number = 0;  // Semantic time for slider display (tracks state.time)
 
   // Visibility-based animation control
-  let figureIsActive;
-  let wasPlayingBeforeHidden = false;
+  let figureIsActive: Writable<boolean>;
+  let wasPlayingBeforeHidden: boolean = false;
 
   // FlowModelClient instance
-  let client = null;
-  let activeRequestId = null;
+  let client: FlowModelClient | null = null;
+  let activeRequestId: string | null = null;
 
   // Contour state
   // Shape: [timesteps][numSamples][2]
-  let contourTrajectories = [];
+  let contourTrajectories: number[][][] = [];
   // Precomputed contour data array, one per timestep
-  let precomputedContours = [];
+  let precomputedContours: ComputedContours[] = [];
   // Domain for contour rendering [xMin, xMax, yMin, yMax]
-  let contourDataDomain = null;
-  let contourActiveRequestId = null;
+  let contourDataDomain: [number, number, number, number] | null = null;
+  let contourActiveRequestId: string | null = null;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -129,11 +134,11 @@ TODO:
   // Reshape flat trajectory data to grid structure
   // Input: [timesteps, gridResolution², 2]
   // Output: [timesteps][gridResolution][gridResolution][2]
-  function reshapeToGrid(trajectories, resolution) {
+  function reshapeToGrid(trajectories: number[][][], resolution: number): number[][][][] {
     return trajectories.map(timestep => {
-      const grid = [];
+      const grid: number[][][] = [];
       for (let i = 0; i < resolution; i++) {
-        grid[i] = [];
+        grid[i] = [] as number[][];
         for (let j = 0; j < resolution; j++) {
           const sampleIdx = i * resolution + j;
           grid[i][j] = timestep[sampleIdx];
@@ -144,7 +149,7 @@ TODO:
   }
 
   // Transform grid coordinates to pixels with horizontal interpolation
-  function transformGridToPixels(grid, t) {
+  function transformGridToPixels(grid: number[][][], t: number): number[][][] {
     if (!scales) return grid;
 
     const centerPixelX = scales.sourceCenterPixelX +
@@ -193,9 +198,9 @@ TODO:
   }
 
   // Generate random initial points for contour sampling
-  function generateContourInitialPoints(numSamples) {
+  function generateContourInitialPoints(numSamples: number): number[][] {
     const domain = computeDomainRange();
-    const points = [];
+    const points: number[][] = [];
     for (let i = 0; i < numSamples; i++) {
       const x = domain.xMin + Math.random() * (domain.xMax - domain.xMin);
       const y = domain.yMin + Math.random() * (domain.yMax - domain.yMin);
@@ -233,7 +238,7 @@ TODO:
   }
 
   // Draw precomputed contours with horizontal interpolation
-  function drawPrecomputedContours(contourData, t) {
+  function drawPrecomputedContours(contourData: ComputedContours, t: number): void {
     if (!ctx || !scales || !contourDataDomain) return;
 
     // Animated center position (same interpolation as mesh grid)
@@ -241,8 +246,8 @@ TODO:
       t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
 
     // Create scale functions that account for the animated horizontal position
-    const xScale = (dataX) => centerPixelX + (dataX - scales.sourceMeanX) * scales.xScaleFactor;
-    const yScale = (dataY) => scales.yScale(dataY);
+    const xScale = (dataX: number) => centerPixelX + (dataX - scales.sourceMeanX) * scales.xScaleFactor;
+    const yScale = (dataY: number) => scales.yScale(dataY);
 
     plotContours(ctx, contourData, {
       colorScale: contourColorScale,
@@ -347,7 +352,7 @@ TODO:
   // Forward clip (0→1)
   const forwardClip = {
     name: "Forward",
-    reduce(t) {
+    reduce(t: number): AnimationState {
       return { time: t };
     }
   };
@@ -355,13 +360,13 @@ TODO:
   // Backward clip (1→0)
   const backwardClip = {
     name: "Backward",
-    reduce(t) {
+    reduce(t: number): AnimationState {
       return { time: 1 - t };
     }
   };
 
   function setupTimeline() {
-    timeline = new Timeline();
+    timeline = new Timeline<AnimationState>();
     timeline.initialState = { time: 0 };
 
     // Total cycle: forward + pause + backward + pause
@@ -384,14 +389,14 @@ TODO:
     timeline.looping = true;
 
     // Register tick callback
-    timeline.onTick((_t, state) => {
+    timeline.onTick((_t: number, state: AnimationState) => {
       displayTime = state.time;  // Track semantic time for slider
       draw(state);
     });
   }
 
   // Handle seeking by display time - map to forward clip's timeline range
-  function handleSeekByDisplayTime(t) {
+  function handleSeekByDisplayTime(t: number): void {
     if (!timeline) return;
     const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
     const forwardEnd = animationDuration / totalCycleDuration;
@@ -410,7 +415,7 @@ TODO:
   // Drawing
   // ----------------------------------------------------------------
 
-  function draw(state) {
+  function draw(state: AnimationState): void {
     if (!ctx || !isInitialized) return;
     ctx.clearRect(0, 0, width, height);
 
@@ -480,7 +485,7 @@ TODO:
   // Event Handlers
   // ----------------------------------------------------------------
 
-  function handleVisibilityChange(isActive) {
+  function handleVisibilityChange(isActive: boolean): void {
     if (!timeline) return;
     if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;

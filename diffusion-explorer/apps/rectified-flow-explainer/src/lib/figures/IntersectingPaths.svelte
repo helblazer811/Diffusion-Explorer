@@ -1,7 +1,8 @@
 <!-- Visualizes intersecting linear paths between source and target distributions with velocity vectors at intersection. -->
 
-<script>
+<script lang="ts">
   import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjax, createSourceTargetScales, dataToPixelX, useCanvas2D, mathjaxInitialized } from "@diffusion-explorer/ui";
+  import type { Snippet } from "svelte";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -9,11 +10,11 @@
   // ----------------------------------------------------------------
 
   // Caption slot (passed as default children)
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Data props
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
+  export let sourceDistributionSamples: [number, number][] = [];
+  export let targetDistributionSamples: [number, number][] = [];
 
   // Arrow styling
   export let arrowColor = "#f17720";
@@ -45,15 +46,15 @@
   export let targetLabelText = "Target Distribution";
 
   // LaTeX label offsets
-  export let topArrowLabelOffset = { x: -55, y: -45 };
-  export let bottomArrowLabelOffset = { x: -55, y: 8 };
-  export let meanArrowLabelOffset = { x: 30, y: -18 };
+  export let topArrowLabelOffset: { x: number; y: number } = { x: -55, y: -45 };
+  export let bottomArrowLabelOffset: { x: number; y: number } = { x: -55, y: 8 };
+  export let meanArrowLabelOffset: { x: number; y: number } = { x: 30, y: -18 };
 
   // Hardcoded line endpoint coordinates
-  export let sourcePointA = [-0.2, -0.8];
-  export let sourcePointB = [-0.2, 0.5];
-  export let targetPointA = [0.2, 1.6];
-  export let targetPointB = [-1.1, -1.0];
+  export let sourcePointA: [number, number] = [-0.2, -0.8];
+  export let sourcePointB: [number, number] = [-0.2, 0.5];
+  export let targetPointA: [number, number] = [0.2, 1.6];
+  export let targetPointB: [number, number] = [-1.1, -1.0];
 
   // Background visibility
   export let backgroundVisible = true;
@@ -69,34 +70,34 @@
   $: caption = children;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
-  let scales = null;
-  let isInitialized = false;
+  let scales: ReturnType<typeof createSourceTargetScales> | null = null;
+  let isInitialized: boolean = false;
 
   // Pre-computed coordinates
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
 
   // Line endpoint pixel coords (computed once)
-  let line1Coords = null; // sourcePointB -> targetPointB
-  let line2Coords = null; // sourcePointA -> targetPointA
-  let intersection = null;
+  let line1Coords: { x1: number; y1: number; x2: number; y2: number } | null = null; // sourcePointB -> targetPointB
+  let line2Coords: { x1: number; y1: number; x2: number; y2: number } | null = null; // sourcePointA -> targetPointA
+  let intersection: { x: number; y: number; t: number } | null = null;
 
   // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
 
-  function normalize(v) {
+  function normalize(v: { x: number; y: number }): { x: number; y: number } {
     const len = Math.hypot(v.x, v.y);
     if (len < 1e-10) return { x: 0, y: 0 };
     return { x: v.x / len, y: v.y / len };
   }
 
-  function findIntersection(l1, l2) {
+  function findIntersection(l1: { x1: number; y1: number; x2: number; y2: number }, l2: { x1: number; y1: number; x2: number; y2: number }): { x: number; y: number; t: number } | null {
     const { x1, y1, x2, y2 } = l1;
     const { x1: x3, y1: y3, x2: x4, y2: y4 } = l2;
 
@@ -115,7 +116,7 @@
   function precomputeScatterCoords() {
     if (!scales) return;
 
-    sourcePixelCoords = sourceDistributionSamples.map((point) => {
+    sourcePixelCoords = sourceDistributionSamples.map((point: [number, number]) => {
       const pixelX =
         scales.sourceCenterPixelX +
         (point[0] - scales.sourceMeanX) * scales.xScaleFactor;
@@ -123,7 +124,7 @@
       return [pixelX, pixelY];
     });
 
-    targetPixelCoords = targetDistributionSamples.map((point) => {
+    targetPixelCoords = targetDistributionSamples.map((point: [number, number]) => {
       const pixelX =
         scales.targetCenterPixelX +
         (point[0] - scales.targetMeanX) * scales.xScaleFactor;
