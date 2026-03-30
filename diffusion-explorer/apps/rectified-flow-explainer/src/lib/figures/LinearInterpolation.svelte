@@ -2,6 +2,8 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
+  import type { Snippet } from "svelte";
+  import type { Writable } from "svelte/store";
   import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -10,11 +12,11 @@
   // ----------------------------------------------------------------
 
   // Caption slot (passed as default children)
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Data props
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
+  export let sourceDistributionSamples: [number, number][] = [];
+  export let targetDistributionSamples: [number, number][] = [];
 
   // Point selection for the line
   export let sourcePointIndex = 0;
@@ -64,7 +66,7 @@
   $: caption = children;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
@@ -75,19 +77,19 @@
   };
 
   // Scales and pre-computed coordinates
-  let scales = null;
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];
-  let sourcePointPixel = [0, 0];
-  let targetPointPixel = [0, 0];
+  let scales: ReturnType<typeof createSourceTargetScales> | null = null;
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
+  let sourcePointPixel: number[] = [0, 0];
+  let targetPointPixel: number[] = [0, 0];
 
   // Animation state - Timeline system
   let isInitialized = false;
   let timeline: Timeline<AnimationState> | null = null;
-  let displayTime = 0;  // Semantic time for slider display (tracks state.time)
+  let displayTime: number = 0;  // Semantic time for slider display (tracks state.time)
 
   // Visibility-based animation control
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // ----------------------------------------------------------------
@@ -98,12 +100,12 @@
   function precomputeScatterCoords() {
     if (!scales) return;
 
-    sourcePixelCoords = sourceDistributionSamples.map((p) => [
+    sourcePixelCoords = sourceDistributionSamples.map((p: [number, number]) => [
       scales.sourceCenterPixelX + (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
 
-    targetPixelCoords = targetDistributionSamples.map((p) => [
+    targetPixelCoords = targetDistributionSamples.map((p: [number, number]) => [
       scales.targetCenterPixelX + (p[0] - scales.targetMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
@@ -124,7 +126,7 @@
   }
 
   // Canvas drawing helpers
-  function drawLine(x1, y1, x2, y2, color, lineW, opacity = 1) {
+  function drawLine(x1: number, y1: number, x2: number, y2: number, color: string, lineW: number, opacity: number = 1) {
     ctx.save();
     ctx.globalAlpha = opacity;
     ctx.strokeStyle = color;
@@ -136,7 +138,7 @@
     ctx.restore();
   }
 
-  function drawCircle(x, y, radius, color, opacity = 1) {
+  function drawCircle(x: number, y: number, radius: number, color: string, opacity: number = 1) {
     ctx.save();
     ctx.globalAlpha = opacity;
     ctx.fillStyle = color;
