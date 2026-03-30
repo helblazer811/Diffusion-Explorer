@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
+  import type { Writable } from "svelte/store";
   import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, Timeline, createPauseClip, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -8,61 +9,61 @@
   // ----------------------------------------------------------------
 
   // Caption
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Data props
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
+  export let sourceDistributionSamples: [number, number][] = [];
+  export let targetDistributionSamples: [number, number][] = [];
 
   // Layout props
-  export let width = 800;
-  export let height = 450;
-  export let marginWidth = 50;
-  export let marginHeight = 20;
-  export let sourceCenterX = 0.2;
-  export let targetCenterX = 0.8;
-  export let yShiftFactor = -0.2;
+  export let width: number = 800;
+  export let height: number = 450;
+  export let marginWidth: number = 50;
+  export let marginHeight: number = 20;
+  export let sourceCenterX: number = 0.2;
+  export let targetCenterX: number = 0.8;
+  export let yShiftFactor: number = -0.2;
 
   // Scatter plot styling
-  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
-  export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
-  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
-  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
+  export let pointRadius: number = settings.stylingSettings.scatterPlot.radius;
+  export let pointOpacity: number = settings.stylingSettings.scatterPlot.opacity;
+  export let sourcePointColor: string = settings.stylingSettings.scatterPlot.color;
+  export let targetPointColor: string = settings.stylingSettings.scatterPlot.color;
 
   // Path line styling
-  export let pathLineColor = "#888";
-  export let pathLineOpacity = 0.25;
-  export let pathLineWidth = 3;
-  export let numPathLines = 15;
+  export let pathLineColor: string = "#888";
+  export let pathLineOpacity: number = 0.25;
+  export let pathLineWidth: number = 3;
+  export let numPathLines: number = 15;
 
   // Selected target point styling
-  export let selectedTargetColor = "#888";
-  export let selectedTargetRadius = 5;
+  export let selectedTargetColor: string = "#888";
+  export let selectedTargetRadius: number = 5;
 
   // Intermediate point styling
-  export let intermediatePointColor = "#f17720";
-  export let intermediatePointRadius = 6;
+  export let intermediatePointColor: string = "#f17720";
+  export let intermediatePointRadius: number = 6;
 
   // Conditional vector styling
-  export let vectorColor = "#f17720";
-  export let vectorOpacity = 1.0;
-  export let vectorWidth = 4.5;
-  export let vectorScale = 0.4; // Multiplier for vector magnitude
+  export let vectorColor: string = "#f17720";
+  export let vectorOpacity: number = 1.0;
+  export let vectorWidth: number = 4.5;
+  export let vectorScale: number = 0.4; // Multiplier for vector magnitude
 
   // Animation timing (normalized 0-1, scaled by animationDuration)
-  export let animationDuration = 8000;
-  export let timing = {
+  export let animationDuration: number = 8000;
+  export let timing: { forwardEnd: number } = {
     forwardEnd: 0.85,
     // pauseEnd: 1.0 implied
   };
-  export let playingByDefault = true;
+  export let playingByDefault: boolean = true;
 
   // Background
-  export let backgroundVisible = true;
+  export let backgroundVisible: boolean = true;
 
   // LaTeX label styling
-  export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
-  export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
+  export let latexLabelOffsetY: number = settings.stylingSettings.figureLatex.latexLabelOffsetY;
+  export let latexFontSize: number = settings.stylingSettings.figureLatex.fontSize;
 
   // ----------------------------------------------------------------
   // State
@@ -71,7 +72,7 @@
   $: caption = children;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
@@ -81,24 +82,26 @@
     t: number;  // Progress along trajectory (0→1)
   };
 
-  let scales = null;
-  let isInitialized = false;
+  type Scales = ReturnType<typeof createSourceTargetScales>;
+
+  let scales: Scales | null = null;
+  let isInitialized: boolean = false;
 
   // Animation state - Timeline system
   let timeline: Timeline<AnimationState> | null = null;
 
   // Visibility-based animation control
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Pre-computed pixel coordinates
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
 
   // Selected indices
-  let selectedTargetIndex = 0;
-  let selectedSourceIndices = [];
-  let selectedPathIndex = 0;
+  let selectedTargetIndex: number = 0;
+  let selectedSourceIndices: number[] = [];
+  let selectedPathIndex: number = 0;
 
   // ----------------------------------------------------------------
   // Helpers
@@ -107,20 +110,20 @@
   function precomputeScatterCoords() {
     if (!scales) return;
 
-    sourcePixelCoords = sourceDistributionSamples.map((p) => [
+    sourcePixelCoords = sourceDistributionSamples.map((p: [number, number]) => [
       scales.sourceCenterPixelX +
         (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
 
-    targetPixelCoords = targetDistributionSamples.map((p) => [
+    targetPixelCoords = targetDistributionSamples.map((p: [number, number]) => [
       scales.targetCenterPixelX +
         (p[0] - scales.targetMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
   }
 
-  function drawLine(x1, y1, x2, y2, color, lineW, opacity = 1) {
+  function drawLine(x1: number, y1: number, x2: number, y2: number, color: string, lineW: number, opacity: number = 1) {
     ctx.save();
     ctx.globalAlpha = opacity;
     ctx.strokeStyle = color;
@@ -132,7 +135,7 @@
     ctx.restore();
   }
 
-  function drawCircle(x, y, radius, color, opacity = 1) {
+  function drawCircle(x: number, y: number, radius: number, color: string, opacity: number = 1) {
     ctx.save();
     ctx.globalAlpha = opacity;
     ctx.fillStyle = color;
@@ -150,7 +153,7 @@
     selectedSourceIndices = [];
     const sourceCount = sourceDistributionSamples.length;
     for (let i = 0; i < numPathLines && i < sourceCount; i++) {
-      let idx;
+      let idx: number;
       do {
         idx = Math.floor(Math.random() * sourceCount);
       } while (selectedSourceIndices.includes(idx));
@@ -192,7 +195,7 @@
     }
   }
 
-  function interpDataToPixel(dataX, dataY, tVal, scalesObj) {
+  function interpDataToPixel(dataX: number, dataY: number, tVal: number, scalesObj: Scales) {
     const sourcePixelX =
       scalesObj.sourceCenterPixelX +
       (dataX - scalesObj.sourceMeanX) * scalesObj.xScaleFactor;
@@ -254,7 +257,7 @@
   };
 
   // Track previous time to detect loop
-  let prevTime = 0;
+  let prevTime: number = 0;
 
   function setupTimeline() {
     timeline = new Timeline<AnimationState>();
@@ -313,7 +316,7 @@
     const targetY = scales.yScale(targetPoint[1]);
 
     // Draw path lines
-    selectedSourceIndices.forEach((sourceIdx) => {
+    selectedSourceIndices.forEach((sourceIdx: number) => {
       const sourcePoint = sourceDistributionSamples[sourceIdx];
       const sourceX =
         scales.sourceCenterPixelX +
@@ -353,7 +356,7 @@
     const pixelDy = targetY - interpPixel.y;
     const pixelMag = Math.sqrt(pixelDx * pixelDx + pixelDy * pixelDy);
 
-    let vectorEndX, vectorEndY;
+    let vectorEndX: number | undefined, vectorEndY: number | undefined;
     if (pixelMag > 0.01) {
       // Scale by magnitude (not normalized) with additional scale factor
       vectorEndX = interpPixel.x + pixelDx * vectorScale;

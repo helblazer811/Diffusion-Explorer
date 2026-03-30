@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
+  import type { Writable } from "svelte/store";
   import * as d3 from "d3";
   import { Figure, TimeSlider, drawScatterPlot, Timeline, useCanvas2D, createPauseClip, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -9,49 +11,49 @@
   // ----------------------------------------------------------------
 
   // FlowModelClient instance (passed from parent, created with correct base path)
-  export let flowMatchingClient = null;
+  export let flowMatchingClient: FlowModelClient | null = null;
 
   // Caption slot
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Data
-  export let trajectories = []; // [timestep][sample][dim]
-  export let targetDistribution = [];
+  export let trajectories: number[][][] = []; // [timestep][sample][dim]
+  export let targetDistribution: number[][] = [];
 
   // Layout
-  export let marginWidth = 20;
-  export let marginHeight = 20;
-  export let canvasWidth = 450;
-  export let canvasHeight = 450;
-  export let domainRange = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
+  export let marginWidth: number = 20;
+  export let marginHeight: number = 20;
+  export let canvasWidth: number = 450;
+  export let canvasHeight: number = 450;
+  export let domainRange: { xMin: number; xMax: number; yMin: number; yMax: number } = { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 };
 
   // Target distribution styling
-  export let targetColor = "#3b82f6";
-  export let targetOpacity = 0.35;
-  export let distributionPointRadius = 5;
+  export let targetColor: string = "#3b82f6";
+  export let targetOpacity: number = 0.35;
+  export let distributionPointRadius: number = 5;
 
   // Trajectory styling
-  export let trajectoryColor = settings.stylingSettings.trajectory.color;
-  export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
-  export let trajectoryPointRadius = settings.stylingSettings.trajectory.endpointRadius;
-  export let trajectoryOpacity = settings.stylingSettings.trajectory.opacity;
-  export let trajectoryFullOpacity = settings.stylingSettings.trajectory.fullOpacity;
-  export let showTrajectoryPreview = false;
-  export let alphaTimeWindow = 0.8; // Fraction (0-1) of trajectory visible with fade
-  export let endpointRadius = settings.stylingSettings.trajectory.endpointRadius;
+  export let trajectoryColor: string = settings.stylingSettings.trajectory.color;
+  export let trajectoryStrokeWidth: number = settings.stylingSettings.trajectory.strokeWidth;
+  export let trajectoryPointRadius: number = settings.stylingSettings.trajectory.endpointRadius;
+  export let trajectoryOpacity: number = settings.stylingSettings.trajectory.opacity;
+  export let trajectoryFullOpacity: number = settings.stylingSettings.trajectory.fullOpacity;
+  export let showTrajectoryPreview: boolean = false;
+  export let alphaTimeWindow: number = 0.8; // Fraction (0-1) of trajectory visible with fade
+  export let endpointRadius: number = settings.stylingSettings.trajectory.endpointRadius;
 
   // Animation timing (normalized 0-1, scaled by animationDuration)
-  export let animationDuration = 6000; // Total cycle duration in ms
-  export let timing = {
+  export let animationDuration: number = 6000; // Total cycle duration in ms
+  export let timing: { pauseStart: number } = {
     pauseStart: 0.833,  // Animation runs 0→0.833, pause 0.833→1.0
   };
-  export let playingByDefault = true;
+  export let playingByDefault: boolean = true;
 
   // Interactive sampling
-  export let maxUserTrajectories = settings.interactiveSettings.maxUserTrajectories;
+  export let maxUserTrajectories: number = settings.interactiveSettings.maxUserTrajectories;
 
   // Background
-  export let backgroundVisible = true;
+  export let backgroundVisible: boolean = true;
 
   // ----------------------------------------------------------------
   // State
@@ -66,42 +68,42 @@
   $: msPerSegment = numSegments > 0 ? animationDuration / numSegments : animationDuration;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(canvasWidth, canvasHeight);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
   // Scales
-  let xScale;
-  let yScale;
+  let xScale: d3.ScaleLinear<number, number>;
+  let yScale: d3.ScaleLinear<number, number>;
 
   // Animation state type - extends PathlineAnimationState
   type AnimationState = PathlineAnimationState;
 
   // Animation - Timeline system
-  let currentSegmentIndex = 0;
+  let currentSegmentIndex: number = 0;
   let timeline: Timeline<AnimationState> | null = null;
 
   // PathlineAnimation instance
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Initialization
-  let isInitialized = false;
+  let isInitialized: boolean = false;
 
   // Visibility tracking
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Pre-computed coordinates
-  let scaledTargetDistribution = [];
-  let scaledTrajectories = [];
+  let scaledTargetDistribution: number[][] = [];
+  let scaledTrajectories: number[][][] = [];
 
   // User-defined trajectory state (supports multiple trajectories)
-  let userStartPoints = []; // Array of [x, y] domain coordinates
-  let userTrajectories = []; // Array of trajectories, each is [timestep][x,y] in pixels
-  let hasUserTrajectory = false;
-  let isStreamingTrajectory = false;
-  let activeRequestId = null; // Track active request for cancellation
+  let userStartPoints: number[][] = []; // Array of [x, y] domain coordinates
+  let userTrajectories: number[][][] = []; // Array of trajectories, each is [timestep][x,y] in pixels
+  let hasUserTrajectory: boolean = false;
+  let isStreamingTrajectory: boolean = false;
+  let activeRequestId: string | null = null; // Track active request for cancellation
 
   // ----------------------------------------------------------------
   // Helpers
@@ -124,7 +126,7 @@
   }
 
 
-  function transposeAndScale(traj) {
+  function transposeAndScale(traj: number[][][]) {
     if (!xScale || !yScale || !traj?.length) return [];
     const numSamples = traj[0]?.length || 0;
     return Array.from({ length: numSamples }, (_, i) =>
@@ -248,7 +250,7 @@
   // ----------------------------------------------------------------
 
   // Handle canvas click - convert to domain coordinates and sample
-  function handleCanvasClick(event) {
+  function handleCanvasClick(event: MouseEvent) {
     // Client is passed as prop; check it's available
     if (!flowMatchingClient || !canvas) return;
 
@@ -266,7 +268,7 @@
   }
 
   // Sample trajectories from all user start points using streaming
-  function sampleFromPoint(point) {
+  function sampleFromPoint(point: number[]) {
     // Ensure client is initialized
     if (!flowMatchingClient) return;
 

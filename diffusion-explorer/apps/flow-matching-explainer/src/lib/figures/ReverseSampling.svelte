@@ -2,6 +2,9 @@
   import { onDestroy } from "svelte";
   import { Figure, TimeSlider, drawScatterPlot, drawText, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
+  import type { Writable } from "svelte/store";
+  import type { Snippet } from "svelte";
+  import type * as d3 from "d3";
   import { settings } from "$lib/settings";
   import { base } from "$app/paths";
 
@@ -10,11 +13,11 @@
   // ----------------------------------------------------------------
 
   // FlowModelClient instance (passed from parent or created internally)
-  export let flowMatchingClient = null;
+  export let flowMatchingClient: FlowModelClient | null = null;
 
   // Data props
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
+  export let sourceDistributionSamples: [number, number][] = [];
+  export let targetDistributionSamples: [number, number][] = [];
 
   // Animation
   export let animationDuration = 6000;
@@ -28,10 +31,10 @@
   export let marginHeight = 20;
 
   // Sampling
-  export let numTrajectorySamples = null; // Use settings if not provided
+  export let numTrajectorySamples: number | null = null; // Use settings if not provided
 
   // Caption slot (passed as default children)
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // ----------------------------------------------------------------
   // State
@@ -43,7 +46,7 @@
   $: effectiveNumSamples = numTrajectorySamples ?? settings.samplingSettings.reverseSampling.numSamples;
 
   // Canvas state - using useCanvas2D for DPR handling
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   $: ctx = canvas && canvas2d.ctx;
 
@@ -60,18 +63,25 @@
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Visibility tracking
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // Pre-computed data
-  let scales = null;
-  let transformedTrajectories = []; // [trajectory][timestep][x,y in pixels]
-  let sourcePixelCoords = []; // [point][x,y] in pixel space
-  let targetPixelCoords = []; // [point][x,y] in pixel space
+  let scales: {
+    yScale: d3.ScaleLinear<number, number>;
+    xScaleFactor: number;
+    sourceCenterPixelX: number;
+    targetCenterPixelX: number;
+    sourceMeanX: number;
+    targetMeanX: number;
+  } | null = null;
+  let transformedTrajectories: number[][][] = []; // [trajectory][timestep][x,y in pixels]
+  let sourcePixelCoords: number[][] = []; // [point][x,y] in pixel space
+  let targetPixelCoords: number[][] = []; // [point][x,y] in pixel space
   let combinedMeanX = 0;
 
   // Raw trajectory data (in domain coordinates)
-  let allTimeSamples = null; // [timestep][sample][dim]
+  let allTimeSamples: number[][][] | null = null; // [timestep][sample][dim]
 
   // Derived values
   $: numTimeSteps = allTimeSamples?.length || 1;
@@ -82,7 +92,7 @@
   // ----------------------------------------------------------------
 
   // Helper to get random subset of indices
-  function getRandomSubsetIndices(totalLength, subsetSize) {
+  function getRandomSubsetIndices(totalLength: number, subsetSize: number): number[] {
     const indices = Array.from({ length: totalLength }, (_, i) => i);
     // Shuffle using Fisher-Yates
     for (let i = indices.length - 1; i > 0; i--) {
@@ -94,12 +104,12 @@
 
   // Compute pixel X for a given data point at time t
   // For reverse sampling, t=0 means at target (right), t=1 means at source (left)
-  function getPixelX(dataX, meanX, t) {
+  function getPixelX(dataX: number, meanX: number, t: number): number {
     // Reverse direction: t=0 -> target (right), t=1 -> source (left)
     const centerPixelX =
-      scales.targetCenterPixelX +
-      t * (scales.sourceCenterPixelX - scales.targetCenterPixelX);
-    return centerPixelX + (dataX - meanX) * scales.xScaleFactor;
+      scales!.targetCenterPixelX +
+      t * (scales!.sourceCenterPixelX - scales!.targetCenterPixelX);
+    return centerPixelX + (dataX - meanX) * scales!.xScaleFactor;
   }
 
   // Pre-compute all trajectory pixel coordinates
@@ -114,11 +124,11 @@
 
     const numSamples = allTimeSamples[0]?.length || 0;
     transformedTrajectories = Array.from({ length: numSamples }, (_, sampleIdx) => {
-      return allTimeSamples.map((timestep, tIdx) => {
+      return allTimeSamples!.map((timestep, tIdx) => {
         const point = timestep[sampleIdx];
-        const t = tIdx / (allTimeSamples.length - 1);
+        const t = tIdx / (allTimeSamples!.length - 1);
         const pixelX = getPixelX(point[0], combinedMeanX, t);
-        const pixelY = scales.yScale(point[1]);
+        const pixelY = scales!.yScale(point[1]);
         return [pixelX, pixelY];
       });
     });
@@ -130,23 +140,23 @@
 
     sourcePixelCoords = sourceDistributionSamples.map((point) => {
       const pixelX =
-        scales.sourceCenterPixelX +
-        (point[0] - scales.sourceMeanX) * scales.xScaleFactor;
-      const pixelY = scales.yScale(point[1]);
+        scales!.sourceCenterPixelX +
+        (point[0] - scales!.sourceMeanX) * scales!.xScaleFactor;
+      const pixelY = scales!.yScale(point[1]);
       return [pixelX, pixelY];
     });
 
     targetPixelCoords = targetDistributionSamples.map((point) => {
       const pixelX =
-        scales.targetCenterPixelX +
-        (point[0] - scales.targetMeanX) * scales.xScaleFactor;
-      const pixelY = scales.yScale(point[1]);
+        scales!.targetCenterPixelX +
+        (point[0] - scales!.targetMeanX) * scales!.xScaleFactor;
+      const pixelY = scales!.yScale(point[1]);
       return [pixelX, pixelY];
     });
   }
 
   // Download data as JSON for caching
-  function downloadAsJson(data, filename) {
+  function downloadAsJson(data: unknown, filename: string): void {
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -333,8 +343,8 @@
     const labelFontSize = settings.stylingSettings.label.fontSize;
     const labelFontWeight = settings.stylingSettings.label.fontWeight;
     const labelFont = `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`;
-    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
-    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
+    drawText(ctx, "Source Distribution", scales!.sourceCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
+    drawText(ctx, "Target Distribution", scales!.targetCenterPixelX, marginHeight / 2, { color: labelColor, font: labelFont });
 
     // --- Dynamic Foreground ---
     pathlineAnimation.draw(state);

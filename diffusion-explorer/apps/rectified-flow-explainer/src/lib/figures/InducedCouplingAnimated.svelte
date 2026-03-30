@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
+  import type { Writable } from "svelte/store";
+  import type { FlowModelClient } from "@diffusion-explorer/diffusion";
   import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler, PathlineAnimation, type PathlineAnimationState } from "@diffusion-explorer/ui";
   import { clipTrajectoriesToStartingRadius } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
@@ -9,20 +11,32 @@
   // ----------------------------------------------------------------
 
   // Ground truth target distribution (displayed on right side along with generated endpoints)
-  export let targetDistribution = null;
+  export let targetDistribution: number[][] | null = null;
 
   // Flow matching client for trajectory generation
-  export let flowMatchingClient = null;
-  export let numSteps = 200;
+  export let flowMatchingClient: FlowModelClient | null = null;
+  export let numSteps: number = 200;
 
   // Animation parameters
-  export let numPoints = 80;  // Number of source points to flow
-  export let numLinesToDraw = 80;
-  export let numTrajectoriesToShow = 20;
+  export let numPoints: number = 80;  // Number of source points to flow
+  export let numLinesToDraw: number = 80;
+  export let numTrajectoriesToShow: number = 20;
 
   // Animation timing (normalized 0-1, scaled by animationDuration)
-  export let animationDuration = 12000; // Total animation duration in ms
-  export let timing = {
+  export let animationDuration: number = 12000; // Total animation duration in ms
+  export let timing: {
+    phase1Start: number;
+    phase1CouplingLinesEnd: number;
+    phase1FadeStart: number;
+    phase1FadeEnd: number;
+    phase1End: number;
+    phase2Start: number;
+    phase2TrajectoryEnd: number;
+    phase2End: number;
+    phase3Start: number;
+    phase3CouplingEnd: number;
+    phase3End: number;
+  } = {
     // Phase 1: Independent Coupling
     phase1Start: 0,
     phase1CouplingLinesEnd: 0.12,    // Lines animate from 0 to here
@@ -42,16 +56,16 @@
   };
 
   // Layout props
-  export let width = 750;
-  export let height = 375;
-  export let marginWidth = 50;
-  export let marginTop = 20;
+  export let width: number = 750;
+  export let height: number = 375;
+  export let marginWidth: number = 50;
+  export let marginTop: number = 20;
 
   // Toggle button labels
   const stateLabels = ["1. Independent Coupling", "2. Simulate the Flow", "3. Induced Coupling"];
 
   // Caption slot
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // ----------------------------------------------------------------
   // State
@@ -70,7 +84,7 @@
   const SOURCE_RADIUS_THRESHOLD = 2.5;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
@@ -84,18 +98,18 @@
   };
 
   // Pre-computed data
-  let scales = null;
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];  // Combined: ground truth + generated endpoints
-  let generatedEndpointPixelCoords = [];  // Just the generated endpoints (for induced coupling)
-  let shuffledTargetIndices = [];  // For naive coupling (random pairings into full target pool)
-  let transformedTrajectories = [];
-  let combinedMeanX = 0;
-  let numTimeSteps = 1;
+  let scales: ReturnType<typeof createSourceTargetScales> | null = null;
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];  // Combined: ground truth + generated endpoints
+  let generatedEndpointPixelCoords: number[][] = [];  // Just the generated endpoints (for induced coupling)
+  let shuffledTargetIndices: number[] = [];  // For naive coupling (random pairings into full target pool)
+  let transformedTrajectories: number[][][] = [];
+  let combinedMeanX: number = 0;
+  let numTimeSteps: number = 1;
 
   // Generated trajectories from forward flow
-  let generatedTrajectories = null;
-  let isGeneratingTrajectories = false;
+  let generatedTrajectories: number[][][] | null = null;
+  let isGeneratingTrajectories: boolean = false;
 
   // Playback control
   let timeline: Timeline<AnimationState> | null = null;
@@ -109,9 +123,9 @@
   };
 
   // Visibility tracking
-  let figureIsActive;
+  let figureIsActive: Writable<boolean> | undefined;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
-  let initialized = false;
+  let initialized: boolean = false;
 
   // State index for toggle button (derived from animation state)
   $: stateIndex = currentState.stateIndex;
@@ -120,7 +134,7 @@
   // Helpers
   // ----------------------------------------------------------------
 
-  function shuffleArray(array) {
+  function shuffleArray<T>(array: T[]): T[] {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [array[i], array[j]] = [array[j], array[i]];
@@ -128,7 +142,7 @@
     return array;
   }
 
-  function getPixelX(dataX, meanX, t) {
+  function getPixelX(dataX: number, meanX: number, t: number): number {
     const centerPixelX =
       scales.sourceCenterPixelX +
       t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
@@ -269,7 +283,7 @@
   // ----------------------------------------------------------------
 
   // Cached values for clip closures
-  let cachedNumSegments = 0;
+  let cachedNumSegments: number = 0;
 
   async function setupTimeline() {
     // Create PathlineAnimation for trajectory phase
@@ -430,7 +444,7 @@
     drawText(ctx, "Target Distribution", scales.targetCenterPixelX, labelY, { color: labelColor, font: labelFont, opacity: labelOpacity });
   }
 
-  function drawNaiveCouplingLines(progress = 1, opacity = couplingLineOpacity) {
+  function drawNaiveCouplingLines(progress: number = 1, opacity: number = couplingLineOpacity): void {
     // Guard against empty arrays
     if (!sourcePixelCoords.length || !targetPixelCoords.length || !shuffledTargetIndices.length) {
       return;
@@ -465,7 +479,7 @@
     pathlineAnimation.draw(state);
   }
 
-  function drawInducedCouplingLines(progress = 1) {
+  function drawInducedCouplingLines(progress: number = 1): void {
     // Guard against empty arrays
     if (!sourcePixelCoords.length || !generatedEndpointPixelCoords.length) {
       return;
