@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
   import { generateClippedGaussianSamples } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
@@ -9,8 +9,8 @@
   import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
   import { Katex } from "@diffusion-explorer/ui";
   // Distribution samples
-  let sourceDistributionSamples = [];
-  let targetDistributionSamples = [];
+  let sourceDistributionSamples: number[][] = [];
+  let targetDistributionSamples: number[][] = [];
 
   // Generate source distribution (Gaussian)
   sourceDistributionSamples = generateClippedGaussianSamples(300);
@@ -28,10 +28,10 @@
         );
         return;
       }
-      const data = await response.json();
+      const data: { points?: number[][] } = await response.json();
       // Data is nested under 'points' property
-      targetDistributionSamples = data.points || data;
-    } catch (error) {
+      targetDistributionSamples = data.points || (data as unknown as number[][]);
+    } catch (error: unknown) {
       console.error("Error loading target distribution:", error);
     }
   }

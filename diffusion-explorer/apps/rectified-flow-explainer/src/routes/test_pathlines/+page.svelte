@@ -6,6 +6,7 @@
   import * as sample from "$lib/flow_matching/sample";
   import * as train from "$lib/flow_matching/train";
   import { FlowModelClient, downloadJSON, generateUniformGridSamples } from "@diffusion-explorer/diffusion";
+  import type { Writable } from "svelte/store";
 
   // ===== DATA =====
   let leftTrajectories: number[][][] = []; // [timestep][sample][dim]
@@ -64,37 +65,37 @@
   // ===== STATE =====
 
   // Canvas
-  let leftCanvas;
-  let rightCanvas;
-  let leftCtx;
-  let rightCtx;
+  let leftCanvas: HTMLCanvasElement | undefined;
+  let rightCanvas: HTMLCanvasElement | undefined;
+  let leftCtx: CanvasRenderingContext2D | null = null;
+  let rightCtx: CanvasRenderingContext2D | null = null;
   let dpr = 1;
 
   // Scales
-  let xScale;
-  let yScale;
+  let xScale: d3.ScaleLinear<number, number> | null = null;
+  let yScale: d3.ScaleLinear<number, number> | null = null;
 
   // Animation
   let time = 0;
   let currentSegmentIndex = 0;
   let segmentAccumulator = 0;
   let isPlaying = playingByDefault;
-  let animationFrameId = null;
-  let lastTimestamp = null;
+  let animationFrameId: number | null = null;
+  let lastTimestamp: number | null = null;
   let isPaused = false;
-  let pauseStartTime = null;
+  let pauseStartTime: number | null = null;
 
   // Initialization
   let isInitialized = false;
   let pathsInitialized = false;
 
   // Pre-computed pixel coordinates
-  let scaledTargetDistribution = [];
-  let scaledLeftTrajectories = [];
-  let scaledRightTrajectories = [];
+  let scaledTargetDistribution: number[][] = [];
+  let scaledLeftTrajectories: number[][][] = [];
+  let scaledRightTrajectories: number[][][] = [];
 
   // Visibility
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   let wasPlayingBeforeHidden = false;
 
   // ===== FUNCTIONS =====
@@ -122,13 +123,13 @@
       leftCanvas.width = canvasWidth * dpr;
       leftCanvas.height = canvasHeight * dpr;
       leftCtx = leftCanvas.getContext("2d");
-      leftCtx.scale(dpr, dpr);
+      if (leftCtx) leftCtx.scale(dpr, dpr);
     }
     if (rightCanvas) {
       rightCanvas.width = canvasWidth * dpr;
       rightCanvas.height = canvasHeight * dpr;
       rightCtx = rightCanvas.getContext("2d");
-      rightCtx.scale(dpr, dpr);
+      if (rightCtx) rightCtx.scale(dpr, dpr);
     }
   }
 
@@ -210,7 +211,7 @@
     draw(rightCtx, scaledRightTrajectories, currentSegmentIndex);
   }
 
-  function animate(ts) {
+  function animate(ts: number) {
     if (!isPlaying) {
       animationFrameId = null;
       return;
@@ -283,7 +284,7 @@
     updateVisualization();
   }
 
-  function handleVisibilityChange(isActive) {
+  function handleVisibilityChange(isActive: boolean) {
     if (!isActive && isPlaying) {
       wasPlayingBeforeHidden = true;
       isPlaying = false;

@@ -2,6 +2,8 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
+  import type { Snippet } from "svelte";
+  import type { Writable } from "svelte/store";
   import * as d3 from "d3";
   import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
 
@@ -10,12 +12,12 @@
   // ----------------------------------------------------------------
 
   // Caption slot (passed as default children)
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Data props (from parent +page.svelte)
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
-  export let allTimeSamples;
+  export let sourceDistributionSamples: [number, number][] = [];
+  export let targetDistributionSamples: [number, number][] = [];
+  export let allTimeSamples: Writable<number[][][]>;
 
   // Props/Configuration
   export let width = 800;
@@ -73,17 +75,19 @@
   // State
   // ----------------------------------------------------------------
 
+  type Scales = ReturnType<typeof createSourceTargetScales>;
+
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
   $: caption = children;
 
   // Scales and pre-computed coordinates
-  let scales = null;
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];
+  let scales: Scales | null = null;
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
 
   // Animation state type
   type AnimationState = {
@@ -99,7 +103,7 @@
   let cachedNumSteps = 1;
 
   // Visibility-based animation control
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   let wasPlayingBeforeHidden = false;
   let isInitialized = false;
 
@@ -114,7 +118,7 @@
    * Compute pixel x position for a point at a given time
    * At t=0, centered at source; at t=1, centered at target
    */
-  function getPixelX(dataX, dataMeanX, t) {
+  function getPixelX(dataX: number, dataMeanX: number, t: number): number {
     if (!scales) return 0;
     const centerPixelX =
       scales.sourceCenterPixelX +
@@ -125,13 +129,13 @@
   function precomputeScatterCoords() {
     if (!scales) return;
 
-    sourcePixelCoords = sourceDistributionSamples.map((p) => [
+    sourcePixelCoords = sourceDistributionSamples.map((p: [number, number]) => [
       scales.sourceCenterPixelX +
         (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
 
-    targetPixelCoords = targetDistributionSamples.map((p) => [
+    targetPixelCoords = targetDistributionSamples.map((p: [number, number]) => [
       scales.targetCenterPixelX +
         (p[0] - scales.targetMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
@@ -272,13 +276,13 @@
     if (allSamples && allSamples.length > 0) {
       const samples = allSamples[state.currentStep];
       if (samples && samples.length > 0) {
-        const meanX = samples.reduce((s, p) => s + p[0], 0) / samples.length;
+        const meanX = samples.reduce((s: number, p: number[]) => s + p[0], 0) / samples.length;
 
         // Draw contours for P_t (behind scatter points)
         if (showContours) {
           // Create scale functions for contour plotting
-          const xScaleForContour = (dataX) => getPixelX(dataX, meanX, t);
-          const yScaleForContour = (dataY) => scales.yScale(dataY);
+          const xScaleForContour = (dataX: number) => getPixelX(dataX, meanX, t);
+          const yScaleForContour = (dataY: number) => scales!.yScale(dataY);
 
           // Compute and plot contours
           const contourData = computeContours(samples, {
@@ -299,7 +303,7 @@
 
         // Draw intermediate scatter
         if (showIntermediateScatter) {
-          const coords = samples.map((p) => [
+          const coords = samples.map((p: number[]) => [
             getPixelX(p[0], meanX, t),
             scales.yScale(p[1]),
           ]);
@@ -346,7 +350,7 @@
   // Event Handlers
   // ----------------------------------------------------------------
 
-  function handleVisibilityChange(isActive) {
+  function handleVisibilityChange(isActive: boolean) {
     if (!timeline) return;
     if (!isActive && timeline.isPlaying) {
       wasPlayingBeforeHidden = true;
