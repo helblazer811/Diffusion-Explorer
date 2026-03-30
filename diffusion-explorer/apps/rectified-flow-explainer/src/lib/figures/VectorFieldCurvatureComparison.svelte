@@ -2,17 +2,19 @@
 
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import type { Snippet } from 'svelte';
+  import type { Writable } from 'svelte/store';
   import * as d3 from 'd3';
   import { DoubleFigure, TimeSlider, drawVectorField, Timeline, useCanvas2D, useVisibilityHandler } from '@diffusion-explorer/ui';
-  import { settings } from '$lib/settings';
+  import { settings, type VectorFieldData } from '$lib/settings';
 
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
   // Data
-  export let flowMatchingVectorField = null;
-  export let rectifiedFlowVectorField = null;
+  export let flowMatchingVectorField: VectorFieldData | null = null;
+  export let rectifiedFlowVectorField: VectorFieldData | null = null;
 
   // Layout
   export let canvasWidth = 400;
@@ -44,7 +46,7 @@
 
   // Callbacks & misc
   export let backgroundVisible = true;
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // ----------------------------------------------------------------
   // State
@@ -56,8 +58,8 @@
     rectifiedFlowVectorField?.velocities?.length > 0;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let leftCanvas = null;
-  let rightCanvas = null;
+  let leftCanvas: HTMLCanvasElement | null = null;
+  let rightCanvas: HTMLCanvasElement | null = null;
   const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
   const rightCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
   // Tie ctx reactivity to canvas variables so it updates when action runs
@@ -70,12 +72,13 @@
   };
 
   // Scales
-  let leftScales = null;
-  let rightScales = null;
+  type Scales = { xScale: d3.ScaleLinear<number, number>; yScale: d3.ScaleLinear<number, number> };
+  let leftScales: Scales | null = null;
+  let rightScales: Scales | null = null;
 
   // Pre-calculated grid positions (pixel coords)
-  let leftGridPositions = [];
-  let rightGridPositions = [];
+  let leftGridPositions: number[][] = [];
+  let rightGridPositions: number[][] = [];
 
   // Animation - Timeline system
   let timeline: Timeline<AnimationState> | null = null;
@@ -84,14 +87,14 @@
   let isInitialized = false;
 
   // Visibility
-  let figureIsActive;
+  let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
 
-  function initializeScales(vectorFieldData) {
+  function initializeScales(vectorFieldData: VectorFieldData | null): Scales | null {
     if (!vectorFieldData) return null;
 
     const { xMin, xMax, yMin, yMax } = vectorFieldData.domainRange;
@@ -107,7 +110,7 @@
     return { xScale, yScale };
   }
 
-  function calculateGridPositions(vectorFieldData, scales) {
+  function calculateGridPositions(vectorFieldData: VectorFieldData | null, scales: Scales | null): number[][] {
     if (!vectorFieldData?.gridPoints || !scales) return [];
 
     return vectorFieldData.gridPoints.map(point => [

@@ -1,20 +1,21 @@
 <!-- The goal here is to visualize a naive independent coupling (X_0, X_1) such that X_0 \sim \pi_0 and X_1 \sim \pi_1 which are independently distributed. -->
 
-<script>
+<script lang="ts">
   import * as d3 from 'd3';
   import { Figure, plotSourceTargetLabels, plotSourceTargetScatter, createSourceTargetScales, dataToPixelX } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
+  import type { Snippet } from 'svelte';
 
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
   // Caption slot (passed as default children)
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Data props (from parent)
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
+  export let sourceDistributionSamples: [number, number][] = [];
+  export let targetDistributionSamples: [number, number][] = [];
 
   // Layout
   export const height = 450;
@@ -53,7 +54,7 @@
   export const hoverPointOpacity = 0.9;
 
   // Background visibility
-  export let backgroundVisible = true;
+  export let backgroundVisible: boolean = true;
 
   // ----------------------------------------------------------------
   // State
@@ -61,15 +62,15 @@
 
   $: caption = children;
 
-  let svgElement;
-  let scales = null;
-  let isInitialized = false;
+  let svgElement: SVGSVGElement | undefined;
+  let scales: ReturnType<typeof createSourceTargetScales> | null = null;
+  let isInitialized: boolean = false;
 
   // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
 
-  function addHoverAttributes(svg) {
+  function addHoverAttributes(svg: d3.Selection<SVGSVGElement, unknown, null, undefined>): void {
     // Add hover-related attributes to scatter circles
     svg.select('#sourceScatter').selectAll('circle')
       .attr('data-index', (d, i) => i)
@@ -86,7 +87,7 @@
   // Setup
   // ----------------------------------------------------------------
 
-  function runInitialComputation() {
+  function runInitialComputation(): void {
     if (!svgElement) return;
     if (sourceDistributionSamples.length === 0 || targetDistributionSamples.length === 0) return;
 
@@ -125,7 +126,7 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  function plotLabels() {
+  function plotLabels(): void {
     if (!svgElement || !scales) return;
 
     const svg = d3.select(svgElement);
@@ -141,7 +142,7 @@
     });
   }
 
-  function plotCoupling(sourcePoints, targetPoints) {
+  function plotCoupling(sourcePoints: [number, number][], targetPoints: [number, number][]): { couplingData: { source: [number, number]; target: [number, number]; isSourcePoint: boolean }[]; shuffledTargets: [number, number][]; shuffledSourceIndices: number[] } {
     if (!svgElement || !scales) return { couplingData: [], shuffledTargets: [], shuffledSourceIndices: [] };
 
     const svg = d3.select(svgElement);
@@ -241,7 +242,7 @@
   // Event Handlers
   // ----------------------------------------------------------------
 
-  function setupPointHoverHandlers(targetPoints, shuffledTargets, shuffledSourceIndices) {
+  function setupPointHoverHandlers(targetPoints: [number, number][], shuffledTargets: [number, number][], shuffledSourceIndices: number[]): void {
     if (!svgElement) return;
 
     const svg = d3.select(svgElement);

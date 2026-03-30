@@ -1,71 +1,73 @@
-<script>
+<script lang="ts">
   import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, mathjaxInitialized } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
+  import type { Snippet } from "svelte";
+  import type { ScaleLinear } from "d3-scale";
 
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
   // Caption
-  export let children = undefined;
+  export let children: Snippet | undefined = undefined;
 
   // Data props
-  export let sourceDistributionSamples = [];
-  export let targetDistributionSamples = [];
+  export let sourceDistributionSamples: [number, number][] = [];
+  export let targetDistributionSamples: [number, number][] = [];
 
   // Layout props
-  export let width = 800;
-  export let height = 450;
-  export let marginWidth = 50;
-  export let marginHeight = 20;
-  export let sourceCenterX = settings.stylingSettings.layout.sourceCenterX;
-  export let targetCenterX = settings.stylingSettings.layout.targetCenterX;
-  export let yShiftFactor = -0.2;
+  export let width: number = 800;
+  export let height: number = 450;
+  export let marginWidth: number = 50;
+  export let marginHeight: number = 20;
+  export let sourceCenterX: number = settings.stylingSettings.layout.sourceCenterX;
+  export let targetCenterX: number = settings.stylingSettings.layout.targetCenterX;
+  export let yShiftFactor: number = -0.2;
 
   // Scatter plot styling
-  export let pointRadius = settings.stylingSettings.scatterPlot.radius;
-  export let pointOpacity = settings.stylingSettings.scatterPlot.opacity;
-  export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
-  export let targetPointColor = settings.stylingSettings.scatterPlot.color;
+  export let pointRadius: number = settings.stylingSettings.scatterPlot.radius;
+  export let pointOpacity: number = settings.stylingSettings.scatterPlot.opacity;
+  export let sourcePointColor: string = settings.stylingSettings.scatterPlot.color;
+  export let targetPointColor: string = settings.stylingSettings.scatterPlot.color;
 
   // Path line styling (between x_0 and x_1)
-  export let lineColor = "#888";
-  export let lineOpacity = 0.25;
-  export let lineWidth = 3;
+  export let lineColor: string = "#888";
+  export let lineOpacity: number = 0.25;
+  export let lineWidth: number = 3;
 
   // Selected point styling (x_0 and x_1)
-  export let selectedPointColor = "#888";
-  export let selectedPointRadius = 5;
+  export let selectedPointColor: string = "#888";
+  export let selectedPointRadius: number = 5;
 
   // Intermediate point styling
-  export let intermediatePointColor = "#f17720";
-  export let intermediatePointRadius = 6;
+  export let intermediatePointColor: string = "#f17720";
+  export let intermediatePointRadius: number = 6;
 
   // Conditional vector styling (v_t)
-  export let vectorColor = "#f17720";
-  export let vectorOpacity = 1.0;
-  export let vectorWidth = 2.5;
-  export let vectorScale = 150;
-  export let t = 0.3;
+  export let vectorColor: string = "#f17720";
+  export let vectorOpacity: number = 1.0;
+  export let vectorWidth: number = 2.5;
+  export let vectorScale: number = 150;
+  export let t: number = 0.3;
 
   // Noisy vector styling (v_t^\theta)
-  export let noisyVectorColor = "#22c55e";
-  export let noiseVector = [15, -90]; // [dx, dy] in pixels
+  export let noisyVectorColor: string = "#22c55e";
+  export let noiseVector: [number, number] = [15, -90]; // [dx, dy] in pixels
 
   // Dashed line styling
-  export let dashedLineColor = "#ef4444";
-  export let dashedLineWidth = 2;
+  export let dashedLineColor: string = "#ef4444";
+  export let dashedLineWidth: number = 2;
 
   // Background
-  export let backgroundVisible = true;
+  export let backgroundVisible: boolean = true;
 
   // LaTeX label styling
-  export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
-  export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
+  export let latexLabelOffsetY: number = settings.stylingSettings.figureLatex.latexLabelOffsetY;
+  export let latexFontSize: number = settings.stylingSettings.figureLatex.fontSize;
 
   // Fixed point positions (pixel coords)
-  export let x0Pixel = { x: 180, y: 170 };
-  export let x1Pixel = { x: 540, y: 130 };
+  export let x0Pixel: { x: number; y: number } = { x: 180, y: 170 };
+  export let x1Pixel: { x: number; y: number } = { x: 540, y: 130 };
 
   // ----------------------------------------------------------------
   // State
@@ -74,17 +76,24 @@
   $: caption = children;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
-  let canvas = null;
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
   // Tie ctx reactivity to canvas variable so it updates when action runs
   $: ctx = canvas && canvas2d.ctx;
 
-  let scales = null;
-  let isInitialized = false;
+  let scales: {
+    yScale: ScaleLinear<number, number>;
+    xScaleFactor: number;
+    sourceCenterPixelX: number;
+    targetCenterPixelX: number;
+    sourceMeanX: number;
+    targetMeanX: number;
+  } | null = null;
+  let isInitialized: boolean = false;
 
   // Pre-computed pixel coordinates
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
 
   // ----------------------------------------------------------------
   // Helpers
@@ -93,7 +102,7 @@
   function precomputeScatterCoords() {
     if (!scales) return;
 
-    sourcePixelCoords = sourceDistributionSamples.map((point) => {
+    sourcePixelCoords = sourceDistributionSamples.map((point: [number, number]) => {
       const pixelX =
         scales.sourceCenterPixelX +
         (point[0] - scales.sourceMeanX) * scales.xScaleFactor;
@@ -101,7 +110,7 @@
       return [pixelX, pixelY];
     });
 
-    targetPixelCoords = targetDistributionSamples.map((point) => {
+    targetPixelCoords = targetDistributionSamples.map((point: [number, number]) => {
       const pixelX =
         scales.targetCenterPixelX +
         (point[0] - scales.targetMeanX) * scales.xScaleFactor;
