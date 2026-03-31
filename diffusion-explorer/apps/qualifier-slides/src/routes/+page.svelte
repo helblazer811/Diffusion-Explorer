@@ -157,7 +157,7 @@
       const targetRes = await fetch(`${base}/${settings.rf.targetDistributionPath}`);
       if (targetRes.ok) {
         const data = await targetRes.json();
-        const samples = data.points?.slice(0, 150) || [];
+        const samples = data.points?.slice(0, 500) || [];
         targetDistributionSamples.set(samples);
       }
     } catch (e) { console.warn('Failed to load RF target distribution:', e); }
@@ -353,9 +353,11 @@
       <div class="figure-container" style="margin-top: -20px;">
         <NormalizingFlowStages bind:this={normFlowFigure} width={1720} height={580} numStages={4} />
       </div>
-      <p class="bottom-reference">
-        Rezende, D. &amp; Mohamed, S. (2015). Variational Inference with Normalizing Flows. <em>Proceedings of the 32nd International Conference on Machine Learning</em>, in <em>Proceedings of Machine Learning Research</em> 37:1530-1538.
-      </p>
+      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
+        <p style="font-size: 0.7em; color: #888; margin: 0;">
+          Rezende, D. &amp; Mohamed, S. (2015). Variational Inference with Normalizing Flows. <em>Proceedings of the 32nd International Conference on Machine Learning</em>, in <em>Proceedings of Machine Learning Research</em> 37:1530-1538.
+        </p>
+      </div>
     </Slide>
 
     <!-- Slide 8: Change of Variables Formula -->
@@ -432,6 +434,54 @@
     <!-- Slide: Continuous Normalizing Flows -->
     <section>
       <h2 class="slide-title">Continuous Normalizing Flows</h2>
+      <p style="margin-top: 0.3em;">
+        CNFs replace discrete transformations with a continuous-time ODE modeled by a neural network.
+      </p>
+      <div class="figure-container" style="margin-top: 0.5em;">
+        {#if dataLoaded}
+          <ProbabilityPath
+            width={1800}
+            height={700}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            {allTimeSamples}
+            {isTraining}
+            playingByDefault={true}
+            backgroundVisible={false}
+            showContours={true}
+            distributionScaleFactor={0.7}
+            showTimeSlider={false}
+            labelFontSize={50}
+            latexFontSize={43}
+          />
+        {/if}
+      </div>
+      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
+        <p style="font-size: 0.7em; color: #888; margin: 0;">
+          Chen et al., <span style="font-style: italic;">Neural Ordinary Differential Equations</span>, 2019
+        </p>
+      </div>
+    </section>
+
+    <!-- Slide: Likelihood Based Training is Expensive -->
+    <section>
+      <h2 class="slide-title">Likelihood Based Training is Expensive</h2>
+      <p style="margin-top: 1em;">
+        The continuous analog of the change of variables formula (the <strong>instantaneous change of variables</strong>) requires:
+      </p>
+      <div style="margin-top: 0.5em;">
+        <Katex math={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_t}{\\partial x}\\right) \\, dt"} displayMode={true} />
+      </div>
+      <div style="display: flex; justify-content: center; margin-top: 1em;">
+        <div style="background: rgba(231, 76, 60, 0.1); border: 2px solid #e74c3c; border-radius: 12px; padding: 0.8em 2em; text-align: center;">
+          <p style="margin: 0; color: #e74c3c; font-weight: bold; font-size: 1.05em;">
+            Requires solving an ODE at <em>every training step</em>
+          </p>
+        </div>
+      </div>
+      <aside class="notes">
+        Key motivation for flow matching: CNFs are expressive but training via maximum likelihood is expensive because of the trace computation and ODE simulation at every step. Flow matching avoids both.
+      </aside>
     </section>
 
     <!-- Slide: Flows and velocity fields -->
