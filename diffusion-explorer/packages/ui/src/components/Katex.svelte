@@ -2,12 +2,13 @@
 	import katex from "katex";
 	export let math;
 	export let displayMode = false;
-	export let displayFontSize = "1.3em";
+	export let displayFontSize = "1.5em";
 	export let color = null;
 
 	const options = {
 		displayMode: displayMode,
-		throwOnError: true
+		throwOnError: true,
+		trust: true
 	}
 
 	$: katexString = katex.renderToString(math, options);
@@ -25,3 +26,23 @@
 {:else}
 	<span style={colorStyle}>{@html katexString}</span>
 {/if}
+
+<style>
+	.katex-display-wrapper {
+		display: block;
+		width: 100%;
+		max-width: 100%;
+	}
+
+	@media (max-width: 600px) {
+		.katex-display-wrapper {
+			font-size: 1.2em !important;
+		}
+	}
+
+	@media (max-width: 400px) {
+		.katex-display-wrapper {
+			font-size: 1em !important;
+		}
+	}
+</style>
