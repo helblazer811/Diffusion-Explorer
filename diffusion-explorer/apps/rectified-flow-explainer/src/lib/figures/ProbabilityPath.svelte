@@ -64,6 +64,9 @@
   // Background visibility
   export let backgroundVisible = true;
 
+  // Time slider visibility
+  export let showTimeSlider = true;
+
   // Visibility controls for scatter plots
   export let showSourceScatter = true;
   export let showTargetScatter = true;
@@ -570,7 +573,9 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider {timeline} color="#f17720" />
+      {#if showTimeSlider}
+        <TimeSlider {timeline} color="#f17720" />
+      {/if}
     </div>
   {/snippet}
 </Figure>
