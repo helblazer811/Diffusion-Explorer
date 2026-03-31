@@ -403,17 +403,35 @@
       </div>
     </Slide>
 
-    <!-- Slide: Limitations of Normalizing Flows -->
+    <!-- Slide: Jacobian Determinants Are Expensive -->
     <section>
-      <h2 class="slide-title">Limitations of Normalizing Flows</h2>
-      <ol style="margin-top: 1.5em;">
-        <li>Architectural constraints for tractable Jacobians.
-          <br/><span style="color: #777;">Restricted to coupling layers and autoregressive transforms, limiting expressivity per layer.</span></li>
-        <li style="margin-top: 0.8em;">Expressivity requires depth.
-          <br/><span style="color: #777;">Many layers needed with alternating splits, making models parameter-heavy and hard to optimize.</span></li>
-        <li style="margin-top: 0.8em;">No free-form density paths.
-          <br/><span style="color: #777;">Fixed composition of layers with no continuous trajectory through density space.</span></li>
-      </ol>
+      <h2 class="slide-title">Jacobian Determinants Are Expensive</h2>
+      <p style="margin-top: 1em;">
+        The forward log-probability under a normalizing flow requires computing:
+      </p>
+      <div style="margin-top: 0.5em;">
+        <Katex math={"\\log p(x) = \\log p(z_0) + \\sum_{i=1}^{K} \\log \\left| \\htmlClass{det-highlight}{\\det \\dfrac{\\partial f_i}{\\partial z_{i-1}}} \\right|"} displayMode={true} />
+      </div>
+      <div style="display: flex; justify-content: center; margin-top: 1em;">
+        <div style="background: rgba(231, 76, 60, 0.1); border: 2px solid #e74c3c; border-radius: 12px; padding: 0.8em 2em; text-align: center;">
+          <p style="margin: 0; color: #e74c3c; font-weight: bold; font-size: 1.05em;">
+            The log-determinant of the Jacobian is <Katex math={"O(d^3)"} /> in general.
+          </p>
+        </div>
+      </div>
+      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
+        <p style="font-size: 0.7em; color: #888; margin: 0;">
+          <strong>Examples of tractable designs:</strong> Planar flows <span style="font-style: italic;">(Rezende &amp; Mohamed, 2015)</span>,
+          NICE <span style="font-style: italic;">(Dinh et al., 2014)</span>,
+          Real NVP <span style="font-style: italic;">(Dinh et al., 2017)</span>,
+          Glow <span style="font-style: italic;">(Kingma &amp; Dhariwal, 2018)</span>
+        </p>
+      </div>
+    </section>
+
+    <!-- Slide: Continuous Normalizing Flows -->
+    <section>
+      <h2 class="slide-title">Continuous Normalizing Flows</h2>
     </section>
 
     <!-- Slide: Flows and velocity fields -->
@@ -844,6 +862,15 @@
 </div>
 
 <style>
+  :global(.det-highlight) {
+    background: rgba(231, 76, 60, 0.1);
+    border: 2px solid #e74c3c;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: inline-block;
+    overflow: visible;
+  }
+
   .reveal {
     height: 100vh;
     width: 100vw;
