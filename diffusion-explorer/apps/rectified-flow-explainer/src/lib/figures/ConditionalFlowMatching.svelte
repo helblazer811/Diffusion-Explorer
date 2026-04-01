@@ -23,6 +23,7 @@
   export let sourceCenterX: number = settings.stylingSettings.layout.sourceCenterX;
   export let targetCenterX: number = settings.stylingSettings.layout.targetCenterX;
   export let yShiftFactor: number = -0.2;
+  export let distributionScaleFactor: number = 0.8;
 
   // Scatter plot styling
   export let pointRadius: number = settings.stylingSettings.scatterPlot.radius;
@@ -64,6 +65,8 @@
   // LaTeX label styling
   export let latexLabelOffsetY: number = settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize: number = settings.stylingSettings.figureLatex.fontSize;
+  export let distributionLabelOffsetY: number = 0;
+  export let vtLabelOffsetY: number = 45;
 
   // Fixed point positions (pixel coords)
   export let x0Pixel: { x: number; y: number } = { x: 180, y: 170 };
@@ -135,6 +138,7 @@
         sourceCenterX,
         targetCenterX,
         yShiftFactor,
+        distributionScaleFactor,
       }
     );
     precomputeScatterCoords();
@@ -245,7 +249,7 @@
       const vtCenterY = (interpY + vtEndY) / 2;
       drawMathjax(
         ctx, "v_t(x_t|x_1)", vtCenterX, vtCenterY,
-        latexFontSize, 10, 45, { color: vectorColor }, draw
+        latexFontSize, 10, vtLabelOffsetY, { color: vectorColor }, draw
       );
 
       // v_t^theta label near noisy vector
@@ -279,7 +283,7 @@
     );
 
     // Distribution labels at top (anchor is bottom-center, so offset down to keep visible)
-    const distributionLabelY = marginHeight;
+    const distributionLabelY = marginHeight + distributionLabelOffsetY;
 
     drawMathjax(
       ctx, "p_0", scales.sourceCenterPixelX, distributionLabelY,

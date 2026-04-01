@@ -79,6 +79,7 @@
   // Show/hide options
   export let showGroundTruth = true;
   export let showLegend = true;
+  export let showTimeSlider = true;
 
   // Constants
   const NUM_STEPS = 16;
@@ -521,9 +522,13 @@
     runInitialComputation();
   }
 
-  // Visibility handling - pause when scrolled off-screen
+  // Visibility handling - pause when scrolled off-screen, restart when visible
   $: if (figureIsActive !== undefined && isInitialized) {
     handleVisibilityChange($figureIsActive);
+    // If becoming visible and timeline exists but has no trajectory data yet, restart
+    if ($figureIsActive && timeline && !timeline.isPlaying && approximationTrajectories.every(t => t.length <= 1)) {
+      computeAllTrajectories();
+    }
   }
 </script>
 
@@ -545,12 +550,14 @@
         onclick={handleCanvasClick}
         style="cursor: {isLoading ? 'wait' : 'pointer'};"
       ></canvas>
-      <TimeSlider
-        {timeline}
-        step={1 / NUM_STEPS}
-        discreteFill={true}
-        color={approximationColor}
-      />
+      {#if showTimeSlider}
+        <TimeSlider
+          {timeline}
+          step={1 / NUM_STEPS}
+          discreteFill={true}
+          color={approximationColor}
+        />
+      {/if}
     </div>
 
     {#snippet footer()}

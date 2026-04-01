@@ -34,6 +34,9 @@
   import OTCoupling from '$rectified-flow/figures/OTCoupling.svelte';
   import RectifiedFlowSuperimposed from '$rectified-flow/figures/RectifiedFlowSuperimposed.svelte';
   import VectorFieldCurvatureComparison from '$rectified-flow/figures/VectorFieldCurvatureComparison.svelte';
+  import EulerStepDemo from '$rectified-flow/figures/EulerStepDemo.svelte';
+  import ConditionalFlowMatching from '$rectified-flow/figures/ConditionalFlowMatching.svelte';
+  import LinearInterpolation from '$rectified-flow/figures/LinearInterpolation.svelte';
 
   // Local figures
   import FlowerImageDistribution from '$lib/figures/FlowerImageDistribution.svelte';
@@ -317,28 +320,25 @@
 
     <!-- Slide 6: Roadmap -->
     <section class="roadmap-slide">
-      <h2 class="slide-title">Presentation Roadmap and Scope</h2>
-      <div class="roadmap">
-        <div class="roadmap-item">
-          <p class="roadmap-title"><strong>I. What is a flow?</strong></p>
-          <p class="roadmap-desc">Normalizing flows, CNFs, continuity equation</p>
-        </div>
-        <div class="roadmap-item">
-          <p class="roadmap-title"><strong>II. How to train flows?</strong></p>
-          <p class="roadmap-desc">Flow Matching, probability paths, connection to SiTs</p>
-        </div>
-        <div class="roadmap-item">
-          <p class="roadmap-title"><strong>III. What can go wrong?</strong></p>
-          <p class="roadmap-desc">Training pathologies, sampling latency, path curvature</p>
-        </div>
-        <div class="roadmap-item">
-          <p class="roadmap-title"><strong>IV. How to fix it?</strong></p>
-          <p class="roadmap-desc">Rectified flows, Reflow, couplings, mini-batch OT</p>
-        </div>
-      </div>
-      <aside class="notes">
-        Four-part narrative thread through flows, training, pathologies, and fixes.
-      </aside>
+      <h2 class="slide-title">Presentation Roadmap</h2>
+      <ol class="roadmap">
+        <li class="roadmap-item">
+          <p class="roadmap-title">Normalizing Flows</p>
+          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+        </li>
+        <li class="roadmap-item">
+          <p class="roadmap-title">Continuous Normalizing Flows</p>
+          <p class="roadmap-ref">Chen et al., 2018</p>
+        </li>
+        <li class="roadmap-item">
+          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
+          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+        </li>
+        <li class="roadmap-item">
+          <p class="roadmap-title">Rectified Flows</p>
+          <p class="roadmap-ref">Liu et al., 2023</p>
+        </li>
+      </ol>
     </section>
 
     <!-- Slide 7: What is a Normalizing Flow? -->
@@ -463,6 +463,76 @@
       </div>
     </section>
 
+    <!-- Slide: Sampling Trajectories from CNFs -->
+    <section>
+      <h2 class="slide-title">Sampling Trajectories from CNFs</h2>
+      <div style="display: flex; align-items: center; gap: 2em; margin-top: 0.8em;">
+        <div style="flex: 1;">
+          <p style="margin-top: 0;">
+            A CNF defines a time-dependent velocity field <Katex math={"\\color{#3b82f6}{v_\\theta(x, t)}"} /> parameterized by a neural network.
+          </p>
+          <p style="margin-top: 0.5em;">
+            Generate samples by solving the ODE:
+          </p>
+          <div style="margin-top: 0.2em;">
+            <Katex math={"\\frac{d\\color{#f17720}{x}}{dt} = \\color{#3b82f6}{v_\\theta(x, t)}"} displayMode={true} />
+          </div>
+          <p style="margin-top: 0.5em;">
+            We integrate forward using numerical methods like Euler's method:
+          </p>
+          <div style="margin-top: 0.2em;">
+            <Katex math={"\\color{#f17720}{x_{t+\\Delta t}} \\color{#333}{=} \\color{#f17720}{x_t} \\color{#333}{+} \\color{#333}{\\Delta t} \\color{#333}{\\cdot} \\color{#3b82f6}{v_\\theta(x_t, t)}"} displayMode={true} />
+          </div>
+        </div>
+        <div style="flex: 0 0 750px;">
+          {#if dataLoaded}
+            <EulerStepDemo
+              {flowMatchingClient}
+              targetDistribution={$targetDistributionSamples}
+              flowMatchingVectorField={vectorFieldData}
+              canvasWidth={750}
+              canvasHeight={750}
+              backgroundVisible={false}
+              maxUserTrajectories={1}
+              showGroundTruth={false}
+              showLegend={false}
+              showArrowHeads={true}
+              arrowScale={100}
+              arrowWidth={5}
+              arrowOpacity={1.0}
+              trajectoryStrokeWidth={5}
+              trajectoryHeadRadius={12}
+              targetPointRadius={7}
+              showTimeSlider={false}
+            />
+          {/if}
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide: CNFs Allow Efficient Likelihood Based Training -->
+    <section>
+      <h2 class="slide-title">CNFs Allow Efficient Likelihood Based Training</h2>
+      <p style="margin-top: 0.8em;">
+        The instantaneous change of variables replaces the expensive Jacobian determinant with a <strong>trace</strong>:
+      </p>
+      <div style="margin-top: 0.5em;">
+        <Katex math={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 \\htmlClass{trace-highlight}{\\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"} displayMode={true} />
+      </div>
+      <div style="display: flex; justify-content: center; margin-top: 1.5em;">
+        <div style="background: rgba(34, 197, 94, 0.1); border: 2px solid #22c55e; border-radius: 12px; padding: 1.5em 2em; text-align: center;">
+          <p style="margin: 0; color: #22c55e; font-weight: bold; font-size: 1.05em;">
+            Trace is <Katex math={"O(d)"} /> instead of <Katex math={"O(d^3)"} /> for the full determinant
+          </p>
+        </div>
+      </div>
+      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
+        <p style="font-size: 0.7em; color: #888; margin: 0;">
+          Chen et al., <span style="font-style: italic;">Neural Ordinary Differential Equations</span>, 2018
+        </p>
+      </div>
+    </section>
+
     <!-- Slide: Likelihood Based Training is Expensive -->
     <section>
       <h2 class="slide-title">Likelihood Based Training is Expensive</h2>
@@ -482,6 +552,73 @@
       <aside class="notes">
         Key motivation for flow matching: CNFs are expressive but training via maximum likelihood is expensive because of the trace computation and ODE simulation at every step. Flow matching avoids both.
       </aside>
+    </section>
+
+    <!-- Slide: Flow Matching -->
+    <section>
+      <h2 class="slide-title">Flow Matching</h2>
+      <p style="margin-top: 0.5em;">
+        Flow matching enables <strong>simulation-free training</strong> — training CNFs without running expensive ODE solvers at each step.
+      </p>
+      <div style="margin-top: 0.3em;">
+        <Katex math={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| v_\\theta(x_t, t) - (x_1 - x_0) \\right\\|^2"} displayMode={true} />
+      </div>
+      <div class="figure-container" style="margin-top: 0.3em; max-height: 550px; overflow: hidden;">
+        {#if dataLoaded}
+          <ConditionalFlowMatching
+            width={1800}
+            height={550}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            backgroundVisible={false}
+            distributionScaleFactor={0.75}
+            yShiftFactor={-0.8}
+            x1Pixel={{ x: 1600, y: 200 }}
+            vectorScale={350}
+            vectorWidth={4}
+            lineWidth={4}
+            dashedLineWidth={3}
+            latexFontSize={36}
+            distributionLabelOffsetY={40}
+            vtLabelOffsetY={65}
+          />
+        {/if}
+      </div>
+      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
+        <p style="font-size: 0.7em; color: #888; margin: 0;">
+          Lipman et al., <span style="font-style: italic;">Flow Matching for Generative Modeling</span>, 2023
+        </p>
+      </div>
+    </section>
+
+    <!-- Slide: Specifying the Probability Path -->
+    <section>
+      <h2 class="slide-title">Specifying the Probability Path</h2>
+      <p style="margin-top: 0.5em;">
+        Flow matching requires defining a probability path <Katex math={"p_t(x)"} /> for interpolating between our source <Katex math={"p_0"} /> and target <Katex math={"p_1"} /> distributions. The simplest choice is a linear path:
+      </p>
+      <div style="margin-top: 0.3em;">
+        <Katex math={"X_t = (1 - t)X_0 + tX_1"} displayMode={true} />
+      </div>
+      <div class="figure-container" style="margin-top: 0.5em;">
+        {#if dataLoaded}
+          <LinearInterpolation
+            width={1800}
+            height={600}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            sourcePointIndex={5}
+            targetPointIndex={10}
+            playingByDefault={true}
+            backgroundVisible={false}
+            showEquation={false}
+            sourceLabelText=""
+            targetLabelText=""
+            labelFontSize={50}
+            latexFontSize={43}
+          />
+        {/if}
+      </div>
     </section>
 
     <!-- Slide: Flows and velocity fields -->
@@ -912,6 +1049,15 @@
 </div>
 
 <style>
+  :global(.trace-highlight) {
+    background: rgba(34, 197, 94, 0.1);
+    border: 2px solid #22c55e;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: inline-block;
+    overflow: visible;
+  }
+
   :global(.det-highlight) {
     background: rgba(231, 76, 60, 0.1);
     border: 2px solid #e74c3c;
@@ -973,16 +1119,25 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 0.8em;
+    gap: 1em;
     flex: 1;
+    padding-left: 2em;
   }
 
   .roadmap-item {
+    list-style-type: decimal;
   }
 
   .roadmap-title {
-    font-size: 1.44em;
+    font-size: 1.2em;
     margin: 0;
+  }
+
+  .roadmap-ref {
+    font-size: 0.75em;
+    color: #aaa;
+    font-style: italic;
+    margin: 0.2em 0 0 0;
   }
 
   .roadmap-desc {
