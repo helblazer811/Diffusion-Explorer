@@ -55,6 +55,9 @@
   // Background visibility
   export let backgroundVisible = true;
 
+  // Show/hide equation at bottom
+  export let showEquation = true;
+
   // LaTeX label styling
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
@@ -315,10 +318,12 @@
     }
 
     // Formula at bottom center
-    drawMathjax(
-      ctx, "x_t \\sim X_t = (1-t)X_0 + tX_1", width / 2, height - marginHeight,
-      latexFontSize, 0, 15, { color: latexColor }
-    );
+    if (showEquation) {
+      drawMathjax(
+        ctx, "x_t \\sim X_t = (1-t)X_0 + tX_1", width / 2, height - marginHeight,
+        latexFontSize, 0, 15, { color: latexColor }
+      );
+    }
   }
 
   // ----------------------------------------------------------------
