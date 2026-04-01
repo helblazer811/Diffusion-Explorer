@@ -37,8 +37,10 @@
   import EulerStepDemo from '$rectified-flow/figures/EulerStepDemo.svelte';
   import ConditionalFlowMatching from '$rectified-flow/figures/ConditionalFlowMatching.svelte';
   import LinearInterpolation from '$rectified-flow/figures/LinearInterpolation.svelte';
+  import HighlightTrajectory from '$rectified-flow/figures/HighlightTrajectory.svelte';
 
   // Local figures
+  import IndependentCouplingAnimated from '$lib/figures/IndependentCouplingAnimated.svelte';
   import FlowerImageDistribution from '$lib/figures/FlowerImageDistribution.svelte';
   import TransformingNoiseIntoData from '$lib/figures/TransformingNoiseIntoData.svelte';
   import DiffusionVsFlow from '$lib/figures/DiffusionVsFlow.svelte';
@@ -398,7 +400,7 @@
         Map data <Katex math={"x"} /> backward through the inverse flow to evaluate <Katex math={"p(z_0)"} /> and train via maximum likelihood:
       </p>
       <div style="margin-top: 0.15em;">
-        <Katex math={"-\\log p(x) = -\\log p(f^{-1}(x)) - \\log \\left| \\det J_{f^{-1}}(x) \\right|"} displayMode={true} />
+        <Katex math={"-\\log p(x) = -\\log p(f^{-1}(x)) - \\log \\left| \\det \\dfrac{\\partial f^{-1}}{\\partial x} \\right|"} displayMode={true} />
       </div>
       <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: hidden;">
         <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={580} numStages={4} />
@@ -510,9 +512,9 @@
       </div>
     </section>
 
-    <!-- Slide: CNFs Allow Efficient Likelihood Based Training -->
+    <!-- Slide: CNFs Allow More Efficient Likelihood Based Training -->
     <section>
-      <h2 class="slide-title">CNFs Allow Efficient Likelihood Based Training</h2>
+      <h2 class="slide-title">CNFs Allow <em>More</em> Efficient Likelihood Based Training</h2>
       <p style="margin-top: 0.8em;">
         The instantaneous change of variables replaces the expensive Jacobian determinant with a <strong>trace</strong>:
       </p>
@@ -520,7 +522,7 @@
         <Katex math={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 \\htmlClass{trace-highlight}{\\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"} displayMode={true} />
       </div>
       <div style="display: flex; justify-content: center; margin-top: 1.5em;">
-        <div style="background: rgba(34, 197, 94, 0.1); border: 2px solid #22c55e; border-radius: 12px; padding: 1.5em 2em; text-align: center;">
+        <div style="background: rgba(34, 197, 94, 0.1); border: 2px solid #22c55e; border-radius: 12px; padding: 0.8em 2em; text-align: center;">
           <p style="margin: 0; color: #22c55e; font-weight: bold; font-size: 1.05em;">
             Trace is <Katex math={"O(d)"} /> instead of <Katex math={"O(d^3)"} /> for the full determinant
           </p>
@@ -536,18 +538,30 @@
     <!-- Slide: Likelihood Based Training is Expensive -->
     <section>
       <h2 class="slide-title">Likelihood Based Training is Expensive</h2>
-      <p style="margin-top: 1em;">
-        The continuous analog of the change of variables formula (the <strong>instantaneous change of variables</strong>) requires:
+      <p style="margin-top: 0.5em;">
+        Requires solving an ODE at <em style="color: #e74c3c;">every training step</em>.
       </p>
-      <div style="margin-top: 0.5em;">
+      <div style="margin-top: 0.3em;">
         <Katex math={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_t}{\\partial x}\\right) \\, dt"} displayMode={true} />
       </div>
-      <div style="display: flex; justify-content: center; margin-top: 1em;">
-        <div style="background: rgba(231, 76, 60, 0.1); border: 2px solid #e74c3c; border-radius: 12px; padding: 0.8em 2em; text-align: center;">
-          <p style="margin: 0; color: #e74c3c; font-weight: bold; font-size: 1.05em;">
-            Requires solving an ODE at <em>every training step</em>
-          </p>
-        </div>
+      <div class="figure-container" style="margin-top: 0.3em; max-height: 600px; overflow: hidden;">
+        {#if dataLoaded}
+          <HighlightTrajectory
+            width={1800}
+            height={600}
+            {flowMatchingClient}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            allTimeSamples={$allTimeSamples}
+            isTraining={$isTraining}
+            reverse={true}
+            showTimeSlider={false}
+            distributionScaleFactor={1.0}
+            endpointRadius={10}
+            trajectoryStrokeWidth={4}
+            latexFontSize={36}
+          />
+        {/if}
       </div>
       <aside class="notes">
         Key motivation for flow matching: CNFs are expressive but training via maximum likelihood is expensive because of the trace computation and ODE simulation at every step. Flow matching avoids both.
@@ -573,7 +587,7 @@
             backgroundVisible={false}
             distributionScaleFactor={0.75}
             yShiftFactor={-0.8}
-            x1Pixel={{ x: 1600, y: 200 }}
+            x1Pixel={{ x: 1600, y: 350 }}
             vectorScale={350}
             vectorWidth={4}
             lineWidth={4}
@@ -600,7 +614,7 @@
       <div style="margin-top: 0.3em;">
         <Katex math={"X_t = (1 - t)X_0 + tX_1"} displayMode={true} />
       </div>
-      <div class="figure-container" style="margin-top: 0.5em;">
+      <div class="figure-container" style="margin-top: -0.5em;">
         {#if dataLoaded}
           <LinearInterpolation
             width={1800}
@@ -608,7 +622,7 @@
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             sourcePointIndex={5}
-            targetPointIndex={10}
+            targetPointIndex={230}
             playingByDefault={true}
             backgroundVisible={false}
             showEquation={false}
@@ -619,6 +633,85 @@
           />
         {/if}
       </div>
+    </section>
+
+    <!-- Slide: Regressing the Velocity Field -->
+    <section>
+      <h2 class="slide-title">Regressing the Velocity Field</h2>
+    </section>
+
+    <!-- Slide: Practical Challenge: Curved Trajectories -->
+    <section>
+      <h2 class="slide-title">Practical Challenge: Curved Trajectories</h2>
+    </section>
+
+    <!-- Slide: Curvature is the Enemy of Speed -->
+    <section>
+      <h2 class="slide-title">Curvature is the Enemy of Speed</h2>
+    </section>
+
+    <!-- Slide: What is a Coupling? -->
+    <section>
+      <h2 class="slide-title">What is a Coupling?</h2>
+      <p style="margin-top: 0.5em;">
+        A <em>coupling</em> is a joint distribution <Katex math={"\\pi(X_0, X_1)"} /> between our source <Katex math={"\\pi(X_0) = p"} /> and target <Katex math={"\\pi(X_1) = q"} /> random variables.
+      </p>
+      <div class="figure-container" style="margin-top: 1.5em;">
+        {#if dataLoaded}
+          <IndependentCouplingAnimated
+            width={1800}
+            height={650}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            backgroundVisible={false}
+            numScatterSamples={150}
+            numLinesToDraw={100}
+            labelFontSize={50}
+            sourceCenterX={0.2}
+            targetCenterX={0.8}
+            distributionScaleFactor={0.9}
+            pointRadius={7}
+          />
+        {/if}
+      </div>
+      <aside class="notes">
+        Independent coupling: randomly pair source and target samples. Lines animate left to right.
+      </aside>
+    </section>
+
+    <!-- Slide: Paths Crossed at the Wrong Time -->
+    <section>
+      <h2 class="slide-title">Paths Crossed at the Wrong Time</h2>
+    </section>
+
+    <!-- Slide: Rectified Flows -->
+    <section>
+      <h2 class="slide-title">Rectified Flows</h2>
+      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
+        <p style="font-size: 0.7em; color: #888; margin: 0;">
+          Liu et al., <span style="font-style: italic;">Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow</span>, 2022
+        </p>
+      </div>
+    </section>
+
+    <!-- Slide: The Reflow Algorithm -->
+    <section>
+      <h2 class="slide-title">The Reflow Algorithm</h2>
+    </section>
+
+    <!-- Slide: Reflow Produces Straighter Trajectories -->
+    <section>
+      <h2 class="slide-title">Reflow Produces Straighter Trajectories</h2>
+    </section>
+
+    <!-- Slide: Key References -->
+    <section>
+      <h2 class="slide-title">Key References</h2>
+    </section>
+
+    <!-- Slide: Thank You -->
+    <section>
+      <h2 class="slide-title">Thank You</h2>
     </section>
 
     <!-- Slide: Flows and velocity fields -->
@@ -1053,7 +1146,7 @@
     background: rgba(34, 197, 94, 0.1);
     border: 2px solid #22c55e;
     border-radius: 8px;
-    padding: 8px 10px;
+    padding: 14px 10px 18px 10px;
     display: inline-block;
     overflow: visible;
   }
