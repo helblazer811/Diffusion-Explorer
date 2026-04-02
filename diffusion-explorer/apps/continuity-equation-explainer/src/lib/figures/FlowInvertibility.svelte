@@ -85,6 +85,7 @@
   export let latexFontSize = 20;
   export let latexColor = "#333";
   export let labelFontSize = 26;
+  export let labelFontFamily = "sans-serif";
   export let labelColor = "#5e5e5e";
 
   // Animation props
@@ -496,7 +497,7 @@
 
     // Draw center label
     const centerLabelY = height / 2 - 130;
-    ctx.font = `500 ${labelFontSize - 4}px sans-serif`;
+    ctx.font = `500 ${labelFontSize - 4}px ${labelFontFamily}`;
     ctx.fillStyle = trajectoryColor;
     ctx.textAlign = "center";
     ctx.fillText("Flow ψₜ(x) is invertible, mapping distinct points to distinct locations.", width / 2, centerLabelY);

@@ -42,6 +42,7 @@
   export let targetLabelText = "Target Distribution";
   export let labelFontSize = settings.stylingSettings.label.fontSize;
   export let labelFontWeight = settings.stylingSettings.label.fontWeight;
+  export let labelFontFamily = "Helvetica, Arial, sans-serif";
   export let labelColor = settings.stylingSettings.label.color;
   export let labelOpacity = settings.stylingSettings.label.opacity;
   export let pointRadius = settings.stylingSettings.scatterPlot.radius;
@@ -366,14 +367,14 @@
     // Draw text labels
     const textY = marginHeight / 2;
     drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
-      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
+      font: `${labelFontWeight} ${labelFontSize}px ${labelFontFamily}`,
       color: labelColor,
       opacity: labelOpacity,
       align: "center",
       baseline: "top",
     });
     drawText(ctx, targetLabelText, scales.targetCenterPixelX, textY, {
-      font: `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`,
+      font: `${labelFontWeight} ${labelFontSize}px ${labelFontFamily}`,
       color: labelColor,
       opacity: labelOpacity,
       align: "center",

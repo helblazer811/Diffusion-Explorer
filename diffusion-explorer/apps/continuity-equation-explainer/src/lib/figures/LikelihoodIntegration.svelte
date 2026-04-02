@@ -59,6 +59,7 @@
   // Label styling
   export let labelColor = "#666666";
   export let labelFontSize = 28;
+  export let labelFontFamily = "Helvetica, Arial, sans-serif";
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
   // Animation timing (in milliseconds)
@@ -341,7 +342,7 @@
     ctx.clearRect(0, 0, width, height);
 
     // Distribution labels
-    const labelFont = `400 ${labelFontSize}px Helvetica, Arial, sans-serif`;
+    const labelFont = `400 ${labelFontSize}px ${labelFontFamily}`;
     drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, marginHeight / 2, {
       color: labelColor,
       font: labelFont,

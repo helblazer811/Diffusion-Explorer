@@ -40,6 +40,7 @@
   export let labelFontSize: number = settings.stylingSettings.label.fontSize;
   export let labelColor: string = settings.stylingSettings.label.color;
   export let labelOpacity: number = settings.stylingSettings.label.opacity;
+  export let labelFontFamily: string = "Helvetica, Arial, sans-serif";
 
   // Subtitles
   export let leftSubtitle: string = "High Error with Few Steps";
@@ -835,7 +836,7 @@
       <div class="panel-container" style="max-width: {canvasWidth}px;">
         <div
           class="panel-label"
-          style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};"
+          style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity}; font-family: {labelFontFamily};"
         >
           {leftLabel}
         </div>
@@ -859,7 +860,7 @@
       <div class="panel-container" style="max-width: {canvasWidth}px;">
         <div
           class="panel-label"
-          style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity};"
+          style="font-size: {labelFontSize}px; color: {labelColor}; opacity: {labelOpacity}; font-family: {labelFontFamily};"
         >
           {rightLabel}
         </div>

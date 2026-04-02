@@ -28,7 +28,8 @@
 
   // From rectified-flow-explainer
   import ProbabilityPath from '$rectified-flow/figures/ProbabilityPath.svelte';
-  import CurvedTrajectorySuperimposed from '$rectified-flow/figures/CurvedTrajectorySuperimposed.svelte';
+  import CurvedTrajectoryIntro from '$lib/figures/CurvedTrajectoryIntro.svelte';
+  import EulerSamplerFigure from '$lib/figures/EulerSamplerFigure.svelte';
   import EulerStepComparison from '$rectified-flow/figures/EulerStepComparison.svelte';
   import IndependentCoupling from '$rectified-flow/figures/IndependentCoupling.svelte';
   import OTCoupling from '$rectified-flow/figures/OTCoupling.svelte';
@@ -36,8 +37,10 @@
   import VectorFieldCurvatureComparison from '$rectified-flow/figures/VectorFieldCurvatureComparison.svelte';
   import EulerStepDemo from '$rectified-flow/figures/EulerStepDemo.svelte';
   import ConditionalFlowMatching from '$rectified-flow/figures/ConditionalFlowMatching.svelte';
+  import ConditionalVelocityField from '$rectified-flow/figures/ConditionalVelocityField.svelte';
   import LinearInterpolation from '$rectified-flow/figures/LinearInterpolation.svelte';
   import HighlightTrajectory from '$rectified-flow/figures/HighlightTrajectory.svelte';
+  import IntersectingPaths from '$rectified-flow/figures/IntersectingPaths.svelte';
 
   // Local figures
   import IndependentCouplingAnimated from '$lib/figures/IndependentCouplingAnimated.svelte';
@@ -49,6 +52,7 @@
   import NormalizingFlowStages from '$lib/figures/NormalizingFlowStages.svelte';
   import ChangeOfVariables from '$lib/figures/ChangeOfVariables.svelte';
   import MaxLikelihoodTraining from '$lib/figures/MaxLikelihoodTraining.svelte';
+  import StochasticInterpolation from '$lib/figures/StochasticInterpolation.svelte';
 
   let flowerFigure: FlowerImageDistribution;
   let noiseFigure: TransformingNoiseIntoData;
@@ -454,6 +458,7 @@
             distributionScaleFactor={0.7}
             showTimeSlider={false}
             labelFontSize={50}
+            labelFontFamily="Libre Baskerville, Georgia, serif"
             latexFontSize={43}
           />
         {/if}
@@ -629,6 +634,24 @@
             sourceLabelText=""
             targetLabelText=""
             labelFontSize={50}
+            labelFontFamily="Libre Baskerville, Georgia, serif"
+            latexFontSize={43}
+          />
+        {/if}
+      </div>
+    </section>
+
+    <!-- Slide: Creating Regression Targets -->
+    <section>
+      <h2 class="slide-title">Creating Regression Targets</h2>
+      <div class="figure-container" style="margin-top: 0.5em;">
+        {#if dataLoaded}
+          <ConditionalVelocityField
+            width={1800}
+            height={800}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            backgroundVisible={false}
             latexFontSize={43}
           />
         {/if}
@@ -640,14 +663,113 @@
       <h2 class="slide-title">Regressing the Velocity Field</h2>
     </section>
 
+    <!-- Slide: Stochastic Interpolants -->
+    <section>
+      <h2 class="slide-title">Stochastic Interpolants</h2>
+      <p style="margin-top: 0.5em;">
+        We take a deterministic path like the <span style="color: #3b82f6; font-weight: bold;">linear path</span> and stochastic interpolants add stochasticity <span style="color: #f17720; font-weight: bold;">(orange)</span>.
+      </p>
+      <div style="margin-top: 0.3em;">
+        <Katex math={"X_t = (1-t)X_0 + tX_1 + \\sigma_t \\cdot \\varepsilon, \\quad \\varepsilon \\sim \\mathcal{N}(0, I)"} displayMode={true} />
+      </div>
+      <div class="figure-container" style="margin-top: -3em;">
+        {#if dataLoaded}
+          <StochasticInterpolation
+            width={1800}
+            height={600}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            sourcePointIndex={5}
+            targetPointIndex={230}
+            sigma={300}
+            maxEpsilonNorm={1.5}
+            playingByDefault={true}
+            backgroundVisible={false}
+            showEquation={false}
+            sourceLabelText=""
+            targetLabelText=""
+            labelFontSize={50}
+            latexFontSize={43}
+          />
+        {/if}
+      </div>
+      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
+        <p style="font-size: 0.7em; color: #888; margin: 0;">
+          Albergo et al., <span style="font-style: italic;">Stochastic Interpolants: A Unifying Framework for Flows and Diffusions</span>, 2023
+        </p>
+      </div>
+    </section>
+
     <!-- Slide: Practical Challenge: Curved Trajectories -->
     <section>
       <h2 class="slide-title">Practical Challenge: Curved Trajectories</h2>
+      <p style="margin-top: 0.5em;">
+        Naively training a flow matching model produces curved trajectories.
+      </p>
+      <div class="figure-container" style="margin-top: 1.5em;">
+        {#if dataLoaded}
+          <CurvedTrajectoryIntro
+            flowMatchingClient={flowMatchingClient}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            allTimeSamples={$allTimeSamples}
+            width={1600}
+            height={700}
+            distributionPointRadius={8}
+            trajectoryStrokeWidth={5}
+            trajectoryEndpointRadius={5}
+            labelFontSize={70}
+            sourceCenterX={0.15}
+            targetCenterX={0.85}
+            playingByDefault={true}
+          />
+        {/if}
+      </div>
     </section>
 
     <!-- Slide: Curvature is the Enemy of Speed -->
     <section>
       <h2 class="slide-title">Curvature is the Enemy of Speed</h2>
+      <p style="margin-top: 0.5em;">Accurately integrating curved functions requires taking smaller steps, which leads to higher sampling latency.</p>
+      <div class="figure-container" style="margin-top: 1em;">
+        <EulerSamplerFigure
+          width={800}
+          height={500}
+          gap={10}
+          backgroundVisible={false}
+          labelFontSize={44}
+          showPlayButton={false}
+        />
+      </div>
+    </section>
+
+    <!-- Slide: What Causes this Curvature? -->
+    <section>
+      <h2 class="slide-title">What Causes this Curvature?</h2>
+      <p style="margin-top: 0.5em;">
+        We train the velocity field <Katex math={"v_\\theta"} /> to match straight paths — why does this produce curvature?
+      </p>
+      <div class="figure-container" style="margin-top: 0.3em; max-height: 550px; overflow: hidden;">
+        {#if dataLoaded}
+          <ConditionalFlowMatching
+            width={1800}
+            height={550}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            backgroundVisible={false}
+            distributionScaleFactor={0.75}
+            yShiftFactor={-0.8}
+            x1Pixel={{ x: 1600, y: 350 }}
+            vectorScale={350}
+            vectorWidth={4}
+            lineWidth={4}
+            dashedLineWidth={3}
+            latexFontSize={36}
+            distributionLabelOffsetY={40}
+            vtLabelOffsetY={65}
+          />
+        {/if}
+      </div>
     </section>
 
     <!-- Slide: What is a Coupling? -->
@@ -660,16 +782,19 @@
         {#if dataLoaded}
           <IndependentCouplingAnimated
             width={1800}
-            height={650}
+            height={800}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             backgroundVisible={false}
             numScatterSamples={150}
             numLinesToDraw={100}
+            useLatexLabels={true}
+            sourceLabel={"\\pi(X_0)"}
+            targetLabel={"\\pi(X_1)"}
             labelFontSize={50}
             sourceCenterX={0.2}
             targetCenterX={0.8}
-            distributionScaleFactor={0.9}
+            distributionScaleFactor={0.7}
             pointRadius={7}
           />
         {/if}
@@ -679,9 +804,62 @@
       </aside>
     </section>
 
-    <!-- Slide: Paths Crossed at the Wrong Time -->
+    <!-- Slide: The Naive Independent Coupling -->
     <section>
-      <h2 class="slide-title">Paths Crossed at the Wrong Time</h2>
+      <h2 class="slide-title">The Naive Independent Coupling</h2>
+      <p style="margin-top: 0.5em;">
+        The simplest choice of coupling is the <em>independent coupling</em>, where <Katex math={"\\pi(X_0)"} /> and <Katex math={"\\pi(X_1)"} /> are independent of each other.
+      </p>
+      <div class="figure-container" style="margin-top: 1.5em;">
+        {#if dataLoaded}
+          <IndependentCouplingAnimated
+            width={1800}
+            height={800}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            backgroundVisible={false}
+            numScatterSamples={150}
+            numLinesToDraw={100}
+            useLatexLabels={true}
+            sourceLabel={"\\pi(X_0)"}
+            targetLabel={"\\pi(X_1)"}
+            labelFontSize={50}
+            sourceCenterX={0.2}
+            targetCenterX={0.8}
+            distributionScaleFactor={0.7}
+            pointRadius={7}
+          />
+        {/if}
+      </div>
+      <aside class="notes">
+        The naive independent coupling: randomly pair source and target samples.
+      </aside>
+    </section>
+
+    <!-- Slide: Our Paths Crossed at the Wrong Time -->
+    <section>
+      <h2 class="slide-title">Our Paths Crossed at the Wrong Time</h2>
+      <p style="margin-top: 0.5em;">
+        The velocity field <Katex math={"v_t^\\theta"} /> cannot accurately resolve conflicting paths — the best it can do is average. This averaging leads to curved trajectories.
+      </p>
+      <div class="figure-container" style="margin-top: 1.5em;">
+        {#if dataLoaded}
+          <IntersectingPaths
+            width={1800}
+            height={800}
+            sourceCenterX={0.2}
+            targetCenterX={0.8}
+            latexFontSize={40}
+            labelFontSize={50}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            backgroundVisible={false}
+          />
+        {/if}
+      </div>
+      <aside class="notes">
+        Intersecting paths create conflicts for the velocity field, which must average, producing curved trajectories.
+      </aside>
     </section>
 
     <!-- Slide: Rectified Flows -->
@@ -707,435 +885,21 @@
     <!-- Slide: Key References -->
     <section>
       <h2 class="slide-title">Key References</h2>
+      <ul style="font-size: 0.75em; margin-top: 0.5em; line-height: 1.8;">
+        <li>Rezende & Mohamed, <span style="font-style: italic;">Variational Inference with Normalizing Flows</span>, 2015</li>
+        <li>Dinh et al., <span style="font-style: italic;">NICE: Non-linear Independent Components Estimation</span>, 2014</li>
+        <li>Dinh et al., <span style="font-style: italic;">Density Estimation Using Real-Valued Non-Volume Preserving Transformations</span>, 2017</li>
+        <li>Kingma & Dhariwal, <span style="font-style: italic;">Glow: Generative Flow with Invertible 1x1 Convolutions</span>, 2018</li>
+        <li>Chen et al., <span style="font-style: italic;">Neural Ordinary Differential Equations</span>, 2018</li>
+        <li>Lipman et al., <span style="font-style: italic;">Flow Matching for Generative Modeling</span>, 2023</li>
+        <li>Albergo et al., <span style="font-style: italic;">Stochastic Interpolants: A Unifying Framework for Flows and Diffusions</span>, 2023</li>
+        <li>Liu et al., <span style="font-style: italic;">Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow</span>, 2022</li>
+      </ul>
     </section>
 
     <!-- Slide: Thank You -->
     <section>
       <h2 class="slide-title">Thank You</h2>
-    </section>
-
-    <!-- Slide: Flows and velocity fields -->
-    <section>
-      <h2 class="slide-title">Flows and Velocity Fields</h2>
-      <p style="font-size: 0.8em;">
-        Learn <Katex math={"v_t(x)"} />, simulate the ODE
-        <Katex math={"\\frac{d}{dt}\\psi_t(x) = v_t(\\psi_t(x))"} /> via Euler's method.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded}
-          <CrownJewel contourBandwidth={10} numScatterSamples={300} />
-        {/if}
-      </div>
-      <aside class="notes">
-        CrownJewel: trajectories + density contours on two moons. Click to trace backward trajectories.
-      </aside>
-    </section>
-
-    <!-- Slide 5: Discrete vs. continuous normalizing flows -->
-    <section>
-      <h2 class="slide-title">Discrete vs. Continuous Normalizing Flows</h2>
-      <div style="display: flex; gap: 2em; justify-content: center; margin-top: 1em;">
-        <div style="flex: 1; max-width: 45%; text-align: left;">
-          <h3 style="font-size: 0.9em;">Discrete NFs</h3>
-          <ul style="font-size: 0.75em;">
-            <li>Compose invertible layers</li>
-            <li>Tractable Jacobians (coupling layers)</li>
-            <li>Architectural constraints</li>
-          </ul>
-        </div>
-        <div style="flex: 1; max-width: 45%; text-align: left;">
-          <h3 style="font-size: 0.9em;">Continuous NFs</h3>
-          <ul style="font-size: 0.75em;">
-            <li>Replace layer stack with an ODE</li>
-            <li>Free architecture choice</li>
-            <li>Simulation cost &rarr; flow matching removes it</li>
-          </ul>
-        </div>
-      </div>
-      <p style="font-size: 0.85em; color: #555; margin-top: 1.5em;">
-        We focus on the <strong>continuous</strong> side for the rest of this talk.
-      </p>
-      <aside class="notes">
-        Conceptual contrast. Discrete NFs have architectural constraints. CNFs free the architecture but introduce simulation cost. Flow matching then removes that cost.
-      </aside>
-    </section>
-
-    <!-- Slide 6: The continuity equation -->
-    <section>
-      <h2 class="slide-title">The Continuity Equation</h2>
-      <div style="margin: 1em 0;">
-        <Katex math={"\\frac{\\partial p_t}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0"} displayMode={true} />
-      </div>
-      <p style="font-size: 0.85em;">
-        Two views of the same object: the ODE moves <em>particles</em>, the continuity equation moves <em>density</em>.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded}
-          <MassConservation />
-        {/if}
-      </div>
-      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">
-        We'll come back to this later.
-      </p>
-      <aside class="notes">
-        Plant the flag. State the PDE. Two views of the same object. We'll return to unpack this in Part 5.
-      </aside>
-    </section>
-
-    <!-- Slide 7: Invertibility -->
-    <section>
-      <h2 class="slide-title">Invertibility</h2>
-      <p style="font-size: 0.85em;">
-        Flows are deterministic and invertible &rarr; trajectories can't merge &rarr; mass is conserved.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded}
-          <InvertibilityExplanation />
-        {/if}
-      </div>
-      <p style="font-size: 0.75em; color: #888; margin-top: 0.5em;">
-        This property will matter twice — once for likelihood, once for rectified flows.
-      </p>
-      <aside class="notes">
-        Non-invertible counterexample. This will matter twice: for likelihood computation and for why rectified flows work.
-      </aside>
-    </section>
-
-    <!-- ============================================================ -->
-    <!-- PART 2: How Do You Train One? -->
-    <!-- ============================================================ -->
-
-    <!-- Slide 8: Flow matching -->
-    <section>
-      <h2 class="slide-title">Flow Matching: The Problem It Solves</h2>
-      <ul style="font-size: 0.85em; text-align: left; max-width: 70%; margin: 0 auto;">
-        <li>Can't compute <Katex math={"v_t"} /> directly</li>
-        <li>Simulation-based training is expensive</li>
-        <li>Flow matching: regress the velocity field with a simple MSE loss</li>
-      </ul>
-      <div style="margin-top: 1em;">
-        <Katex math={"\\mathcal{L}(\\theta) = \\mathbb{E}_{t, X_0, X_1} \\left[ \\| v_t^\\theta(X_t) - (X_1 - X_0) \\|^2 \\right]"} displayMode={true} />
-      </div>
-      <aside class="notes">
-        Flow matching lets us regress the velocity field directly without simulation. Simple MSE loss.
-      </aside>
-    </section>
-
-    <!-- Slide 9: Linear path + conditional flow matching -->
-    <section>
-      <h2 class="slide-title">The Linear Path</h2>
-      <p style="font-size: 0.85em;">
-        <Katex math={"X_t = (1-t)X_0 + tX_1"} />. Condition on <Katex math={"x_1"} /> for a tractable loss.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded}
-          <ProbabilityPath
-            width={900}
-            sourceDistributionSamples={$sourceDistributionSamples}
-            targetDistributionSamples={$targetDistributionSamples}
-            {allTimeSamples}
-            {isTraining}
-            playingByDefault={true}
-            backgroundVisible={false}
-            showContours={true}
-          />
-        {/if}
-      </div>
-      <p style="font-size: 0.75em; color: #888;">
-        Key subtlety: the model only sees <Katex math={"x_t"} />, not <Katex math={"x_1"} />.
-      </p>
-      <aside class="notes">
-        Linear interpolation path. Condition on x_1 for tractable loss. Model only sees x_t, not x_1.
-      </aside>
-    </section>
-
-    <!-- Slide 10: Stochastic interpolants -->
-    <section>
-      <h2 class="slide-title">Stochastic Interpolants</h2>
-      <p style="font-size: 0.85em;">
-        Albergo &amp; Vanden-Eijnden define <Katex math={"I_t = \\alpha_t X_0 + \\beta_t X_1"} />
-      </p>
-      <ul style="font-size: 0.8em; text-align: left; max-width: 65%; margin: 0.5em auto;">
-        <li>Derive a velocity field from the interpolant</li>
-        <li>Recover the same continuity equation</li>
-        <li>The linear path <Katex math={"(1-t)X_0 + tX_1"} /> is a special case</li>
-      </ul>
-      <p style="font-size: 0.85em; margin-top: 1em;">
-        Two communities, same destination.
-      </p>
-      <aside class="notes">
-        Stochastic interpolants: a unifying framework. Two derivation paths converging to the same velocity field and continuity equation.
-      </aside>
-    </section>
-
-    <!-- ============================================================ -->
-    <!-- PART 3: What Goes Wrong? -->
-    <!-- ============================================================ -->
-
-    <!-- Slide 11: The paradox -->
-    <section>
-      <h2 class="slide-title">The Paradox</h2>
-      <p style="font-size: 0.85em;">
-        We trained on <strong>straight-line</strong> targets. Why are the learned trajectories <strong>curved</strong>?
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded && flowMatchingGridTrajectories}
-          <CurvedTrajectorySuperimposed
-            {flowMatchingClient}
-            trajectories={flowMatchingGridTrajectories}
-            sourceDistribution={$sourceDistributionSamples}
-            targetDistribution={$targetDistributionSamples}
-            playingByDefault={true}
-            backgroundVisible={false}
-          />
-        {/if}
-      </div>
-      <aside class="notes">
-        Superimposed curved trajectories. We trained on straight lines but learned curves. Why?
-      </aside>
-    </section>
-
-    <!-- Slide 12: Curvature is the enemy of speed -->
-    <section>
-      <h2 class="slide-title">Curvature is the Enemy of Speed</h2>
-      <p style="font-size: 0.85em;">
-        Euler steps on curved paths miss. More curvature &rarr; more steps &rarr; more cost.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded}
-          <EulerStepComparison
-            {flowMatchingClient}
-            {rectifiedFlowClient}
-            targetDistribution={$targetDistributionSamples}
-            backgroundVisible={false}
-            maxUserTrajectories={1}
-          />
-        {/if}
-      </div>
-      <aside class="notes">
-        Euler step accuracy comparison. More curvature = more steps = more neural network calls = more cost.
-      </aside>
-    </section>
-
-    <!-- Slide 13: What is a coupling? -->
-    <section>
-      <h2 class="slide-title">What is a Coupling?</h2>
-      <p style="font-size: 0.85em;">
-        Independent coupling: draw <Katex math={"(X_0, X_1)"} /> independently. Lots of crossing paths.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded}
-          <IndependentCoupling
-            width={900}
-            sourceDistributionSamples={$sourceDistributionSamples}
-            targetDistributionSamples={$targetDistributionSamples}
-            backgroundVisible={false}
-          />
-        {/if}
-      </div>
-      <aside class="notes">
-        Independent coupling with crossing lines. Random pairings lead to crossed paths.
-      </aside>
-    </section>
-
-    <!-- Slide 14: The mechanism -->
-    <section>
-      <h2 class="slide-title">Crossing Paths &rarr; Curvature</h2>
-      <p style="font-size: 0.8em;">
-        Crossing paths &rarr; conflicting velocities at same <Katex math={"(x, t)"} /> &rarr; model averages &rarr; curvature.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded && otCouplingData}
-          <OTCoupling
-            width={900}
-            sourceDistributionSamples={otCouplingData.sourcePoints}
-            targetDistributionSamples={otCouplingData.targetPoints}
-            matching={otCouplingData.matching}
-            backgroundVisible={false}
-          />
-        {/if}
-      </div>
-      <p style="font-size: 0.75em; color: #888;">
-        OT coupling: fewer crossings &rarr; straighter. But hard to compute in high dimensions.
-      </p>
-      <aside class="notes">
-        The mechanism: crossing paths cause conflicting velocities, model averages them, spatial variation of the average produces curvature. OT coupling as contrast.
-      </aside>
-    </section>
-
-    <!-- ============================================================ -->
-    <!-- PART 4: Rectified Flows — The Fix -->
-    <!-- ============================================================ -->
-
-    <!-- Slide 15: The idea -->
-    <section>
-      <h2 class="slide-title">Rectified Flows: The Idea</h2>
-      <p style="font-size: 0.85em;">
-        Replace the independent coupling with one <strong>induced by the model itself</strong>.
-      </p>
-      <ol style="font-size: 0.8em; text-align: left; max-width: 65%; margin: 0.5em auto;">
-        <li>Train a flow matching model with independent coupling</li>
-        <li>Flow source samples through the model &rarr; get new <Katex math={"(X_0, X_1)"} /> pairs</li>
-        <li>Retrain on the induced coupling</li>
-      </ol>
-      <p style="font-size: 0.85em; margin-top: 1em;">
-        The <strong>reflow</strong> procedure.
-      </p>
-      <aside class="notes">
-        The idea: train, flow, retrain. Replace independent coupling with model-induced coupling.
-      </aside>
-    </section>
-
-    <!-- Slide 16: The reflow algorithm + result -->
-    <section>
-      <h2 class="slide-title">Reflow: Before and After</h2>
-      <div class="figure-container">
-        {#if dataLoaded && flowMatchingGridTrajectories && rectifiedFlowGridTrajectories}
-          <RectifiedFlowSuperimposed
-            width={900}
-            {flowMatchingClient}
-            {rectifiedFlowClient}
-            leftTrajectories={flowMatchingGridTrajectories}
-            rightTrajectories={rectifiedFlowGridTrajectories[rectifiedFlowGridTrajectories.length - 1]
-              ? clipTrajectoriesToStartingRadius(
-                  rectifiedFlowGridTrajectories[rectifiedFlowGridTrajectories.length - 1],
-                  2.5
-                )
-              : []}
-            targetDistribution={$targetDistributionSamples}
-            playingByDefault={true}
-            backgroundVisible={false}
-          />
-        {/if}
-      </div>
-      <aside class="notes">
-        Side-by-side trajectory comparison: flow matching vs. rectified flow. Notice how much straighter the rectified flow trajectories are.
-      </aside>
-    </section>
-
-    <!-- Slide 17: Why it works -->
-    <section>
-      <h2 class="slide-title">Why Rectified Flows Work</h2>
-      <p style="font-size: 0.85em;">
-        Deterministic ODE trajectories can't cross (uniqueness / invertibility).
-      </p>
-      <p style="font-size: 0.85em;">
-        Induced coupling is non-crossing &rarr; no conflicting velocities &rarr; straighter.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded && flowInvertibilityData}
-          <FlowInvertibility data={flowInvertibilityData} />
-        {/if}
-      </div>
-      <aside class="notes">
-        This is where invertibility from Slide 7 pays off. ODE trajectories can't cross, so the induced coupling is non-crossing.
-      </aside>
-    </section>
-
-    <!-- Slide 18: Vector field comparison -->
-    <section>
-      <h2 class="slide-title">Vector Field Comparison</h2>
-      <p style="font-size: 0.85em;">
-        Rectified model's field is more temporally consistent &rarr; lower curvature.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded && vectorFieldData && rectifiedFlowVectorFieldData}
-          <VectorFieldCurvatureComparison
-            flowMatchingVectorField={vectorFieldData}
-            rectifiedFlowVectorField={rectifiedFlowVectorFieldData}
-            playingByDefault={true}
-            backgroundVisible={false}
-            normalizeVectors={false}
-            showArrowHeads={true}
-            animationDuration={4000}
-          />
-        {/if}
-      </div>
-      <aside class="notes">
-        Vector field comparison over time. Flow matching field changes rapidly. Rectified flow field is stable — indicating straighter paths.
-      </aside>
-    </section>
-
-    <!-- ============================================================ -->
-    <!-- PART 5: The Continuity Equation — Coming Back to It -->
-    <!-- ============================================================ -->
-
-    <!-- Slide 19: Returning to the continuity equation -->
-    <section>
-      <h2 class="slide-title">Returning to the Continuity Equation</h2>
-      <p style="font-size: 0.85em;">
-        Flows conserve mass because they're invertible. The divergence theorem converts flux into the PDE.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded}
-          <DivergenceIntro />
-        {/if}
-      </div>
-      <aside class="notes">
-        We planted the flag in Slide 6. Now we unpack it. Source/sink/incompressible fields. Divergence theorem connects flux to the PDE.
-      </aside>
-    </section>
-
-    <!-- Slide 20: Exact likelihood -->
-    <section>
-      <h2 class="slide-title">Exact Likelihood</h2>
-      <div style="margin: 0.5em 0;">
-        <Katex math={"\\log p(x(t_1), t_1) = \\log p(x(t_0), t_0) - \\int_{t_0}^{t_1} \\nabla \\cdot v(x(t), t)\\, dt"} displayMode={true} />
-      </div>
-      <p style="font-size: 0.85em;">
-        Run the flow backward, integrate divergence along the path. A defining capability of CNFs.
-      </p>
-      <div class="figure-container">
-        {#if dataLoaded && reverseSamplingData}
-          <LikelihoodIntegration data={reverseSamplingData} selectedIndices={[5, 15]} />
-        {/if}
-      </div>
-      <aside class="notes">
-        The continuity equation gives us log-likelihood. Run flow backward, integrate divergence. Something diffusion models can't do natively.
-      </aside>
-    </section>
-
-    <!-- ============================================================ -->
-    <!-- PART 6: Wrap-Up -->
-    <!-- ============================================================ -->
-
-    <!-- Slide 21: Summary -->
-    <section>
-      <h2 class="slide-title">Summary</h2>
-      <ol style="font-size: 0.8em; text-align: left; max-width: 70%; margin: 0 auto;">
-        <li><strong>Flows</strong> transform simple distributions to complex ones via learned velocity fields</li>
-        <li><strong>Flow matching</strong> enables simulation-free training with a simple regression loss</li>
-        <li><strong>Independent coupling</strong> &rarr; crossing paths &rarr; curvature &rarr; slow sampling</li>
-        <li><strong>Rectified flows</strong> induce a non-crossing coupling &rarr; straight paths &rarr; fast sampling</li>
-        <li>The <strong>continuity equation</strong> provides the density-side view, unlocking exact likelihood</li>
-        <li><strong>Stochastic interpolants</strong> unify the framework</li>
-      </ol>
-      <aside class="notes">
-        The thread: flows, flow matching, curvature from independent coupling, rectified flows fix it. Continuity equation as density-side view. Stochastic interpolants as unifying framework.
-      </aside>
-    </section>
-
-    <!-- Slide 22: References -->
-    <section>
-      <h2 class="slide-title">Diffusion Explorer</h2>
-      <p style="font-size: 0.85em;">
-        All visualizations are interactive — play with these ideas yourself!
-      </p>
-      <p style="font-size: 0.8em; color: #666;">
-        github.com/helblazer811/Diffusion-Explorer
-      </p>
-      <div style="margin-top: 1.5em; text-align: left; max-width: 65%; margin-left: auto; margin-right: auto;">
-        <h3 style="font-size: 0.8em;">Key References</h3>
-        <ul style="font-size: 0.65em;">
-          <li>Lipman et al. (2022) — Flow Matching for Generative Modeling</li>
-          <li>Liu et al. (2022) — Flow Straight and Fast: Rectified Flow</li>
-          <li>Albergo &amp; Vanden-Eijnden (2023) — Stochastic Interpolants</li>
-          <li>Chen et al. (2018) — Neural ODEs</li>
-        </ul>
-      </div>
-      <aside class="notes">
-        Plug the interactive tool. References and acknowledgements.
-      </aside>
     </section>
 
   </div>

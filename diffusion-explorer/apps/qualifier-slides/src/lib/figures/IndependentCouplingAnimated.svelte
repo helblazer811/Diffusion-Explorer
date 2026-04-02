@@ -4,7 +4,7 @@
 <script lang="ts">
   import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
-  import { Figure, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler, shuffleArray } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawText, drawMathjax, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler, shuffleArray } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -36,6 +36,9 @@
 
   // Label styling
   export let labelFontSize = settings.stylingSettings.label.fontSize;
+  export let sourceLabel = "Source Distribution";
+  export let targetLabel = "Target Distribution";
+  export let useLatexLabels = false;
 
   // Coupling line styling
   export let couplingLineColor = '#888';
@@ -183,15 +186,21 @@
     const labelColor = settings.stylingSettings.label.color;
     const labelFontWeight = settings.stylingSettings.label.fontWeight;
     const labelOpacity = settings.stylingSettings.label.opacity;
-    const labelFont = `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`;
     const labelY = marginHeight / 2;
 
-    drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, labelY, {
-      font: labelFont, color: labelColor, opacity: labelOpacity, align: "center", baseline: "top",
-    });
-    drawText(ctx, "Target Distribution", scales.targetCenterPixelX, labelY, {
-      font: labelFont, color: labelColor, opacity: labelOpacity, align: "center", baseline: "top",
-    });
+    if (useLatexLabels) {
+      const requestRedraw = () => { if (timeline) draw(timeline.state); };
+      drawMathjax(ctx, sourceLabel, scales.sourceCenterPixelX, labelY + labelFontSize, labelFontSize, 0, labelFontSize * 1.0, { color: labelColor }, requestRedraw);
+      drawMathjax(ctx, targetLabel, scales.targetCenterPixelX, labelY + labelFontSize, labelFontSize, 0, labelFontSize * 1.0, { color: labelColor }, requestRedraw);
+    } else {
+      const labelFont = `${labelFontWeight} ${labelFontSize}px Libre Baskerville, Georgia, serif`;
+      drawText(ctx, sourceLabel, scales.sourceCenterPixelX, labelY, {
+        font: labelFont, color: labelColor, opacity: labelOpacity, align: "center", baseline: "top",
+      });
+      drawText(ctx, targetLabel, scales.targetCenterPixelX, labelY, {
+        font: labelFont, color: labelColor, opacity: labelOpacity, align: "center", baseline: "top",
+      });
+    }
   }
 
   function drawCouplingLines(progress: number) {

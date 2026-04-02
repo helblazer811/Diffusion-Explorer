@@ -503,6 +503,7 @@
       .attr("y", yScale(yTop - yShift) - 5)
       .attr("text-anchor", "middle")
       .attr("font-size", `${labelFontSize}px`)
+      .attr("font-family", "Libre Baskerville, Georgia, serif")
       .attr("fill", labelColor)
       .attr("opacity", labelOpacity)
       .text(label);
