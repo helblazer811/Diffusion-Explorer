@@ -68,12 +68,12 @@
   };
 
   export let mergeTime = 0.4;  // Normalized time (0-1) when trajectories merge
-  export let numSteps = 200;   // Number of discrete points per trajectory
+  export let numSteps = 400;   // Number of discrete points per trajectory
 
   // Distribution data - can be provided or loaded from file
   export let sourceDistribution: number[][] | null = null;  // If null, generates Gaussian
   export let targetDistribution: number[][] | null = null;  // If null, loads smiley face from file
-  export let smileyFaceDataPath = "/flow_invertibility/data/smiley_face.json";  // Path to smiley face data
+  export let smileyFaceDataPath = "/data/smiley_face.json";  // Path to smiley face data
   export let numScatterPoints = 150;  // Number of points to display for target (samples from distribution)
   export let numSourcePoints = 300;   // Number of points for source distribution (more for denser look)
   export let distributionScale = 0.4;  // Scale factor for distributions
@@ -95,6 +95,7 @@
   // Styling props - labels
   export let latexFontSize = 18;
   export let labelFontSize = 22;
+  export let labelFontFamily = "sans-serif";
 
   // Animation props
   export let animationDuration = 8000;
@@ -583,7 +584,7 @@
     if (!ctx) return;
 
     const centerY = marginHeight - 5;
-    ctx.font = `400 ${labelFontSize}px sans-serif`;
+    ctx.font = `400 ${labelFontSize}px ${labelFontFamily}`;
     ctx.textAlign = "center";
     ctx.fillStyle = "#666";
     ctx.fillText("Paths merge! Invertibility violated.", width / 2, centerY);
