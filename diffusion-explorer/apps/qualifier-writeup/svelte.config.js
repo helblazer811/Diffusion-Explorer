@@ -10,7 +10,7 @@ const config = {
 	kit: {
 		adapter: adapter(),
 		paths: {
-			base: dev ? '' : '/blog/rectified-flow'
+			base: dev ? '' : '/blog/qualifier-writeup'
 		},
 		prerender: {
 			handleMissingId: 'ignore'

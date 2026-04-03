@@ -4,19 +4,20 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [sveltekit()],
+  resolve: {
+    alias: {
+      '$qualifier-slides': path.resolve(__dirname, '../qualifier-slides/src/lib'),
+    }
+  },
   server: {
     fs: {
-      // Allow Vite to serve files from your diffusion package dist folder
       allow: [
-        // adjust this path to your local package dist folder
-        path.resolve('../packages/diffusion/dist')
+        path.resolve('../packages/diffusion/dist'),
+        path.resolve('../qualifier-slides/src/lib'),
       ]
     }
   },
   worker: {
     format: 'es'
   },
-  // esbuild: {
-  //   drop: ['console', 'debugger']
-  // }
 });
