@@ -295,11 +295,11 @@
       <div style="margin-top: 2em;">
         <AnnotatedEquation
           tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#e74c3c} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#2ecc71} p(x)}"}
-          debug={true}
+          debug={false}
           annotations={[
-            { color: '#3498db', label: 'prior density', side: 'below' },
-            { color: '#e74c3c', label: 'Jacobian determinant', side: 'above' },
-            { color: '#2ecc71', label: 'data density', side: 'below' },
+            { color: '#3498db', label: 'Prior Density', side: 'below' },
+            { color: '#e74c3c', label: 'Jacobian Determinant', side: 'above' },
+            { color: '#2ecc71', label: 'Data Density', side: 'below' },
           ]}
         />
       </div>
@@ -397,9 +397,9 @@
         <AnnotatedEquation
           tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#e74c3c} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#2ecc71} p(x)}"}
           annotations={[
-            { color: '#3498db', label: 'prior density', side: 'below' },
-            { color: '#e74c3c', label: 'Jacobian determinant', side: 'above' },
-            { color: '#2ecc71', label: 'data density', side: 'below' },
+            { color: '#3498db', label: 'Prior Density', side: 'below' },
+            { color: '#e74c3c', label: 'Jacobian Determinant', side: 'above' },
+            { color: '#2ecc71', label: 'Data Density', side: 'below' },
           ]}
         />
       </div>
