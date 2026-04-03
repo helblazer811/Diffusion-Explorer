@@ -1,5 +1,6 @@
 // Existing components
 export { default as Katex } from './components/Katex.svelte';
+export { default as AnnotatedEquation } from './components/AnnotatedEquation.svelte';
 export { default as Minimizable } from './components/Minimizable.svelte';
 export { default as Quote } from './components/Quote.svelte';
 export {
@@ -80,7 +81,16 @@ export {
   type RGBAColor,
 } from './plotting/streamlines/gpu';
 
-// Animation utilities
+// Pulsing paths renderer (GPU-accelerated)
+export {
+  PulsingPathsRenderer,
+  preparePathData,
+  type PulsingPathsRendererOptions,
+  type PulsingPathsRenderStyle,
+  type PulsingPathsGPUData,
+} from './plotting/pulsing-paths';
+
+// Animation core (re-exported from tempus)
 export {
   Clock,
   Timeline,
@@ -89,18 +99,22 @@ export {
   type Clip,
   type ClipTiming,
   type ClipOptions,
-} from './animation/timeline';
-
-export {
   type Animation,
   type AnimationWithData,
-} from './animation/animation';
-
-export {
   useVisibilityHandler,
   type VisibilityState,
-} from './animation/visibility';
+  TimelineBuilder,
+  type TimelineBuilderAddOptions,
+  type TimelineBuilderAddAtOptions,
+  exportAnimation,
+  streamingVideoExport,
+  downloadBlob,
+  downloadFrames,
+  type VideoExportOptions,
+  type ExportableAnimation,
+} from 'tempus';
 
+// Domain-specific animations
 export {
   StreamlineAnimation,
   type StreamlineAnimationState,
@@ -125,18 +139,4 @@ export {
   type PulsingPathlineAnimationState,
   type PulsingPathlineAnimationOptions,
 } from './animation/animations/pulsing-pathline-animation';
-
-export {
-  TimelineBuilder,
-  type TimelineBuilderAddOptions,
-  type TimelineBuilderAddAtOptions,
-} from './animation/timeline-builder';
-
-export {
-  exportAnimation,
-  downloadBlob,
-  downloadFrames,
-  type VideoExportOptions,
-  type ExportableAnimation,
-} from './animation/video-export';
 

@@ -11,6 +11,21 @@ const mathjaxCache = new Map<string, { img: HTMLImageElement; aspectRatio: numbe
 // Track formulas currently being rendered
 const pendingRenders = new Set<string>();
 
+/**
+ * Returns a Promise that resolves when all pending MathJax renders are complete,
+ * or null if nothing is pending (fast path for the common case).
+ */
+export function waitForPendingRenders(): Promise<void> | null {
+  if (pendingRenders.size === 0) return null;
+  return new Promise(resolve => {
+    const check = () => {
+      if (pendingRenders.size === 0) resolve();
+      else setTimeout(check, 10);
+    };
+    check();
+  });
+}
+
 // Style options type
 export type MathjaxStyleOptions = {
   color?: string;
@@ -46,9 +61,10 @@ export async function loadMathJax(): Promise<void> {
 
   mathjaxLoading = new Promise((resolve, reject) => {
     window.MathJax = {
-      loader: { load: ['input/tex', 'output/svg'] },
-      tex: { packages: ['base', 'ams'] },
+      loader: { load: ['[tex]/color'] },
+      tex: { packages: { '[+]': ['color'] } },
       svg: { fontCache: 'none' },
+      options: { enableMenu: false },
       startup: { typeset: false }
     };
 
