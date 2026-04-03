@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>Visualizing Rectified Flows</title>
+	<title>A Visual Survey of Flow-Based Generative Models</title>
 </svelte:head>
 
 <TopNav
