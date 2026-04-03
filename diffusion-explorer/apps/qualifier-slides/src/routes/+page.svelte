@@ -12,7 +12,7 @@
     loadCachedVectorField as loadCachedVF,
     loadCachedRectifiedFlowTrajectories as loadCachedRFTraj,
   } from '@diffusion-explorer/diffusion';
-  import { Katex } from '@diffusion-explorer/ui';
+  import { Katex, AnnotatedEquation } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
 
   // ========== FIGURE IMPORTS ==========
@@ -33,13 +33,14 @@
   import EulerStepComparison from '$rectified-flow/figures/EulerStepComparison.svelte';
   import IndependentCoupling from '$rectified-flow/figures/IndependentCoupling.svelte';
   import OTCoupling from '$rectified-flow/figures/OTCoupling.svelte';
-  import RectifiedFlowSuperimposed from '$rectified-flow/figures/RectifiedFlowSuperimposed.svelte';
+  import RectifiedFlowSuperimposed from '$lib/figures/RectifiedFlowSuperimposed.svelte';
   import VectorFieldCurvatureComparison from '$rectified-flow/figures/VectorFieldCurvatureComparison.svelte';
   import EulerStepDemo from '$rectified-flow/figures/EulerStepDemo.svelte';
   import ConditionalFlowMatching from '$rectified-flow/figures/ConditionalFlowMatching.svelte';
   import ConditionalVelocityField from '$rectified-flow/figures/ConditionalVelocityField.svelte';
   import LinearInterpolation from '$rectified-flow/figures/LinearInterpolation.svelte';
   import HighlightTrajectory from '$rectified-flow/figures/HighlightTrajectory.svelte';
+  import ReflowAlgorithm from '$rectified-flow/figures/ReflowAlgorithm.svelte';
   import IntersectingPaths from '$rectified-flow/figures/IntersectingPaths.svelte';
 
   // Local figures
@@ -53,6 +54,7 @@
   import ChangeOfVariables from '$lib/figures/ChangeOfVariables.svelte';
   import MaxLikelihoodTraining from '$lib/figures/MaxLikelihoodTraining.svelte';
   import StochasticInterpolation from '$lib/figures/StochasticInterpolation.svelte';
+  import InducedCouplingAnimated from '$lib/figures/InducedCouplingAnimated.svelte';
 
   let flowerFigure: FlowerImageDistribution;
   let noiseFigure: TransformingNoiseIntoData;
@@ -287,6 +289,22 @@
       </aside>
     </section>
 
+    <!-- Test Slide: Annotated Equation -->
+    <section>
+      <h2 class="slide-title">Annotated Equation Test</h2>
+      <div style="margin-top: 2em;">
+        <AnnotatedEquation
+          tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#e74c3c} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#2ecc71} p(x)}"}
+          debug={true}
+          annotations={[
+            { color: '#3498db', label: 'prior density', side: 'below' },
+            { color: '#e74c3c', label: 'Jacobian determinant', side: 'above' },
+            { color: '#2ecc71', label: 'data density', side: 'below' },
+          ]}
+        />
+      </div>
+    </section>
+
     <!-- Slide 2: The Goal of Generative Modeling -->
     <Slide figure={flowerFigure}>
       <h2 class="slide-title">The Goal of Generative Modeling</h2>
@@ -376,7 +394,14 @@
         This leverages the differentiability and invertibility of <Katex math={"f(z)"} />.
       </p>
       <div style="margin-top: 0.5em;">
-        <Katex math={"p(z) \\left| \\det \\frac{\\partial f}{\\partial z} \\right|^{-1} = p(x)"} displayMode={true} />
+        <AnnotatedEquation
+          tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#e74c3c} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#2ecc71} p(x)}"}
+          annotations={[
+            { color: '#3498db', label: 'prior density', side: 'below' },
+            { color: '#e74c3c', label: 'Jacobian determinant', side: 'above' },
+            { color: '#2ecc71', label: 'data density', side: 'below' },
+          ]}
+        />
       </div>
       <div class="figure-container" style="margin-top: -10px; height: 580px;">
         <ChangeOfVariables bind:this={covFigure} width={1720} height={580} numSamples={300} contourThresholds={3} />
@@ -842,7 +867,7 @@
       <p style="margin-top: 0.5em;">
         The velocity field <Katex math={"v_t^\\theta"} /> cannot accurately resolve conflicting paths — the best it can do is average. This averaging leads to curved trajectories.
       </p>
-      <div class="figure-container" style="margin-top: 1.5em;">
+      <div class="figure-container" style="margin-top: 2.5em;">
         {#if dataLoaded}
           <IntersectingPaths
             width={1800}
@@ -851,6 +876,9 @@
             targetCenterX={0.8}
             latexFontSize={40}
             labelFontSize={50}
+            meanArrowLabelOffset={{ x: 60, y: -18 }}
+            topArrowLabelOffset={{ x: -55, y: -60 }}
+            bottomArrowLabelOffset={{ x: -55, y: 20 }}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             backgroundVisible={false}
@@ -865,6 +893,24 @@
     <!-- Slide: Rectified Flows -->
     <section>
       <h2 class="slide-title">Rectified Flows</h2>
+      <p style="margin-top: 0.5em;">Reflow recursively trains flow matching models and uses them to produce a better coupling.</p>
+      <div class="figure-container" style="margin-top: 1em;">
+        {#if dataLoaded}
+          <InducedCouplingAnimated
+            width={1800}
+            height={550}
+            targetDistribution={$targetDistributionSamples}
+            {flowMatchingClient}
+            numSteps={200}
+            numPoints={100}
+            numLinesToDraw={100}
+            numTrajectoriesToShow={30}
+            animationDuration={24000}
+            labelFontSize={50}
+            toggleFontSize={28}
+          />
+        {/if}
+      </div>
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
         <p style="font-size: 0.7em; color: #888; margin: 0;">
           Liu et al., <span style="font-style: italic;">Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow</span>, 2022
@@ -875,11 +921,58 @@
     <!-- Slide: The Reflow Algorithm -->
     <section>
       <h2 class="slide-title">The Reflow Algorithm</h2>
+      <div class="figure-container" style="margin-top: 2em;">
+        <ReflowAlgorithm backgroundVisible={false} fontSize={36} />
+      </div>
+    </section>
+
+    <!-- Slide: The Reflow Algorithm (visualization) -->
+    <section>
+      <h2 class="slide-title">The Reflow Algorithm</h2>
+      <div class="figure-container" style="margin-top: 3em;">
+        {#if dataLoaded}
+          <InducedCouplingAnimated
+            width={1800}
+            height={550}
+            targetDistribution={$targetDistributionSamples}
+            {flowMatchingClient}
+            numSteps={200}
+            numPoints={100}
+            numLinesToDraw={100}
+            numTrajectoriesToShow={30}
+            animationDuration={24000}
+            labelFontSize={50}
+            toggleFontSize={28}
+          />
+        {/if}
+      </div>
     </section>
 
     <!-- Slide: Reflow Produces Straighter Trajectories -->
     <section>
       <h2 class="slide-title">Reflow Produces Straighter Trajectories</h2>
+      <div class="figure-container" style="margin-top: 1em;">
+        {#if dataLoaded}
+          <RectifiedFlowSuperimposed
+            width={1800}
+            canvasWidth={700}
+            canvasHeight={700}
+            gap={10}
+            {flowMatchingClient}
+            {rectifiedFlowClient}
+            leftTrajectories={flowMatchingGridTrajectories ?? []}
+            rightTrajectories={rectifiedFlowGridTrajectories?.[rectifiedFlowGridTrajectories.length - 1]
+              ? clipTrajectoriesToStartingRadius(
+                  rectifiedFlowGridTrajectories[rectifiedFlowGridTrajectories.length - 1],
+                  2.5
+                )
+              : []}
+            targetDistribution={$targetDistributionSamples}
+            playingByDefault={true}
+            backgroundVisible={false}
+          />
+        {/if}
+      </div>
     </section>
 
     <!-- Slide: Key References -->
