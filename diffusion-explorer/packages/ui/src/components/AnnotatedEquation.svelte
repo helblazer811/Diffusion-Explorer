@@ -101,7 +101,7 @@
     const belowCount = annotations.filter((a) => !a.side || a.side === "below").length;
     const maxAboveStack = Math.max(0, aboveCount - 1);
     const maxBelowStack = Math.max(0, belowCount - 1);
-    const topPad = aboveCount > 0 ? verticalGap + maxAboveStack * rowSpacing + labelFontSize + 20 : 4;
+    const topPad = aboveCount > 0 ? verticalGap + maxAboveStack * rowSpacing + labelFontSize * 1.5 + 8 : 4;
     const bottomPad = belowCount > 0 ? verticalGap + maxBelowStack * rowSpacing + labelFontSize + 20 : 4;
     container.style.paddingTop = `${topPad}px`;
     container.style.paddingBottom = `${bottomPad}px`;
@@ -122,6 +122,12 @@
 
   function drawAnnotations() {
     if (!container || !svgOverlay) return;
+
+    // Skip redraw if in Reveal.js overview mode (slides are heavily scaled down)
+    // In overview, the container is scaled much smaller than its layout size
+    const scaleCheck = container.getBoundingClientRect().width / container.offsetWidth;
+    if (container.offsetWidth > 0 && scaleCheck < 0.3) return;
+
     clearOverlay();
 
     const cRect = container.getBoundingClientRect();
@@ -329,7 +335,7 @@
 
     // Above/below annotations
     const cx = box.x + box.w / 2;
-    const arrowGap = 4;
+    const arrowGap = 10;
     const levelOffset = (item.elbowLevel || 0) * rowSpacing;
     let tipY, elbowY;
     if (resolvedSide === "above") {
@@ -340,7 +346,7 @@
       elbowY = eqBottom + verticalGap + levelOffset;
     }
 
-    const labelGapY = 14;
+    const labelGapY = labelFontSize * 0.4;
     const labelGapX = 12;
     const textAnchor = resolvedAlign === "left" ? "end" : "start";
     const textY = elbowY - labelGapY;
@@ -373,7 +379,7 @@
         fill: "none",
         stroke: color,
         "stroke-width": 2.5,
-        "marker-end": `url(#arrowhead-${markerId})`,
+        "marker-end": `url(#${markerId})`,
       })
     );
   }
