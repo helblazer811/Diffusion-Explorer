@@ -23,6 +23,7 @@
     contourBandwidth = 8,
     contourThresholds = 5 as number | number[],
     contourFillColor = '#f17720',
+    showLabels = false,
   }: {
     width?: number;
     height?: number;
@@ -32,6 +33,7 @@
     contourBandwidth?: number;
     contourThresholds?: number | number[];
     contourFillColor?: string;
+    showLabels?: boolean;
   } = $props();
 
   // ----------------------------------------------------------------
@@ -226,9 +228,17 @@
       // Draw scatter (same color as contour)
       drawScatterPlot(ctx, stage.pixelCoords, 5, contourFillColor, 0.4 * opacity);
 
-      // Label below: z_i ~ p(z_i)
-      const labelY = height - 30;
-      drawMathjax(ctx, `z_{${s}} \\sim p(z_{${s}})`, stage.centerX, labelY, 34, 0, 0, { color: '#333' });
+      // Distribution labels below each stage
+      if (showLabels) {
+        const labelY = height - 30;
+        if (s === 0) {
+          drawMathjax(ctx, `p(z)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' });
+        } else if (s === stages.length - 1) {
+          drawMathjax(ctx, `p(x)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' });
+        } else {
+          drawMathjax(ctx, `p(z_{${s}})`, stage.centerX, labelY, 34, 0, 0, { color: '#333' });
+        }
+      }
 
       ctx.restore();
 

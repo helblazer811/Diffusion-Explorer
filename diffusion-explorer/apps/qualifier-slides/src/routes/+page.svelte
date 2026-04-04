@@ -45,6 +45,8 @@
 
   // Local figures
   import IndependentCouplingAnimated from '$lib/figures/IndependentCouplingAnimated.svelte';
+  import FlowInvertibilitySimple from '$lib/figures/FlowInvertibilitySimple.svelte';
+  import ChangeOfVariablesIntro from '$lib/figures/ChangeOfVariablesIntro.svelte';
   import FlowerImageDistribution from '$lib/figures/FlowerImageDistribution.svelte';
   import TransformingNoiseIntoData from '$lib/figures/TransformingNoiseIntoData.svelte';
   import DiffusionVsFlow from '$lib/figures/DiffusionVsFlow.svelte';
@@ -64,6 +66,7 @@
   let covFigure: ChangeOfVariables;
   let composeFigure: NormalizingFlowStages;
   let mlFigure: MaxLikelihoodTraining;
+  let encodeFigure: MaxLikelihoodTraining;
 
   // Provide reveal instance to Slide components via context
   setContext('getReveal', () => revealInstance);
@@ -289,20 +292,24 @@
       </aside>
     </section>
 
-    <!-- Test Slide: Annotated Equation -->
+    <!-- Slide: About Me -->
     <section>
-      <h2 class="slide-title">Annotated Equation Test</h2>
-      <div style="margin-top: 2em;">
-        <AnnotatedEquation
-          tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#e74c3c} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#2ecc71} p(x)}"}
-          debug={false}
-          annotations={[
-            { color: '#3498db', label: 'Prior Density', side: 'below' },
-            { color: '#e74c3c', label: 'Jacobian Determinant', side: 'above' },
-            { color: '#2ecc71', label: 'Data Density', side: 'below' },
-          ]}
-        />
+      <h2 class="slide-title">About Me</h2>
+      <div style="display: flex; align-items: center; gap: 3em; margin-top: 4em;">
+        <div style="flex: 6; display: flex; align-items: center; justify-content: center;">
+          <ul style="font-size: 1.3em; line-height: 1.8;">
+            <li>3rd year PhD student</li>
+            <li>Advised by Polo Chau</li>
+            <li>Research focus: generative models, interpretability, visualization</li>
+          </ul>
+        </div>
+        <div style="flex: 4; display: flex; align-items: center; justify-content: center;">
+          <img src="https://alechelbling.com/data/images/alec_photo.jpg" alt="Alec Helbling" style="width: 450px; height: 450px; border-radius: 16px; object-fit: cover;" />
+        </div>
       </div>
+      <aside class="notes">
+        Brief introduction before diving into the technical content.
+      </aside>
     </section>
 
     <!-- Slide 2: The Goal of Generative Modeling -->
@@ -329,10 +336,12 @@
       </div>
     </Slide>
 
-    <!-- Slide 4: Diffusion vs Flow -->
+    <!-- Slide 4: Diffusion vs Flow (hidden for now) -->
+    <!--
     <Slide figure={diffFlowFigure}>
       <DiffusionVsFlow bind:this={diffFlowFigure} width={1720} height={520} animationDuration={24000} />
     </Slide>
+    -->
 
     <!-- Slide 5: Flow-based Generative Models -->
     <Slide figure={flowPathFigure}>
@@ -369,12 +378,11 @@
     <Slide figure={normFlowFigure}>
       <h2 class="slide-title">What is a Normalizing Flow?</h2>
       <p style="margin-top: 0.5em;">
-        A <strong>Normalizing Flow</strong> is a transformation of a simple
-        probability distribution (e.g., a standard normal) into a more
-        complex distribution by a sequence of <strong>invertible</strong> and
-        <strong>differentiable</strong> mappings.
+        A <strong>Normalizing Flow</strong> transforms a simple
+        distribution <Katex math={"p(z)"}/> into a complex
+        distribution <Katex math={"p(x)"}/> by a sequence of mappings <Katex math={"f_i(z)"}/>.
       </p>
-      <div class="figure-container" style="margin-top: -20px;">
+      <div class="figure-container" style="margin-top: -50px;">
         <NormalizingFlowStages bind:this={normFlowFigure} width={1720} height={580} numStages={4} />
       </div>
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
@@ -384,41 +392,139 @@
       </div>
     </Slide>
 
-    <!-- Slide 8: Change of Variables Formula -->
-    <Slide figure={covFigure}>
+    <!-- Slide: Normalizing Flows are Invertible (figure) -->
+    <section>
+      <h2 class="slide-title">Flows are Invertible and Differentiable</h2>
+      <div class="figure-container" style="margin-top: 3em;">
+        {#if dataLoaded}
+          <FlowInvertibilitySimple
+            width={1800}
+            height={950}
+            {allTimeSamples}
+            numLines={5}
+            distributionScaleFactor={1.0}
+          />
+        {/if}
+      </div>
+    </section>
+
+    <!-- Slide: Flows Preserve Probability Mass (figure) -->
+    <section>
+      <h2 class="slide-title">Flows Preserve Probability Mass</h2>
+      <p style="margin-top: 0.5em;">
+        Invertibility ensures mass is not created or destroyed.
+      </p>
+      <div class="figure-container" style="margin-top: 2.5em;">
+        {#if dataLoaded}
+          <FlowInvertibilitySimple
+            width={1800}
+            height={950}
+            {allTimeSamples}
+            numLines={5}
+            staticForward={true}
+            overlayText={"f(z) maps all points to distinct locations"}
+          />
+        {/if}
+      </div>
+    </section>
+
+    <!-- Slide: Change of Variables Formula (original form) -->
+    <section>
       <h2 class="slide-title">Change of Variables Formula</h2>
       <p style="margin-top: 0.5em;">
-        The Change of Variables Formula connects the density of <Katex math={"p(x)"} /> to <Katex math={"p(z)"} />.
+        Flows link the density of a complex distribution <Katex math={"\\color{#f17720}{p(x)}"} /> to a simple distribution <Katex math={"\\color{#3498db}{p(z)}"} />.
       </p>
-      <p>
-        This leverages the differentiability and invertibility of <Katex math={"f(z)"} />.
-      </p>
-      <div style="margin-top: 0.5em;">
+      <div style="margin-top: 1.8em;">
         <AnnotatedEquation
-          tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#e74c3c} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#2ecc71} p(x)}"}
+          scale={2.2}
+          verticalGap={100}
+          tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#e74c3c} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#f17720} p(x)}"}
           annotations={[
-            { color: '#3498db', label: 'Prior Density', side: 'below' },
-            { color: '#e74c3c', label: 'Jacobian Determinant', side: 'above' },
-            { color: '#2ecc71', label: 'Data Density', side: 'below' },
+            { color: '#3498db', label: 'Source Density', side: 'above', align: 'left' },
+            { color: '#e74c3c', label: 'Jacobian', side: 'below', align: 'right' },
+            { color: '#f17720', label: 'Data Density', side: 'above' },
           ]}
         />
       </div>
-      <div class="figure-container" style="margin-top: -10px; height: 580px;">
-        <ChangeOfVariables bind:this={covFigure} width={1720} height={580} numSamples={300} contourThresholds={3} />
+    </section>
+
+    <!-- Slide: Jacobian Measures Local Volume Change -->
+    <section>
+      <h2 class="slide-title">Jacobian Measures Local Volume Change</h2>
+      <p style="margin-top: 0.5em;">
+        Determinant of the Jacobian <Katex math={"\\color{#f17720}{\\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"} /> measures how <Katex math={"f"} /> locally stretches and shears space.
+      </p>
+      <div class="figure-container" style="margin-top: 0.5em;">
+        {#if dataLoaded}
+          <ChangeOfVariablesIntro
+            width={1800}
+            height={950}
+            {allTimeSamples}
+            numFrames={5}
+            distributionScaleFactor={1.0}
+          />
+        {/if}
       </div>
-    </Slide>
+    </section>
+
+    <!-- Slide: Log Form of Change of Variables -->
+    <section>
+      <h2 class="slide-title">Log-Likelihood Under a Flow</h2>
+      <p style="margin-top: 0.5em;">
+        Taking the log gives a more convenient form:
+      </p>
+      <div style="margin-top: 2.5em;">
+        <AnnotatedEquation
+          scale={1.8}
+          verticalGap={100}
+          tex={"{\\color{#f17720} \\log p(x)} = {\\color{#3498db} \\log p(z)} + {\\color{#e74c3c} \\log \\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"}
+          annotations={[
+            { color: '#f17720', label: 'Data Density', side: 'above', align: 'left' },
+            { color: '#3498db', label: 'Source Density', side: 'below' },
+            { color: '#e74c3c', label: 'Log Volume Change', side: 'above', align: 'left' },
+          ]}
+        />
+      </div>
+    </section>
 
     <!-- Slide: Composing Multiple Transformations -->
     <Slide figure={composeFigure}>
       <h2 class="slide-title">Composing Multiple Transformations</h2>
+      <div style="margin-top: 0.5em; margin-bottom: 0.8em;">
+        <AnnotatedEquation
+          scale={1.3}
+          verticalGap={60}
+          rowSpacing={40}
+          tex={"\\log p(x) = \\log p(z_0) + {\\color{#e74c3c} \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|}"}
+          annotations={[
+            { color: '#e74c3c', label: 'Sum of Log Volume Changes', side: 'above', align: 'left' },
+          ]}
+        />
+      </div>
+      <div class="figure-container" style="margin-top: 10px; height: 520px; overflow: hidden;">
+        <NormalizingFlowStages bind:this={composeFigure} width={1720} height={580} numStages={4} showLabels={true} />
+      </div>
+    </Slide>
+
+    <!-- Slide: Computing the Likelihood of Data -->
+    <Slide figure={encodeFigure}>
+      <h2 class="slide-title">Computing the Likelihood of Data</h2>
       <p style="margin-top: 0.3em;">
-        Chain multiple invertible transformations to build expressive mappings from simple distributions.
+        Map data <Katex math={"x"} /> through the inverse flow <Katex math={"f^{-1}"} /> to encode it into the simple distribution <Katex math={"p(z)"} />.
       </p>
-      <div style="margin-top: 0.15em;">
-        <Katex math={"\\log p(x) = \\log p(z_0) - \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|"} displayMode={true} />
+      <div style="margin-top: 1em;">
+        <AnnotatedEquation
+          scale={1.3}
+          verticalGap={20}
+          rowSpacing={35}
+          tex={"{\\color{#3498db} \\log p(x)} = \\log p(z_0) + \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|"}
+          annotations={[
+            { color: '#3498db', label: 'Data Log-Likelihood', side: 'above', align: 'right' },
+          ]}
+        />
       </div>
       <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: hidden;">
-        <NormalizingFlowStages bind:this={composeFigure} width={1720} height={580} numStages={4} />
+        <MaxLikelihoodTraining bind:this={encodeFigure} width={1720} height={580} numStages={4} reversed={true} />
       </div>
     </Slide>
 
@@ -426,10 +532,10 @@
     <Slide figure={mlFigure}>
       <h2 class="slide-title">Maximum Likelihood Training</h2>
       <p style="margin-top: 0.3em;">
-        Map data <Katex math={"x"} /> backward through the inverse flow to evaluate <Katex math={"p(z_0)"} /> and train via maximum likelihood:
+        Find parameters <Katex math={"\\theta"} /> that maximize the log-likelihood of observed data:
       </p>
       <div style="margin-top: 0.15em;">
-        <Katex math={"-\\log p(x) = -\\log p(f^{-1}(x)) - \\log \\left| \\det \\dfrac{\\partial f^{-1}}{\\partial x} \\right|"} displayMode={true} />
+        <Katex math={"\\theta^* = \\arg\\max_\\theta \\sum_{x \\in \\mathcal{D}} \\log p_\\theta(x)"} displayMode={true} />
       </div>
       <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: hidden;">
         <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={580} numStages={4} />
@@ -987,6 +1093,17 @@
         <li>Lipman et al., <span style="font-style: italic;">Flow Matching for Generative Modeling</span>, 2023</li>
         <li>Albergo et al., <span style="font-style: italic;">Stochastic Interpolants: A Unifying Framework for Flows and Diffusions</span>, 2023</li>
         <li>Liu et al., <span style="font-style: italic;">Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow</span>, 2022</li>
+      </ul>
+    </section>
+
+    <!-- Slide: Conclusion -->
+    <section>
+      <h2 class="slide-title">Conclusion</h2>
+      <ul style="margin-top: 1em; font-size: 1.05em; line-height: 1.8;">
+        <li><strong>Normalizing Flows</strong> — invertible mappings with tractable densities via the change of variables formula</li>
+        <li><strong>Continuous Normalizing Flows</strong> — replace discrete layers with a continuous-time ODE, avoiding expensive Jacobian determinants</li>
+        <li><strong>Flow Matching &amp; Stochastic Interpolants</strong> — scalable training via regression on conditional velocity fields</li>
+        <li><strong>Rectified Flows</strong> — straighten trajectories through reflow for efficient few-step sampling</li>
       </ul>
     </section>
 

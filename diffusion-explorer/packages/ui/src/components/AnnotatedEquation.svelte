@@ -24,7 +24,7 @@
   export let scale = 1.6;
 
   /** @type {number} Vertical distance from term edge to the horizontal arm (px) */
-  export let verticalGap = 36;
+  export let verticalGap = 56;
 
   /** @type {number} Extra vertical spacing per stacked annotation on the same side (px) */
   export let rowSpacing = 24;
@@ -96,17 +96,18 @@
       }
     }
 
-    // Compute how much vertical space annotations need and set padding
+    // Compute padding: just enough for the annotations
     const aboveCount = annotations.filter((a) => a.side === "above").length;
     const belowCount = annotations.filter((a) => !a.side || a.side === "below").length;
     const maxAboveStack = Math.max(0, aboveCount - 1);
     const maxBelowStack = Math.max(0, belowCount - 1);
-    const topPad = aboveCount > 0 ? (verticalGap + maxAboveStack * rowSpacing + labelFontSize + 16) * 2.5 : 8;
-    const bottomPad = belowCount > 0 ? (verticalGap + maxBelowStack * rowSpacing + labelFontSize + 16) * 2.5 : 8;
+    const topPad = aboveCount > 0 ? verticalGap + maxAboveStack * rowSpacing + labelFontSize + 20 : 4;
+    const bottomPad = belowCount > 0 ? verticalGap + maxBelowStack * rowSpacing + labelFontSize + 20 : 4;
     container.style.paddingTop = `${topPad}px`;
     container.style.paddingBottom = `${bottomPad}px`;
-    container.style.paddingLeft = `${(horizontalExtent + 32) * 4}px`;
-    container.style.paddingRight = `${(horizontalExtent + 32) * 4}px`;
+    // No horizontal padding — annotations draw outside bounds via overflow: visible
+    container.style.paddingLeft = '0px';
+    container.style.paddingRight = '0px';
 
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     drawAnnotations();
@@ -183,6 +184,76 @@
     const eqTop = eqRect.top - cRect.top;
     const eqBottom = eqRect.bottom - cRect.top;
 
+    // Pre-compute text extents to detect horizontal overlaps on the same side.
+    // Render temporary hidden text elements to measure widths.
+    const labelGapX = 12;
+    for (const item of resolved) {
+      const cx = item.box.x + item.box.w / 2;
+      const textStartX = item.resolvedAlign === "left" ? cx - labelGapX : cx + labelGapX;
+      const tmpText = makeSVG("text", {
+        x: textStartX,
+        y: 0,
+        "text-anchor": item.resolvedAlign === "left" ? "end" : "start",
+        "font-size": labelFontSize,
+        "font-family": "inherit",
+        visibility: "hidden",
+      });
+      tmpText.textContent = item.label;
+      svgOverlay.appendChild(tmpText);
+      const textWidth = tmpText.getComputedTextLength();
+      svgOverlay.removeChild(tmpText);
+
+      const elbowOverhang = 10;
+      if (item.resolvedAlign === "left") {
+        item.labelLeft = textStartX - textWidth - elbowOverhang;
+        item.labelRight = cx;
+      } else {
+        item.labelLeft = cx;
+        item.labelRight = textStartX + textWidth + elbowOverhang;
+      }
+    }
+
+    // Check for horizontal overlaps on the same side.
+    // If two annotations on the same side overlap horizontally,
+    // the more central one gets bumped further away (higher elbowLevel).
+    for (const item of resolved) {
+      item.elbowLevel = 0;
+    }
+
+    const sides = ["above", "below"];
+    for (const side of sides) {
+      const sideItems = resolved.filter((it) => it.resolvedSide === side);
+      // Sort by distance from center (outermost first)
+      sideItems.sort(
+        (a, b) =>
+          Math.abs(b.box.x + b.box.w / 2 - eqCenterX) -
+          Math.abs(a.box.x + a.box.w / 2 - eqCenterX)
+      );
+
+      // Greedily assign levels: for each item, check if it overlaps
+      // with any already-placed item at the same level
+      for (let i = 0; i < sideItems.length; i++) {
+        const curr = sideItems[i];
+        let level = 0;
+        let hasOverlap = true;
+        while (hasOverlap) {
+          hasOverlap = false;
+          for (let j = 0; j < i; j++) {
+            const other = sideItems[j];
+            if (other.elbowLevel === level) {
+              // Check horizontal overlap
+              if (curr.labelLeft < other.labelRight && curr.labelRight > other.labelLeft) {
+                hasOverlap = true;
+                level++;
+                break;
+              }
+            }
+          }
+        }
+        curr.elbowLevel = level;
+      }
+    }
+
     // Draw
     for (const item of resolved) {
       if (debug) drawDebugBox(item.box, item);
@@ -224,54 +295,7 @@
     );
   }
 
-  function drawLConnector(item, eqTop, eqBottom) {
-    const { box, color, label, resolvedSide, resolvedAlign, stackIndex } = item;
-    const cx = box.x + box.w / 2;
-    const vOffset = verticalGap + stackIndex * rowSpacing;
-
-    // Arrow tip: slightly above/below the box
-    const arrowGap = 4;
-    let tipY, elbowY;
-    if (resolvedSide === "above") {
-      tipY = box.y - boxPadding - arrowGap;
-      elbowY = eqTop - vOffset;
-    } else {
-      tipY = box.y + box.h + boxPadding + arrowGap;
-      elbowY = eqBottom + vOffset;
-    }
-
-    // Render text first to measure its width
-    const labelGapY = 14;  // vertical gap above the elbow line
-    const labelGapX = 12;  // horizontal gap away from the vertical part
-    const textAnchor = resolvedAlign === "left" ? "end" : "start";
-    const textY = elbowY - labelGapY;
-    const textStartX = resolvedAlign === "left" ? cx - labelGapX : cx + labelGapX;
-
-    // Place text temporarily to measure
-    const text = makeSVG("text", {
-      x: textStartX,
-      y: textY,
-      "text-anchor": textAnchor,
-      "dominant-baseline": "alphabetic",
-      "font-size": labelFontSize,
-      "font-family": "inherit",
-      fill: color,
-    });
-    text.textContent = label;
-    svgOverlay.appendChild(text);
-
-    // Measure text width and compute horizontal arm endpoint
-    // Extend a bit past the text
-    const textWidth = text.getComputedTextLength();
-    const elbowOverhang = 10;
-    let endX;
-    if (resolvedAlign === "left") {
-      endX = textStartX - textWidth - elbowOverhang;
-    } else {
-      endX = textStartX + textWidth + elbowOverhang;
-    }
-
-    // Define arrowhead marker for this color
+  function ensureArrowMarker(color) {
     let defs = svgOverlay.querySelector("defs");
     if (!defs) {
       defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
@@ -296,14 +320,59 @@
       );
       defs.appendChild(marker);
     }
+    return markerId;
+  }
 
-    // L-shaped path: horizontal arm spans the text width, then vertical to arrow tip
+  function drawLConnector(item, eqTop, eqBottom) {
+    const { box, color, label, resolvedSide, resolvedAlign, stackIndex } = item;
+    const markerId = ensureArrowMarker(color);
+
+    // Above/below annotations
+    const cx = box.x + box.w / 2;
+    const arrowGap = 4;
+    const levelOffset = (item.elbowLevel || 0) * rowSpacing;
+    let tipY, elbowY;
+    if (resolvedSide === "above") {
+      tipY = box.y - boxPadding - arrowGap;
+      elbowY = eqTop - verticalGap - levelOffset;
+    } else {
+      tipY = box.y + box.h + boxPadding + arrowGap;
+      elbowY = eqBottom + verticalGap + levelOffset;
+    }
+
+    const labelGapY = 14;
+    const labelGapX = 12;
+    const textAnchor = resolvedAlign === "left" ? "end" : "start";
+    const textY = elbowY - labelGapY;
+    const textStartX = resolvedAlign === "left" ? cx - labelGapX : cx + labelGapX;
+
+    const text = makeSVG("text", {
+      x: textStartX,
+      y: textY,
+      "text-anchor": textAnchor,
+      "dominant-baseline": "alphabetic",
+      "font-size": labelFontSize,
+      "font-family": "inherit",
+      fill: color,
+    });
+    text.textContent = label;
+    svgOverlay.appendChild(text);
+
+    const textWidth = text.getComputedTextLength();
+    const elbowOverhang = 10;
+    let endX;
+    if (resolvedAlign === "left") {
+      endX = textStartX - textWidth - elbowOverhang;
+    } else {
+      endX = textStartX + textWidth + elbowOverhang;
+    }
+
     svgOverlay.appendChild(
       makeSVG("path", {
         d: `M ${endX} ${elbowY} L ${cx} ${elbowY} L ${cx} ${tipY}`,
         fill: "none",
         stroke: color,
-        "stroke-width": 2,
+        "stroke-width": 2.5,
         "marker-end": `url(#arrowhead-${markerId})`,
       })
     );
@@ -325,12 +394,16 @@
 <style>
   .eq-wrap {
     position: relative;
-    display: inline-block;
+    display: block;
+    margin: 0 auto;
+    width: fit-content;
     padding: 8px;
+    overflow: visible;
   }
 
   .eq-content {
     position: relative;
+    text-align: center;
   }
 
   .annot-overlay {

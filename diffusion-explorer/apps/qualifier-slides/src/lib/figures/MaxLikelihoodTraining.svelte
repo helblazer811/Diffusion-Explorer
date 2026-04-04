@@ -25,6 +25,7 @@
     contourFillColor = '#f17720',
     highlightColor = '#3b82f6',
     highlightPointIndex = 15,
+    reversed = false,
   }: {
     width?: number;
     height?: number;
@@ -36,6 +37,7 @@
     contourFillColor?: string;
     highlightColor?: string;
     highlightPointIndex?: number;
+    reversed?: boolean;
   } = $props();
 
   // ----------------------------------------------------------------
@@ -140,7 +142,25 @@
       allStages.push({ samples, pixelCoords, centerX, contours });
     }
 
-    stages = allStages;
+    if (reversed) {
+      // Reverse the data order but keep positions left-to-right
+      // So complex dist is on the left and simple on the right
+      const reversedStages: StageData[] = [];
+      for (let s = 0; s < allStages.length; s++) {
+        const srcStage = allStages[allStages.length - 1 - s];
+        reversedStages.push({
+          ...srcStage,
+          centerX: allStages[s].centerX,
+          pixelCoords: srcStage.samples.map((p) => [
+            allStages[s].centerX + p[0] * scaleFactor,
+            vertCenter - p[1] * scaleFactor,
+          ]),
+        });
+      }
+      stages = reversedStages;
+    } else {
+      stages = allStages;
+    }
   }
 
   // ----------------------------------------------------------------
@@ -157,30 +177,29 @@
     for (let s = 0; s < numStages; s++) {
       initState[`stage${s}`] = 1; // always visible
     }
-    // Per-stage point reveal: point0 = last stage (appears first), pointN-1 = first stage (appears last)
-    for (let s = 0; s < numStages; s++) {
-      initState[`point${s}`] = 0;
-    }
+    // pointProgress: 0 = at first stage, numStages-1 = at last stage
+    initState['pointProgress'] = 0;
+    initState['pointVisible'] = 0;
     timeline.initialState = initState;
 
-    // Stagger point appearances right-to-left
-    const animPhase = 0.7;
-    const slotDuration = animPhase / numStages;
+    // Fade in the dot
+    timeline.add({
+      name: 'PointFadeIn',
+      reduce(t: number) {
+        return { pointVisible: t } as Partial<AnimState>;
+      },
+    }, { start: 0.02, end: 0.08 });
 
-    for (let s = 0; s < numStages; s++) {
-      // s=0 → last stage (rightmost), s=N-1 → first stage (leftmost)
-      const key = `point${s}`;
-      const start = 0.05 + s * slotDuration;
-      const end = start + slotDuration * 0.5; // quick fade-in
-      timeline.add({
-        name: `Point_${s}`,
-        reduce(t: number) {
-          return { [key]: t } as Partial<AnimState>;
-        },
-      }, { start, end });
-    }
+    // Animate dot moving across stages
+    const numSegments = numStages - 1;
+    timeline.add({
+      name: 'PointMove',
+      reduce(t: number) {
+        return { pointProgress: t * numSegments } as Partial<AnimState>;
+      },
+    }, { start: 0.08, end: 0.7 });
 
-    timeline.add(createPauseClip(), { start: 0.05 + animPhase, end: 1.0 });
+    timeline.add(createPauseClip(), { start: 0.7, end: 1.0 });
 
     timeline.onTick((_t: number, state: Readonly<AnimState>) => {
       draw(state);
@@ -223,18 +242,21 @@
 
       drawScatterPlot(ctx, stage.pixelCoords, 5, contourFillColor, 0.1 * opacity);
 
-      // Labels: z_i ~ p(z_i)
+      // Labels
       const labelY = height - 30;
-      drawMathjax(ctx, `z_{${s}} \\sim p(z_{${s}})`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
+      if (reversed) {
+        if (s === 0) drawMathjax(ctx, `p(x)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
+        else if (s === stages.length - 1) drawMathjax(ctx, `p(z)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
+      } else {
+        if (s === 0) drawMathjax(ctx, `p(z)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
+        else if (s === stages.length - 1) drawMathjax(ctx, `p(x)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
+      }
 
       ctx.restore();
 
-      // Draw reversed arrows (pointing right to left: f^{-1})
+      // Draw arrows between stages
       if (s < stages.length - 1 && opacity >= 1) {
         const nextStage = stages[s + 1];
-        // Arrow goes FROM next stage TO this stage (reverse direction)
-        const arrowFromX = nextStage.centerX - 165;
-        const arrowToX = stage.centerX + 165;
         const arrowY = vertCenter;
 
         ctx.save();
@@ -242,39 +264,63 @@
         ctx.strokeStyle = '#555';
         ctx.lineWidth = 2.5;
 
-        drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, 7);
-
-        const arrowMidX = (arrowFromX + arrowToX) / 2;
-        drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, 34, 0, 0, { color: '#555' }, requestRedraw);
+        if (reversed) {
+          // Arrow left to right: f^{-1}
+          const arrowFromX = stage.centerX + 165;
+          const arrowToX = nextStage.centerX - 165;
+          drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, 7);
+          const arrowMidX = (arrowFromX + arrowToX) / 2;
+          drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, 34, 0, 0, { color: '#555' }, requestRedraw);
+        } else {
+          // Arrow right to left: f^{-1}
+          const arrowFromX = nextStage.centerX - 165;
+          const arrowToX = stage.centerX + 165;
+          drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, 7);
+          const arrowMidX = (arrowFromX + arrowToX) / 2;
+          drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, 34, 0, 0, { color: '#555' }, requestRedraw);
+        }
 
         ctx.restore();
       }
     }
 
-    // Draw highlight points appearing one at a time, right to left
-    const lastIdx = stages.length - 1;
-    const ptIdx = highlightPointIndex % stages[0].pixelCoords.length;
+    // Draw highlight point moving continuously between stages
+    const pointVisible = state['pointVisible'] ?? 0;
+    const pointProgress = state['pointProgress'] ?? 0;
+    if (pointVisible > 0 && stages.length > 0) {
+      const lastIdx = stages.length - 1;
+      const ptIdx = highlightPointIndex % stages[0].pixelCoords.length;
 
-    for (let s = 0; s < numStages; s++) {
-      const opacity = state[`point${s}`] ?? 0;
-      if (opacity <= 0) continue;
+      // pointProgress goes from 0 to numStages-1
+      // Map to stage indices based on direction
+      const segIdx = Math.min(Math.floor(pointProgress), numStages - 2);
+      const segT = pointProgress - segIdx;
 
-      // s=0 → last stage (rightmost), s=1 → second-to-last, etc.
-      const stageIdx = lastIdx - s;
-      const pt = stages[stageIdx].pixelCoords[ptIdx];
-      const isLatest = s === numStages - 1 || (state[`point${s + 1}`] ?? 0) <= 0;
+      // Get the two stages to interpolate between
+      let fromStageIdx: number, toStageIdx: number;
+      if (reversed) {
+        fromStageIdx = segIdx;
+        toStageIdx = segIdx + 1;
+      } else {
+        fromStageIdx = lastIdx - segIdx;
+        toStageIdx = lastIdx - segIdx - 1;
+      }
+
+      const fromPt = stages[fromStageIdx].pixelCoords[ptIdx];
+      const toPt = stages[toStageIdx].pixelCoords[ptIdx];
+
+      const x = fromPt[0] + (toPt[0] - fromPt[0]) * segT;
+      const y = fromPt[1] + (toPt[1] - fromPt[1]) * segT;
 
       ctx.save();
-      ctx.globalAlpha = opacity;
+      ctx.globalAlpha = pointVisible;
       ctx.beginPath();
-      ctx.arc(pt[0], pt[1], isLatest ? 14 : 10, 0, Math.PI * 2);
+      ctx.arc(x, y, 14, 0, Math.PI * 2);
       ctx.fillStyle = highlightColor;
       ctx.fill();
-      if (isLatest) {
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
       ctx.restore();
     }
   }
