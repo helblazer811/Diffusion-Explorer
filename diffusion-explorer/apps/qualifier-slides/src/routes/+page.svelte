@@ -58,6 +58,7 @@
   import StochasticInterpolation from '$lib/figures/StochasticInterpolation.svelte';
   import InducedCouplingAnimated from '$lib/figures/InducedCouplingAnimated.svelte';
   import DataLikelihood from '$lib/figures/DataLikelihood.svelte';
+  import ChangeOfVariablesFigure from '$lib/figures/ChangeOfVariablesFigure.svelte';
 
   let flowerFigure: FlowerImageDistribution;
   let noiseFigure: TransformingNoiseIntoData;
@@ -426,7 +427,7 @@
       <p style="margin-top: 0.5em;">
         Invertibility ensures probability mass is not created or destroyed.
       </p>
-      <div class="figure-container" style="margin-top: 1em;">
+      <div class="figure-container" style="margin-top: 2.5em;">
         {#if dataLoaded}
           <FlowInvertibilitySimple
             bind:this={invertibilityFigure}
@@ -445,11 +446,11 @@
     <section>
       <h2 class="slide-title">How Likely is My Data?</h2>
       <p style="margin-top: 0.5em;">
-        We want to evaluate the likelihood of data under our model, but the data distribution is complex.
+        It is easy to evaluate the density for a <span style="color: #4594e3;">simple distribution</span> <Katex math={"\\color{#4594e3}{p(z)}"} />, but not straightforward for a <span style="color: #f17720;">complex distribution</span> <Katex math={"\\color{#f17720}{p(x)}"} />.
       </p>
-      <div class="figure-container" style="margin-top: 0.5em; max-height: 700px; overflow: hidden;">
+      <div class="figure-container" style="margin-top: 2em;">
         {#if dataLoaded}
-          <DataLikelihood width={1700} height={650} {allTimeSamples} />
+          <DataLikelihood width={1800} height={850} {allTimeSamples} distributionScaleFactor={1.0} />
         {/if}
       </div>
     </section>
@@ -457,21 +458,26 @@
     <!-- Slide: Change of Variables Formula (original form) -->
     <section>
       <h2 class="slide-title">Change of Variables Formula</h2>
-      <p style="margin-top: 0.5em;">
-        Flows link the density of a complex distribution <Katex math={"\\color{#f17720}{p(x)}"} /> to a simple distribution <Katex math={"\\color{#3498db}{p(z)}"} />.
+      <p style="margin-top: 0.3em;">
+        Flows link the <span style="color: #4594e3;">source density</span> <Katex math={"\\color{#4594e3}{p(z)}"} /> to the <span style="color: #f17720;">data density</span> <Katex math={"\\color{#f17720}{p(x)}"} />.
       </p>
-      <div style="margin-top: 1.8em;">
+      <div style="margin-top: 0.3em;">
         <AnnotatedEquation
-          scale={1.8}
-          verticalGap={100}
-          labelFontSize={42}
-          tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#2ecc71} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#f17720} p(x)}"}
+          scale={1.3}
+          verticalGap={20}
+          labelFontSize={36}
+          boxPadding={4}
+          tex={"{\\color{#4594e3} p(z)} \\left| \\det \\frac{\\partial f}{\\partial z} \\right|^{-1} = {\\color{#f17720} p(x)}"}
           annotations={[
-            { color: '#3498db', label: 'Source Density', side: 'above', align: 'left' },
-            { color: '#2ecc71', label: 'Jacobian', side: 'below', align: 'right' },
+            { color: '#4594e3', label: 'Source Density', side: 'above', align: 'left' },
             { color: '#f17720', label: 'Data Density', side: 'above' },
           ]}
         />
+      </div>
+      <div class="figure-container" style="margin-top: 0.5em;">
+        {#if dataLoaded}
+          <ChangeOfVariablesFigure width={1800} height={650} {allTimeSamples} distributionScaleFactor={1.0} />
+        {/if}
       </div>
     </section>
 
@@ -532,7 +538,7 @@
         />
       </div>
       <div class="figure-container" style="margin-top: 10px; height: 520px; overflow: hidden;">
-        <NormalizingFlowStages bind:this={composeFigure} width={1720} height={580} numStages={4} showLabels={true} />
+        <NormalizingFlowStages bind:this={composeFigure} width={1720} height={580} numStages={4} showLabels={true} looping={false} />
       </div>
     </Slide>
 
