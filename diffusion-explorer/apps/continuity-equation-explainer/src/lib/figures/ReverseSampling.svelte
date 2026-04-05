@@ -55,6 +55,9 @@
   export let labelFontSize = 28;
   export let labelFontWeight = 400;
 
+  // Trajectory filtering
+  export let numTrajectories = 5; // Number of trajectories to display
+
   // Animation props
   export let animationDuration = 6000;
   export let playingByDefault = true;
@@ -123,11 +126,13 @@
     ];
     combinedMeanX = allX.reduce((a, b) => a + b, 0) / allX.length;
 
-    const numSamples = data.trajectories.length;
-    const numSteps = data.trajectories[0]?.length || 0;
+    // Limit trajectories to numTrajectories
+    const trajectoriesToShow = data.trajectories.slice(0, numTrajectories);
+    const numSamples = trajectoriesToShow.length;
+    const numSteps = trajectoriesToShow[0]?.length || 0;
 
     transformedTrajectories = Array.from({ length: numSamples }, (_, sampleIdx) => {
-      return data!.trajectories[sampleIdx].map((point, tIdx) => {
+      return trajectoriesToShow[sampleIdx].map((point, tIdx) => {
         const t = tIdx / (numSteps - 1);
         const pixelX = getPixelX(point[0], combinedMeanX, t);
         const pixelY = scales!.yScale(point[1]);

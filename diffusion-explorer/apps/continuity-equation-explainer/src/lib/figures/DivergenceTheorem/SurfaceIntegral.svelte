@@ -58,8 +58,12 @@
   export let gradientSubdivisions = 12;
 
   // Animation pulse settings (in pixels)
-  export let pulseWidthPixels = 30;
-  export let pulsePauseWidthPixels = 5;
+  export let pulseWidthPixels = 40;
+  export let pulsePauseWidthPixels = 15;
+
+  // Arrowhead settings
+  export let showArrowhead = true;
+  export let arrowheadSize = 2.0;
 
   // Vector styling
   export let normalColor = "#f97316"; // Orange
@@ -192,6 +196,8 @@
         pulseGap: pulsePauseWidthPixels,
         baseOpacity: 1.0,
         color: streamlineColor,
+        showArrowhead,
+        arrowheadSize,
       });
 
       // Generate streamlines in domain coordinates

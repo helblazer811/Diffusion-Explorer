@@ -416,7 +416,7 @@
         <canvas
           bind:this={canvas1}
           class="edge-fade"
-          style="width: {canvasWidth}px; height: {canvasHeight}px; --fade-size: {edgeFadeSize}px;"
+          style="width: 100%; aspect-ratio: {canvasWidth} / {canvasHeight}; --fade-size: {edgeFadeSize}px;"
         ></canvas>
       {/snippet}
       {#snippet leftLabel()}
@@ -430,7 +430,7 @@
         <canvas
           bind:this={canvas2}
           class="edge-fade"
-          style="width: {canvasWidth}px; height: {canvasHeight}px; --fade-size: {edgeFadeSize}px;"
+          style="width: 100%; aspect-ratio: {canvasWidth} / {canvasHeight}; --fade-size: {edgeFadeSize}px;"
         ></canvas>
       {/snippet}
       {#snippet centerLabel()}
@@ -444,7 +444,7 @@
         <canvas
           bind:this={canvas3}
           class="edge-fade"
-          style="width: {canvasWidth}px; height: {canvasHeight}px; --fade-size: {edgeFadeSize}px;"
+          style="width: 100%; aspect-ratio: {canvasWidth} / {canvasHeight}; --fade-size: {edgeFadeSize}px;"
         ></canvas>
       {/snippet}
       {#snippet rightLabel()}
