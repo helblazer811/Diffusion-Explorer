@@ -25,6 +25,7 @@
     contourFillColor = '#f17720',
     showLabels = false,
     looping = true,
+    static: isStatic = false,
   }: {
     width?: number;
     height?: number;
@@ -36,6 +37,7 @@
     contourFillColor?: string;
     showLabels?: boolean;
     looping?: boolean;
+    static?: boolean;
   } = $props();
 
   // ----------------------------------------------------------------
@@ -169,9 +171,17 @@
   function setupTimeline() {
     const initState: AnimState = {};
     for (let s = 0; s < numStages; s++) {
-      initState[`stage${s}`] = 0;
+      initState[`stage${s}`] = isStatic ? 1 : 0;
     }
     timeline.initialState = initState;
+
+    if (isStatic) {
+      // Just draw the final state immediately, no animation
+      timeline.onTick((_t: number, state: Readonly<AnimState>) => {
+        draw(state);
+      });
+      return;
+    }
 
     const animPhase = 0.85;
     const slotDuration = animPhase / numStages;

@@ -36,6 +36,7 @@
   // Trajectory styling
   export let trajectoryStrokeWidth: number = settings.stylingSettings.trajectory.strokeWidth;
   export let trajectoryEndpointRadius: number = settings.stylingSettings.trajectory.endpointRadius;
+  export let trajectoryColor: string = settings.stylingSettings.trajectory.color;
 
   // Label styling
   export let labelFontSize: number = settings.stylingSettings.label.fontSize;
@@ -198,7 +199,7 @@
     // Create PathlineAnimation for regular trajectories with settings-based style
     pathlineAnimation = PathlineAnimation.fromTrajectories<AnimationState>(regularTrajectories, {
       style: {
-        color: settings.stylingSettings.trajectory.color,
+        color: trajectoryColor,
         strokeWidth: trajectoryStrokeWidth,
         pointRadius: trajectoryEndpointRadius,
         opacity: settings.stylingSettings.trajectory.opacity,

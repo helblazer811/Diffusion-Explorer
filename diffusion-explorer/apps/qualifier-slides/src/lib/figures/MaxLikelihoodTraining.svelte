@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { base } from '$app/paths';
   import {
     Timeline,
     useCanvas2D,
@@ -27,6 +28,10 @@
     highlightPointIndices = [15, 42, 78, 120, 160] as number[],
     reversed = false,
     showDatasetLabel = false,
+    showImages = false,
+    flowerPointIndex = 30,
+    noisePointIndex = 42,
+    imageSize = 120,
   }: {
     width?: number;
     height?: number;
@@ -40,6 +45,10 @@
     highlightPointIndices?: number[];
     reversed?: boolean;
     showDatasetLabel?: boolean;
+    showImages?: boolean;
+    flowerPointIndex?: number;
+    noisePointIndex?: number;
+    imageSize?: number;
   } = $props();
 
   // ----------------------------------------------------------------
@@ -49,6 +58,23 @@
   const canvas2d = useCanvas2D(width, height);
   let ctx: CanvasRenderingContext2D | null = $state(null);
   let isInitialized = $state(false);
+  let noiseDataUrl = $state('');
+
+  function generateNoiseDataUrl(): string {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 256;
+    const nctx = c.getContext('2d')!;
+    const imageData = nctx.createImageData(256, 256);
+    for (let i = 0; i < imageData.data.length; i += 4) {
+      const v = Math.floor(Math.random() * 256);
+      imageData.data[i] = v;
+      imageData.data[i + 1] = v;
+      imageData.data[i + 2] = v;
+      imageData.data[i + 3] = 255;
+    }
+    nctx.putImageData(imageData, 0, 0);
+    return c.toDataURL();
+  }
 
   type StageData = {
     samples: number[][];
@@ -377,6 +403,7 @@
 
   function tryInitialize() {
     if (isInitialized || !canvas || !ctx) return;
+    if (showImages) noiseDataUrl = generateNoiseDataUrl();
     generateStageData();
     setupTimeline();
     isInitialized = true;
@@ -387,10 +414,77 @@
   });
 </script>
 
-<div style="width: {width}px;">
+<div style="width: {width}px; position: relative;">
   <canvas
     bind:this={canvas}
     use:canvas2d.bindCanvas
     style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
   ></canvas>
+
+  {#if showImages && isInitialized && stages.length > 0}
+    {@const dataStageIdx = reversed ? 0 : stages.length - 1}
+    {@const noiseStageIdx = reversed ? stages.length - 1 : 0}
+    {@const ptIdx = highlightPointIndices[0] % stages[dataStageIdx].pixelCoords.length}
+    {@const dataPt = stages[dataStageIdx].pixelCoords[ptIdx]}
+    {@const noisePt = stages[noiseStageIdx].pixelCoords[ptIdx]}
+    {@const flowerImgX = dataPt[0] - imageSize - 80}
+    {@const flowerImgY = dataPt[1] - imageSize - 40}
+    {@const noiseImgX = noisePt[0] + 60}
+    {@const noiseImgY = noisePt[1] - imageSize - 30}
+
+    <!-- Connecting lines -->
+    <svg
+      viewBox="0 0 {width} {height}"
+      style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;"
+    >
+      <line
+        x1={dataPt[0]} y1={dataPt[1]}
+        x2={flowerImgX + imageSize / 2} y2={flowerImgY + imageSize}
+        stroke="#666" stroke-width="2.5" opacity="0.6"
+      />
+      <line
+        x1={noisePt[0]} y1={noisePt[1]}
+        x2={noiseImgX + imageSize / 2} y2={noiseImgY + imageSize}
+        stroke="#666" stroke-width="2.5" opacity="0.6"
+      />
+    </svg>
+
+    <!-- Flower image (HTML overlay) -->
+    <img
+      src="{base}/flower_samples/image_00001.jpg"
+      alt=""
+      style="
+        position: absolute;
+        left: {flowerImgX / width * 100}%;
+        top: {flowerImgY / height * 100}%;
+        width: {imageSize / width * 100}%;
+        height: {imageSize / height * 100}%;
+        object-fit: cover;
+        border-radius: 4px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        z-index: 6;
+        pointer-events: none;
+      "
+    />
+
+    <!-- Noise image (HTML overlay) -->
+    {#if noiseDataUrl}
+      <img
+        src={noiseDataUrl}
+        alt=""
+        style="
+          position: absolute;
+          left: {noiseImgX / width * 100}%;
+          top: {noiseImgY / height * 100}%;
+          width: {imageSize / width * 100}%;
+          height: {imageSize / height * 100}%;
+          object-fit: cover;
+          border-radius: 4px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+          z-index: 6;
+          pointer-events: none;
+        "
+      />
+    {/if}
+  {/if}
 </div>

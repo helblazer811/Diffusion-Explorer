@@ -67,10 +67,6 @@
 
     const requestRedraw = () => draw();
 
-    // Labels below distributions
-    drawMathjax(ctx, "p(z)", scales.sourceCenterPixelX, height - 25, labelFontSize, 0, 0, { color: '#4594e3' }, requestRedraw);
-    drawMathjax(ctx, "p(x)", scales.targetCenterPixelX, height - 25, labelFontSize, 0, 0, { color: '#f17720' }, requestRedraw);
-
     // Scatter plots
     drawScatterPlot(ctx, sourcePixelCoords, pointRadius, '#4594e3', pointOpacity);
     drawScatterPlot(ctx, targetPixelCoords, pointRadius, '#f17720', pointOpacity);
@@ -120,7 +116,7 @@
     ctx.restore();
 
     // f(z) label above arrow
-    drawMathjax(ctx, "f(z)", mx, my - 20, 44, 0, 0, { color: arrowColor }, requestRedraw);
+    drawMathjax(ctx, "f(z)", mx, my - 5, 44, 0, 0, { color: arrowColor }, requestRedraw);
   }
 
   export function restart() { draw(); }
