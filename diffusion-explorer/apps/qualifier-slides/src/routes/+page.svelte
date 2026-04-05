@@ -414,7 +414,7 @@
         distribution <Katex math={"p(x)"}/> by a sequence of mappings <Katex math={"f_i(z)"}/>.
       </p>
       <div class="figure-container" style="margin-top: -50px;">
-        <NormalizingFlowStages bind:this={normFlowFigure} width={1720} height={580} numStages={4} showLabels={true} looping={false} />
+        <NormalizingFlowStages bind:this={normFlowFigure} width={1720} numStages={4} showLabels={true} looping={false} />
       </div>
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
         <p style="font-size: 0.7em; color: #888; margin: 0;">
@@ -468,9 +468,9 @@
       <div style="margin-top: 1.5em; height: 185px; overflow: visible; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2;">
         {#if !covShowLog}
           <AnnotatedEquation
-            scale={1.1}
+            scale={1.4}
             verticalGap={20}
-            labelFontSize={32}
+            labelFontSize={36}
             boxPadding={4}
             tex={"{\\color{#4594e3} p(z)} \\left| \\det \\frac{\\partial f}{\\partial z} \\right|^{-1} = {\\color{#f17720} p(x)}"}
             annotations={[
@@ -480,9 +480,9 @@
           />
         {:else}
           <AnnotatedEquation
-            scale={1.1}
+            scale={1.4}
             verticalGap={20}
-            labelFontSize={32}
+            labelFontSize={36}
             boxPadding={4}
             tex={"{\\color{#4594e3} \\log p(z)} - \\log \\left| \\det \\frac{\\partial f}{\\partial z} \\right| = {\\color{#f17720} \\log p(x)}"}
             annotations={[
@@ -535,7 +535,7 @@
         />
       </div>
       <div class="figure-container" style="margin-top: 10px; height: 520px; overflow: hidden;">
-        <NormalizingFlowStages bind:this={composeFigure} width={1720} height={580} numStages={4} showLabels={true} static={true} />
+        <NormalizingFlowStages bind:this={composeFigure} width={1720} numStages={4} showLabels={true} static={true} />
       </div>
     </Slide>
 
@@ -1392,6 +1392,11 @@
 </div>
 
 <style>
+  :global(.reveal) {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
   :global(.trace-highlight) {
     background: rgba(34, 197, 94, 0.1);
     border: 2px solid #22c55e;

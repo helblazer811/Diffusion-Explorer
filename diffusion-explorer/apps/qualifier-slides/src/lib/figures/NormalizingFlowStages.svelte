@@ -14,9 +14,11 @@
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
+  const REF_WIDTH = 1720;
+  const REF_HEIGHT = 580;
+
   let {
-    width = 1720,
-    height = 580,
+    width = REF_WIDTH,
     numStages = 5,
     numSamples = 200,
     animationDuration = 8000,
@@ -28,7 +30,6 @@
     static: isStatic = false,
   }: {
     width?: number;
-    height?: number;
     numStages?: number;
     numSamples?: number;
     animationDuration?: number;
@@ -39,6 +40,10 @@
     looping?: boolean;
     static?: boolean;
   } = $props();
+
+  // Derive height and uniform scale factor from width
+  const k = width / REF_WIDTH;
+  const height = Math.round(REF_HEIGHT * k);
 
   // ----------------------------------------------------------------
   // State
@@ -118,12 +123,12 @@
       targetSamples.push([gx * 0.35, gy * 0.35]);
     }
 
-    // Layout: evenly spaced centers
-    const margin = 180;
+    // Layout: evenly spaced centers (all pixel values scale with k)
+    const margin = 180 * k;
     const usableWidth = width - 2 * margin;
     const spacing = usableWidth / (numStages - 1);
     const vertCenter = height * 0.42;
-    const scaleFactor = 70; // data units to pixel units
+    const scaleFactor = 70 * k; // data units to pixel units
 
     // Generate intermediate stages via linear interpolation
     const allStages: StageData[] = [];
@@ -214,7 +219,14 @@
     ctx.clearRect(0, 0, width, height);
 
     const vertCenter = height * 0.42;
-    const scaleFactor = 70;
+    const scaleFactor = 70 * k;
+    const dotRadius = 5 * k;
+    const arrowGap = 165 * k;
+    const arrowHeadSize = 7 * k;
+    const arrowLineWidth = 2.5 * k;
+    const fontSize = 34 * k;
+    const labelBottomOffset = 30 * k;
+    const arrowLabelOffset = 20 * k;
 
     for (let s = 0; s < stages.length; s++) {
       const stage = stages[s];
@@ -238,17 +250,17 @@
       });
 
       // Draw scatter (same color as contour)
-      drawScatterPlot(ctx, stage.pixelCoords, 5, contourFillColor, 0.4 * opacity);
+      drawScatterPlot(ctx, stage.pixelCoords, dotRadius, contourFillColor, 0.4 * opacity);
 
       // Distribution labels below each stage
       if (showLabels) {
-        const labelY = height - 30;
+        const labelY = height - labelBottomOffset;
         if (s === 0) {
-          drawMathjax(ctx, `p(z)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' });
+          drawMathjax(ctx, `p(z)`, stage.centerX, labelY, fontSize, 0, 0, { color: '#333' });
         } else if (s === stages.length - 1) {
-          drawMathjax(ctx, `p(x)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' });
+          drawMathjax(ctx, `p(x)`, stage.centerX, labelY, fontSize, 0, 0, { color: '#333' });
         } else {
-          drawMathjax(ctx, `p(z_{${s}})`, stage.centerX, labelY, 34, 0, 0, { color: '#333' });
+          drawMathjax(ctx, `p(z_{${s}})`, stage.centerX, labelY, fontSize, 0, 0, { color: '#333' });
         }
       }
 
@@ -257,20 +269,20 @@
       // Draw arrow to next stage (visible once this stage is fully revealed)
       if (s < stages.length - 1 && opacity >= 1) {
         const nextStage = stages[s + 1];
-        const arrowFromX = stage.centerX + 165;
-        const arrowToX = nextStage.centerX - 165;
+        const arrowFromX = stage.centerX + arrowGap;
+        const arrowToX = nextStage.centerX - arrowGap;
         const arrowY = vertCenter;
 
         ctx.save();
         ctx.globalAlpha = 1;
         ctx.strokeStyle = '#555';
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = arrowLineWidth;
 
-        drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, 7);
+        drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, arrowHeadSize);
 
         // Label above arrow: f_i
         const arrowMidX = (arrowFromX + arrowToX) / 2;
-        drawMathjax(ctx, `f_{${s}}`, arrowMidX, arrowY - 20, 34, 0, 0, { color: '#555' });
+        drawMathjax(ctx, `f_{${s}}`, arrowMidX, arrowY - arrowLabelOffset, fontSize, 0, 0, { color: '#555' });
 
         ctx.restore();
       }
@@ -302,6 +314,7 @@
     generateStageData();
     setupTimeline();
     isInitialized = true;
+    timeline.play();
   }
 
   onDestroy(() => {
