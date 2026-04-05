@@ -459,9 +459,10 @@
   <!-- ============================================================ -->
   <h1 id="normalizing-flows" class="section-heading">Normalizing Flows</h1>
 
+  <h2 id="what-is-a-normalizing-flow">What is a Normalizing Flow?</h2>
   <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
   <p>
-    <strong>What is a Normalizing Flow?</strong> A normalizing flow
+    A normalizing flow
     <HoverableReference id="rezende2016variationalinferencenormalizingflows" {bibEntries} {citations} />
     is a generative model that transforms a simple probability distribution—one
     that is easy to sample from and evaluate, such as a multivariate Gaussian—into
@@ -484,7 +485,8 @@
     <div id="figure-3">
       <NormalizingFlowStages
         width={figureWidth}
-        height={350}
+        numStages={4}
+        showLabels={true}
       />
       <div class="caption">
         <span class="figure-number">Figure 3:</span>
@@ -496,20 +498,25 @@
 
   <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
   <p>
-    <strong>Flows are Invertible and Differentiable.</strong> A crucial requirement of normalizing flows is that each transformation
-    <Katex math={"f_i"} /> be invertible. Invertibility ensures that probability
-    mass is conserved—no mass is created or destroyed as we transform our
-    distribution. Every point in the source distribution maps to exactly one point
-    in the target distribution, and vice versa. This bijective property is what
-    allows us to precisely track how probability density changes as we apply the
-    flow.
+    A crucial requirement of normalizing flows is that each transformation
+    <Katex math={"f_i"} /> be:
   </p>
-  <p>
-    Differentiability is equally important: it enables us to compute how much the
-    transformation locally stretches or compresses space. This local volume change,
-    captured by the Jacobian determinant, is the key ingredient for computing
-    likelihoods under the transformed distribution.
-  </p>
+  <ol>
+    <li>
+      <strong>Invertible.</strong> Invertibility ensures that probability
+      mass is conserved—no mass is created or destroyed as we transform our
+      distribution. Every point in the source distribution maps to exactly one point
+      in the target distribution, and vice versa. This bijective property is what
+      allows us to precisely track how probability density changes as we apply the
+      flow.
+    </li>
+    <li>
+      <strong>Differentiable.</strong> Differentiability enables us to compute how much the
+      transformation locally stretches or compresses space. This local volume change,
+      captured by the Jacobian determinant, is the key ingredient for computing
+      likelihoods under the transformed distribution.
+    </li>
+  </ol>
 
   {#if showOtherFigures}
     <div id="figure-4">
@@ -648,7 +655,8 @@
     <div id="figure-8">
       <NormalizingFlowStages
         width={figureWidth}
-        height={350}
+        numStages={4}
+        showLabels={true}
         static={true}
       />
       <div class="caption">
