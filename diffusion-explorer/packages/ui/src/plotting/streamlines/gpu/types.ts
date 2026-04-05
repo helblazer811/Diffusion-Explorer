@@ -77,6 +77,14 @@ export interface StreamlineRendererOptions {
   showPreview?: boolean;
   /** Opacity of the preview line (default: 0.3) */
   previewOpacity?: number;
+  /** Show arrowheads at the front of each pulse (default: false) */
+  showArrowhead?: boolean;
+  /**
+   * Arrowhead size as multiple of thickness.
+   * Controls both length and half-base width.
+   * Default: 2.0 (arrowhead length = 2 * thickness)
+   */
+  arrowheadSize?: number;
 }
 
 /**
@@ -97,6 +105,10 @@ export interface StreamlineRenderStyle {
   showPreview?: boolean;
   /** Optional override for preview opacity */
   previewOpacity?: number;
+  /** Optional override for showing arrowheads */
+  showArrowhead?: boolean;
+  /** Optional override for arrowhead size */
+  arrowheadSize?: number;
 }
 
 /**

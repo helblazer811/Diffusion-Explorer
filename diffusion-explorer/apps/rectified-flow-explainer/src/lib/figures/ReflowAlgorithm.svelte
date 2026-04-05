@@ -9,9 +9,12 @@
 
   // Background visibility
   export let backgroundVisible = true;
+
+  // Font size override (in px)
+  export let fontSize = null;
 </script>
 
-<Algorithm {backgroundVisible} {caption}>
+<Algorithm {backgroundVisible} {caption} {fontSize}>
   {#snippet title()}
     Algorithm: Reflow Procedure
   {/snippet}

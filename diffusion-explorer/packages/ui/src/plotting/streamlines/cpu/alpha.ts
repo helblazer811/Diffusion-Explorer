@@ -79,6 +79,7 @@ export function precomputePatternIndices(
  * Compute alpha values for animated pulses along a streamline.
  *
  * Uses precomputed pattern indices and LUT for efficient per-frame computation.
+ * Uses fractional indexing with linear interpolation to avoid flickering.
  *
  * @param patternIndices - Precomputed LUT indices for each point (from precomputePatternIndices)
  * @param alphaLUT - Precomputed alpha lookup table (from createAlphaLUT)
@@ -96,13 +97,19 @@ export function computeAlphaTrail(
   const numPoints = patternIndices.length;
   const lutResolution = alphaLUT.length;
 
-  // Phase shift in LUT indices
-  const shiftAmount = Math.floor(((phase + offset) % 1) * lutResolution);
+  // Use fractional shift for smooth animation (no Math.floor!)
+  const shiftAmount = ((phase + offset) % 1) * lutResolution;
 
   for (let i = 0; i < numPoints; i++) {
-    // Shift index and wrap around
-    let idx = patternIndices[i] - shiftAmount;
-    if (idx < 0) idx += lutResolution;
-    outAlphas[i] = alphaLUT[idx];
+    // Compute fractional index
+    let fracIdx = patternIndices[i] - shiftAmount;
+    if (fracIdx < 0) fracIdx += lutResolution;
+
+    // Linear interpolation between adjacent LUT entries
+    const idx0 = Math.floor(fracIdx) % lutResolution;
+    const idx1 = (idx0 + 1) % lutResolution;
+    const t = fracIdx - Math.floor(fracIdx);
+
+    outAlphas[i] = alphaLUT[idx0] * (1 - t) + alphaLUT[idx1] * t;
   }
 }

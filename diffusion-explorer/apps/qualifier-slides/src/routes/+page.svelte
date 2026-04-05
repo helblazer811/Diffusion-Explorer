@@ -57,6 +57,7 @@
   import MaxLikelihoodTraining from '$lib/figures/MaxLikelihoodTraining.svelte';
   import StochasticInterpolation from '$lib/figures/StochasticInterpolation.svelte';
   import InducedCouplingAnimated from '$lib/figures/InducedCouplingAnimated.svelte';
+  import DataLikelihood from '$lib/figures/DataLikelihood.svelte';
 
   let flowerFigure: FlowerImageDistribution;
   let noiseFigure: TransformingNoiseIntoData;
@@ -67,6 +68,10 @@
   let composeFigure: NormalizingFlowStages;
   let mlFigure: MaxLikelihoodTraining;
   let encodeFigure: MaxLikelihoodTraining;
+  let invertibilityFigure: FlowInvertibilitySimple;
+  let massFigure: FlowInvertibilitySimple;
+  let jacobianFigure: ChangeOfVariablesIntro;
+  let trajFigure: HighlightTrajectory;
 
   // Provide reveal instance to Slide components via context
   setContext('getReveal', () => revealInstance);
@@ -374,6 +379,29 @@
       </ol>
     </section>
 
+    <!-- Roadmap: Normalizing Flows -->
+    <section class="roadmap-slide">
+      <h2 class="slide-title">Presentation Roadmap</h2>
+      <ol class="roadmap">
+        <li class="roadmap-item roadmap-active">
+          <p class="roadmap-title">Normalizing Flows</p>
+          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Continuous Normalizing Flows</p>
+          <p class="roadmap-ref">Chen et al., 2018</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
+          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Rectified Flows</p>
+          <p class="roadmap-ref">Liu et al., 2023</p>
+        </li>
+      </ol>
+    </section>
+
     <!-- Slide 7: What is a Normalizing Flow? -->
     <Slide figure={normFlowFigure}>
       <h2 class="slide-title">What is a Normalizing Flow?</h2>
@@ -383,7 +411,7 @@
         distribution <Katex math={"p(x)"}/> by a sequence of mappings <Katex math={"f_i(z)"}/>.
       </p>
       <div class="figure-container" style="margin-top: -50px;">
-        <NormalizingFlowStages bind:this={normFlowFigure} width={1720} height={580} numStages={4} />
+        <NormalizingFlowStages bind:this={normFlowFigure} width={1720} height={580} numStages={4} showLabels={true} looping={false} />
       </div>
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
         <p style="font-size: 0.7em; color: #888; margin: 0;">
@@ -393,37 +421,35 @@
     </Slide>
 
     <!-- Slide: Normalizing Flows are Invertible (figure) -->
-    <section>
+    <Slide figure={invertibilityFigure}>
       <h2 class="slide-title">Flows are Invertible and Differentiable</h2>
-      <div class="figure-container" style="margin-top: 3em;">
+      <p style="margin-top: 0.5em;">
+        Invertibility ensures probability mass is not created or destroyed.
+      </p>
+      <div class="figure-container" style="margin-top: 1em;">
         {#if dataLoaded}
           <FlowInvertibilitySimple
+            bind:this={invertibilityFigure}
             width={1800}
-            height={950}
+            height={850}
             {allTimeSamples}
             numLines={5}
             distributionScaleFactor={1.0}
+            overlayText={"f(z) maps all points to distinct locations"}
           />
         {/if}
       </div>
-    </section>
+    </Slide>
 
-    <!-- Slide: Flows Preserve Probability Mass (figure) -->
+    <!-- Slide: How Likely is My Data? -->
     <section>
-      <h2 class="slide-title">Flows Preserve Probability Mass</h2>
+      <h2 class="slide-title">How Likely is My Data?</h2>
       <p style="margin-top: 0.5em;">
-        Invertibility ensures mass is not created or destroyed.
+        We want to evaluate the likelihood of data under our model, but the data distribution is complex.
       </p>
-      <div class="figure-container" style="margin-top: 2.5em;">
+      <div class="figure-container" style="margin-top: 0.5em; max-height: 700px; overflow: hidden;">
         {#if dataLoaded}
-          <FlowInvertibilitySimple
-            width={1800}
-            height={950}
-            {allTimeSamples}
-            numLines={5}
-            staticForward={true}
-            overlayText={"f(z) maps all points to distinct locations"}
-          />
+          <DataLikelihood width={1700} height={650} {allTimeSamples} />
         {/if}
       </div>
     </section>
@@ -436,12 +462,13 @@
       </p>
       <div style="margin-top: 1.8em;">
         <AnnotatedEquation
-          scale={2.2}
+          scale={1.8}
           verticalGap={100}
-          tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#e74c3c} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#f17720} p(x)}"}
+          labelFontSize={42}
+          tex={"{\\color{#3498db} p(z)} \\left| \\det {\\color{#2ecc71} \\frac{\\partial f}{\\partial z}} \\right|^{-1} = {\\color{#f17720} p(x)}"}
           annotations={[
             { color: '#3498db', label: 'Source Density', side: 'above', align: 'left' },
-            { color: '#e74c3c', label: 'Jacobian', side: 'below', align: 'right' },
+            { color: '#2ecc71', label: 'Jacobian', side: 'below', align: 'right' },
             { color: '#f17720', label: 'Data Density', side: 'above' },
           ]}
         />
@@ -449,14 +476,15 @@
     </section>
 
     <!-- Slide: Jacobian Measures Local Volume Change -->
-    <section>
+    <Slide figure={jacobianFigure}>
       <h2 class="slide-title">Jacobian Measures Local Volume Change</h2>
       <p style="margin-top: 0.5em;">
-        Determinant of the Jacobian <Katex math={"\\color{#f17720}{\\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"} /> measures how <Katex math={"f"} /> locally stretches and shears space.
+        Determinant of the Jacobian <Katex math={"\\color{#2ecc71}{\\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"} /> measures how <Katex math={"f"} /> locally stretches and compresses space.
       </p>
       <div class="figure-container" style="margin-top: 0.5em;">
         {#if dataLoaded}
           <ChangeOfVariablesIntro
+            bind:this={jacobianFigure}
             width={1800}
             height={950}
             {allTimeSamples}
@@ -465,7 +493,7 @@
           />
         {/if}
       </div>
-    </section>
+    </Slide>
 
     <!-- Slide: Log Form of Change of Variables -->
     <section>
@@ -477,11 +505,12 @@
         <AnnotatedEquation
           scale={1.8}
           verticalGap={100}
-          tex={"{\\color{#f17720} \\log p(x)} = {\\color{#3498db} \\log p(z)} + {\\color{#e74c3c} \\log \\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"}
+          labelFontSize={42}
+          tex={"{\\color{#f17720} \\log p(x)} = {\\color{#3498db} \\log p(z)} + {\\color{#2ecc71} \\log \\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"}
           annotations={[
             { color: '#f17720', label: 'Data Density', side: 'above', align: 'left' },
             { color: '#3498db', label: 'Source Density', side: 'below' },
-            { color: '#e74c3c', label: 'Log Volume Change', side: 'above', align: 'left' },
+            { color: '#2ecc71', label: 'Log Volume Change', side: 'above', align: 'left' },
           ]}
         />
       </div>
@@ -490,14 +519,15 @@
     <!-- Slide: Composing Multiple Transformations -->
     <Slide figure={composeFigure}>
       <h2 class="slide-title">Composing Multiple Transformations</h2>
-      <div style="margin-top: 0.5em; margin-bottom: 0.8em;">
+      <div style="margin-top: 1.5em; margin-bottom: 0.8em;">
         <AnnotatedEquation
           scale={1.3}
           verticalGap={60}
           rowSpacing={40}
-          tex={"\\log p(x) = \\log p(z_0) + {\\color{#e74c3c} \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|}"}
+          labelFontSize={42}
+          tex={"\\log p(x) = \\log p(z_0) + {\\color{#2ecc71} \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|}"}
           annotations={[
-            { color: '#e74c3c', label: 'Sum of Log Volume Changes', side: 'above', align: 'left' },
+            { color: '#2ecc71', label: 'Sum of Log Volume Changes', side: 'above', align: 'left' },
           ]}
         />
       </div>
@@ -510,21 +540,22 @@
     <Slide figure={encodeFigure}>
       <h2 class="slide-title">Computing the Likelihood of Data</h2>
       <p style="margin-top: 0.3em;">
-        Map data <Katex math={"x"} /> through the inverse flow <Katex math={"f^{-1}"} /> to encode it into the simple distribution <Katex math={"p(z)"} />.
+        Map data <Katex math={"x"} /> through the inverses <Katex math={"f_i^{-1}"} /> to compute <Katex math={"\\color{#3b82f6}{\\log p(x)}"} />.
       </p>
-      <div style="margin-top: 1em;">
+      <div style="margin-top: 1em; margin-bottom: 0.8em;">
         <AnnotatedEquation
           scale={1.3}
           verticalGap={20}
           rowSpacing={35}
-          tex={"{\\color{#3498db} \\log p(x)} = \\log p(z_0) + \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|"}
+          labelFontSize={44}
+          tex={"{\\color{#3b82f6} \\log p(x)} = \\log p(z_0) + \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i^{-1}}{\\partial z_{i+1}} \\right|"}
           annotations={[
-            { color: '#3498db', label: 'Data Log-Likelihood', side: 'above', align: 'right' },
+            { color: '#3b82f6', label: 'Data Log-Likelihood', side: 'above', align: 'right' },
           ]}
         />
       </div>
       <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: hidden;">
-        <MaxLikelihoodTraining bind:this={encodeFigure} width={1720} height={580} numStages={4} reversed={true} />
+        <MaxLikelihoodTraining bind:this={encodeFigure} width={1720} height={580} numStages={4} reversed={true} highlightPointIndices={[15]} highlightColor="#3b82f6" />
       </div>
     </Slide>
 
@@ -532,40 +563,77 @@
     <Slide figure={mlFigure}>
       <h2 class="slide-title">Maximum Likelihood Training</h2>
       <p style="margin-top: 0.3em;">
-        Find parameters <Katex math={"\\theta"} /> that maximize the log-likelihood of observed data:
+        Learn transformations <Katex math={"f_{i,\\theta}"} /> that maximize the log-likelihood of observed <span style="color: #3b82f6; font-weight: bold;">data</span>:
       </p>
-      <div style="margin-top: 0.15em;">
-        <Katex math={"\\theta^* = \\arg\\max_\\theta \\sum_{x \\in \\mathcal{D}} \\log p_\\theta(x)"} displayMode={true} />
+      <div style="margin-top: 0.8em; margin-bottom: -20px;">
+        <AnnotatedEquation
+          scale={1.1}
+          verticalGap={65}
+          labelFontSize={32}
+          boxPadding={4}
+          tex={"{\\color{#f17720} f_{1,\\theta}^*, \\ldots, f_{K,\\theta}^*} = \\arg\\max_\\theta \\sum_{{\\color{#3b82f6} x \\in \\mathcal{D}}} \\log p_\\theta(x)"}
+          annotations={[
+            { color: '#3b82f6', label: 'Data', side: 'below' },
+            { color: '#f17720', label: 'Learned Flows', side: 'above', align: 'left' },
+          ]}
+        />
       </div>
-      <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: hidden;">
-        <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={580} numStages={4} />
+      <div class="figure-container" style="margin-top: -20px; height: 480px; overflow: hidden;">
+        <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={520} numStages={4} reversed={true} />
       </div>
     </Slide>
 
     <!-- Slide: Jacobian Determinants Are Expensive -->
     <section>
       <h2 class="slide-title">Jacobian Determinants Are Expensive</h2>
-      <p style="margin-top: 1em;">
-        The forward log-probability under a normalizing flow requires computing:
+      <p style="margin-top: 0.5em;">
+        In general, flows require computing <span style="color: #e74c3c; font-weight: bold;">expensive determinants</span>.
       </p>
-      <div style="margin-top: 0.5em;">
-        <Katex math={"\\log p(x) = \\log p(z_0) + \\sum_{i=1}^{K} \\log \\left| \\htmlClass{det-highlight}{\\det \\dfrac{\\partial f_i}{\\partial z_{i-1}}} \\right|"} displayMode={true} />
+      <div style="margin-top: 3em;">
+        <AnnotatedEquation
+          scale={1.8}
+          verticalGap={80}
+          labelFontSize={42}
+          tex={"\\log p(x) = \\log p(z_0) + \\sum_{i=1}^{K} \\log \\left| {\\color{#e74c3c} \\det \\dfrac{\\partial f_i}{\\partial z_{i-1}}} \\right|"}
+          annotations={[
+            { color: '#e74c3c', label: 'O(d³) in general', side: 'below', align: 'left' },
+          ]}
+        />
       </div>
-      <div style="display: flex; justify-content: center; margin-top: 1em;">
-        <div style="background: rgba(231, 76, 60, 0.1); border: 2px solid #e74c3c; border-radius: 12px; padding: 0.8em 2em; text-align: center;">
-          <p style="margin: 0; color: #e74c3c; font-weight: bold; font-size: 1.05em;">
-            The log-determinant of the Jacobian is <Katex math={"O(d^3)"} /> in general.
-          </p>
-        </div>
-      </div>
+      <p style="margin-top: 2em;">
+        A substantial body of work restricts <Katex math={"f_i"} /> to make evaluating the determinants more efficient.
+      </p>
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
         <p style="font-size: 0.7em; color: #888; margin: 0;">
-          <strong>Examples of tractable designs:</strong> Planar flows <span style="font-style: italic;">(Rezende &amp; Mohamed, 2015)</span>,
+          <strong>Examples:</strong> Planar flows <span style="font-style: italic;">(Rezende &amp; Mohamed, 2015)</span>,
           NICE <span style="font-style: italic;">(Dinh et al., 2014)</span>,
           Real NVP <span style="font-style: italic;">(Dinh et al., 2017)</span>,
           Glow <span style="font-style: italic;">(Kingma &amp; Dhariwal, 2018)</span>
         </p>
       </div>
+    </section>
+
+    <!-- Roadmap: Continuous Normalizing Flows -->
+    <section class="roadmap-slide">
+      <h2 class="slide-title">Presentation Roadmap</h2>
+      <ol class="roadmap">
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Normalizing Flows</p>
+          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+        </li>
+        <li class="roadmap-item roadmap-active">
+          <p class="roadmap-title">Continuous Normalizing Flows</p>
+          <p class="roadmap-ref">Chen et al., 2018</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
+          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Rectified Flows</p>
+          <p class="roadmap-ref">Liu et al., 2023</p>
+        </li>
+      </ol>
     </section>
 
     <!-- Slide: Continuous Normalizing Flows -->
@@ -601,22 +669,56 @@
       </div>
     </section>
 
-    <!-- Slide: Sampling Trajectories from CNFs -->
+    <!-- Slide: Sampling Trajectories From a CNF -->
+    <Slide figure={trajFigure}>
+      <h2 class="slide-title">Sampling Trajectories From a CNF</h2>
+      <p style="margin-top: 0.5em;">
+        Individual samples have trajectories <Katex math={"\\color{#f17720}{x(t)}"} /> from <Katex math={"x_0 \\sim p_0"} /> to <Katex math={"x_1 \\sim p_1"} />.
+      </p>
+      <div class="figure-container" style="margin-top: 0.5em;">
+        {#if dataLoaded}
+          <HighlightTrajectory
+            bind:this={trajFigure}
+            width={1800}
+            height={700}
+            {flowMatchingClient}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            allTimeSamples={$allTimeSamples}
+            isTraining={$isTraining}
+            numTrajectoriesToShow={1}
+            reverse={false}
+            showTimeSlider={false}
+            distributionScaleFactor={0.8}
+            endpointRadius={12}
+            trajectoryStrokeWidth={5}
+            latexFontSize={43}
+            animationDuration={8000}
+            pauseBeforeRestart={3000}
+            sourceLabelText={"p_0"}
+            targetLabelText={"p_1"}
+            labelFontSize={50}
+          />
+        {/if}
+      </div>
+    </Slide>
+
+    <!-- Slide: CNFs Learn to Represent Velocity Fields -->
     <section>
-      <h2 class="slide-title">Sampling Trajectories from CNFs</h2>
-      <div style="display: flex; align-items: center; gap: 2em; margin-top: 0.8em;">
+      <h2 class="slide-title">CNFs Learn to Represent Velocity Fields</h2>
+      <div style="display: flex; align-items: center; gap: 2em; margin-top: 3em;">
         <div style="flex: 1;">
           <p style="margin-top: 0;">
-            A CNF defines a time-dependent velocity field <Katex math={"\\color{#3b82f6}{v_\\theta(x, t)}"} /> parameterized by a neural network.
+            CNFs model a velocity field <Katex math={"\\color{#3b82f6}{v_\\theta}"} />.
           </p>
           <p style="margin-top: 0.5em;">
-            Generate samples by solving the ODE:
+            Generate sample trajectories by solving an ODE:
           </p>
           <div style="margin-top: 0.2em;">
             <Katex math={"\\frac{d\\color{#f17720}{x}}{dt} = \\color{#3b82f6}{v_\\theta(x, t)}"} displayMode={true} />
           </div>
           <p style="margin-top: 0.5em;">
-            We integrate forward using numerical methods like Euler's method:
+            Using numerical integration methods like Euler's method:
           </p>
           <div style="margin-top: 0.2em;">
             <Katex math={"\\color{#f17720}{x_{t+\\Delta t}} \\color{#333}{=} \\color{#f17720}{x_t} \\color{#333}{+} \\color{#333}{\\Delta t} \\color{#333}{\\cdot} \\color{#3b82f6}{v_\\theta(x_t, t)}"} displayMode={true} />
@@ -635,11 +737,12 @@
               showGroundTruth={false}
               showLegend={false}
               showArrowHeads={true}
+              arrowHeadRadius={8}
               arrowScale={100}
               arrowWidth={5}
               arrowOpacity={1.0}
               trajectoryStrokeWidth={5}
-              trajectoryHeadRadius={12}
+              trajectoryHeadRadius={20}
               targetPointRadius={7}
               showTimeSlider={false}
             />
@@ -650,19 +753,19 @@
 
     <!-- Slide: CNFs Allow More Efficient Likelihood Based Training -->
     <section>
-      <h2 class="slide-title">CNFs Allow <em>More</em> Efficient Likelihood Based Training</h2>
+      <h2 class="slide-title">CNFs Allow More Efficient Training</h2>
       <p style="margin-top: 0.8em;">
-        The instantaneous change of variables replaces the expensive Jacobian determinant with a <strong>trace</strong>:
+        The instantaneous change of variables replaces the expensive Jacobian determinant with a <span style="color: #22c55e;">trace</span>:
       </p>
-      <div style="margin-top: 0.5em;">
-        <Katex math={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 \\htmlClass{trace-highlight}{\\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"} displayMode={true} />
-      </div>
-      <div style="display: flex; justify-content: center; margin-top: 1.5em;">
-        <div style="background: rgba(34, 197, 94, 0.1); border: 2px solid #22c55e; border-radius: 12px; padding: 0.8em 2em; text-align: center;">
-          <p style="margin: 0; color: #22c55e; font-weight: bold; font-size: 1.05em;">
-            Trace is <Katex math={"O(d)"} /> instead of <Katex math={"O(d^3)"} /> for the full determinant
-          </p>
-        </div>
+      <div style="margin-top: 3em;">
+        <AnnotatedEquation
+          scale={1.5}
+          verticalGap={60}
+          tex={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 {\\color{#22c55e} \\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"}
+          annotations={[
+            { color: '#22c55e', label: 'Trace is only O(d)', side: 'above' },
+          ]}
+        />
       </div>
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
         <p style="font-size: 0.7em; color: #888; margin: 0;">
@@ -673,12 +776,20 @@
 
     <!-- Slide: Likelihood Based Training is Expensive -->
     <section>
-      <h2 class="slide-title">Likelihood Based Training is Expensive</h2>
+      <h2 class="slide-title">Training is Still Expensive</h2>
       <p style="margin-top: 0.5em;">
         Requires solving an ODE at <em style="color: #e74c3c;">every training step</em>.
       </p>
       <div style="margin-top: 0.3em;">
-        <Katex math={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_t}{\\partial x}\\right) \\, dt"} displayMode={true} />
+        <AnnotatedEquation
+          scale={1.3}
+          verticalGap={50}
+          labelFontSize={42}
+          tex={"\\log p_1(x_1) = \\log p_0(x_0) - {\\color{#e74c3c} \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_t}{\\partial x}\\right) \\, dt}"}
+          annotations={[
+            { color: '#e74c3c', label: 'Requires O(n) ODE solves', side: 'below', align: 'right' },
+          ]}
+        />
       </div>
       <div class="figure-container" style="margin-top: 0.3em; max-height: 600px; overflow: hidden;">
         {#if dataLoaded}
@@ -696,12 +807,38 @@
             endpointRadius={10}
             trajectoryStrokeWidth={4}
             latexFontSize={36}
+            sourceLabelText={"p_0"}
+            targetLabelText={"p_1"}
+            labelFontSize={50}
           />
         {/if}
       </div>
       <aside class="notes">
         Key motivation for flow matching: CNFs are expressive but training via maximum likelihood is expensive because of the trace computation and ODE simulation at every step. Flow matching avoids both.
       </aside>
+    </section>
+
+    <!-- Roadmap: Flow Matching -->
+    <section class="roadmap-slide">
+      <h2 class="slide-title">Presentation Roadmap</h2>
+      <ol class="roadmap">
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Normalizing Flows</p>
+          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Continuous Normalizing Flows</p>
+          <p class="roadmap-ref">Chen et al., 2018</p>
+        </li>
+        <li class="roadmap-item roadmap-active">
+          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
+          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Rectified Flows</p>
+          <p class="roadmap-ref">Liu et al., 2023</p>
+        </li>
+      </ol>
     </section>
 
     <!-- Slide: Flow Matching -->
@@ -762,8 +899,9 @@
             playingByDefault={true}
             backgroundVisible={false}
             showEquation={false}
-            sourceLabelText=""
-            targetLabelText=""
+            useLatexLabels={true}
+            sourceLabelText={"X_0"}
+            targetLabelText={"X_1"}
             labelFontSize={50}
             labelFontFamily="Libre Baskerville, Georgia, serif"
             latexFontSize={43}
@@ -772,42 +910,30 @@
       </div>
     </section>
 
-    <!-- Slide: Creating Regression Targets -->
-    <section>
-      <h2 class="slide-title">Creating Regression Targets</h2>
-      <div class="figure-container" style="margin-top: 0.5em;">
-        {#if dataLoaded}
-          <ConditionalVelocityField
-            width={1800}
-            height={800}
-            sourceDistributionSamples={$sourceDistributionSamples}
-            targetDistributionSamples={$targetDistributionSamples}
-            backgroundVisible={false}
-            latexFontSize={43}
-          />
-        {/if}
-      </div>
-    </section>
-
-    <!-- Slide: Regressing the Velocity Field -->
-    <section>
-      <h2 class="slide-title">Regressing the Velocity Field</h2>
-    </section>
-
     <!-- Slide: Stochastic Interpolants -->
     <section>
       <h2 class="slide-title">Stochastic Interpolants</h2>
       <p style="margin-top: 0.5em;">
-        We take a deterministic path like the <span style="color: #3b82f6; font-weight: bold;">linear path</span> and stochastic interpolants add stochasticity <span style="color: #f17720; font-weight: bold;">(orange)</span>.
+        We take a deterministic path like the <span style="color: #3b82f6; font-weight: bold;">linear path</span> and <span style="color: #f17720; font-weight: bold;">stochastic interpolants</span> add stochasticity.
       </p>
       <div style="margin-top: 0.3em;">
-        <Katex math={"X_t = (1-t)X_0 + tX_1 + \\sigma_t \\cdot \\varepsilon, \\quad \\varepsilon \\sim \\mathcal{N}(0, I)"} displayMode={true} />
+        <AnnotatedEquation
+          scale={1.3}
+          verticalGap={50}
+          labelFontSize={42}
+          tex={"X_t = (1-t)X_0 + tX_1 + {\\color{#f17720} \\sigma_t \\cdot \\varepsilon}, \\quad \\varepsilon \\sim \\mathcal{N}(0, I)"}
+          annotations={[
+            { color: '#f17720', label: 'Noise', side: 'below' },
+          ]}
+        />
       </div>
       <div class="figure-container" style="margin-top: -3em;">
         {#if dataLoaded}
           <StochasticInterpolation
             width={1800}
             height={600}
+            sourcePointColor={"#999"}
+            targetPointColor={"#999"}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             sourcePointIndex={5}
@@ -828,6 +954,24 @@
         <p style="font-size: 0.7em; color: #888; margin: 0;">
           Albergo et al., <span style="font-style: italic;">Stochastic Interpolants: A Unifying Framework for Flows and Diffusions</span>, 2023
         </p>
+      </div>
+    </section>
+
+    <!-- Slide: Developed Independently in Parallel -->
+    <section>
+      <h2 class="slide-title">Two Frameworks, One Idea</h2>
+      <p style="margin-top: 0.5em;">
+        Flow Matching and Stochastic Interpolants were developed independently and in parallel, arriving at the same core insight.
+      </p>
+      <div style="display: flex; align-items: flex-start; justify-content: center; gap: 3em; margin-top: 2em;">
+        <div style="flex: 1; text-align: center;">
+          <img src="{base}/images/flow_matching_paper.png" alt="Flow Matching paper" style="max-height: 600px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+          <p style="font-size: 0.7em; color: #888; margin-top: 0.5em;">Lipman et al., 2023</p>
+        </div>
+        <div style="flex: 1; text-align: center;">
+          <img src="{base}/images/stochastic_interpolants_paper.png" alt="Stochastic Interpolants paper" style="max-height: 600px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+          <p style="font-size: 0.7em; color: #888; margin-top: 0.5em;">Albergo & Vanden-Eijnden, 2023</p>
+        </div>
       </div>
     </section>
 
@@ -982,6 +1126,7 @@
             targetCenterX={0.8}
             latexFontSize={40}
             labelFontSize={50}
+            labelFontFamily="Libre Baskerville, Georgia, serif"
             meanArrowLabelOffset={{ x: 60, y: -18 }}
             topArrowLabelOffset={{ x: -55, y: -60 }}
             bottomArrowLabelOffset={{ x: -55, y: 20 }}
@@ -996,6 +1141,29 @@
       </aside>
     </section>
 
+    <!-- Roadmap: Rectified Flows -->
+    <section class="roadmap-slide">
+      <h2 class="slide-title">Presentation Roadmap</h2>
+      <ol class="roadmap">
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Normalizing Flows</p>
+          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Continuous Normalizing Flows</p>
+          <p class="roadmap-ref">Chen et al., 2018</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
+          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+        </li>
+        <li class="roadmap-item roadmap-active">
+          <p class="roadmap-title">Rectified Flows</p>
+          <p class="roadmap-ref">Liu et al., 2023</p>
+        </li>
+      </ol>
+    </section>
+
     <!-- Slide: Rectified Flows -->
     <section>
       <h2 class="slide-title">Rectified Flows</h2>
@@ -1004,7 +1172,7 @@
         {#if dataLoaded}
           <InducedCouplingAnimated
             width={1800}
-            height={550}
+            height={700}
             targetDistribution={$targetDistributionSamples}
             {flowMatchingClient}
             numSteps={200}
@@ -1024,7 +1192,8 @@
       </div>
     </section>
 
-    <!-- Slide: The Reflow Algorithm -->
+    <!-- Slide: The Reflow Algorithm (hidden for now) -->
+    <!--
     <section>
       <h2 class="slide-title">The Reflow Algorithm</h2>
       <div class="figure-container" style="margin-top: 2em;">
@@ -1032,7 +1201,6 @@
       </div>
     </section>
 
-    <!-- Slide: The Reflow Algorithm (visualization) -->
     <section>
       <h2 class="slide-title">The Reflow Algorithm</h2>
       <div class="figure-container" style="margin-top: 3em;">
@@ -1053,6 +1221,7 @@
         {/if}
       </div>
     </section>
+    -->
 
     <!-- Slide: Reflow Produces Straighter Trajectories -->
     <section>
@@ -1084,16 +1253,13 @@
     <!-- Slide: Key References -->
     <section>
       <h2 class="slide-title">Key References</h2>
-      <ul style="font-size: 0.75em; margin-top: 0.5em; line-height: 1.8;">
-        <li>Rezende & Mohamed, <span style="font-style: italic;">Variational Inference with Normalizing Flows</span>, 2015</li>
-        <li>Dinh et al., <span style="font-style: italic;">NICE: Non-linear Independent Components Estimation</span>, 2014</li>
-        <li>Dinh et al., <span style="font-style: italic;">Density Estimation Using Real-Valued Non-Volume Preserving Transformations</span>, 2017</li>
-        <li>Kingma & Dhariwal, <span style="font-style: italic;">Glow: Generative Flow with Invertible 1x1 Convolutions</span>, 2018</li>
-        <li>Chen et al., <span style="font-style: italic;">Neural Ordinary Differential Equations</span>, 2018</li>
-        <li>Lipman et al., <span style="font-style: italic;">Flow Matching for Generative Modeling</span>, 2023</li>
-        <li>Albergo et al., <span style="font-style: italic;">Stochastic Interpolants: A Unifying Framework for Flows and Diffusions</span>, 2023</li>
-        <li>Liu et al., <span style="font-style: italic;">Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow</span>, 2022</li>
-      </ul>
+      <div style="font-size: 0.65em; margin-top: 1em; line-height: 1.6; columns: 2; column-gap: 2em;">
+        <p class="bib-entry">[1] D. Rezende & S. Mohamed. "Variational Inference with Normalizing Flows." <em>ICML</em>, 2015.</p>
+        <p class="bib-entry">[2] R. Chen et al. "Neural Ordinary Differential Equations." <em>NeurIPS</em>, 2018.</p>
+        <p class="bib-entry">[3] Y. Lipman et al. "Flow Matching for Generative Modeling." <em>ICLR</em>, 2023.</p>
+        <p class="bib-entry">[4] M. Albergo & E. Vanden-Eijnden. "Stochastic Interpolants: A Unifying Framework for Flows and Diffusions." <em>ICML</em>, 2023.</p>
+        <p class="bib-entry">[5] Q. Liu et al. "Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow." <em>ICLR</em>, 2023.</p>
+      </div>
     </section>
 
     <!-- Slide: Conclusion -->
@@ -1193,6 +1359,27 @@
 
   .roadmap-item {
     list-style-type: decimal;
+    transition: opacity 0.3s;
+  }
+
+  .roadmap-active {
+    opacity: 1;
+  }
+
+  .roadmap-active .roadmap-title {
+    color: #f17720;
+    font-weight: bold;
+  }
+
+  .roadmap-inactive {
+    opacity: 0.35;
+  }
+
+  :global(.bib-entry) {
+    margin: 0 0 0.6em 0;
+    text-indent: -1.5em;
+    padding-left: 1.5em;
+    break-inside: avoid;
   }
 
   .roadmap-title {

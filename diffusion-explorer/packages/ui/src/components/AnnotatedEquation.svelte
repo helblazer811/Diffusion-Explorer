@@ -55,17 +55,47 @@
 
   let colorGroupEls = new Map();
 
+  let resizeTimer = null;
+  let revealHandlers = [];
+
   onMount(async () => {
     await loadMathJax();
     mounted = true;
     await renderAndAnnotate();
 
-    resizeObserver = new ResizeObserver(() => drawAnnotations());
+    resizeObserver = new ResizeObserver(() => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => drawAnnotations(), 300);
+    });
     resizeObserver.observe(container);
+
+    // Listen to Reveal.js lifecycle events for overview mode transitions
+    if (typeof window !== 'undefined' && window.Reveal) {
+      const onOverviewShown = () => { inOverview = true; clearOverlay(); };
+      const onOverviewHidden = () => { inOverview = false; setTimeout(() => drawAnnotations(), 100); };
+      const onSlideChanged = () => setTimeout(() => drawAnnotations(), 50);
+
+      window.Reveal.on('overviewshown', onOverviewShown);
+      window.Reveal.on('overviewhidden', onOverviewHidden);
+      window.Reveal.on('slidechanged', onSlideChanged);
+
+      revealHandlers = [
+        ['overviewshown', onOverviewShown],
+        ['overviewhidden', onOverviewHidden],
+        ['slidechanged', onSlideChanged],
+      ];
+    }
   });
 
   onDestroy(() => {
     resizeObserver?.disconnect();
+    if (resizeTimer) clearTimeout(resizeTimer);
+    // Clean up Reveal.js listeners
+    if (typeof window !== 'undefined' && window.Reveal) {
+      for (const [event, handler] of revealHandlers) {
+        window.Reveal.off(event, handler);
+      }
+    }
   });
 
   $: if (mounted && tex) {
@@ -120,14 +150,11 @@
     }
   }
 
+  let inOverview = false;
+
   function drawAnnotations() {
     if (!container || !svgOverlay) return;
-
-    // Skip redraw if in Reveal.js overview mode (slides are heavily scaled down)
-    // In overview, the container is scaled much smaller than its layout size
-    const scaleCheck = container.getBoundingClientRect().width / container.offsetWidth;
-    if (container.offsetWidth > 0 && scaleCheck < 0.3) return;
-
+    if (inOverview) return;
     clearOverlay();
 
     const cRect = container.getBoundingClientRect();

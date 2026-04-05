@@ -10,9 +10,9 @@
   export let width = 1800;
   export let height = 800;
   export let numFrames = 5;
-  export let frameColor = '#f17720';
+  export let frameColor = '#2ecc71';
   export let frameOpacity = 0.7;
-  export let frameScale = 0.3; // size of coordinate frames in data space
+  export let frameScale = 0.5; // size of coordinate frames in data space
   export let pointColor = '#4594e3';
   export let pointRadius = 5;
   export let pointOpacity = 0.25;
@@ -292,6 +292,17 @@
       ];
       drawCoordFrame(frame.tgtPx[0], frame.tgtPx[1], ex, ey, frameColor, frameOpacity);
     }
+  }
+
+  export function restart() {
+    if (timeline) {
+      timeline.seek(0);
+      timeline.play();
+    }
+  }
+
+  export function pause() {
+    if (timeline) timeline.pause();
   }
 
   onDestroy(() => { if (timeline) timeline.pause(); });

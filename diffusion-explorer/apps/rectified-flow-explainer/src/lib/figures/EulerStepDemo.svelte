@@ -64,6 +64,7 @@
   export let arrowWidth = 2.5;
   export let arrowOpacity = 0.6;
   export let showArrowHeads = false;
+  export let arrowHeadRadius = 5;
   export let centerQuiver = true;
 
   // Starting points
@@ -435,6 +436,7 @@
           opacity: arrowOpacity,
           normalizeVectors: false,
           showArrowHeads,
+          headRadius: arrowHeadRadius,
           centerQuiver,
         }
       );

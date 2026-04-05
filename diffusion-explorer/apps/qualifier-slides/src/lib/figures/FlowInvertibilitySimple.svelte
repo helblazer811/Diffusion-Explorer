@@ -234,6 +234,18 @@
     }
   }
 
+  export function restart() {
+    if (staticForward) return;
+    if (timeline) {
+      timeline.seek(0);
+      timeline.play();
+    }
+  }
+
+  export function pause() {
+    if (timeline) timeline.pause();
+  }
+
   onDestroy(() => { if (timeline) timeline.pause(); });
 
   $: ctx = canvas && canvas2d.ctx;

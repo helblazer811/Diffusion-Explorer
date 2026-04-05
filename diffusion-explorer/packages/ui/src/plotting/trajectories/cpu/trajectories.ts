@@ -351,15 +351,34 @@ export function drawTrajectories(
       }
     } else {
       // Default mode: draw path up to segmentIndex with uniform opacity
+      // Support fractional segmentIndex for smooth interpolation
+      const floorIdx = Math.floor(segmentIndex);
+      const frac = segmentIndex - floorIdx;
+      const lastFullPoint = Math.min(floorIdx + 1, points.length - 1);
+
+      // Compute interpolated endpoint for partial segment
+      let interpX: number, interpY: number;
+      if (frac > 0 && lastFullPoint + 1 < points.length) {
+        const [x1, y1] = points[lastFullPoint];
+        const [x2, y2] = points[lastFullPoint + 1];
+        interpX = x1 + frac * (x2 - x1);
+        interpY = y1 + frac * (y2 - y1);
+      } else {
+        [interpX, interpY] = points[lastFullPoint];
+      }
+
       // Draw outline first if specified
       if (outline) {
         ctx.lineWidth = outlineWidth;
         ctx.strokeStyle = outlineColor;
         ctx.globalAlpha = outlineOpacity;
         ctx.beginPath();
-        for (let j = 0; j <= segmentIndex + 1 && j < points.length; j++) {
+        for (let j = 0; j <= lastFullPoint && j < points.length; j++) {
           const [x, y] = points[j];
           j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        if (frac > 0 && lastFullPoint + 1 < points.length) {
+          ctx.lineTo(interpX, interpY);
         }
         ctx.stroke();
       }
@@ -368,19 +387,37 @@ export function drawTrajectories(
       ctx.strokeStyle = style.color;
       ctx.globalAlpha = style.opacity;
       ctx.beginPath();
-      for (let j = 0; j <= segmentIndex + 1 && j < points.length; j++) {
+      for (let j = 0; j <= lastFullPoint && j < points.length; j++) {
         const [x, y] = points[j];
         j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      if (frac > 0 && lastFullPoint + 1 < points.length) {
+        ctx.lineTo(interpX, interpY);
       }
       ctx.stroke();
     }
 
     // 3. Draw marker at head position (unless disabled)
     if (style.showHeadMarker !== false) {
-      const markerIdx = Math.min(segmentIndex + 1, points.length - 1);
-      const [mx, my] = points[markerIdx];
-      const prevIdx = Math.max(0, markerIdx - 1);
-      const [px, py] = points[prevIdx];
+      // Support fractional segmentIndex for smooth marker placement
+      const floorIdx = Math.floor(segmentIndex);
+      const frac = segmentIndex - floorIdx;
+      const baseIdx = Math.min(floorIdx + 1, points.length - 1);
+
+      let mx: number, my: number;
+      let px: number, py: number;
+      if (frac > 0 && baseIdx + 1 < points.length) {
+        const [x1, y1] = points[baseIdx];
+        const [x2, y2] = points[baseIdx + 1];
+        mx = x1 + frac * (x2 - x1);
+        my = y1 + frac * (y2 - y1);
+        px = x1;
+        py = y1;
+      } else {
+        [mx, my] = points[baseIdx];
+        const prevIdx = Math.max(0, baseIdx - 1);
+        [px, py] = points[prevIdx];
+      }
 
       // Draw marker
       const headType = style.headStyle?.type ?? 'circle';
