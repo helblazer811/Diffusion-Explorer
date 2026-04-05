@@ -932,14 +932,9 @@
     of variables formula replaces the expensive determinant with a much cheaper
     <span style="color: #22c55e;">trace</span>:
   </p>
-  <AnnotatedEquation
-    scale={1.0}
-    verticalGap={40}
-    labelFontSize={16}
-    tex={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 {\\color{#22c55e} \\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"}
-    annotations={[
-      { color: '#22c55e', label: 'Trace is only O(d)', side: 'above' },
-    ]}
+  <Katex
+    math={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 {\\color{#22c55e} \\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"}
+    displayMode={true}
   />
   <p>
     The trace of the Jacobian is only <Katex math={"O(d)"} />, a dramatic
@@ -956,17 +951,13 @@
     CNFs still has a significant drawback: it requires solving an ODE at
     <em>every training step</em>. To compute the log-likelihood of a data point, we
     must integrate the trace of the Jacobian along the entire trajectory from
-    <Katex math={"t=0"} /> to <Katex math={"t=1"} />. This simulation is
-    computationally expensive and becomes a bottleneck during training.
+    <Katex math={"t=0"} /> to <Katex math={"t=1"} />, which
+    <span style="color: #e74c3c;">requires solving the ODE for each training example</span>.
+    This simulation is computationally expensive and becomes a bottleneck during training.
   </p>
-  <AnnotatedEquation
-    scale={1.0}
-    verticalGap={40}
-    labelFontSize={16}
-    tex={"\\log p_1(x_1) = \\log p_0(x_0) - {\\color{#e74c3c} \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_t}{\\partial x}\\right) \\, dt}"}
-    annotations={[
-      { color: '#e74c3c', label: 'Requires O(n) ODE solves', side: 'below', align: 'right' },
-    ]}
+  <Katex
+    math={"\\log p_1(x_1) = \\log p_0(x_0) - {\\color{#e74c3c} \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_t}{\\partial x}\\right) \\, dt}"}
+    displayMode={true}
   />
 
   {#if showOtherFigures}
