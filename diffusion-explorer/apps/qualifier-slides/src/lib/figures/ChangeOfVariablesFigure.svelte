@@ -1,21 +1,21 @@
 <script>
   import { onDestroy } from "svelte";
-  import { drawScatterPlot, drawMathjax, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
+  import { drawScatterPlot, drawMathjax, drawArrowHead, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   export let allTimeSamples;
   export let width = 1800;
-  export let height = 800;
-  export let pointColor = '#4594e3';
+  export let height = 700;
   export let pointRadius = 5;
   export let pointOpacity = 0.5;
   export let labelFontSize = 50;
   export let sourceCenterX = 0.25;
   export let targetCenterX = 0.75;
   export let distributionScaleFactor = 0.85;
-  export let highlightColor = '#f17720';
-  export let highlightRadius = 14;
+  export let arrowColor = '#555';
+  export let arrowWidth = 4;
   export let highlightIndex = 15;
+  export let highlightRadius = 12;
 
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
@@ -23,8 +23,8 @@
   let scales = null;
   let sourcePixelCoords = [];
   let targetPixelCoords = [];
-  let highlightSourcePixel = [0, 0];
-  let highlightTargetPixel = [0, 0];
+  let highlightSourcePt = [0, 0];
+  let highlightTargetPt = [0, 0];
   let isInitialized = false;
 
   function runInitialComputation() {
@@ -54,8 +54,8 @@
     ]);
 
     const idx = highlightIndex % sourceSamples.length;
-    highlightSourcePixel = sourcePixelCoords[idx];
-    highlightTargetPixel = targetPixelCoords[idx];
+    highlightSourcePt = sourcePixelCoords[idx];
+    highlightTargetPt = targetPixelCoords[idx];
 
     isInitialized = true;
     draw();
@@ -67,38 +67,60 @@
 
     const requestRedraw = () => draw();
 
-    // Labels below
+    // Labels below distributions
     drawMathjax(ctx, "p(z)", scales.sourceCenterPixelX, height - 25, labelFontSize, 0, 0, { color: '#4594e3' }, requestRedraw);
     drawMathjax(ctx, "p(x)", scales.targetCenterPixelX, height - 25, labelFontSize, 0, 0, { color: '#f17720' }, requestRedraw);
-
 
     // Scatter plots
     drawScatterPlot(ctx, sourcePixelCoords, pointRadius, '#4594e3', pointOpacity);
     drawScatterPlot(ctx, targetPixelCoords, pointRadius, '#f17720', pointOpacity);
 
-    // Highlight source point (blue)
+    // Highlight points
     ctx.save();
     ctx.beginPath();
-    ctx.arc(highlightSourcePixel[0], highlightSourcePixel[1], highlightRadius, 0, Math.PI * 2);
+    ctx.arc(highlightSourcePt[0], highlightSourcePt[1], highlightRadius, 0, Math.PI * 2);
     ctx.fillStyle = '#4594e3';
-    ctx.globalAlpha = 1;
     ctx.fill();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.restore();
 
-    // Highlight target point (orange)
     ctx.save();
     ctx.beginPath();
-    ctx.arc(highlightTargetPixel[0], highlightTargetPixel[1], highlightRadius, 0, Math.PI * 2);
+    ctx.arc(highlightTargetPt[0], highlightTargetPt[1], highlightRadius, 0, Math.PI * 2);
     ctx.fillStyle = '#f17720';
-    ctx.globalAlpha = 1;
     ctx.fill();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.restore();
+
+    // Curved arrow connecting source point to target point
+    const sx = highlightSourcePt[0];
+    const sy = highlightSourcePt[1];
+    const tx = highlightTargetPt[0];
+    const ty = highlightTargetPt[1];
+    const mx = (sx + tx) / 2;
+    const my = Math.min(sy, ty) - 80;
+
+    ctx.save();
+    ctx.strokeStyle = arrowColor;
+    ctx.lineWidth = arrowWidth;
+    ctx.beginPath();
+    ctx.moveTo(sx + highlightRadius + 4, sy);
+    ctx.quadraticCurveTo(mx, my, tx - highlightRadius - 4, ty);
+    ctx.stroke();
+
+    // Arrowhead at left side of target point
+    ctx.fillStyle = arrowColor;
+    const prevX = (tx - highlightRadius - 4) - ((tx - highlightRadius - 4) - mx) * 0.05;
+    const prevY = ty - (ty - my) * 0.05;
+    drawArrowHead(ctx, prevX, prevY, tx - highlightRadius - 4, ty, 12);
+    ctx.restore();
+
+    // f(z) label above arrow
+    drawMathjax(ctx, "f(z)", mx, my - 20, 44, 0, 0, { color: arrowColor }, requestRedraw);
   }
 
   export function restart() { draw(); }
@@ -117,44 +139,4 @@
     use:canvas2d.bindCanvas
     style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
   />
-  {#if isInitialized}
-    <svg
-      viewBox="0 0 {width} {height}"
-      style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible;"
-    >
-      <defs>
-        <marker id="arrow-gray" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 Z" fill="#333" />
-        </marker>
-      </defs>
-
-      <!-- Source annotation -->
-      <line
-        x1={highlightSourcePixel[0] - 70}
-        y1={highlightSourcePixel[1] - 145}
-        x2={highlightSourcePixel[0]}
-        y2={highlightSourcePixel[1] - highlightRadius - 4}
-        stroke="#333" stroke-width="3" marker-end="url(#arrow-gray)" />
-      <text
-        x={highlightSourcePixel[0] - 240}
-        y={highlightSourcePixel[1] - 160}
-        fill="#333" font-size="46" font-family="Libre Baskerville, Georgia, serif">
-        Easy to evaluate p(z)
-      </text>
-
-      <!-- Target annotation -->
-      <line
-        x1={scales.targetCenterPixelX}
-        y1={highlightTargetPixel[1] - 145}
-        x2={highlightTargetPixel[0]}
-        y2={highlightTargetPixel[1] - highlightRadius - 4}
-        stroke="#333" stroke-width="3" marker-end="url(#arrow-gray)" />
-      <text
-        x={scales.targetCenterPixelX - 200}
-        y={highlightTargetPixel[1] - 160}
-        fill="#333" font-size="46" font-family="Libre Baskerville, Georgia, serif">
-        Less straightforward
-      </text>
-    </svg>
-  {/if}
 </div>
