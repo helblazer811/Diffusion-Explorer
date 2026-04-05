@@ -46,7 +46,7 @@
   import DataLikelihood from "$qualifier-slides/figures/DataLikelihood.svelte";
   import ChangeOfVariablesIntro from "$qualifier-slides/figures/ChangeOfVariablesIntro.svelte";
   import StochasticInterpolation from "$qualifier-slides/figures/StochasticInterpolation.svelte";
-  import { Bibliography, HoverableReference, Katex, ArticleHeader, AnnotatedEquation } from "@diffusion-explorer/ui";
+  import { Bibliography, HoverableReference, Katex, ArticleHeader } from "@diffusion-explorer/ui";
   import { base } from "$app/paths";
 
   // ========== DATA MANAGEMENT STATE ==========
