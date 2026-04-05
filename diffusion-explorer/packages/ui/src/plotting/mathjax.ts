@@ -177,7 +177,22 @@ function applyStylesToSvg(
   const paths = svg.querySelectorAll('path');
   paths.forEach(path => {
     if (color) {
-      path.setAttribute('fill', color);
+      // Only apply default color to paths not already colored by \color{} LaTeX commands.
+      // MathJax wraps \color{} content in <g fill="#hex"> groups. We skip paths inside
+      // those groups, but still color paths under the default <g fill="currentColor">.
+      let hasExplicitColor = false;
+      let el: Element | null = path.parentElement;
+      while (el && el !== svg) {
+        const fill = el.getAttribute('fill');
+        if (fill && fill !== 'currentColor') {
+          hasExplicitColor = true;
+          break;
+        }
+        el = el.parentElement;
+      }
+      if (!hasExplicitColor) {
+        path.setAttribute('fill', color);
+      }
     }
     if (stroke) {
       path.setAttribute('stroke', stroke);
