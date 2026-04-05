@@ -18,6 +18,8 @@
   export let onDragStart = () => {};  // Called when user starts dragging
   export let onDragEnd = () => {};    // Called when user stops dragging
   export let showValue = false;
+  export let maxWidth = '600px';
+  export let labelSize = '';
   export let valueFormatter = (v) => v.toFixed(2);  // Function to format displayed value
 
   // Custom ticks: array of {position: number (0-1), label: string}
@@ -75,8 +77,8 @@
   }
 </script>
 
-<div class="slider-container" class:disabled>
-  <div class="slider-inner">
+<div class="slider-container" class:disabled style={labelSize ? `--slider-label-size: ${labelSize};` : ''}>
+  <div class="slider-inner" style="max-width: {maxWidth};">
     <div class="slider-wrapper">
       <input
         type="range"
@@ -149,7 +151,6 @@
     display: flex;
     align-items: center;
     width: 100%;
-    max-width: 600px;
   }
 
   .slider-wrapper {
@@ -212,7 +213,7 @@
   .tick-label {
     position: absolute;
     top: 12px;
-    font-size: 11px;
+    font-size: var(--slider-label-size, 11px);
     transform: translateX(-50%);
     font-family: monospace;
     color: #888;
@@ -228,7 +229,7 @@
     left: 50%;
     top: 0;
     transform: translateX(-50%);
-    font-size: 16px;
+    font-size: var(--slider-label-size, 16px);
     font-family: Helvetica, sans-serif;
     color: #7b7b7b;
   }

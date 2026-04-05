@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, ContourRenderer, createLinearColorScale, parseContourColor, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, Slider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, ContourRenderer, createLinearColorScale, parseContourColor, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import type { Writable } from "svelte/store";
   import type { Snippet } from "svelte";
@@ -67,6 +67,12 @@
 
   // Time slider visibility
   export let showTimeSlider = true;
+  export let showPlayButton = true;
+  export let sliderMaxWidth = '644px';
+  export let sliderLabelSize = '0.85em';
+  export let useRawSlider = false;
+
+  let rawSliderValue = 0;
 
   // Visibility controls for scatter plots
   export let showSourceScatter = true;
@@ -328,8 +334,9 @@
     timeline.looping = true;
 
     // Register tick callback
-    timeline.onTick((_t, state) => {
+    timeline.onTick((t, state) => {
       draw(state);
+      rawSliderValue = t;
     });
   }
 
@@ -575,7 +582,29 @@
         ></canvas>
       </div>
       {#if showTimeSlider}
-        <TimeSlider {timeline} color="#f17720" />
+        {#if useRawSlider}
+          <div style="width: 100%; padding: 0 20px; box-sizing: border-box; font-size: {sliderLabelSize};">
+            <Slider
+              value={rawSliderValue}
+              min={0}
+              max={1}
+              step={0.001}
+              color="#f17720"
+              showTicks={true}
+              showLabel={true}
+              label="Time"
+              minLabel="t=0"
+              maxLabel="t=1"
+              maxWidth={sliderMaxWidth}
+              labelSize={sliderLabelSize}
+              onInput={(v) => { if (timeline) timeline.seek(v); }}
+              onDragStart={() => { if (timeline) timeline.startSeeking(); }}
+              onDragEnd={() => { if (timeline) timeline.endSeeking(); }}
+            />
+          </div>
+        {:else}
+          <TimeSlider {timeline} color="#f17720" {showPlayButton} maxWidth={sliderMaxWidth} labelSize={sliderLabelSize} />
+        {/if}
       {/if}
     </div>
   {/snippet}

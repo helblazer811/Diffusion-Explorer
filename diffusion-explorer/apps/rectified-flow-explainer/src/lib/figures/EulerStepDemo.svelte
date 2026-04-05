@@ -6,6 +6,7 @@
   import {
     Figure,
     TimeSlider,
+    Slider,
     drawScatterPlot,
     drawVectorField,
     drawTrajectories,
@@ -81,6 +82,9 @@
   export let showGroundTruth = true;
   export let showLegend = true;
   export let showTimeSlider = true;
+  export let useRawSlider = false;
+  export let sliderMaxWidth = '644px';
+  export let sliderLabelSize = '0.85em';
 
   // Constants
   const NUM_STEPS = 16;
@@ -89,6 +93,7 @@
   const PAUSE_BEFORE_RESTART = 1500;
 
   // Derived from props
+  let rawSliderValue = 0;
   $: caption = children;
   $: isDataValid = targetDistribution?.length > 0;
   $: hasVectorField = flowMatchingVectorField?.velocities?.length > 0;
@@ -306,6 +311,7 @@
 
     timeline.onTick((t, state) => {
       if (!isInitialized || isLoading) return;
+      rawSliderValue = t;
       animState = state;
       draw(state);
     });
@@ -553,12 +559,34 @@
         style="cursor: {isLoading ? 'wait' : 'pointer'};"
       ></canvas>
       {#if showTimeSlider}
-        <TimeSlider
-          {timeline}
-          step={1 / NUM_STEPS}
-          discreteFill={true}
-          color={approximationColor}
-        />
+        {#if useRawSlider}
+          <div style="width: 100%; padding: 0 20px; box-sizing: border-box;">
+            <Slider
+              value={rawSliderValue}
+              min={0}
+              max={1}
+              step={0.001}
+              color={approximationColor}
+              showTicks={true}
+              showLabel={true}
+              label="Time"
+              minLabel="t=0"
+              maxLabel="t=1"
+              maxWidth={sliderMaxWidth}
+              labelSize={sliderLabelSize}
+              onInput={(v) => { if (timeline) timeline.seek(v); }}
+              onDragStart={() => { if (timeline) timeline.startSeeking(); }}
+              onDragEnd={() => { if (timeline) timeline.endSeeking(); }}
+            />
+          </div>
+        {:else}
+          <TimeSlider
+            {timeline}
+            step={1 / NUM_STEPS}
+            discreteFill={true}
+            color={approximationColor}
+          />
+        {/if}
       {/if}
     </div>
 
