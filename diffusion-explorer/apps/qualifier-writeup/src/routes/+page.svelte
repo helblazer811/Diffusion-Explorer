@@ -485,13 +485,12 @@
       <NormalizingFlowStages
         width={figureWidth}
         height={350}
-      >
-        <div class="caption">
-          <span class="figure-number">Figure 3:</span>
-          A normalizing flow applies a sequence of invertible transformations to
-          transform a simple source distribution into a complex target distribution.
-        </div>
-      </NormalizingFlowStages>
+      />
+      <div class="caption">
+        <span class="figure-number">Figure 3:</span>
+        A normalizing flow applies a sequence of invertible transformations to
+        transform a simple source distribution into a complex target distribution.
+      </div>
     </div>
   {/if}
 
@@ -520,15 +519,14 @@
         {allTimeSamples}
         numLines={5}
         distributionScaleFactor={1.0}
-      >
-        <div class="caption">
-          <span class="figure-number">Figure 4:</span>
-          A normalizing flow maps all points to distinct locations, ensuring that
-          probability mass is conserved through the transformation. The invertibility
-          of the flow means that we can always map back from the target distribution
-          to the source distribution.
-        </div>
-      </FlowInvertibilitySimple>
+      />
+      <div class="caption">
+        <span class="figure-number">Figure 4:</span>
+        A normalizing flow maps all points to distinct locations, ensuring that
+        probability mass is conserved through the transformation. The invertibility
+        of the flow means that we can always map back from the target distribution
+        to the source distribution.
+      </div>
     </div>
   {/if}
 
@@ -553,15 +551,14 @@
         height={400}
         {allTimeSamples}
         distributionScaleFactor={1.0}
-      >
-        <div class="caption">
-          <span class="figure-number">Figure 5:</span>
-          It is easy to evaluate the density for a <span style="color: #4594e3;">simple distribution</span>,
-          but not straightforward for a <span style="color: #f17720;">complex distribution</span>.
-          Normalizing flows provide a way to compute the density of a data point under the complex
-          distribution by mapping it back to the simple distribution.
-        </div>
-      </DataLikelihood>
+      />
+      <div class="caption">
+        <span class="figure-number">Figure 5:</span>
+        It is easy to evaluate the density for a <span style="color: #4594e3;">simple distribution</span>,
+        but not straightforward for a <span style="color: #f17720;">complex distribution</span>.
+        Normalizing flows provide a way to compute the density of a data point under the complex
+        distribution by mapping it back to the simple distribution.
+      </div>
     </div>
   {/if}
 
@@ -590,13 +587,12 @@
       <ChangeOfVariables
         width={figureWidth}
         height={350}
-      >
-        <div class="caption">
-          <span class="figure-number">Figure 6:</span>
-          The change of variables formula tracks how probability density changes
-          through an invertible transformation using the Jacobian determinant.
-        </div>
-      </ChangeOfVariables>
+      />
+      <div class="caption">
+        <span class="figure-number">Figure 6:</span>
+        The change of variables formula tracks how probability density changes
+        through an invertible transformation using the Jacobian determinant.
+      </div>
     </div>
   {/if}
 
@@ -622,15 +618,14 @@
         {allTimeSamples}
         numFrames={5}
         distributionScaleFactor={1.0}
-      >
-        <div class="caption">
-          <span class="figure-number">Figure 7:</span>
-          The determinant of the Jacobian
-          <Katex math={"\\left| \\det \\frac{\\partial f}{\\partial z} \\right|"} />
-          measures how the transformation <Katex math={"f"} /> locally stretches and
-          compresses space, providing geometric intuition for the change of variables formula.
-        </div>
-      </ChangeOfVariablesIntro>
+      />
+      <div class="caption">
+        <span class="figure-number">Figure 7:</span>
+        The determinant of the Jacobian
+        <Katex math={"\\left| \\det \\frac{\\partial f}{\\partial z} \\right|"} />
+        measures how the transformation <Katex math={"f"} /> locally stretches and
+        compresses space, providing geometric intuition for the change of variables formula.
+      </div>
     </div>
   {/if}
 
@@ -655,14 +650,13 @@
         width={figureWidth}
         height={350}
         static={true}
-      >
-        <div class="caption">
-          <span class="figure-number">Figure 8:</span>
-          Composing multiple invertible transformations. The log-likelihood of a data
-          point is computed by accumulating the log-determinant of the Jacobian at each
-          stage of the flow.
-        </div>
-      </NormalizingFlowStages>
+      />
+      <div class="caption">
+        <span class="figure-number">Figure 8:</span>
+        Composing multiple invertible transformations. The log-likelihood of a data
+        point is computed by accumulating the log-determinant of the Jacobian at each
+        stage of the flow.
+      </div>
     </div>
   {/if}
 
@@ -688,14 +682,13 @@
         reversed={true}
         highlightPointIndices={[15]}
         highlightColor="#3b82f6"
-      >
-        <div class="caption">
-          <span class="figure-number">Figure 9:</span>
-          To compute the likelihood of a <span style="color: #3b82f6;">data point</span>,
-          we map it backward through the inverse transformations, accumulating the
-          log-determinant of the Jacobian at each stage.
-        </div>
-      </MaxLikelihoodTraining>
+      />
+      <div class="caption">
+        <span class="figure-number">Figure 9:</span>
+        To compute the likelihood of a <span style="color: #3b82f6;">data point</span>,
+        we map it backward through the inverse transformations, accumulating the
+        log-determinant of the Jacobian at each stage.
+      </div>
     </div>
   {/if}
 
@@ -721,14 +714,13 @@
       <MaxLikelihoodTraining
         width={figureWidth}
         height={350}
-      >
-        <div class="caption">
-          <span class="figure-number">Figure 10:</span>
-          Maximum likelihood training learns flow transformations that maximize the
-          log-likelihood of the observed data by propagating data points backward
-          through the inverse flow.
-        </div>
-      </MaxLikelihoodTraining>
+      />
+      <div class="caption">
+        <span class="figure-number">Figure 10:</span>
+        Maximum likelihood training learns flow transformations that maximize the
+        log-likelihood of the observed data by propagating data points backward
+        through the inverse flow.
+      </div>
     </div>
   {/if}
 
