@@ -52,6 +52,7 @@
   export let labelOpacity = settings.stylingSettings.label.opacity;
   export let sourceLabelText = "Source Distribution";
   export let targetLabelText = "Target Distribution";
+  export let useLatexLabels = false;
 
   // Background visibility
   export let backgroundVisible = true;
@@ -253,20 +254,26 @@
     // --- Static Background ---
     // Draw text labels
     const textY = marginHeight / 2;
-    drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
-      font: `${labelFontWeight} ${labelFontSize}px ${labelFontFamily}`,
-      color: labelColor,
-      opacity: labelOpacity,
-      align: "center",
-      baseline: "top",
-    });
-    drawText(ctx, targetLabelText, scales.targetCenterPixelX, textY, {
-      font: `${labelFontWeight} ${labelFontSize}px ${labelFontFamily}`,
-      color: labelColor,
-      opacity: labelOpacity,
-      align: "center",
-      baseline: "top",
-    });
+    if (useLatexLabels) {
+      const requestRedraw = () => { if (timeline) draw(timeline.state); };
+      drawMathjax(ctx, sourceLabelText, scales.sourceCenterPixelX, textY + labelFontSize, labelFontSize, 0, labelFontSize * 1.0, { color: labelColor }, requestRedraw);
+      drawMathjax(ctx, targetLabelText, scales.targetCenterPixelX, textY + labelFontSize, labelFontSize, 0, labelFontSize * 1.0, { color: labelColor }, requestRedraw);
+    } else {
+      drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, textY, {
+        font: `${labelFontWeight} ${labelFontSize}px ${labelFontFamily}`,
+        color: labelColor,
+        opacity: labelOpacity,
+        align: "center",
+        baseline: "top",
+      });
+      drawText(ctx, targetLabelText, scales.targetCenterPixelX, textY, {
+        font: `${labelFontWeight} ${labelFontSize}px ${labelFontFamily}`,
+        color: labelColor,
+        opacity: labelOpacity,
+        align: "center",
+        baseline: "top",
+      });
+    }
 
     // Draw scatter plots
     drawScatterPlot(ctx, sourcePixelCoords, pointRadius, sourcePointColor, pointOpacity);

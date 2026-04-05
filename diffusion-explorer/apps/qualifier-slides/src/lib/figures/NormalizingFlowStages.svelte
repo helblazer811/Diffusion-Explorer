@@ -24,6 +24,7 @@
     contourThresholds = 5 as number | number[],
     contourFillColor = '#f17720',
     showLabels = false,
+    looping = true,
   }: {
     width?: number;
     height?: number;
@@ -34,6 +35,7 @@
     contourThresholds?: number | number[];
     contourFillColor?: string;
     showLabels?: boolean;
+    looping?: boolean;
   } = $props();
 
   // ----------------------------------------------------------------
@@ -161,7 +163,7 @@
 
   const timeline = new Timeline<AnimState>();
   timeline.duration = animationDuration / 1000;
-  timeline.looping = true;
+  timeline.looping = looping;
   timeline.setEndPause(5.0);
 
   function setupTimeline() {

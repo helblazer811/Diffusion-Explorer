@@ -24,8 +24,9 @@
     contourThresholds = 5 as number | number[],
     contourFillColor = '#f17720',
     highlightColor = '#3b82f6',
-    highlightPointIndex = 15,
+    highlightPointIndices = [15, 42, 78, 120, 160] as number[],
     reversed = false,
+    showDatasetLabel = false,
   }: {
     width?: number;
     height?: number;
@@ -36,8 +37,9 @@
     contourThresholds?: number | number[];
     contourFillColor?: string;
     highlightColor?: string;
-    highlightPointIndex?: number;
+    highlightPointIndices?: number[];
     reversed?: boolean;
+    showDatasetLabel?: boolean;
   } = $props();
 
   // ----------------------------------------------------------------
@@ -177,29 +179,48 @@
     for (let s = 0; s < numStages; s++) {
       initState[`stage${s}`] = 1; // always visible
     }
-    // pointProgress: 0 = at first stage, numStages-1 = at last stage
-    initState['pointProgress'] = 0;
-    initState['pointVisible'] = 0;
+    // Per-point progress and visibility
+    for (let p = 0; p < highlightPointIndices.length; p++) {
+      initState[`pt${p}Progress`] = 0;
+      initState[`pt${p}Visible`] = 0;
+    }
     timeline.initialState = initState;
 
-    // Fade in the dot
-    timeline.add({
-      name: 'PointFadeIn',
-      reduce(t: number) {
-        return { pointVisible: t } as Partial<AnimState>;
-      },
-    }, { start: 0.02, end: 0.08 });
-
-    // Animate dot moving across stages
     const numSegments = numStages - 1;
-    timeline.add({
-      name: 'PointMove',
-      reduce(t: number) {
-        return { pointProgress: t * numSegments } as Partial<AnimState>;
-      },
-    }, { start: 0.08, end: 0.7 });
 
-    timeline.add(createPauseClip(), { start: 0.7, end: 1.0 });
+    // All points fade in together
+    for (let p = 0; p < highlightPointIndices.length; p++) {
+      timeline.add({
+        name: `Pt${p}FadeIn`,
+        reduce(t: number) {
+          return { [`pt${p}Visible`]: t } as Partial<AnimState>;
+        },
+      }, { start: 0.02, end: 0.08 });
+    }
+
+    // Move-pause-move-pause pattern: each segment gets a move phase and a pause
+    const movePhaseStart = 0.08;
+    const movePhaseEnd = 0.85;
+    const totalMoveDuration = movePhaseEnd - movePhaseStart;
+    const moveFraction = 0.5; // fraction of each slot spent moving (rest is pause)
+    const slotDuration = totalMoveDuration / numSegments;
+
+    for (let seg = 0; seg < numSegments; seg++) {
+      const slotStart = movePhaseStart + seg * slotDuration;
+      const moveEnd = slotStart + slotDuration * moveFraction;
+      const segValue = seg; // progress value at start of this segment
+
+      for (let p = 0; p < highlightPointIndices.length; p++) {
+        timeline.add({
+          name: `Pt${p}Seg${seg}`,
+          reduce(t: number) {
+            return { [`pt${p}Progress`]: segValue + t } as Partial<AnimState>;
+          },
+        }, { start: slotStart, end: moveEnd });
+      }
+    }
+
+    timeline.add(createPauseClip(), { start: movePhaseEnd, end: 1.0 });
 
     timeline.onTick((_t: number, state: Readonly<AnimState>) => {
       draw(state);
@@ -284,44 +305,53 @@
       }
     }
 
-    // Draw highlight point moving continuously between stages
-    const pointVisible = state['pointVisible'] ?? 0;
-    const pointProgress = state['pointProgress'] ?? 0;
-    if (pointVisible > 0 && stages.length > 0) {
+    // Draw highlight points moving continuously between stages
+    if (stages.length > 0) {
       const lastIdx = stages.length - 1;
-      const ptIdx = highlightPointIndex % stages[0].pixelCoords.length;
+      const totalPts = stages[0].pixelCoords.length;
 
-      // pointProgress goes from 0 to numStages-1
-      // Map to stage indices based on direction
-      const segIdx = Math.min(Math.floor(pointProgress), numStages - 2);
-      const segT = pointProgress - segIdx;
+      for (let p = 0; p < highlightPointIndices.length; p++) {
+        const ptVisible = state[`pt${p}Visible`] ?? 0;
+        const ptProgress = state[`pt${p}Progress`] ?? 0;
+        if (ptVisible <= 0) continue;
 
-      // Get the two stages to interpolate between
-      let fromStageIdx: number, toStageIdx: number;
-      if (reversed) {
-        fromStageIdx = segIdx;
-        toStageIdx = segIdx + 1;
-      } else {
-        fromStageIdx = lastIdx - segIdx;
-        toStageIdx = lastIdx - segIdx - 1;
+        const ptIdx = highlightPointIndices[p] % totalPts;
+        const segIdx = Math.min(Math.floor(ptProgress), numStages - 2);
+        const segT = ptProgress - segIdx;
+
+        let fromStageIdx: number, toStageIdx: number;
+        if (reversed) {
+          fromStageIdx = segIdx;
+          toStageIdx = segIdx + 1;
+        } else {
+          fromStageIdx = lastIdx - segIdx;
+          toStageIdx = lastIdx - segIdx - 1;
+        }
+
+        const fromPt = stages[fromStageIdx].pixelCoords[ptIdx];
+        const toPt = stages[toStageIdx].pixelCoords[ptIdx];
+
+        const x = fromPt[0] + (toPt[0] - fromPt[0]) * segT;
+        const y = fromPt[1] + (toPt[1] - fromPt[1]) * segT;
+
+        ctx.save();
+        ctx.globalAlpha = ptVisible;
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = highlightColor;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
       }
 
-      const fromPt = stages[fromStageIdx].pixelCoords[ptIdx];
-      const toPt = stages[toStageIdx].pixelCoords[ptIdx];
-
-      const x = fromPt[0] + (toPt[0] - fromPt[0]) * segT;
-      const y = fromPt[1] + (toPt[1] - fromPt[1]) * segT;
-
-      ctx.save();
-      ctx.globalAlpha = pointVisible;
-      ctx.beginPath();
-      ctx.arc(x, y, 14, 0, Math.PI * 2);
-      ctx.fillStyle = highlightColor;
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.restore();
+      // Dataset label on the first stage (data side)
+      if (showDatasetLabel) {
+        const dataStageIdx = reversed ? 0 : lastIdx;
+        const dataStage = stages[dataStageIdx];
+        drawMathjax(ctx, `\\mathcal{D}`, dataStage.centerX, height * 0.08, 44, 0, 0, { color: highlightColor }, requestRedraw);
+      }
     }
   }
 

@@ -44,11 +44,28 @@
   // Trajectory settings
   export let numTrajectoriesToShow = 1;
   export let samplingSteps = 400;
+  export let endpointRadius = settings.stylingSettings.trajectory.endpointRadius;
+  export let scatterPlotRadius = settings.stylingSettings.scatterPlot.radius;
+  export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
 
   // LaTeX label styling
   export let latexLabelOffsetY =
     settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
+
+  // Reverse mode (animate trajectory from target → source)
+  export let reverse = false;
+
+  // Distribution scale
+  export let distributionScaleFactor: number | undefined = undefined;
+
+  // Distribution labels
+  export let sourceLabelText = "";
+  export let targetLabelText = "";
+  export let labelFontSize = 50;
+
+  // Show/hide options
+  export let showTimeSlider = true;
 
   // Caption slot (passed as default children)
   export let children: Snippet | undefined = undefined;
@@ -128,13 +145,14 @@
     combinedMeanX = allX.reduce((a, b) => a + b, 0) / allX.length;
 
     transformedTrajectories = selectedTrajectoryIndices.map((sampleIdx) => {
-      return allTimeSamples.map((timestep, tIdx) => {
+      const traj = allTimeSamples.map((timestep, tIdx) => {
         const point = timestep[sampleIdx];
         const t = tIdx / (allTimeSamples.length - 1);
         const pixelX = getPixelX(point[0], combinedMeanX, t);
         const pixelY = scales.yScale(point[1]);
         return [pixelX, pixelY];
       });
+      return reverse ? [...traj].reverse() : traj;
     });
 
     // Calculate path lengths for each trajectory
@@ -207,6 +225,7 @@
         sourceCenterX: settings.stylingSettings.layout.sourceCenterX,
         targetCenterX: settings.stylingSettings.layout.targetCenterX,
         yShiftFactor: settings.stylingSettings.scatterPlot.yShiftFactor,
+        ...(distributionScaleFactor !== undefined && { distributionScaleFactor }),
       }
     );
 
@@ -229,8 +248,8 @@
       {
         style: {
           color: settings.stylingSettings.trajectory.color,
-          strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
-          pointRadius: settings.stylingSettings.trajectory.endpointRadius,
+          strokeWidth: trajectoryStrokeWidth,
+          pointRadius: endpointRadius,
           opacity: settings.stylingSettings.trajectory.opacity,
         }
       }
@@ -252,7 +271,7 @@
       reduce(t: number) {
         return {
           time: t,
-          segmentIndex: Math.floor(t * (pathlineAnimation?.data.numSegments ?? cachedNumTimesteps - 1)),
+          segmentIndex: t * (pathlineAnimation?.data.numSegments ?? cachedNumTimesteps - 1),
           clickedSegmentIndex: Math.floor(t * (samplingSteps - 1)),
         };
       },
@@ -281,6 +300,17 @@
     if (timeline) timeline.pause();
   }
 
+  export function restart() {
+    if (timeline) {
+      timeline.seek(0);
+      timeline.play();
+    }
+  }
+
+  export function pause() {
+    if (timeline) timeline.pause();
+  }
+
   // ----------------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------------
@@ -297,15 +327,24 @@
     drawScatterPlot(
       ctx,
       sourcePixelCoords,
-      settings.stylingSettings.scatterPlot.radius,
+      scatterPlotRadius,
       settings.stylingSettings.scatterPlot.color,
       settings.stylingSettings.scatterPlot.opacity
     );
 
+    // Distribution labels
+    if (sourceLabelText && scales) {
+      const requestRedraw = () => { if (timeline) draw(timeline.state); };
+      drawMathjax(ctx, sourceLabelText, scales.sourceCenterPixelX, marginHeight / 2 + labelFontSize, labelFontSize, 0, labelFontSize, { color: '#333' }, requestRedraw);
+      if (targetLabelText) {
+        drawMathjax(ctx, targetLabelText, scales.targetCenterPixelX, marginHeight / 2 + labelFontSize, labelFontSize, 0, labelFontSize, { color: '#333' }, requestRedraw);
+      }
+    }
+
     drawScatterPlot(
       ctx,
       targetPixelCoords,
-      settings.stylingSettings.scatterPlot.radius,
+      scatterPlotRadius,
       settings.stylingSettings.scatterPlot.color,
       settings.stylingSettings.scatterPlot.opacity
     );
@@ -326,7 +365,7 @@
       // Draw trajectory line if we have at least 2 points
       if (endIdx >= 2) {
         ctx.strokeStyle = settings.stylingSettings.trajectory.color;
-        ctx.lineWidth = settings.stylingSettings.trajectory.strokeWidth;
+        ctx.lineWidth = trajectoryStrokeWidth;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.globalAlpha = settings.stylingSettings.trajectory.opacity;
@@ -347,7 +386,7 @@
       ctx.arc(
         currentPoint[0],
         currentPoint[1],
-        settings.stylingSettings.trajectory.endpointRadius,
+        endpointRadius,
         0,
         Math.PI * 2
       );
@@ -356,11 +395,13 @@
       // Draw LaTeX labels for in-progress trajectory
       const startPoint = clickedTrajectory[0];
       const latexColor = settings.stylingSettings.figureLatex.color;
+      const clickStartLabel = reverse ? "x_1" : "x";
+      const clickMovingLabel = reverse ? "\\log p_t(x_t)" : "x(t)";
 
-      // Draw "x" label at start
+      // Draw start label
       drawMathjax(
         ctx,
-        "x",
+        clickStartLabel,
         startPoint[0],
         startPoint[1],
         latexFontSize,
@@ -369,11 +410,11 @@
         { color: latexColor }
       );
 
-      // Draw "ψ_t(x)" label at current position (after initial movement)
+      // Draw moving label at current position (after initial movement)
       if (t >= 0.05) {
         drawMathjax(
           ctx,
-          "\\psi_t(x)",
+          clickMovingLabel,
           currentPoint[0],
           currentPoint[1],
           latexFontSize,
@@ -389,12 +430,29 @@
     for (let idx = 0; idx < transformedTrajectories.length; idx++) {
       const traj = transformedTrajectories[idx];
       const startPoint = traj[0];
-      const currentPoint = getPointAtProgress(idx, t);
+      // Compute current point from fractional segmentIndex to match marker position
+      const fracIdx = state.segmentIndex;
+      const floorIdx = Math.floor(fracIdx);
+      const frac = fracIdx - floorIdx;
+      const baseIdx = Math.min(floorIdx + 1, traj.length - 1);
+      let currentPoint: number[];
+      if (frac > 0 && baseIdx + 1 < traj.length) {
+        currentPoint = [
+          traj[baseIdx][0] + frac * (traj[baseIdx + 1][0] - traj[baseIdx][0]),
+          traj[baseIdx][1] + frac * (traj[baseIdx + 1][1] - traj[baseIdx][1]),
+        ];
+      } else {
+        currentPoint = traj[baseIdx];
+      }
 
-      // Draw "x" label at start
+      const startLabel = reverse ? "x_1" : "x_0";
+      const movingLabel = reverse ? "\\log p_t(x_t)" : "x(t)";
+      const endLabel = reverse ? "x_0" : "x_1";
+
+      // Draw start label
       drawMathjax(
         ctx,
-        "x",
+        startLabel,
         startPoint[0],
         startPoint[1],
         latexFontSize,
@@ -403,11 +461,24 @@
         { color: latexColor }
       );
 
-      // Draw "ψ_t(x)" label at current position (after initial movement)
-      if (t >= 0.05) {
+      // Draw moving label or end label
+      if (t >= 0.98) {
+        // Trajectory finished — show end label
+        const endPoint = traj[traj.length - 1];
         drawMathjax(
           ctx,
-          "\\psi_t(x)",
+          endLabel,
+          endPoint[0],
+          endPoint[1],
+          latexFontSize,
+          0,
+          latexLabelOffsetY,
+          { color: latexColor }
+        );
+      } else if (t >= 0.05) {
+        drawMathjax(
+          ctx,
+          movingLabel,
           currentPoint[0],
           currentPoint[1],
           latexFontSize,
@@ -489,8 +560,8 @@
           {
             style: {
               color: settings.stylingSettings.trajectory.color,
-              strokeWidth: settings.stylingSettings.trajectory.strokeWidth,
-              pointRadius: settings.stylingSettings.trajectory.endpointRadius,
+              strokeWidth: trajectoryStrokeWidth,
+              pointRadius: endpointRadius,
               opacity: settings.stylingSettings.trajectory.opacity,
             }
           }
@@ -550,10 +621,12 @@
           style="cursor:pointer;width:100%;height:auto;aspect-ratio:{width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider
-        {timeline}
-        color={settings.stylingSettings.trajectory.color}
-      />
+      {#if showTimeSlider}
+        <TimeSlider
+          {timeline}
+          color={settings.stylingSettings.trajectory.color}
+        />
+      {/if}
     </div>
   {/snippet}
 </Figure>

@@ -23,6 +23,9 @@ export default defineConfig({
       ]
     }
   },
+  ssr: {
+    noExternal: ['tempus', '@diffusion-explorer/ui'],
+  },
   worker: {
     format: 'es'
   }
