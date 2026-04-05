@@ -61,6 +61,11 @@
   export let marginWidth: number = 50;
   export let marginTop: number = 20;
 
+  // Label props
+  export let labelFontSize: number = settings.stylingSettings.label.fontSize;
+  export let labelFontFamily: string = "Helvetica, Arial, sans-serif";
+  export let toggleFontSize: number = 16;
+
   // Toggle button labels
   const stateLabels = ["1. Independent Coupling", "2. Simulate the Flow", "3. Induced Coupling"];
 
@@ -435,10 +440,9 @@
 
   function drawLabels() {
     const labelColor = settings.stylingSettings.label.color;
-    const labelFontSize = settings.stylingSettings.label.fontSize;
     const labelFontWeight = settings.stylingSettings.label.fontWeight;
     const labelOpacity = settings.stylingSettings.label.opacity;
-    const labelFont = `${labelFontWeight} ${labelFontSize}px Helvetica, Arial, sans-serif`;
+    const labelFont = `${labelFontWeight} ${labelFontSize}px ${labelFontFamily}`;
     const labelY = marginTop / 2 + 5;
     drawText(ctx, "Source Distribution", scales.sourceCenterPixelX, labelY, { color: labelColor, font: labelFont, opacity: labelOpacity });
     drawText(ctx, "Target Distribution", scales.targetCenterPixelX, labelY, { color: labelColor, font: labelFont, opacity: labelOpacity });
@@ -608,7 +612,7 @@
         <MultiStateToggleButton
           labels={stateLabels}
           value={stateIndex}
-          fontSize={16}
+          fontSize={toggleFontSize}
           padding="8px 20px"
           onchange={jumpToState}
         />

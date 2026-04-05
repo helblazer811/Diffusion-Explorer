@@ -61,6 +61,7 @@
   // Callbacks & misc
   export let onInitialized: (() => void) | undefined = undefined;
   export let backgroundVisible: boolean = true;
+  export let showTimeSlider: boolean = true;
   export let children: Snippet | undefined = undefined;
 
   // ----------------------------------------------------------------
@@ -469,10 +470,12 @@
     {/snippet}
 
     {#snippet footer()}
-      <TimeSlider
-        {timeline}
-        color="#f17720"
-      />
+      {#if showTimeSlider}
+        <TimeSlider
+          {timeline}
+          color="#f17720"
+        />
+      {/if}
     {/snippet}
   </DoubleFigure>
 {:else}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, mathjaxInitialized } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import type { Snippet } from "svelte";
@@ -315,6 +316,19 @@
   $: if (isInitialized) {
     mathjaxInitialized.then(() => draw());
   }
+
+  // Redraw on Reveal.js slide changes (canvas may have zero dimensions when initially hidden)
+  let revealHandler: (() => void) | null = null;
+  $: if (isInitialized && typeof window !== 'undefined' && window.Reveal) {
+    revealHandler = () => setTimeout(() => draw(), 50);
+    window.Reveal.on('slidechanged', revealHandler);
+  }
+
+  onDestroy(() => {
+    if (revealHandler && typeof window !== 'undefined' && window.Reveal) {
+      window.Reveal.off('slidechanged', revealHandler);
+    }
+  });
 </script>
 
 <Figure {caption} {backgroundVisible}>

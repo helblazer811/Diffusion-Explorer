@@ -28,12 +28,12 @@
 
   // From rectified-flow-explainer
   import ProbabilityPath from '$rectified-flow/figures/ProbabilityPath.svelte';
-  import CurvedTrajectoryIntro from '$lib/figures/CurvedTrajectoryIntro.svelte';
-  import EulerSamplerFigure from '$lib/figures/EulerSamplerFigure.svelte';
+  import ChangeOfVariablesAnnotated from '$lib/figures/ChangeOfVariablesAnnotated.svelte';
+  import EulerODECurvature from '$lib/figures/EulerODECurvature.svelte';
   import EulerStepComparison from '$rectified-flow/figures/EulerStepComparison.svelte';
   import IndependentCoupling from '$rectified-flow/figures/IndependentCoupling.svelte';
   import OTCoupling from '$rectified-flow/figures/OTCoupling.svelte';
-  import RectifiedFlowSuperimposed from '$lib/figures/RectifiedFlowSuperimposed.svelte';
+  import RectifiedFlowSuperimposed from '$rectified-flow/figures/RectifiedFlowSuperimposed.svelte';
   import VectorFieldCurvatureComparison from '$rectified-flow/figures/VectorFieldCurvatureComparison.svelte';
   import EulerStepDemo from '$rectified-flow/figures/EulerStepDemo.svelte';
   import ConditionalFlowMatching from '$rectified-flow/figures/ConditionalFlowMatching.svelte';
@@ -57,7 +57,7 @@
   import ChangeOfVariables from '$lib/figures/ChangeOfVariables.svelte';
   import MaxLikelihoodTraining from '$lib/figures/MaxLikelihoodTraining.svelte';
   import StochasticInterpolation from '$lib/figures/StochasticInterpolation.svelte';
-  import InducedCouplingAnimated from '$lib/figures/InducedCouplingAnimated.svelte';
+  import InducedCouplingAnimated from '$rectified-flow/figures/InducedCouplingAnimated.svelte';
   import DataLikelihood from '$lib/figures/DataLikelihood.svelte';
   import ChangeOfVariablesFigure from '$lib/figures/ChangeOfVariablesFigure.svelte';
 
@@ -527,7 +527,7 @@
           scale={1.3}
           verticalGap={60}
           rowSpacing={40}
-          labelFontSize={42}
+          labelFontSize={48}
           tex={"\\log p(x) = \\log p(z_0) + {\\color{#2ecc71} \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|}"}
           annotations={[
             { color: '#2ecc71', label: 'Sum of Log Volume Changes', side: 'above', align: 'left' },
@@ -550,7 +550,7 @@
           scale={1.3}
           verticalGap={20}
           rowSpacing={35}
-          labelFontSize={28}
+          labelFontSize={36}
           tex={"{\\color{#3b82f6} \\log p(x)} = \\log p(z_0) + \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i^{-1}}{\\partial z_{i+1}} \\right|"}
           annotations={[
             { color: '#3b82f6', label: 'Data Log-Likelihood', side: 'above', align: 'right' },
@@ -572,7 +572,7 @@
         <AnnotatedEquation
           scale={1.1}
           verticalGap={50}
-          labelFontSize={36}
+          labelFontSize={42}
           boxPadding={4}
           tex={"{\\color{#f17720} f_{1,\\theta}^*, \\ldots, f_{K,\\theta}^*} = \\arg\\max_\\theta \\sum_{{\\color{#3b82f6} x \\in \\mathcal{D}}} \\log p_\\theta(x)"}
           annotations={[
@@ -1107,7 +1107,7 @@
       </p>
       <div class="figure-container" style="margin-top: 1.5em;">
         {#if dataLoaded}
-          <CurvedTrajectoryIntro
+          <ChangeOfVariablesAnnotated
             flowMatchingClient={flowMatchingClient}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
@@ -1132,7 +1132,7 @@
       <h2 class="slide-title">Curvature is the Enemy of Speed</h2>
       <p style="margin-top: 0.5em;">Accurately integrating curved functions requires taking smaller steps, which leads to higher sampling latency.</p>
       <div class="figure-container" style="margin-top: 1em;">
-        <EulerSamplerFigure
+        <EulerODECurvature
           width={800}
           height={500}
           gap={10}
@@ -1286,6 +1286,7 @@
             numTrajectoriesToShow={30}
             animationDuration={24000}
             labelFontSize={50}
+            labelFontFamily="Libre Baskerville, Georgia, serif"
             toggleFontSize={28}
           />
         {/if}
@@ -1321,6 +1322,7 @@
             numTrajectoriesToShow={30}
             animationDuration={24000}
             labelFontSize={50}
+            labelFontFamily="Libre Baskerville, Georgia, serif"
             toggleFontSize={28}
           />
         {/if}
@@ -1331,7 +1333,7 @@
     <!-- Slide: Reflow Produces Straighter Trajectories -->
     <section>
       <h2 class="slide-title">Reflow Produces Straighter Trajectories</h2>
-      <div class="figure-container" style="margin-top: 1em;">
+      <div class="figure-container" style="margin-top: 2em;">
         {#if dataLoaded}
           <RectifiedFlowSuperimposed
             width={1800}
@@ -1350,6 +1352,9 @@
             targetDistribution={$targetDistributionSamples}
             playingByDefault={true}
             backgroundVisible={false}
+            showTimeSlider={false}
+            labelFontSize={40}
+            trajectoryStrokeWidth={4}
           />
         {/if}
       </div>
