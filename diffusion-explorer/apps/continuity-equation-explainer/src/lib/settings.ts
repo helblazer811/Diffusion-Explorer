@@ -29,7 +29,7 @@ export const settings = {
       color: '#3b82f6',
       yShiftFactor: -0.5,
       scaleFactor: 0.8,
-      clippingRadius: 1.8
+      clippingRadius: 5.0
     },
     // Figure LaTeX styling
     figureLatex: {

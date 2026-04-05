@@ -81,8 +81,12 @@
   export let segmentLength = 0.01;
 
   // Animation pulse settings (in pixels)
-  export let pulseWidthPixels = 30;
-  export let pulsePauseWidthPixels = 5;
+  export let pulseWidthPixels = 40;
+  export let pulsePauseWidthPixels = 15;
+
+  // Arrowhead settings
+  export let showArrowhead = true;
+  export let arrowheadSize = 2.0;
 
   // Animation timing
   export let animationDuration = 16;
@@ -305,6 +309,8 @@
         pulseGap: pulsePauseWidthPixels,
         baseOpacity: streamlineOpacity,
         color: streamlineColor,
+        showArrowhead,
+        arrowheadSize,
       });
 
       // Generate streamlines in domain coordinates
