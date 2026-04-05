@@ -58,12 +58,19 @@
   };
   export let playingByDefault: boolean = true;
 
+  // Distribution scale factor
+  export let distributionScaleFactor: number = 0.8;
+
+  // Single path mode: show only one random pair at a time, pick new pair each loop
+  export let singlePathMode: boolean = false;
+
   // Background
   export let backgroundVisible: boolean = true;
 
   // LaTeX label styling
   export let latexLabelOffsetY: number = settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize: number = settings.stylingSettings.figureLatex.fontSize;
+  export let distributionLabelOffsetY: number = 0;
 
   // ----------------------------------------------------------------
   // State
@@ -152,7 +159,8 @@
 
     selectedSourceIndices = [];
     const sourceCount = sourceDistributionSamples.length;
-    for (let i = 0; i < numPathLines && i < sourceCount; i++) {
+    const count = singlePathMode ? 1 : numPathLines;
+    for (let i = 0; i < count && i < sourceCount; i++) {
       let idx: number;
       do {
         idx = Math.floor(Math.random() * sourceCount);
@@ -208,8 +216,16 @@
   }
 
   function selectNextSourcePath() {
-    // Cycle to next source path, wrapping around
-    selectedPathIndex = (selectedPathIndex + 1) % selectedSourceIndices.length;
+    if (singlePathMode) {
+      // Pick a completely new random source and target pair
+      selectedTargetIndex = Math.floor(Math.random() * targetDistributionSamples.length);
+      const sourceIdx = Math.floor(Math.random() * sourceDistributionSamples.length);
+      selectedSourceIndices = [sourceIdx];
+      selectedPathIndex = 0;
+    } else {
+      // Cycle to next source path, wrapping around
+      selectedPathIndex = (selectedPathIndex + 1) % selectedSourceIndices.length;
+    }
   }
 
   // ----------------------------------------------------------------
@@ -237,6 +253,7 @@
         sourceCenterX,
         targetCenterX,
         yShiftFactor,
+        distributionScaleFactor,
       }
     );
 
@@ -271,11 +288,10 @@
     timeline.duration = animationDuration / 1000;
     timeline.looping = true;
 
-    // Register tick callback - detect loop by time jumping backwards
+    // Register tick callback - detect loop by normalized time (0-1) jumping backwards
     timeline.onTick((time, state) => {
-      const duration = timeline!.duration;
-      // Detect loop: time jumped from near end back to start
-      if (prevTime > duration * 0.9 && time < duration * 0.1) {
+      // Detect loop: normalized time jumped from near end back to start
+      if (prevTime > 0.9 && time < 0.1) {
         selectNextSourcePath();
       }
       prevTime = time;
@@ -316,7 +332,10 @@
     const targetY = scales.yScale(targetPoint[1]);
 
     // Draw path lines
-    selectedSourceIndices.forEach((sourceIdx: number) => {
+    const pathIndicesToDraw = singlePathMode ? [selectedPathIndex] : selectedSourceIndices.map((_, i) => i);
+    for (const i of pathIndicesToDraw) {
+      const sourceIdx = selectedSourceIndices[i];
+      if (sourceIdx === undefined) continue;
       const sourcePoint = sourceDistributionSamples[sourceIdx];
       const sourceX =
         scales.sourceCenterPixelX +
@@ -329,9 +348,9 @@
         targetY,
         pathLineColor,
         pathLineWidth,
-        pathLineOpacity
+        singlePathMode ? 0.5 : pathLineOpacity
       );
-    });
+    }
 
     // Draw selected target point
     drawCircle(targetX, targetY, selectedTargetRadius, selectedTargetColor);
@@ -374,7 +393,7 @@
     const latexColor = settings.stylingSettings.figureLatex.color;
 
     // p_0 and p_1 above distributions (anchor is bottom-center, so offset down to keep visible)
-    const distributionLabelY = marginHeight;
+    const distributionLabelY = marginHeight + distributionLabelOffsetY;
 
     drawMathjax(
       ctx, "p_0", scales.sourceCenterPixelX, distributionLabelY,
