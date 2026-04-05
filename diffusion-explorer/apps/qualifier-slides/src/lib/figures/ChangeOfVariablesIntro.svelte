@@ -328,7 +328,7 @@
 
 <Figure backgroundVisible={false} bind:isActive={figureIsActive}>
   {#snippet children()}
-    <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: 200px;">
+    <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: 120px;">
       <div style="width: 100%; max-width: {width}px;">
         <canvas
           bind:this={canvas}

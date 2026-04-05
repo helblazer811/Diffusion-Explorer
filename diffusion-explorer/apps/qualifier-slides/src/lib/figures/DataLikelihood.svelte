@@ -14,7 +14,7 @@
   export let targetCenterX = 0.75;
   export let distributionScaleFactor = 0.85;
   export let highlightColor = '#f17720';
-  export let highlightRadius = 14;
+  export let highlightRadius = 10;
   export let highlightIndex = 15;
 
   let canvas = null;
@@ -67,38 +67,16 @@
 
     const requestRedraw = () => draw();
 
-    // Labels below
-    drawMathjax(ctx, "p(z)", scales.sourceCenterPixelX, height - 25, labelFontSize, 0, 0, { color: '#4594e3' }, requestRedraw);
-    drawMathjax(ctx, "p(x)", scales.targetCenterPixelX, height - 25, labelFontSize, 0, 0, { color: '#f17720' }, requestRedraw);
+    // Labels above
+    drawMathjax(ctx, "p(z)", scales.sourceCenterPixelX, 100, labelFontSize, 0, 0, { color: '#4594e3' }, requestRedraw);
+    drawMathjax(ctx, "p(x)", scales.targetCenterPixelX, 100, labelFontSize, 0, 0, { color: '#f17720' }, requestRedraw);
 
 
     // Scatter plots
     drawScatterPlot(ctx, sourcePixelCoords, pointRadius, '#4594e3', pointOpacity);
     drawScatterPlot(ctx, targetPixelCoords, pointRadius, '#f17720', pointOpacity);
 
-    // Highlight source point (blue)
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(highlightSourcePixel[0], highlightSourcePixel[1], highlightRadius, 0, Math.PI * 2);
-    ctx.fillStyle = '#4594e3';
-    ctx.globalAlpha = 1;
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.restore();
-
-    // Highlight target point (orange)
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(highlightTargetPixel[0], highlightTargetPixel[1], highlightRadius, 0, Math.PI * 2);
-    ctx.fillStyle = '#f17720';
-    ctx.globalAlpha = 1;
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.restore();
+    // Highlight points are drawn in SVG so they appear above the lines
   }
 
   export function restart() { draw(); }
@@ -122,39 +100,64 @@
       viewBox="0 0 {width} {height}"
       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible;"
     >
-      <defs>
-        <marker id="arrow-gray" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 Z" fill="#333" />
-        </marker>
-      </defs>
-
-      <!-- Source annotation -->
+      <!-- Source annotation (below point, offset left) -->
       <line
-        x1={highlightSourcePixel[0] - 70}
-        y1={highlightSourcePixel[1] - 145}
-        x2={highlightSourcePixel[0]}
-        y2={highlightSourcePixel[1] - highlightRadius - 4}
-        stroke="#333" stroke-width="3" marker-end="url(#arrow-gray)" />
+        x1={highlightSourcePixel[0] - 60}
+        y1={highlightSourcePixel[1] + 90}
+        x2={highlightSourcePixel[0] - 5}
+        y2={highlightSourcePixel[1] + 8}
+        stroke="#333" stroke-width="2.5" />
+      <rect
+        x={highlightSourcePixel[0] - 250}
+        y={highlightSourcePixel[1] + 95}
+        width="470" height="55" rx="6"
+        fill="white" fill-opacity="0.8" />
       <text
         x={highlightSourcePixel[0] - 240}
-        y={highlightSourcePixel[1] - 160}
+        y={highlightSourcePixel[1] + 135}
         fill="#333" font-size="46" font-family="Libre Baskerville, Georgia, serif">
         Easy to evaluate p(z)
       </text>
 
-      <!-- Target annotation -->
+      <!-- Target annotation (below point, offset right) -->
       <line
-        x1={scales.targetCenterPixelX}
-        y1={highlightTargetPixel[1] - 145}
-        x2={highlightTargetPixel[0]}
-        y2={highlightTargetPixel[1] - highlightRadius - 4}
-        stroke="#333" stroke-width="3" marker-end="url(#arrow-gray)" />
+        x1={highlightTargetPixel[0] + 60}
+        y1={highlightTargetPixel[1] + 90}
+        x2={highlightTargetPixel[0] + 5}
+        y2={highlightTargetPixel[1] + 8}
+        stroke="#333" stroke-width="2.5" />
+      <rect
+        x={highlightTargetPixel[0] - 10}
+        y={highlightTargetPixel[1] + 95}
+        width="420" height="55" rx="6"
+        fill="white" fill-opacity="0.8" />
       <text
-        x={scales.targetCenterPixelX - 200}
-        y={highlightTargetPixel[1] - 160}
+        x={highlightTargetPixel[0]}
+        y={highlightTargetPixel[1] + 135}
         fill="#333" font-size="46" font-family="Libre Baskerville, Georgia, serif">
         Less straightforward
       </text>
+
+      <!-- Source distribution label below scatter plot -->
+      <text
+        x={scales.sourceCenterPixelX}
+        y={height - 30}
+        fill="#4594e3" font-size="46" font-family="Libre Baskerville, Georgia, serif"
+        text-anchor="middle">
+        Multivariate Gaussian
+      </text>
+
+      <!-- Highlight points (drawn last so they appear above lines) -->
+      <circle
+        cx={highlightSourcePixel[0] - 5}
+        cy={highlightSourcePixel[1] + 8}
+        r={highlightRadius}
+        fill="#4594e3" />
+      <circle
+        cx={highlightTargetPixel[0] + 5}
+        cy={highlightTargetPixel[1] + 8}
+        r={highlightRadius}
+        fill="#f17720" />
     </svg>
   {/if}
 </div>

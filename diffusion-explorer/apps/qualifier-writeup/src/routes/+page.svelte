@@ -42,7 +42,11 @@
   import NormalizingFlowStages from "$qualifier-slides/figures/NormalizingFlowStages.svelte";
   import ChangeOfVariables from "$qualifier-slides/figures/ChangeOfVariables.svelte";
   import MaxLikelihoodTraining from "$qualifier-slides/figures/MaxLikelihoodTraining.svelte";
-  import { Bibliography, HoverableReference, Katex, ArticleHeader } from "@diffusion-explorer/ui";
+  import FlowInvertibilitySimple from "$qualifier-slides/figures/FlowInvertibilitySimple.svelte";
+  import DataLikelihood from "$qualifier-slides/figures/DataLikelihood.svelte";
+  import ChangeOfVariablesIntro from "$qualifier-slides/figures/ChangeOfVariablesIntro.svelte";
+  import StochasticInterpolation from "$qualifier-slides/figures/StochasticInterpolation.svelte";
+  import { Bibliography, HoverableReference, Katex, ArticleHeader, AnnotatedEquation } from "@diffusion-explorer/ui";
   import { base } from "$app/paths";
 
   // ========== DATA MANAGEMENT STATE ==========
@@ -455,13 +459,29 @@
   <!-- ============================================================ -->
   <h1 id="normalizing-flows" class="section-heading">Normalizing Flows</h1>
 
-  <h2 id="what-is-normalizing-flow">What is a Normalizing Flow?</h2>
-  <!-- TODO: Write prose introducing normalizing flows as a sequence of invertible transformations
-       that map a simple base distribution to a complex target distribution. -->
-  <p><em>[TODO: Introduce normalizing flows — sequence of invertible transformations mapping a simple distribution to a complex one.]</em></p>
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    <strong>What is a Normalizing Flow?</strong> A normalizing flow
+    <HoverableReference id="rezende2016variationalinferencenormalizingflows" {bibEntries} {citations} />
+    is a generative model that transforms a simple probability distribution—one
+    that is easy to sample from and evaluate, such as a multivariate Gaussian—into
+    a complex target distribution through a sequence of invertible, differentiable
+    transformations. Concretely, given a base random variable <Katex math={"z_0 \\sim p_0"} />
+    drawn from a simple distribution <Katex math={"p_0"} />, we apply a chain of
+    transformations <Katex math={"f_1, f_2, \\ldots, f_K"} /> to obtain
+    <Katex math={"x = f_K \\circ \\cdots \\circ f_1(z_0)"} />.
+  </p>
+  <p>
+    Each transformation <Katex math={"f_i"} /> must be invertible and differentiable,
+    so that we can both generate new samples (by applying the transformations forward)
+    and compute the likelihood of observed data (by inverting the transformations to
+    map data back to the base distribution). The name "normalizing flow" reflects the
+    idea that the sequence of transformations "flows" samples from a simple ("normal")
+    distribution toward the complex data distribution.
+  </p>
 
   {#if showOtherFigures}
-    <div id="figure-nf-stages">
+    <div id="figure-3">
       <NormalizingFlowStages
         width={figureWidth}
         height={350}
@@ -475,20 +495,104 @@
     </div>
   {/if}
 
-  <h2 id="change-of-variables">The Change of Variables Formula</h2>
-  <!-- TODO: Write prose explaining how the change of variables formula relates the
-       density of the transformed distribution to the base distribution via the
-       Jacobian determinant. -->
-  <p><em>[TODO: Explain the change of variables formula and the role of the Jacobian determinant in tracking density changes through invertible transformations.]</em></p>
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    <strong>Flows are Invertible and Differentiable.</strong> A crucial requirement of normalizing flows is that each transformation
+    <Katex math={"f_i"} /> be invertible. Invertibility ensures that probability
+    mass is conserved—no mass is created or destroyed as we transform our
+    distribution. Every point in the source distribution maps to exactly one point
+    in the target distribution, and vice versa. This bijective property is what
+    allows us to precisely track how probability density changes as we apply the
+    flow.
+  </p>
+  <p>
+    Differentiability is equally important: it enables us to compute how much the
+    transformation locally stretches or compresses space. This local volume change,
+    captured by the Jacobian determinant, is the key ingredient for computing
+    likelihoods under the transformed distribution.
+  </p>
 
   {#if showOtherFigures}
-    <div id="figure-cov">
+    <div id="figure-4">
+      <FlowInvertibilitySimple
+        width={figureWidth}
+        height={400}
+        {allTimeSamples}
+        numLines={5}
+        distributionScaleFactor={1.0}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 4:</span>
+          A normalizing flow maps all points to distinct locations, ensuring that
+          probability mass is conserved through the transformation. The invertibility
+          of the flow means that we can always map back from the target distribution
+          to the source distribution.
+        </div>
+      </FlowInvertibilitySimple>
+    </div>
+  {/if}
+
+  <h2 id="evaluating-data-likelihood">Evaluating the Data Likelihood</h2>
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    A central advantage of normalizing flows over many other generative models is
+    their ability to compute exact likelihoods. Evaluating the density of a point
+    under a simple distribution like a Gaussian is straightforward—we have a
+    closed-form expression. But evaluating the density under a complex data
+    distribution is not so easy. Normalizing flows solve this problem by providing
+    a principled way to relate the density of a data point <Katex math={"x"} />
+    under the complex distribution to the density of its preimage
+    <Katex math={"z = f^{-1}(x)"} /> under the simple base distribution, using
+    the change of variables formula.
+  </p>
+
+  {#if showOtherFigures}
+    <div id="figure-5">
+      <DataLikelihood
+        width={figureWidth}
+        height={400}
+        {allTimeSamples}
+        distributionScaleFactor={1.0}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 5:</span>
+          It is easy to evaluate the density for a <span style="color: #4594e3;">simple distribution</span>,
+          but not straightforward for a <span style="color: #f17720;">complex distribution</span>.
+          Normalizing flows provide a way to compute the density of a data point under the complex
+          distribution by mapping it back to the simple distribution.
+        </div>
+      </DataLikelihood>
+    </div>
+  {/if}
+
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    <strong>The Change of Variables Formula.</strong> The change of variables formula provides the mathematical link between the
+    density of the base distribution and the density of the transformed
+    distribution. For an invertible transformation <Katex math={"f"} /> that maps
+    <Katex math={"z"} /> to <Katex math={"x = f(z)"} />, the density of
+    <Katex math={"x"} /> is given by:
+  </p>
+  <Katex
+    math={"p(x) = p(z) \\left| \\det \\frac{\\partial f}{\\partial z} \\right|^{-1}"}
+    displayMode={true}
+  />
+  <p>
+    The term <Katex math={"\\left| \\det \\frac{\\partial f}{\\partial z} \\right|"} />
+    is the absolute value of the determinant of the Jacobian matrix of <Katex math={"f"} />.
+    It measures how much the transformation locally stretches or compresses volume.
+    When the transformation expands a region of space, the density must decrease
+    proportionally (and vice versa) so that the total probability mass is conserved.
+  </p>
+
+  {#if showOtherFigures}
+    <div id="figure-6">
       <ChangeOfVariables
         width={figureWidth}
         height={350}
       >
         <div class="caption">
-          <span class="figure-number">Figure 4:</span>
+          <span class="figure-number">Figure 6:</span>
           The change of variables formula tracks how probability density changes
           through an invertible transformation using the Jacobian determinant.
         </div>
@@ -496,31 +600,162 @@
     </div>
   {/if}
 
-  <h2 id="ml-training">Maximum Likelihood Training</h2>
-  <!-- TODO: Write prose about how normalizing flows are trained via maximum likelihood,
-       propagating samples backward through the inverse flow to evaluate likelihoods. -->
-  <p><em>[TODO: Describe maximum likelihood training for normalizing flows — evaluating likelihoods by propagating samples backward through the inverse flow.]</em></p>
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    <strong>Jacobian Measures Local Volume Change.</strong> To build further intuition for the change of variables formula, we can
+    visualize what the Jacobian determinant is actually measuring. The determinant
+    of the Jacobian <Katex math={"\\left| \\det \\frac{\\partial f}{\\partial z} \\right|"} />
+    captures the local volume change induced by the transformation <Katex math={"f"} />.
+    Imagine a small region of space around a point <Katex math={"z"} />—the Jacobian
+    tells us how much this region is stretched, compressed, or rotated as it is
+    mapped to the region around <Katex math={"f(z)"} />. If the determinant is
+    greater than one, the transformation is locally expanding space (and the density
+    decreases). If it is less than one, space is being compressed (and the density
+    increases).
+  </p>
 
   {#if showOtherFigures}
-    <div id="figure-ml-training">
+    <div id="figure-7">
+      <ChangeOfVariablesIntro
+        width={figureWidth}
+        height={400}
+        {allTimeSamples}
+        numFrames={5}
+        distributionScaleFactor={1.0}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 7:</span>
+          The determinant of the Jacobian
+          <Katex math={"\\left| \\det \\frac{\\partial f}{\\partial z} \\right|"} />
+          measures how the transformation <Katex math={"f"} /> locally stretches and
+          compresses space, providing geometric intuition for the change of variables formula.
+        </div>
+      </ChangeOfVariablesIntro>
+    </div>
+  {/if}
+
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    <strong>Composing Multiple Transformations.</strong> In practice, a single transformation is rarely expressive enough to bridge the
+    gap between a simple base distribution and a complex data distribution. Instead,
+    normalizing flows compose multiple transformations
+    <Katex math={"f_1, f_2, \\ldots, f_K"} />, each contributing a small change.
+    The change of variables formula extends naturally to compositions—the
+    log-likelihood under the full flow is the log-likelihood under the base
+    distribution plus the sum of log-determinants at each stage:
+  </p>
+  <Katex
+    math={"\\log p(x) = \\log p(z_0) + \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|"}
+    displayMode={true}
+  />
+
+  {#if showOtherFigures}
+    <div id="figure-8">
+      <NormalizingFlowStages
+        width={figureWidth}
+        height={350}
+        static={true}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 8:</span>
+          Composing multiple invertible transformations. The log-likelihood of a data
+          point is computed by accumulating the log-determinant of the Jacobian at each
+          stage of the flow.
+        </div>
+      </NormalizingFlowStages>
+    </div>
+  {/if}
+
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    <strong>Computing the Likelihood of Data.</strong> To compute the likelihood of an observed data point <Katex math={"x"} />, we
+    map it backward through the inverse transformations
+    <Katex math={"f_K^{-1}, \\ldots, f_1^{-1}"} /> to recover its representation
+    in the base space. At each step, we accumulate the log-determinant of the
+    Jacobian of the inverse transformation. This gives us the log-likelihood of the
+    data point:
+  </p>
+  <Katex
+    math={"\\log p(x) = \\log p(z_0) + \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i^{-1}}{\\partial z_{i+1}} \\right|"}
+    displayMode={true}
+  />
+
+  {#if showOtherFigures}
+    <div id="figure-9">
       <MaxLikelihoodTraining
         width={figureWidth}
         height={350}
+        reversed={true}
+        highlightPointIndices={[15]}
+        highlightColor="#3b82f6"
       >
         <div class="caption">
-          <span class="figure-number">Figure 5:</span>
-          Maximum likelihood training evaluates the density of a data point by
-          propagating it backward through the inverse flow, accumulating the
+          <span class="figure-number">Figure 9:</span>
+          To compute the likelihood of a <span style="color: #3b82f6;">data point</span>,
+          we map it backward through the inverse transformations, accumulating the
           log-determinant of the Jacobian at each stage.
         </div>
       </MaxLikelihoodTraining>
     </div>
   {/if}
 
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    <strong>Maximum Likelihood Training.</strong> With the ability to compute exact log-likelihoods, we can train normalizing flows
+    by maximizing the log-likelihood of observed data. Given a dataset
+    <Katex math={"\\mathcal{D}"} />, we optimize the parameters <Katex math={"\\theta"} />
+    of our flow transformations to maximize:
+  </p>
+  <Katex
+    math={"f_{1,\\theta}^*, \\ldots, f_{K,\\theta}^* = \\arg\\max_\\theta \\sum_{x \\in \\mathcal{D}} \\log p_\\theta(x)"}
+    displayMode={true}
+  />
+  <p>
+    For each data point, we invert the flow, evaluate the base distribution density,
+    and accumulate the log-determinant corrections. This provides an exact gradient
+    signal for training, in contrast to models that rely on approximate inference.
+  </p>
+
+  {#if showOtherFigures}
+    <div id="figure-10">
+      <MaxLikelihoodTraining
+        width={figureWidth}
+        height={350}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 10:</span>
+          Maximum likelihood training learns flow transformations that maximize the
+          log-likelihood of the observed data by propagating data points backward
+          through the inverse flow.
+        </div>
+      </MaxLikelihoodTraining>
+    </div>
+  {/if}
+
   <h2 id="jacobian-expensive">Jacobian Determinants Are Expensive</h2>
-  <!-- TODO: Write prose about the computational cost of Jacobian determinants (O(d³)),
-       motivating the transition to continuous normalizing flows. -->
-  <p><em>[TODO: Discuss the O(d³) cost of computing Jacobian determinants, which limits the scalability of discrete normalizing flows and motivates continuous normalizing flows.]</em></p>
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    While normalizing flows provide an elegant framework for exact likelihood
+    computation, there is a major practical obstacle: computing the determinant of
+    the Jacobian matrix is expensive. For a transformation in <Katex math={"d"} />
+    dimensions, computing the full Jacobian determinant requires
+    <Katex math={"O(d^3)"} /> operations in general:
+  </p>
+  <Katex
+    math={"\\log p(x) = \\log p(z_0) + \\sum_{i=1}^{K} \\log \\left| {\\color{#e74c3c} \\det \\dfrac{\\partial f_i}{\\partial z_{i-1}}} \\right|"}
+    displayMode={true}
+  />
+  <p>
+    This cubic cost is prohibitive for high-dimensional data like images, where
+    <Katex math={"d"} /> can be in the tens of thousands or more. A substantial body
+    of work has addressed this by restricting the form of the transformations
+    <Katex math={"f_i"} /> to make the Jacobian determinant cheaper to compute—for
+    example, planar flows, Real NVP, and Glow use architectures with triangular
+    Jacobians, reducing the determinant to a product of diagonal entries. However,
+    these restrictions limit the expressiveness of the flow. An alternative approach,
+    which we discuss next, is to move to a continuous-time formulation that avoids
+    the Jacobian determinant entirely.
+  </p>
 
   <!-- ============================================================ -->
   <!-- SECTION 3: CONTINUOUS NORMALIZING FLOWS [NEW]                -->
@@ -528,11 +763,15 @@
   <h1 id="continuous-normalizing-flows" class="section-heading">Continuous Normalizing Flows</h1>
 
   <h2 id="discrete-to-continuous">From Discrete to Continuous</h2>
-  <!-- TODO: Write prose bridging from discrete normalizing flows to CNFs.
-       Explain how CNFs replace discrete transformation steps with a continuous ODE,
-       defining a probability path from source to target. -->
-  <p><em>[TODO: Introduce continuous normalizing flows — replacing discrete transformation steps with a continuous ODE that defines a probability path from source to target distribution.]</em></p>
-
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    Rather than composing a fixed number of discrete transformations, continuous
+    normalizing flows (CNFs) (Chen et al., 2018)
+    replace the sequence of layers with a single continuous-time ordinary
+    differential equation (ODE) parameterized by a neural network. Instead of
+    applying <Katex math={"K"} /> separate transformations, we define a smooth
+    trajectory through the space of probability distributions.
+  </p>
   <p>
     A flow model learns to bridge a simple source probability distribution <Katex
       math={"p"}
@@ -546,7 +785,7 @@
     <Katex math={"(p_t)_{0 \\leq t \\leq 1}"} />, that smoothly interpolates
     between our simple source distribution <Katex math={"p_0"} /> and our data distribution
     <Katex math={"p_1 = q"} /> (see
-    <a href="#figure-cnf-path" class="internal-link">Figure 6</a>). We index this path
+    <a href="#figure-11" class="internal-link">Figure 11</a>). We index this path
     by a time variable <Katex math={"t \\in [0, 1]"} />, where
     <Katex math={"t=0"} /> corresponds to the source distribution and <Katex
       math={"t=1"}
@@ -557,7 +796,7 @@
   </p>
 
   {#if showOtherFigures}
-    <div id="figure-cnf-path">
+    <div id="figure-11">
       <ProbabilityPath
         width={figureWidth}
         sourceDistributionSamples={$sourceDistributionSamples}
@@ -569,7 +808,7 @@
         showContours={true}
       >
         <div class="caption">
-          <span class="figure-number">Figure 6:</span>
+          <span class="figure-number">Figure 11:</span>
           The <span style="color: #f17720;">probability path</span>
           <Katex math={"p_t"} color="#f17720" /> of a continuous normalizing flow
           as it is transformed from a simple source distribution <Katex
@@ -582,9 +821,48 @@
     </div>
   {/if}
 
-  <h2 id="sampling-euler">Sampling with Euler's Method</h2>
-  <!-- TODO: Write prose about how CNFs are sampled by solving ODEs, and introduce
-       the velocity field v_t(x) that generates the flow. -->
+  <h2 id="sampling-trajectories">Sampling Trajectories From a CNF</h2>
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    Individual samples drawn from the source distribution <Katex math={"p_0"} />
+    have trajectories <Katex math={"x(t)"} /> that trace a path from
+    <Katex math={"x_0 \\sim p_0"} /> to <Katex math={"x_1 \\sim p_1"} /> as
+    time progresses from <Katex math={"t=0"} /> to <Katex math={"t=1"} />.
+    These trajectories are the paths that individual "particles" take as the
+    continuous normalizing flow transforms the source distribution into the target
+    distribution. Understanding these trajectories is important because the
+    geometry of these paths—how straight or curved they are—will turn out to have
+    significant implications for the efficiency of sampling.
+  </p>
+
+  {#if showOtherFigures}
+    <div id="figure-12">
+      <HighlightTrajectory
+        width={figureWidth}
+        {flowMatchingClient}
+        sourceDistributionSamples={$sourceDistributionSamples}
+        targetDistributionSamples={$targetDistributionSamples}
+        allTimeSamples={$allTimeSamples}
+        isTraining={$isTraining}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 12:</span>
+          A single <span style="color: #f17720;">sample trajectory</span>
+          <Katex math={"\\psi_t(x)"} color="#f17720" /> showing how an individual point
+          <Katex math={"x"} color="#f17720" />
+          moves from the source distribution to the target distribution.
+          Tap
+          <img
+            src="{base}/icons/tap.svg"
+            alt="tap"
+            style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+          /> to generate a sample.
+        </div>
+      </HighlightTrajectory>
+    </div>
+  {/if}
+
+  <h2 id="velocity-fields">CNFs Learn to Represent Velocity Fields</h2>
   <p>
     Rather than directly modeling the flow
     <Katex math={"\\psi_t(x)"} />, continuous normalizing flows model a
@@ -631,7 +909,7 @@
       showArrowHeads={true}
     >
       <div class="caption">
-        <span class="figure-number">Figure 7:</span>
+        <span class="figure-number">Figure 13:</span>
         <strong> Euler integration through a time-dependent <span style="color: #3b82f6;">velocity field</span> <Katex math={"v_t(x)"} />. </strong>
         The <span style="color: #f17720;">Euler approximation</span> takes
         16 discrete steps along the direction of the <span style="color: #3b82f6;">velocity field</span>. Tap
@@ -644,37 +922,74 @@
     </EulerStepDemo>
   {/if}
 
-  <h2 id="efficient-likelihood">Efficient Likelihood Training</h2>
-  <!-- TODO: Write prose about how CNFs allow more efficient likelihood-based training
-       using the trace of the Jacobian (O(d)) instead of the full determinant (O(d³)).
-       Also discuss the limitation: likelihood-based training still requires solving
-       an ODE at every training step, which is expensive. -->
-  <p><em>[TODO: Explain how CNFs reduce the cost of likelihood computation from O(d³) to O(d) using the trace instead of the determinant. Discuss the remaining limitation: ODE solving at every training step is still expensive, motivating simulation-free approaches like flow matching.]</em></p>
+  <h2 id="efficient-likelihood">CNFs Allow More Efficient Training</h2>
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    A key advantage of the continuous-time formulation is that it enables more
+    efficient likelihood computation. Recall that discrete normalizing flows
+    require computing the full Jacobian determinant at each layer, which costs
+    <Katex math={"O(d^3)"} />. In the continuous setting, the instantaneous change
+    of variables formula replaces the expensive determinant with a much cheaper
+    <span style="color: #22c55e;">trace</span>:
+  </p>
+  <AnnotatedEquation
+    scale={1.0}
+    verticalGap={40}
+    labelFontSize={16}
+    tex={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 {\\color{#22c55e} \\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"}
+    annotations={[
+      { color: '#22c55e', label: 'Trace is only O(d)', side: 'above' },
+    ]}
+  />
+  <p>
+    The trace of the Jacobian is only <Katex math={"O(d)"} />, a dramatic
+    improvement over the <Katex math={"O(d^3)"} /> cost of the full determinant.
+    This makes CNFs practical for higher-dimensional data where discrete
+    normalizing flows with unrestricted architectures would be computationally
+    prohibitive.
+  </p>
+
+  <h2 id="training-expensive">Training is Still Expensive</h2>
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    Despite the efficiency gains from using the trace, likelihood-based training of
+    CNFs still has a significant drawback: it requires solving an ODE at
+    <em>every training step</em>. To compute the log-likelihood of a data point, we
+    must integrate the trace of the Jacobian along the entire trajectory from
+    <Katex math={"t=0"} /> to <Katex math={"t=1"} />. This simulation is
+    computationally expensive and becomes a bottleneck during training.
+  </p>
+  <AnnotatedEquation
+    scale={1.0}
+    verticalGap={40}
+    labelFontSize={16}
+    tex={"\\log p_1(x_1) = \\log p_0(x_0) - {\\color{#e74c3c} \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_t}{\\partial x}\\right) \\, dt}"}
+    annotations={[
+      { color: '#e74c3c', label: 'Requires O(n) ODE solves', side: 'below', align: 'right' },
+    ]}
+  />
 
   {#if showOtherFigures}
-    <HighlightTrajectory
-      width={figureWidth}
-      {flowMatchingClient}
-      sourceDistributionSamples={$sourceDistributionSamples}
-      targetDistributionSamples={$targetDistributionSamples}
-      allTimeSamples={$allTimeSamples}
-      isTraining={$isTraining}
-    >
-      <div class="caption">
-        <span class="figure-number">Figure 8:</span>
-        A single <span style="color: #f17720;">sample trajectory</span>
-        <Katex math={"\\psi_t(x)"} color="#f17720" /> showing how an individual point
-        <Katex math={"x"} color="#f17720" />
-        moves from the source distribution to the target distribution. Likelihood-based
-        training of CNFs requires solving this ODE at every training step, which is expensive.
-        Tap
-        <img
-          src="{base}/icons/tap.svg"
-          alt="tap"
-          style="width: 28px; height: 28px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
-        /> to generate a sample.
-      </div>
-    </HighlightTrajectory>
+    <div id="figure-14">
+      <HighlightTrajectory
+        width={figureWidth}
+        {flowMatchingClient}
+        sourceDistributionSamples={$sourceDistributionSamples}
+        targetDistributionSamples={$targetDistributionSamples}
+        allTimeSamples={$allTimeSamples}
+        isTraining={$isTraining}
+        reverse={true}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 14:</span>
+          Likelihood-based training of CNFs requires solving the ODE at every training
+          step—tracing each <span style="color: #f17720;">trajectory</span> from the
+          target distribution back to the source distribution to compute the
+          log-likelihood. This expense motivates simulation-free training methods
+          like flow matching.
+        </div>
+      </HighlightTrajectory>
+    </div>
   {/if}
 
   <!-- ============================================================ -->
@@ -715,8 +1030,9 @@
     </li>
   </ol>
 
+  <h2 id="probability-path">Defining the Probability Path</h2>
   <p>
-    <strong>Step 1: Defining the Probability Path. </strong> We will focus on a
+    We will focus on a
     specific choice of probability path called the
     <em>linear path</em>. The linear path can be defined through a simple linear
     interpolation between our source and target distributions:
@@ -754,7 +1070,7 @@
       backgroundVisible={false}
     >
       <div class="caption">
-        <span class="figure-number">Figure 9:</span>
+        <span class="figure-number">Figure 15:</span>
         Linear interpolation between a source point <Katex math={"x_0"} /> and target
         point <Katex math={"x_1"} />, producing the interpolated sample <Katex
           math={"x_t"}
@@ -763,8 +1079,8 @@
     </LinearInterpolation>
   {/if}
 
+  <h2 id="regressing-velocity-field">Regressing the Velocity Field</h2>
   <p>
-    <strong>Step 2: Regressing the Velocity Field. </strong>
     Now, the second step of flow matching is to "match" the true velocity field <Katex
       math={"v_t(x_t)"}
     /> with an approximation <Katex math={"v_t^\\theta(x_t)"} />, parameterized
@@ -798,7 +1114,7 @@
       backgroundVisible={false}
     >
       <div class="caption">
-        <span class="figure-number">Figure 10:</span>
+        <span class="figure-number">Figure 16:</span>
         The conditional velocity field <Katex math={"v_t(x|x_1)"} /> for a specific
         target point <Katex math={"x_1"} /> can be represented by a bunch of straight arrows pointing
         from the source distribution points to the target point.
@@ -847,7 +1163,7 @@
       backgroundVisible={false}
     >
       <div class="caption">
-        <span class="figure-number">Figure 11:</span>
+        <span class="figure-number">Figure 17:</span>
         <strong>
           Conditional flow matching trains a <span style="color: #22c55e;"
             >learned velocity field</span
@@ -885,6 +1201,71 @@
     />.
   </p>
 
+  <h2 id="stochastic-interpolants">Stochastic Interpolants</h2>
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    Stochastic interpolants
+    <HoverableReference id="albergo2023" {bibEntries} {citations} />
+    generalize the flow matching framework by adding controlled noise to the
+    interpolation path. Rather than following a purely deterministic linear path
+    between source and target, stochastic interpolants introduce a noise term
+    <Katex math={"\\sigma_t \\cdot \\varepsilon"} /> where
+    <Katex math={"\\varepsilon \\sim \\mathcal{N}(0, I)"} />:
+  </p>
+  <Katex
+    math={"X_t = (1-t)X_0 + tX_1 + \\sigma_t \\cdot \\varepsilon, \\quad \\varepsilon \\sim \\mathcal{N}(0, I)"}
+    displayMode={true}
+  />
+  <p>
+    The noise schedule <Katex math={"\\sigma_t"} /> controls how much stochasticity
+    is introduced at each time step. When <Katex math={"\\sigma_t = 0"} /> for all
+    <Katex math={"t"} />, we recover the deterministic flow matching setting.
+    When <Katex math={"\\sigma_t > 0"} />, the interpolant becomes stochastic,
+    bridging the gap between deterministic flow models and stochastic diffusion
+    models. This unifying perspective reveals that many seemingly different
+    generative modeling approaches are special cases of a single framework.
+  </p>
+
+  {#if showOtherFigures}
+    <div id="figure-18">
+      <StochasticInterpolation
+        width={figureWidth}
+        height={450}
+        sourceDistributionSamples={$sourceDistributionSamples}
+        targetDistributionSamples={$targetDistributionSamples}
+        sourcePointIndex={5}
+        targetPointIndex={10}
+        sigma={300}
+        maxEpsilonNorm={1.5}
+        playingByDefault={true}
+        backgroundVisible={false}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 18:</span>
+          <strong>Stochastic interpolants</strong> add noise to the deterministic
+          <span style="color: #3b82f6;">linear path</span>, producing
+          <span style="color: #f17720;">stochastic trajectories</span> that spread
+          around the deterministic path. The amount of noise is controlled by the
+          schedule <Katex math={"\\sigma_t"} />.
+        </div>
+      </StochasticInterpolation>
+    </div>
+  {/if}
+
+  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
+  <p>
+    <strong>Two Frameworks, One Idea.</strong> Remarkably, the flow matching framework
+    <HoverableReference id="lipman2022" {bibEntries} {citations} />
+    and the stochastic interpolants framework
+    <HoverableReference id="albergo2023" {bibEntries} {citations} />
+    were developed independently and in parallel, arriving at the same core insight:
+    that one can train continuous normalizing flows by regressing onto conditional
+    velocity fields without simulation. Despite different mathematical
+    formulations and notation, both frameworks provide simulation-free training
+    objectives that are equivalent under appropriate choices of interpolation
+    schedules.
+  </p>
+
   <h1 id="the-problem" class="section-heading">The Problem</h1>
 
   <p>
@@ -897,10 +1278,10 @@
     >). To further illustrate this point, if we superimpose the source and
     target distributions we can see that this curvature is even more extreme
     (see
-    <a href="#figure-12" class="internal-link">Figure 12</a>).
+    <a href="#figure-19" class="internal-link">Figure 19</a>).
   </p>
 
-  <div id="figure-12">
+  <div id="figure-19">
     <CurvedTrajectorySuperimposed
       {flowMatchingClient}
       trajectories={$flowMatchingGridTrajectories}
@@ -910,7 +1291,7 @@
       backgroundVisible={false}
     >
       <div class="caption">
-        <span class="figure-number">Figure 12:</span>
+        <span class="figure-number">Figure 19:</span>
         <strong
           >A flow matching model produces curved sampling <span
             style="color: #f17720;">trajectories</span
@@ -953,7 +1334,7 @@
   {#if showOtherFigures}
     <EulerSamplerFigure width={figureWidth} backgroundVisible={false}>
       <div class="caption">
-        <span class="figure-number">Figure 13:</span>
+        <span class="figure-number">Figure 20:</span>
         Comparison of Euler method approximations for high-curvature (left) and low-curvature
         (right) functions. Ground truth shown in black, Euler approximation in orange.
         Highly curved trajectories require many steps to simulate accurately.
@@ -998,8 +1379,8 @@
   </p>
   <p>
     The simplest form of coupling, and the one we investigate in this article,
-    is an independent coupling (see <a href="#figure-14" class="internal-link"
-      >Figure 14</a
+    is an independent coupling (see <a href="#figure-21" class="internal-link"
+      >Figure 21</a
     >), where we independently draw <Katex math={"X_0 \\sim p"} /> and <Katex
       math={"X_1 \\sim q"}
     />, and we have that <Katex math={"\\pi(x_0, x_1) = \\pi(x_0)\\pi(x_1)"} />.
@@ -1010,7 +1391,7 @@
   <p>
     As mentioned above, our choice of independent coupling is the key culprit
     behind our curved trajectories. You can see in
-    <a href="#figure-14" class="internal-link">Figure 14</a> that the lines
+    <a href="#figure-21" class="internal-link">Figure 21</a> that the lines
     connecting independently drawn source and target points cross each other a
     lot. These intersections lead to curved trajectories because they introduce
     branches in our paths that our learned velocity field <Katex
@@ -1019,7 +1400,7 @@
   </p>
 
   {#if showOtherFigures}
-    <div id="figure-14">
+    <div id="figure-21">
       <IndependentCoupling
         width={figureWidth}
         sourceDistributionSamples={$sourceDistributionSamples}
@@ -1027,7 +1408,7 @@
         backgroundVisible={false}
       >
         <div class="caption">
-          <span class="figure-number">Figure 14:</span>
+          <span class="figure-number">Figure 21:</span>
           Visualization of an independent coupling connecting random source points
           to random target points.
         </div>
@@ -1038,7 +1419,7 @@
   <p>
     An alternative to the independent coupling is an
     <em>optimal transport coupling</em>
-    (see <a href="#figure-15" class="internal-link">Figure 15</a>), which
+    (see <a href="#figure-22" class="internal-link">Figure 22</a>), which
     connects source and target points in a way that minimizes the overall cost
     of transporting mass from the source to the target distribution. This
     coupling tends to produce fewer crossing paths, which leads to straighter
@@ -1048,7 +1429,7 @@
   </p>
 
   {#if showOtherFigures && $otCouplingData}
-    <div id="figure-15">
+    <div id="figure-22">
       <OTCoupling
         width={figureWidth}
         sourceDistributionSamples={$otCouplingData.sourcePoints}
@@ -1057,7 +1438,7 @@
         backgroundVisible={false}
       >
         <div class="caption">
-          <span class="figure-number">Figure 15:</span>
+          <span class="figure-number">Figure 22:</span>
           Visualization of an <strong>optimal transport coupling</strong> computed via Sinkhorn algorithm.
           Unlike the independent coupling, the OT coupling minimizes transport cost, resulting in
           less tangled paths with fewer crossings.
@@ -1089,7 +1470,7 @@
   </p>
 
   {#if showOtherFigures}
-    <div id="figure-16">
+    <div id="figure-23">
       <IntersectingPaths
         width={figureWidth}
         height={400}
@@ -1101,7 +1482,7 @@
         backgroundVisible={false}
       >
         <div class="caption">
-          <span class="figure-number">Figure 16:</span>
+          <span class="figure-number">Figure 23:</span>
           Two pairs <Katex math={"(x_0^a, x_1^a)"} /> and <Katex
             math={"(x_0^b, x_1^b)"}
           /> that intersect at a point <Katex math="x" /> at time <Katex
@@ -1196,7 +1577,7 @@
     points that caused curvature in the first place. 
   </p>
   {#if showOtherFigures}
-    <div id="figure-17">
+    <div id="figure-24">
       <InducedCouplingAnimated
         width={figureWidth}
         targetDistribution={$targetDistributionSamples}
@@ -1207,7 +1588,7 @@
         numTrajectoriesToShow={30}
       >
         <div class="caption">
-          <span class="figure-number">Figure 17:</span>
+          <span class="figure-number">Figure 24:</span>
           <strong>The coupling induced by the flow model produces less tangled paths.</strong>
           We start out with a naive independent coupling, where paths cross each other frequently. 
           If we produce an induced coupling by flowing source points through the learned flow model, we get a coupling with
@@ -1220,12 +1601,12 @@
   <p>
     We can also compare the trajectories learned by a standard flow matching
     model versus a rectified flow model (see
-    <a href="#figure-18" class="internal-link">Figure 18</a>
+    <a href="#figure-25" class="internal-link">Figure 25</a>
     ). The rectified flow model learns significantly straighter trajectories, which
     are easier to simulate with fewer steps.
   </p>
   {#if showOtherFigures}
-    <div id="figure-18">
+    <div id="figure-25">
       <RectifiedFlowSuperimposed
         width={figureWidth}
         {flowMatchingClient}
@@ -1242,7 +1623,7 @@
         backgroundVisible={false}
       >
         <div class="caption">
-          <span class="figure-number">Figure 18:</span>
+          <span class="figure-number">Figure 25:</span>
           <strong>
             A rectified flow model learns straighter <span
               style="color: #f17720;">sampling paths</span
@@ -1267,13 +1648,13 @@
     needed during sampling. We can observe this effect by comparing how well
     Euler's method approximates the "ground truth" trajectory (using many steps)
     with varying numbers of integration steps (see
-    <a href="#figure-19" class="internal-link">Figure 19</a>
+    <a href="#figure-26" class="internal-link">Figure 26</a>
     ). Notice how the rectified flow model produces accurate approximations even
     with very few steps, while the flow matching model's curved trajectories
     lead to significant deviation from the true path.
   </p>
   {#if showOtherFigures}
-    <div id="figure-19">
+    <div id="figure-26">
       <EulerStepComparison
         {flowMatchingClient}
         {rectifiedFlowClient}
@@ -1282,7 +1663,7 @@
         maxUserTrajectories={1}
       >
         <div class="caption">
-          <span class="figure-number">Figure 19:</span>
+          <span class="figure-number">Figure 26:</span>
           <strong>
             The straight trajectories of rectified flows enable accurate simulation with fewer Euler steps.
           </strong>
@@ -1301,12 +1682,12 @@
   <p>
     Finally, we can compare the vector fields learned by a standard flow
     matching model versus a rectified flow model (see
-    <a href="#figure-20" class="internal-link">Figure 20</a>
+    <a href="#figure-27" class="internal-link">Figure 27</a>
     ). The rectified flow model learns vector field that is more consistent over
     time, meaning the model has lower curvature in its trajectories.
   </p>
   {#if showOtherFigures}
-    <div id="figure-20">
+    <div id="figure-27">
       <VectorFieldCurvatureComparison
         flowMatchingVectorField={$vectorFieldData}
         rectifiedFlowVectorField={$rectifiedFlowVectorFieldData}
@@ -1317,7 +1698,7 @@
         animationDuration={4000}
       >
         <div class="caption">
-          <span class="figure-number">Figure 20:</span>
+          <span class="figure-number">Figure 27:</span>
           The curvature of a flow matching model can be seen through its rapidly
           changing vector field. In contrast, a rectified flow model learns a more
           consistent vector field over time, indicating straighter trajectories.

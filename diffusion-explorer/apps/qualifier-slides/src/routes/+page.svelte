@@ -45,6 +45,7 @@
 
   // Local figures
   import IndependentCouplingAnimated from '$lib/figures/IndependentCouplingAnimated.svelte';
+  import CouplingPairsAnimated from '$lib/figures/CouplingPairsAnimated.svelte';
   import FlowInvertibilitySimple from '$lib/figures/FlowInvertibilitySimple.svelte';
   import ChangeOfVariablesIntro from '$lib/figures/ChangeOfVariablesIntro.svelte';
   import FlowerImageDistribution from '$lib/figures/FlowerImageDistribution.svelte';
@@ -549,15 +550,15 @@
           scale={1.3}
           verticalGap={20}
           rowSpacing={35}
-          labelFontSize={36}
+          labelFontSize={28}
           tex={"{\\color{#3b82f6} \\log p(x)} = \\log p(z_0) + \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i^{-1}}{\\partial z_{i+1}} \\right|"}
           annotations={[
             { color: '#3b82f6', label: 'Data Log-Likelihood', side: 'above', align: 'right' },
           ]}
         />
       </div>
-      <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: hidden;">
-        <MaxLikelihoodTraining bind:this={encodeFigure} width={1720} height={580} numStages={4} reversed={true} highlightPointIndices={[15]} highlightColor="#3b82f6" />
+      <div class="figure-container" style="margin-top: -20px; height: 580px; overflow: visible;">
+        <MaxLikelihoodTraining bind:this={encodeFigure} width={1720} height={580} numStages={4} reversed={true} highlightPointIndices={[15]} highlightColor="#3b82f6" showImages={true} />
       </div>
     </Slide>
 
@@ -567,10 +568,10 @@
       <p style="margin-top: 0.3em;">
         Learn <Katex math={"f_{i,\\theta}"} /> that maximize the log-likelihood of observed <span style="color: #3b82f6; font-weight: bold;">data</span>:
       </p>
-      <div style="margin-top: 0.8em; margin-bottom: -20px;">
+      <div style="margin-top: 1.5em; margin-bottom: -20px;">
         <AnnotatedEquation
           scale={1.1}
-          verticalGap={65}
+          verticalGap={50}
           labelFontSize={36}
           boxPadding={4}
           tex={"{\\color{#f17720} f_{1,\\theta}^*, \\ldots, f_{K,\\theta}^*} = \\arg\\max_\\theta \\sum_{{\\color{#3b82f6} x \\in \\mathcal{D}}} \\log p_\\theta(x)"}
@@ -580,8 +581,8 @@
           ]}
         />
       </div>
-      <div class="figure-container" style="margin-top: -20px; height: 480px; overflow: hidden;">
-        <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={520} numStages={4} reversed={true} />
+      <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: visible;">
+        <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={520} numStages={4} reversed={true} showImages={true} />
       </div>
     </Slide>
 
@@ -594,8 +595,8 @@
       <div style="margin-top: 2em;">
         <AnnotatedEquation
           scale={1.8}
-          verticalGap={110}
-          labelFontSize={52}
+          verticalGap={85}
+          labelFontSize={42}
           tex={"\\log p(x) = \\log p(z_0) + \\sum_{i=1}^{K} \\log \\left| {\\color{#e74c3c} \\det \\dfrac{\\partial f_i}{\\partial z_{i-1}}} \\right|"}
           annotations={[
             { color: '#e74c3c', label: 'O(d³) in general', side: 'below', align: 'left' },
@@ -608,7 +609,6 @@
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
         <p style="font-size: 0.7em; color: #888; margin: 0;">
           <strong>Examples:</strong> Planar flows <span style="font-style: italic;">(Rezende &amp; Mohamed, 2015)</span>,
-          NICE <span style="font-style: italic;">(Dinh et al., 2014)</span>,
           Real NVP <span style="font-style: italic;">(Dinh et al., 2017)</span>,
           Glow <span style="font-style: italic;">(Kingma &amp; Dhariwal, 2018)</span>
         </p>
@@ -680,7 +680,7 @@
       <p style="margin-top: 0.5em;">
         Individual samples have trajectories <Katex math={"\\color{#f17720}{x(t)}"} /> from <Katex math={"x_0 \\sim p_0"} /> to <Katex math={"x_1 \\sim p_1"} />.
       </p>
-      <div class="figure-container" style="margin-top: 0em;">
+      <div class="figure-container" style="margin-top: 1em;">
         {#if dataLoaded}
           <HighlightTrajectory
             bind:this={trajFigure}
@@ -750,7 +750,7 @@
               arrowWidth={5}
               arrowOpacity={1.0}
               trajectoryStrokeWidth={5}
-              trajectoryHeadRadius={20}
+              trajectoryHeadRadius={8}
               targetPointRadius={7}
               showTimeSlider={true}
               useRawSlider={true}
@@ -774,14 +774,9 @@
           verticalGap={60}
           tex={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 {\\color{#22c55e} \\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"}
           annotations={[
-            { color: '#22c55e', label: 'Trace is only O(d)', side: 'above' },
+            { color: '#22c55e', label: 'Trace is only O(d)', side: 'above', align: 'left' },
           ]}
         />
-      </div>
-      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
-        <p style="font-size: 0.7em; color: #888; margin: 0;">
-          Chen et al., <span style="font-style: italic;">Neural Ordinary Differential Equations</span>, 2018
-        </p>
       </div>
     </section>
 
@@ -794,11 +789,11 @@
       <div style="margin-top: 0.3em;">
         <AnnotatedEquation
           scale={1.3}
-          verticalGap={50}
-          labelFontSize={42}
+          verticalGap={60}
+          labelFontSize={36}
           tex={"\\log p_1(x_1) = \\log p_0(x_0) - {\\color{#e74c3c} \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_t}{\\partial x}\\right) \\, dt}"}
           annotations={[
-            { color: '#e74c3c', label: 'Requires O(n) ODE solves', side: 'below', align: 'right' },
+            { color: '#e74c3c', label: 'Requires O(n) ODE solves', side: 'below', align: 'left' },
           ]}
         />
       </div>
@@ -859,7 +854,7 @@
         Flow matching enables <strong>simulation-free training</strong> — training CNFs without running expensive ODE solvers at each step.
       </p>
       <div style="margin-top: 0.3em;">
-        <Katex math={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| v_\\theta(x_t, t) - (x_1 - x_0) \\right\\|^2"} displayMode={true} />
+        <Katex math={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| {\\color{#22c55e} v_t^\\theta(x_t)} - {\\color{#f17720} v_t(x_t|x_1)} \\right\\|^2"} displayMode={true} />
       </div>
       <div class="figure-container" style="margin-top: 0.3em; max-height: 550px; overflow: hidden;">
         {#if dataLoaded}
@@ -889,33 +884,128 @@
       </div>
     </section>
 
+    <!-- Slide: The Probability Path -->
+    <section>
+      <h2 class="slide-title">The Probability Path</h2>
+      <p style="margin-top: 0.5em;">
+        A <span style="color: #f17720; font-weight: bold;">probability path</span> <Katex math={"\\color{#f17720}{p_t(x)}"} /> describes how the distribution evolves continuously from source <Katex math={"p_0"} /> to target <Katex math={"p_1"} />.
+      </p>
+      <div class="figure-container" style="margin-top: 0.5em;">
+        {#if dataLoaded}
+          <ProbabilityPath
+            width={1800}
+            height={600}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            {allTimeSamples}
+            {isTraining}
+            playingByDefault={true}
+            backgroundVisible={false}
+            showContours={true}
+            distributionScaleFactor={0.7}
+            showTimeSlider={true}
+            useRawSlider={true}
+            sliderMaxWidth="1100px"
+            sliderLabelSize="30px"
+            labelFontSize={50}
+            labelFontFamily="Libre Baskerville, Georgia, serif"
+            latexFontSize={43}
+          />
+        {/if}
+      </div>
+    </section>
+
     <!-- Slide: Specifying the Probability Path -->
     <section>
-      <h2 class="slide-title">Specifying the Probability Path</h2>
+      <h2 class="slide-title">The Linear Probability Path</h2>
       <p style="margin-top: 0.5em;">
-        Flow matching requires defining a probability path <Katex math={"p_t(x)"} /> for interpolating between our source <Katex math={"p_0"} /> and target <Katex math={"p_1"} /> distributions. The simplest choice is a linear path:
+        The simplest choice of path is to linearly interpolate our source <Katex math={"X_0"} /> and target <Katex math={"X_1"} /> random variables:
       </p>
-      <div style="margin-top: 0.3em;">
-        <Katex math={"X_t = (1 - t)X_0 + tX_1"} displayMode={true} />
-      </div>
-      <div class="figure-container" style="margin-top: -0.5em;">
+      <div class="figure-container" style="margin-top: 0.5em;">
         {#if dataLoaded}
           <LinearInterpolation
             width={1800}
-            height={600}
+            height={700}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             sourcePointIndex={5}
             targetPointIndex={230}
             playingByDefault={true}
             backgroundVisible={false}
-            showEquation={false}
+            showEquation={true}
+            equationText={"X_t = (1 - t)X_0 + tX_1"}
             useLatexLabels={true}
             sourceLabelText={"X_0"}
             targetLabelText={"X_1"}
             labelFontSize={50}
             labelFontFamily="Libre Baskerville, Georgia, serif"
             latexFontSize={43}
+            sliderMaxWidth="1200px"
+            sliderLabelSize="30px"
+            showPlayButton={false}
+          />
+        {/if}
+      </div>
+    </section>
+
+    <!-- Slide: The Conditional Velocity Field -->
+    <section>
+      <h2 class="slide-title">The Conditional Velocity Field</h2>
+      <p style="margin-top: 0.5em;">
+        The <span style="color: #f17720; font-weight: bold;">conditional velocity field</span> <Katex math={"\\color{#f17720}{v_t(x_t | x_1)}"} /> is the velocity that moves <Katex math={"x_t"} /> along the path toward <Katex math={"x_1"} />.
+      </p>
+      <div class="figure-container" style="margin-top: 1.5em;">
+        {#if dataLoaded}
+          <ConditionalVelocityField
+            width={1800}
+            height={840}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            backgroundVisible={false}
+            playingByDefault={true}
+            singlePathMode={true}
+            sourceCenterX={0.2}
+            targetCenterX={0.8}
+            yShiftFactor={-0.5}
+            distributionScaleFactor={0.65}
+            pointOpacity={0.4}
+            distributionLabelOffsetY={40}
+            latexFontSize={43}
+            vectorScale={0.4}
+            vectorWidth={4.5}
+            animationDuration={8000}
+          />
+        {/if}
+      </div>
+    </section>
+
+    <!-- Slide: Regressing the Velocity Field -->
+    <section>
+      <h2 class="slide-title">Regressing the Velocity Field</h2>
+      <p style="margin-top: 0.5em;">
+        Given a point <Katex math={"x_t"} /> we want to predict the velocity <Katex math={"\\color{#22c55e}{v_t^\\theta(x_t)}"} /> that matches the target conditional velocity <Katex math={"\\color{#f17720}{v_t(x_t | x_1)}"} />.
+      </p>
+      <div style="margin-top: 0.3em;">
+        <Katex math={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| {\\color{#22c55e} v_t^\\theta(x_t)} - {\\color{#f17720} v_t(x_t|x_1)} \\right\\|^2"} displayMode={true} />
+      </div>
+      <div class="figure-container" style="margin-top: 0.3em; max-height: 550px; overflow: hidden;">
+        {#if dataLoaded}
+          <ConditionalFlowMatching
+            width={1800}
+            height={550}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            backgroundVisible={false}
+            distributionScaleFactor={0.75}
+            yShiftFactor={-0.8}
+            x1Pixel={{ x: 1600, y: 350 }}
+            vectorScale={350}
+            vectorWidth={4}
+            lineWidth={4}
+            dashedLineWidth={3}
+            latexFontSize={36}
+            distributionLabelOffsetY={40}
+            vtLabelOffsetY={65}
           />
         {/if}
       </div>
@@ -986,6 +1076,29 @@
       </div>
     </section>
 
+    <!-- Roadmap: Rectified Flows -->
+    <section class="roadmap-slide">
+      <h2 class="slide-title">Presentation Roadmap</h2>
+      <ol class="roadmap">
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Normalizing Flows</p>
+          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Continuous Normalizing Flows</p>
+          <p class="roadmap-ref">Chen et al., 2018</p>
+        </li>
+        <li class="roadmap-item roadmap-inactive">
+          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
+          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+        </li>
+        <li class="roadmap-item roadmap-active">
+          <p class="roadmap-title">Rectified Flows</p>
+          <p class="roadmap-ref">Liu et al., 2023</p>
+        </li>
+      </ol>
+    </section>
+
     <!-- Slide: Practical Challenge: Curved Trajectories -->
     <section>
       <h2 class="slide-title">Practical Challenge: Curved Trajectories</h2>
@@ -1004,9 +1117,10 @@
             distributionPointRadius={8}
             trajectoryStrokeWidth={5}
             trajectoryEndpointRadius={5}
-            labelFontSize={70}
-            sourceCenterX={0.15}
-            targetCenterX={0.85}
+            trajectoryColor="#f17720"
+            labelFontSize={50}
+            sourceCenterX={0.2}
+            targetCenterX={0.8}
             playingByDefault={true}
           />
         {/if}
@@ -1023,7 +1137,7 @@
           height={500}
           gap={10}
           backgroundVisible={false}
-          labelFontSize={44}
+          labelFontSize={56}
           showPlayButton={false}
         />
       </div>
@@ -1031,20 +1145,22 @@
 
     <!-- Slide: What Causes this Curvature? -->
     <section>
-      <h2 class="slide-title">What Causes this Curvature?</h2>
+      <h2 class="slide-title">What Causes Curved Paths?</h2>
       <p style="margin-top: 0.5em;">
         We train the velocity field <Katex math={"v_\\theta"} /> to match straight paths — why does this produce curvature?
       </p>
-      <div class="figure-container" style="margin-top: 0.3em; max-height: 550px; overflow: hidden;">
+      <div class="figure-container" style="margin-top: 0.3em; max-height: 650px; overflow: hidden;">
         {#if dataLoaded}
           <ConditionalFlowMatching
             width={1800}
-            height={550}
+            height={650}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             backgroundVisible={false}
-            distributionScaleFactor={0.75}
+            distributionScaleFactor={0.85}
             yShiftFactor={-0.8}
+            sourceCenterX={0.25}
+            targetCenterX={0.75}
             x1Pixel={{ x: 1600, y: 350 }}
             vectorScale={350}
             vectorWidth={4}
@@ -1062,31 +1178,32 @@
     <section>
       <h2 class="slide-title">What is a Coupling?</h2>
       <p style="margin-top: 0.5em;">
-        A <em>coupling</em> is a joint distribution <Katex math={"\\pi(X_0, X_1)"} /> between our source <Katex math={"\\pi(X_0) = p"} /> and target <Katex math={"\\pi(X_1) = q"} /> random variables.
+        A <em>coupling</em> is a joint distribution <Katex math={"\\pi({\\color{#3b82f6}{X_0}}, {\\color{#f17720}{X_1}})"} /> between our source <Katex math={"\\pi({\\color{#3b82f6}{X_0}})"} /> and target <Katex math={"\\pi({\\color{#f17720}{X_1}})"} /> random variables.
       </p>
       <div class="figure-container" style="margin-top: 1.5em;">
         {#if dataLoaded}
-          <IndependentCouplingAnimated
+          <CouplingPairsAnimated
             width={1800}
             height={800}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             backgroundVisible={false}
             numScatterSamples={150}
-            numLinesToDraw={100}
-            useLatexLabels={true}
-            sourceLabel={"\\pi(X_0)"}
-            targetLabel={"\\pi(X_1)"}
+            sourceLabel={"\\pi({\\color{#3b82f6}{X_0}})"}
+            targetLabel={"\\pi({\\color{#f17720}{X_1}})"}
             labelFontSize={50}
+            latexFontSize={43}
             sourceCenterX={0.2}
             targetCenterX={0.8}
             distributionScaleFactor={0.7}
             pointRadius={7}
+            numPairs={10}
+            pairDuration={2500}
           />
         {/if}
       </div>
       <aside class="notes">
-        Independent coupling: randomly pair source and target samples. Lines animate left to right.
+        Coupling: pairs drawn one at a time with labels showing (x_0, x_1).
       </aside>
     </section>
 
@@ -1152,29 +1269,6 @@
       </aside>
     </section>
 
-    <!-- Roadmap: Rectified Flows -->
-    <section class="roadmap-slide">
-      <h2 class="slide-title">Presentation Roadmap</h2>
-      <ol class="roadmap">
-        <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Normalizing Flows</p>
-          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
-        </li>
-        <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Continuous Normalizing Flows</p>
-          <p class="roadmap-ref">Chen et al., 2018</p>
-        </li>
-        <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
-          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
-        </li>
-        <li class="roadmap-item roadmap-active">
-          <p class="roadmap-title">Rectified Flows</p>
-          <p class="roadmap-ref">Liu et al., 2023</p>
-        </li>
-      </ol>
-    </section>
-
     <!-- Slide: Rectified Flows -->
     <section>
       <h2 class="slide-title">Rectified Flows</h2>
@@ -1183,7 +1277,7 @@
         {#if dataLoaded}
           <InducedCouplingAnimated
             width={1800}
-            height={700}
+            height={600}
             targetDistribution={$targetDistributionSamples}
             {flowMatchingClient}
             numSteps={200}
@@ -1241,9 +1335,9 @@
         {#if dataLoaded}
           <RectifiedFlowSuperimposed
             width={1800}
-            canvasWidth={700}
-            canvasHeight={700}
-            gap={10}
+            canvasWidth={650}
+            canvasHeight={650}
+            gap={20}
             {flowMatchingClient}
             {rectifiedFlowClient}
             leftTrajectories={flowMatchingGridTrajectories ?? []}
@@ -1264,7 +1358,7 @@
     <!-- Slide: Key References -->
     <section>
       <h2 class="slide-title">Key References</h2>
-      <div style="font-size: 0.65em; margin-top: 1em; line-height: 1.6; columns: 2; column-gap: 2em;">
+      <div style="font-size: 0.85em; margin-top: 1em; line-height: 1.8;">
         <p class="bib-entry">[1] D. Rezende & S. Mohamed. "Variational Inference with Normalizing Flows." <em>ICML</em>, 2015.</p>
         <p class="bib-entry">[2] R. Chen et al. "Neural Ordinary Differential Equations." <em>NeurIPS</em>, 2018.</p>
         <p class="bib-entry">[3] Y. Lipman et al. "Flow Matching for Generative Modeling." <em>ICLR</em>, 2023.</p>
