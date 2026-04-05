@@ -26,6 +26,9 @@
   /** @type {number} Vertical distance from term edge to the horizontal arm (px) */
   export let verticalGap = 56;
 
+  /** @type {number} Extra vertical gap added to 'below' annotations where the label sits above the elbow (px) */
+  export let belowExtraGap = 20;
+
   /** @type {number} Extra vertical spacing per stacked annotation on the same side (px) */
   export let rowSpacing = 24;
 
@@ -132,7 +135,7 @@
     const maxAboveStack = Math.max(0, aboveCount - 1);
     const maxBelowStack = Math.max(0, belowCount - 1);
     const topPad = aboveCount > 0 ? verticalGap + maxAboveStack * rowSpacing + labelFontSize * 1.5 + 8 : 4;
-    const bottomPad = belowCount > 0 ? verticalGap + maxBelowStack * rowSpacing + labelFontSize + 20 : 4;
+    const bottomPad = belowCount > 0 ? verticalGap + belowExtraGap + maxBelowStack * rowSpacing + labelFontSize + 20 : 4;
     container.style.paddingTop = `${topPad}px`;
     container.style.paddingBottom = `${bottomPad}px`;
     // No horizontal padding — annotations draw outside bounds via overflow: visible
@@ -370,7 +373,7 @@
       elbowY = eqTop - verticalGap - levelOffset;
     } else {
       tipY = box.y + box.h + boxPadding + arrowGap;
-      elbowY = eqBottom + verticalGap + levelOffset;
+      elbowY = eqBottom + verticalGap + belowExtraGap + levelOffset;
     }
 
     const labelGapY = labelFontSize * 0.4;

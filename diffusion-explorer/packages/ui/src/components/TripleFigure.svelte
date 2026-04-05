@@ -134,6 +134,7 @@
 
   .figure-panel {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -182,5 +183,23 @@
     line-height: 1.5;
     color: #666;
     text-align: left;
+  }
+
+  @media (max-width: 600px) {
+    .panel-title {
+      font-size: 1.1rem;
+    }
+    .panel-label {
+      font-size: 1rem;
+    }
+  }
+
+  @media (max-width: 400px) {
+    .panel-title {
+      font-size: 0.9rem;
+    }
+    .panel-label {
+      font-size: 0.85rem;
+    }
   }
 </style>

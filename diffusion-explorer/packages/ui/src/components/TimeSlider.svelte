@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { Timeline } from '../animation/timeline';
+  import type { Timeline } from 'tempus';
   import Slider from './Slider.svelte';
 
   // Props
@@ -19,6 +19,9 @@
   export let dragEnabled = true;
   export let hideSpacerOnMobile = false;
   export let discreteFill = false;  // Snap fill to step boundaries
+  export let showPlayButton = true;
+  export let maxWidth = '644px';
+  export let labelSize = '0.85em';
 
   // Optional Timeline instance - when provided, TimeSlider controls the timeline directly
   // This enables seamless scrubbing while animation is playing
@@ -125,25 +128,27 @@
   }
 </script>
 
-<div class="time-slider-container" class:disabled>
-  <div class="time-slider-inner">
-    <button
-      class="play-button"
-      onclick={togglePlay}
-      aria-label={playing ? 'Pause' : 'Play'}
-      {disabled}
-    >
-      {#if playing}
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <rect x="6" y="4" width="4" height="16" />
-          <rect x="14" y="4" width="4" height="16" />
-        </svg>
-      {:else}
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z" />
-        </svg>
-      {/if}
-    </button>
+<div class="time-slider-container" class:disabled style="font-size: {labelSize};">
+  <div class="time-slider-inner" style="max-width: {maxWidth};">
+    {#if showPlayButton}
+      <button
+        class="play-button"
+        onclick={togglePlay}
+        aria-label={playing ? 'Pause' : 'Play'}
+        {disabled}
+      >
+        {#if playing}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" />
+            <rect x="14" y="4" width="4" height="16" />
+          </svg>
+        {:else}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        {/if}
+      </button>
+    {/if}
 
     <div class="slider-wrapper">
       <Slider
@@ -163,6 +168,8 @@
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         {discreteFill}
+        {maxWidth}
+        {labelSize}
       />
     </div>
 

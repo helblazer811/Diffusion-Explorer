@@ -17,8 +17,7 @@
  * });
  */
 
-import type { AnimationWithData } from '../animation';
-import type { Clip } from '../timeline';
+import type { AnimationWithData, Clip } from 'tempus';
 import { drawTrajectories, type TrajectoryStyleOptions } from '../../plotting/trajectories';
 
 /**
