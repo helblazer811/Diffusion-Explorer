@@ -112,6 +112,7 @@
   let reverseSamplingData: any = null;
 
   let dataLoaded = false;
+  let covShowLog = false;
 
   // ========== HELPERS ==========
 
@@ -448,35 +449,51 @@
       <p style="margin-top: 0.5em;">
         It is easy to evaluate the density for a <span style="color: #4594e3;">simple distribution</span> <Katex math={"\\color{#4594e3}{p(z)}"} />, but not straightforward for a <span style="color: #f17720;">complex distribution</span> <Katex math={"\\color{#f17720}{p(x)}"} />.
       </p>
-      <div class="figure-container" style="margin-top: 2em;">
+      <div class="figure-container" style="margin-top: 1.5em;">
         {#if dataLoaded}
           <DataLikelihood width={1800} height={850} {allTimeSamples} distributionScaleFactor={1.0} />
         {/if}
       </div>
     </section>
 
-    <!-- Slide: Change of Variables Formula (original form) -->
-    <section>
+    <!-- Slide: Change of Variables Formula (click to toggle log form) -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <section on:click={() => covShowLog = !covShowLog} style="cursor: pointer;">
       <h2 class="slide-title">Change of Variables Formula</h2>
       <p style="margin-top: 0.3em;">
         Flows link the <span style="color: #4594e3;">source density</span> <Katex math={"\\color{#4594e3}{p(z)}"} /> to the <span style="color: #f17720;">data density</span> <Katex math={"\\color{#f17720}{p(x)}"} />.
       </p>
-      <div style="margin-top: 0.3em;">
-        <AnnotatedEquation
-          scale={1.3}
-          verticalGap={20}
-          labelFontSize={36}
-          boxPadding={4}
-          tex={"{\\color{#4594e3} p(z)} \\left| \\det \\frac{\\partial f}{\\partial z} \\right|^{-1} = {\\color{#f17720} p(x)}"}
-          annotations={[
-            { color: '#4594e3', label: 'Source Density', side: 'above', align: 'left' },
-            { color: '#f17720', label: 'Data Density', side: 'above' },
-          ]}
-        />
+      <div style="margin-top: 1.5em; height: 185px; overflow: visible; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2;">
+        {#if !covShowLog}
+          <AnnotatedEquation
+            scale={1.1}
+            verticalGap={20}
+            labelFontSize={32}
+            boxPadding={4}
+            tex={"{\\color{#4594e3} p(z)} \\left| \\det \\frac{\\partial f}{\\partial z} \\right|^{-1} = {\\color{#f17720} p(x)}"}
+            annotations={[
+              { color: '#4594e3', label: 'Source Density', side: 'above', align: 'left' },
+              { color: '#f17720', label: 'Data Density', side: 'above', align: 'right' },
+            ]}
+          />
+        {:else}
+          <AnnotatedEquation
+            scale={1.1}
+            verticalGap={20}
+            labelFontSize={32}
+            boxPadding={4}
+            tex={"{\\color{#4594e3} \\log p(z)} - \\log \\left| \\det \\frac{\\partial f}{\\partial z} \\right| = {\\color{#f17720} \\log p(x)}"}
+            annotations={[
+              { color: '#4594e3', label: 'Source Density', side: 'above', align: 'left' },
+              { color: '#f17720', label: 'Data Density', side: 'above', align: 'right' },
+            ]}
+          />
+        {/if}
       </div>
-      <div class="figure-container" style="margin-top: 0.5em;">
+      <div class="figure-container" style="margin-top: 0px; position: relative; z-index: 1;">
         {#if dataLoaded}
-          <ChangeOfVariablesFigure width={1800} height={650} {allTimeSamples} distributionScaleFactor={1.0} />
+          <ChangeOfVariablesFigure width={1800} height={800} {allTimeSamples} distributionScaleFactor={0.8} />
         {/if}
       </div>
     </section>
@@ -487,12 +504,12 @@
       <p style="margin-top: 0.5em;">
         Determinant of the Jacobian <Katex math={"\\color{#2ecc71}{\\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"} /> measures how <Katex math={"f"} /> locally stretches and compresses space.
       </p>
-      <div class="figure-container" style="margin-top: 0.5em;">
+      <div class="figure-container" style="margin-top: 1.5em;">
         {#if dataLoaded}
           <ChangeOfVariablesIntro
             bind:this={jacobianFigure}
             width={1800}
-            height={950}
+            height={800}
             {allTimeSamples}
             numFrames={5}
             distributionScaleFactor={1.0}
@@ -500,27 +517,6 @@
         {/if}
       </div>
     </Slide>
-
-    <!-- Slide: Log Form of Change of Variables -->
-    <section>
-      <h2 class="slide-title">Log-Likelihood Under a Flow</h2>
-      <p style="margin-top: 0.5em;">
-        Taking the log gives a more convenient form:
-      </p>
-      <div style="margin-top: 2.5em;">
-        <AnnotatedEquation
-          scale={1.8}
-          verticalGap={100}
-          labelFontSize={42}
-          tex={"{\\color{#f17720} \\log p(x)} = {\\color{#3498db} \\log p(z)} + {\\color{#2ecc71} \\log \\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"}
-          annotations={[
-            { color: '#f17720', label: 'Data Density', side: 'above', align: 'left' },
-            { color: '#3498db', label: 'Source Density', side: 'below' },
-            { color: '#2ecc71', label: 'Log Volume Change', side: 'above', align: 'left' },
-          ]}
-        />
-      </div>
-    </section>
 
     <!-- Slide: Composing Multiple Transformations -->
     <Slide figure={composeFigure}>
@@ -538,7 +534,7 @@
         />
       </div>
       <div class="figure-container" style="margin-top: 10px; height: 520px; overflow: hidden;">
-        <NormalizingFlowStages bind:this={composeFigure} width={1720} height={580} numStages={4} showLabels={true} looping={false} />
+        <NormalizingFlowStages bind:this={composeFigure} width={1720} height={580} numStages={4} showLabels={true} static={true} />
       </div>
     </Slide>
 
@@ -553,7 +549,7 @@
           scale={1.3}
           verticalGap={20}
           rowSpacing={35}
-          labelFontSize={44}
+          labelFontSize={36}
           tex={"{\\color{#3b82f6} \\log p(x)} = \\log p(z_0) + \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i^{-1}}{\\partial z_{i+1}} \\right|"}
           annotations={[
             { color: '#3b82f6', label: 'Data Log-Likelihood', side: 'above', align: 'right' },
@@ -569,13 +565,13 @@
     <Slide figure={mlFigure}>
       <h2 class="slide-title">Maximum Likelihood Training</h2>
       <p style="margin-top: 0.3em;">
-        Learn transformations <Katex math={"f_{i,\\theta}"} /> that maximize the log-likelihood of observed <span style="color: #3b82f6; font-weight: bold;">data</span>:
+        Learn <Katex math={"f_{i,\\theta}"} /> that maximize the log-likelihood of observed <span style="color: #3b82f6; font-weight: bold;">data</span>:
       </p>
       <div style="margin-top: 0.8em; margin-bottom: -20px;">
         <AnnotatedEquation
           scale={1.1}
           verticalGap={65}
-          labelFontSize={32}
+          labelFontSize={36}
           boxPadding={4}
           tex={"{\\color{#f17720} f_{1,\\theta}^*, \\ldots, f_{K,\\theta}^*} = \\arg\\max_\\theta \\sum_{{\\color{#3b82f6} x \\in \\mathcal{D}}} \\log p_\\theta(x)"}
           annotations={[
@@ -595,11 +591,11 @@
       <p style="margin-top: 0.5em;">
         In general, flows require computing <span style="color: #e74c3c; font-weight: bold;">expensive determinants</span>.
       </p>
-      <div style="margin-top: 3em;">
+      <div style="margin-top: 2em;">
         <AnnotatedEquation
           scale={1.8}
-          verticalGap={80}
-          labelFontSize={42}
+          verticalGap={110}
+          labelFontSize={52}
           tex={"\\log p(x) = \\log p(z_0) + \\sum_{i=1}^{K} \\log \\left| {\\color{#e74c3c} \\det \\dfrac{\\partial f_i}{\\partial z_{i-1}}} \\right|"}
           annotations={[
             { color: '#e74c3c', label: 'O(d³) in general', side: 'below', align: 'left' },
@@ -652,7 +648,7 @@
         {#if dataLoaded}
           <ProbabilityPath
             width={1800}
-            height={700}
+            height={600}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             {allTimeSamples}
@@ -661,7 +657,10 @@
             backgroundVisible={false}
             showContours={true}
             distributionScaleFactor={0.7}
-            showTimeSlider={false}
+            showTimeSlider={true}
+            useRawSlider={true}
+            sliderMaxWidth="1100px"
+            sliderLabelSize="30px"
             labelFontSize={50}
             labelFontFamily="Libre Baskerville, Georgia, serif"
             latexFontSize={43}
@@ -681,7 +680,7 @@
       <p style="margin-top: 0.5em;">
         Individual samples have trajectories <Katex math={"\\color{#f17720}{x(t)}"} /> from <Katex math={"x_0 \\sim p_0"} /> to <Katex math={"x_1 \\sim p_1"} />.
       </p>
-      <div class="figure-container" style="margin-top: 0.5em;">
+      <div class="figure-container" style="margin-top: 0em;">
         {#if dataLoaded}
           <HighlightTrajectory
             bind:this={trajFigure}
@@ -694,7 +693,10 @@
             isTraining={$isTraining}
             numTrajectoriesToShow={1}
             reverse={false}
-            showTimeSlider={false}
+            showTimeSlider={true}
+            useRawSlider={true}
+            sliderMaxWidth="1100px"
+            sliderLabelSize="30px"
             distributionScaleFactor={0.8}
             endpointRadius={12}
             trajectoryStrokeWidth={5}
@@ -712,7 +714,7 @@
     <!-- Slide: CNFs Learn to Represent Velocity Fields -->
     <section>
       <h2 class="slide-title">CNFs Learn to Represent Velocity Fields</h2>
-      <div style="display: flex; align-items: center; gap: 2em; margin-top: 3em;">
+      <div style="display: flex; align-items: center; gap: 2em; margin-top: 1em;">
         <div style="flex: 1;">
           <p style="margin-top: 0;">
             CNFs model a velocity field <Katex math={"\\color{#3b82f6}{v_\\theta}"} />.
@@ -750,7 +752,10 @@
               trajectoryStrokeWidth={5}
               trajectoryHeadRadius={20}
               targetPointRadius={7}
-              showTimeSlider={false}
+              showTimeSlider={true}
+              useRawSlider={true}
+              sliderMaxWidth="700px"
+              sliderLabelSize="30px"
             />
           {/if}
         </div>

@@ -5,6 +5,7 @@
   import {
     Figure,
     TimeSlider,
+    Slider,
     drawScatterPlot,
     drawMathjax,
     createSourceTargetScales,
@@ -66,6 +67,9 @@
 
   // Show/hide options
   export let showTimeSlider = true;
+  export let useRawSlider = false;
+  export let sliderMaxWidth = '644px';
+  export let sliderLabelSize = '0.85em';
 
   // Caption slot (passed as default children)
   export let children: Snippet | undefined = undefined;
@@ -75,6 +79,8 @@
   // ----------------------------------------------------------------
 
   $: caption = children;
+
+  let rawSliderValue = 0;
 
   // Canvas - need both bind:this (for reactivity) and action (for DPR setup)
   let canvas: HTMLCanvasElement | null = null;
@@ -287,6 +293,7 @@
 
     // Register tick callback
     timeline.onTick((_t, state) => {
+      rawSliderValue = _t;
       draw(state);
     });
   }
@@ -622,10 +629,32 @@
         ></canvas>
       </div>
       {#if showTimeSlider}
-        <TimeSlider
-          {timeline}
-          color={settings.stylingSettings.trajectory.color}
-        />
+        {#if useRawSlider}
+          <div style="width: 100%; padding: 0 20px; box-sizing: border-box;">
+            <Slider
+              value={rawSliderValue}
+              min={0}
+              max={1}
+              step={0.001}
+              color={settings.stylingSettings.trajectory.color}
+              showTicks={true}
+              showLabel={true}
+              label="Time"
+              minLabel="t=0"
+              maxLabel="t=1"
+              maxWidth={sliderMaxWidth}
+              labelSize={sliderLabelSize}
+              onInput={(v) => { if (timeline) timeline.seek(v); }}
+              onDragStart={() => { if (timeline) timeline.startSeeking(); }}
+              onDragEnd={() => { if (timeline) timeline.endSeeking(); }}
+            />
+          </div>
+        {:else}
+          <TimeSlider
+            {timeline}
+            color={settings.stylingSettings.trajectory.color}
+          />
+        {/if}
       {/if}
     </div>
   {/snippet}
