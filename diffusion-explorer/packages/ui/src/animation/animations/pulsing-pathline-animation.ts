@@ -28,8 +28,7 @@
  * anim.draw(state);
  */
 
-import type { Animation } from '../animation';
-import type { Clip } from '../timeline';
+import type { Animation, Clip } from 'tempus';
 import {
   PulsingPathsRenderer,
   type PulsingPathsRendererOptions,

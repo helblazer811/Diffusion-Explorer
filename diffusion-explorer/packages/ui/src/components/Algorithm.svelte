@@ -3,7 +3,7 @@
   import Figure from './Figure.svelte';
 
   // Slots: title, inputs, outputs, steps, caption
-  let { title, inputs, outputs, steps, caption, backgroundVisible = true } = $props();
+  let { title, inputs, outputs, steps, caption, backgroundVisible = true, fontSize = null } = $props();
 
   // Set up line counter context for AlgorithmLine auto-numbering
   setContext('algorithm-line-counter', { value: 0 });
@@ -11,7 +11,7 @@
 
 <Figure {backgroundVisible} {caption}>
   {#snippet children()}
-    <div class="algorithm-box">
+    <div class="algorithm-box" style={fontSize ? `font-size: ${fontSize}px` : ''}>
       <div class="algorithm-title">
         {@render title?.()}
       </div>
@@ -41,7 +41,7 @@
   }
 
   .algorithm-title {
-    font-size: 1.25rem;
+    font-size: 1.25em;
     font-weight: 600;
     margin-bottom: 1rem;
     padding-bottom: 0.75rem;
@@ -50,7 +50,7 @@
   }
 
   .algorithm-content {
-    font-size: 1.15rem;
+    font-size: 1.15em;
     line-height: 1.8;
   }
 
