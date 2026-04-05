@@ -33,7 +33,8 @@
 
   const MIN_RING_RADIUS = PLOT_RADIUS * 0.35;
   const MAX_RING_RADIUS = PLOT_RADIUS * 0.75;
-  const SHELL_HALF_WIDTH = 18;
+  const SHELL_HALF_WIDTH_MAX = 18;
+  const SHELL_HALF_WIDTH_MIN = 4;
 
   const NUM_SAMPLES = 400;
   const DOT_RADIUS = 3;
@@ -48,6 +49,14 @@
     while (u === 0) u = Math.random();
     while (v === 0) v = Math.random();
     return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
+
+  /** Map dimension to shell half-width — thinner at high d */
+  function shellHalfWidthForD(d: number): number {
+    const logMin = Math.log(D_VALUES[0]);
+    const logMax = Math.log(D_VALUES[D_VALUES.length - 1]);
+    const t = Math.min(1, Math.max(0, (Math.log(d) - logMin) / (logMax - logMin)));
+    return SHELL_HALF_WIDTH_MAX * (1 - t) + SHELL_HALF_WIDTH_MIN * t;
   }
 
   /** Map dimension to ring radius via log interpolation */
@@ -97,7 +106,7 @@
       const d = D_VALUES[di];
       const rr = ringRadiusForD(d);
       const samples = precomputedSamples.get(d)!;
-      const devScale = Math.sqrt(d) * SHELL_HALF_WIDTH;
+      const devScale = Math.sqrt(d) * shellHalfWidthForD(d);
       const coords: number[][] = [];
       for (const s of samples) {
         const r = rr + s.dev * devScale;
@@ -141,10 +150,11 @@
 
     const d = state.d;
     const currentRingR = ringRadiusForD(d);
+    const currentShellHW = shellHalfWidthForD(d);
 
-    // Right plot: shell annulus (fixed pixel width)
-    const innerR = Math.max(0, currentRingR - SHELL_HALF_WIDTH);
-    const outerR = currentRingR + SHELL_HALF_WIDTH;
+    // Right plot: shell annulus (thins with increasing dimension)
+    const innerR = Math.max(0, currentRingR - currentShellHW);
+    const outerR = currentRingR + currentShellHW;
 
     ctx.save();
     ctx.beginPath();
@@ -249,6 +259,7 @@
   }
 
   $: currentRingR = ringRadiusForD(animState.d);
+  $: currentShellHW = shellHalfWidthForD(animState.d);
 </script>
 
 <h2>Gaussian in High Dimensions</h2>
@@ -278,7 +289,7 @@
       <div
         class="bound-label"
         style="
-          left: {RIGHT_CX + currentRingR * 0.7 + SHELL_HALF_WIDTH + 8}px;
+          left: {RIGHT_CX + currentRingR * 0.7 + currentShellHW + 8}px;
           top: {RIGHT_CY - currentRingR * 0.7 - 12}px;
         "
       >

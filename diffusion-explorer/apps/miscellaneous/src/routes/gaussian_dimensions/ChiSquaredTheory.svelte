@@ -200,7 +200,7 @@
   $: currentRingR = ringRadiusForD(animState.d);
 </script>
 
-<h2>Why Does This Happen?</h2>
+<h2>Concentration of Measure via the Chi-Squared Distribution</h2>
 
 <Figure backgroundVisible={false}>
   {#snippet children()}
