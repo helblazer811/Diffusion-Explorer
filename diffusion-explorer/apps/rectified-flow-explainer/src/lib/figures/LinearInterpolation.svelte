@@ -59,6 +59,12 @@
 
   // Show/hide equation at bottom
   export let showEquation = true;
+  export let equationText = "x_t \\sim X_t = (1-t)X_0 + tX_1";
+
+  // Slider styling
+  export let sliderMaxWidth = '644px';
+  export let showPlayButton = true;
+  export let sliderLabelSize = '0.85em';
 
   // LaTeX label styling
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
@@ -328,7 +334,7 @@
     // Formula at bottom center
     if (showEquation) {
       drawMathjax(
-        ctx, "x_t \\sim X_t = (1-t)X_0 + tX_1", width / 2, height - marginHeight,
+        ctx, equationText, width / 2, height - marginHeight,
         latexFontSize, 0, 15, { color: latexColor }
       );
     }
@@ -376,7 +382,7 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider {timeline} {displayTime} onSeekByDisplayTime={handleSeekByDisplayTime} color="#f17720" />
+      <TimeSlider {timeline} {displayTime} onSeekByDisplayTime={handleSeekByDisplayTime} color="#f17720" maxWidth={sliderMaxWidth} {showPlayButton} labelSize={sliderLabelSize} />
     </div>
   {/snippet}
 </Figure>
