@@ -16,6 +16,7 @@
   export let pointColor = '#4594e3';
   export let pointRadius = 5;
   export let pointOpacity = 0.5;
+  export let arrowHeadRadius = 10;
   export let labelFontSize = 50;
   export let animationDuration = 16000;
   export let sourceCenterX = 0.25;
@@ -24,6 +25,10 @@
   export let staticForward = false;
   export let overlayText = "";
   export let showCurvedArrow = true;
+  export let marginTop = 70;
+  export let children: unknown = undefined;
+
+  $: caption = children;
 
   let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
@@ -147,7 +152,7 @@
       ctx.fillStyle = lineColor;
       const prevX = arrowEnd - (arrowEnd - mx) * 0.05;
       const prevY = arrowY - (arrowY - my) * 0.05;
-      drawArrowHead(ctx, prevX, prevY, arrowEnd, arrowY, 12);
+      drawArrowHead(ctx, prevX, prevY, arrowEnd, arrowY, arrowHeadRadius + 2);
       ctx.restore();
     }
 
@@ -173,7 +178,7 @@
 
           if (state.forwardProgress > 0.05) {
             ctx.fillStyle = lineColor;
-            drawArrowHead(ctx, sx, sy, endX, endY, 10);
+            drawArrowHead(ctx, sx, sy, endX, endY, arrowHeadRadius);
           }
         }
         ctx.globalAlpha = 1;
@@ -275,9 +280,9 @@
   }
 </script>
 
-<Figure backgroundVisible={false} bind:isActive={figureIsActive}>
+<Figure backgroundVisible={false} {caption} bind:isActive={figureIsActive}>
   {#snippet children()}
-    <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: 70px;">
+    <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: {marginTop}px;">
       <div style="width: 100%; max-width: {width}px;">
         <canvas
           bind:this={canvas}

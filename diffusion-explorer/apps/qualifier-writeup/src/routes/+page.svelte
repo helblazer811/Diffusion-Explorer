@@ -525,15 +525,21 @@
         height={400}
         {allTimeSamples}
         numLines={5}
-        distributionScaleFactor={1.0}
-      />
-      <div class="caption">
-        <span class="figure-number">Figure 4:</span>
-        A normalizing flow maps all points to distinct locations, ensuring that
-        probability mass is conserved through the transformation. The invertibility
-        of the flow means that we can always map back from the target distribution
-        to the source distribution.
-      </div>
+        distributionScaleFactor={1.3}
+        labelFontSize={24}
+        lineWidth={3}
+        pointRadius={3}
+        arrowHeadRadius={7}
+        marginTop={0}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 4:</span>
+          A normalizing flow maps all points to distinct locations, ensuring that
+          probability mass is conserved through the transformation. The invertibility
+          of the flow means that we can always map back from the target distribution
+          to the source distribution.
+        </div>
+      </FlowInvertibilitySimple>
     </div>
   {/if}
 
