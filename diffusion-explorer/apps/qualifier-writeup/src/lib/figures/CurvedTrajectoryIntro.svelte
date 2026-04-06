@@ -35,6 +35,7 @@
 
   // Caption slot (passed as default children)
   export let children: Snippet | undefined = undefined;
+  export let sliderLabelSize = '1.1em';
 
   // ----------------------------------------------------------------
   // State
@@ -414,6 +415,7 @@
       <TimeSlider
         {timeline}
         color={settings.stylingSettings.trajectory.color}
+        labelSize={sliderLabelSize}
       />
     </div>
   {/snippet}

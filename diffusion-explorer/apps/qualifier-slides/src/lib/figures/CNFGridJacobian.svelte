@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import type { Writable } from 'svelte/store';
   import {
+    Figure,
     Timeline,
     createPauseClip,
     useCanvas2D,
@@ -32,8 +33,13 @@
   export let pauseDuration: number = 5000;
   export let scatterPointColor: string = '#3b82f6';
   export let scatterPointRadius: number = 4;
-  export let scatterPointOpacity: number = 0.25;
+  export let scatterPointOpacity: number = 0.5;
   export let backgroundVisible: boolean = false;
+  export let labelFontSize: string = '0.7em';
+  export let showDetLabel: boolean = true;
+  export let children: unknown = undefined;
+
+  $: caption = children;
 
   // Layout: left region takes leftFrac of width, right region takes rightFrac
   const leftFrac = 0.45;
@@ -383,10 +389,10 @@
 
     // Drop shadow
     ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.18)';
-    ctx.shadowBlur = 16;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
+    ctx.shadowBlur = 8;
     ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 4;
+    ctx.shadowOffsetY = 2;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.roundRect(rX, rY, rSide, rSide, cornerRadius);
@@ -564,16 +570,22 @@
   }
 </script>
 
-<div class="jacobian-wrapper" style="width: 100%; max-width: {width}px;">
-  <div class="det-label" style="left: {(leftFrac + gapFrac + (1 - leftFrac - gapFrac) / 2) * 100}%;">
-    <Katex math={"\\color{#2ecc71}{\\left|\\det \\dfrac{\\partial f}{\\partial z}\\right|}"} />
-  </div>
-  <canvas
-    bind:this={canvas}
-    use:canvas2d.bindCanvas
-    style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
-  ></canvas>
-</div>
+<Figure backgroundVisible={false} {caption}>
+  {#snippet children()}
+    <div class="jacobian-wrapper" style="width: 100%; max-width: {width}px;">
+      {#if showDetLabel}
+        <div class="det-label" style="left: {(leftFrac + gapFrac + (1 - leftFrac - gapFrac) / 2) * 100}%; font-size: {labelFontSize};">
+          <Katex math={"\\color{#2ecc71}{\\left|\\det \\dfrac{\\partial f}{\\partial z}\\right|}"} />
+        </div>
+      {/if}
+      <canvas
+        bind:this={canvas}
+        use:canvas2d.bindCanvas
+        style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
+      ></canvas>
+    </div>
+  {/snippet}
+</Figure>
 
 <style>
   .jacobian-wrapper {
@@ -583,7 +595,6 @@
     position: absolute;
     top: -3.5em;
     transform: translateX(-50%);
-    font-size: 0.7em;
     pointer-events: none;
   }
 </style>

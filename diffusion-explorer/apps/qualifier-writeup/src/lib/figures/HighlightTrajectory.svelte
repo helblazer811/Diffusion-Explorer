@@ -61,9 +61,11 @@
 
   // Show/hide options
   export let showTimeSlider = true;
+  export let interactive = true;
 
   // Caption slot (passed as default children)
   export let children: Snippet | undefined = undefined;
+  export let sliderLabelSize = '1.1em';
 
   // ----------------------------------------------------------------
   // State
@@ -565,14 +567,15 @@
         <canvas
           bind:this={canvas}
           use:canvas2d.bindCanvas
-          onclick={handleCanvasClick}
-          style="cursor:pointer;width:100%;height:auto;aspect-ratio:{width}/{height};"
+          onclick={interactive ? handleCanvasClick : undefined}
+          style="cursor:{interactive ? 'pointer' : 'default'};width:100%;height:auto;aspect-ratio:{width}/{height};"
         ></canvas>
       </div>
       {#if showTimeSlider}
         <TimeSlider
           {timeline}
           color={settings.stylingSettings.trajectory.color}
+          labelSize={sliderLabelSize}
         />
       {/if}
     </div>

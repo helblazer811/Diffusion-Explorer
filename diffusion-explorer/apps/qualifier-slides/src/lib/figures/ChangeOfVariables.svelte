@@ -23,6 +23,13 @@
     contourBandwidth = 8,
     contourThresholds = 5 as number | number[],
     contourFillColor = '#f17720',
+    scaleFactor = 70,
+    pointRadius = 5,
+    pointOpacity = 0.4,
+    labelFontSize = 34,
+    arrowHeadRadius = 7,
+    arrowLineWidth = 2.5,
+    children,
   }: {
     width?: number;
     height?: number;
@@ -31,6 +38,13 @@
     contourBandwidth?: number;
     contourThresholds?: number | number[];
     contourFillColor?: string;
+    scaleFactor?: number;
+    pointRadius?: number;
+    pointOpacity?: number;
+    labelFontSize?: number;
+    arrowHeadRadius?: number;
+    arrowLineWidth?: number;
+    children?: any;
   } = $props();
 
   // ----------------------------------------------------------------
@@ -84,7 +98,6 @@
     if (targetDistribution.length === 0) return;
     const rng = mulberry32(42);
     const vertCenter = height * 0.35;
-    const scaleFactor = 70;
     const sourceCenterX = width * 0.3;
     const targetCenterX = width * 0.7;
 
@@ -167,7 +180,6 @@
     ctx.clearRect(0, 0, width, height);
 
     const vertCenter = height * 0.35;
-    const scaleFactor = 70;
 
     // Draw source (z)
     const source = stages[0];
@@ -186,8 +198,8 @@
         fill: true, stroke: false,
       });
 
-      drawScatterPlot(ctx, source.pixelCoords, 5, contourFillColor, 0.4 * opacity);
-      drawMathjax(ctx, 'p(z)', source.centerX, height - 60, 34, 0, 0, { color: '#333' }, requestRedraw);
+      drawScatterPlot(ctx, source.pixelCoords, pointRadius, contourFillColor, pointOpacity * opacity);
+      drawMathjax(ctx, 'p(z)', source.centerX, height - 60, labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
 
       ctx.restore();
     }
@@ -201,11 +213,11 @@
       ctx.save();
       ctx.globalAlpha = state.arrow;
       ctx.strokeStyle = '#555';
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = arrowLineWidth;
 
-      drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, 7);
+      drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, arrowHeadRadius);
       const arrowMidX = (arrowFromX + arrowToX) / 2;
-      drawMathjax(ctx, 'f', arrowMidX, arrowY - 20, 34, 0, 0, { color: '#555' }, requestRedraw);
+      drawMathjax(ctx, 'f', arrowMidX, arrowY - 20, labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
 
       ctx.restore();
     }
@@ -227,8 +239,8 @@
         fill: true, stroke: false,
       });
 
-      drawScatterPlot(ctx, target.pixelCoords, 5, contourFillColor, 0.4 * opacity);
-      drawMathjax(ctx, 'p(x)', target.centerX, height - 60, 34, 0, 0, { color: '#333' }, requestRedraw);
+      drawScatterPlot(ctx, target.pixelCoords, pointRadius, contourFillColor, pointOpacity * opacity);
+      drawMathjax(ctx, 'p(x)', target.centerX, height - 60, labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
 
       ctx.restore();
     }
@@ -280,10 +292,15 @@
   });
 </script>
 
-<div style="width: {width}px;">
+<figure style="width: {width}px; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
   <canvas
     bind:this={canvas}
     use:canvas2d.bindCanvas
     style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
   ></canvas>
-</div>
+  {#if children}
+    <figcaption style="font-size: 1.1rem; line-height: 1.5; color: #666; text-align: left;">
+      {@render children()}
+    </figcaption>
+  {/if}
+</figure>

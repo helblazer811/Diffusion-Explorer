@@ -54,6 +54,7 @@
 
   // Background
   export let backgroundVisible: boolean = true;
+  export let sliderLabelSize = '1.1em';
 
   // ----------------------------------------------------------------
   // State
@@ -366,6 +367,7 @@
             {timeline}
             step={numSegments > 0 ? 1 / numSegments : 0.01}
             color={trajectoryColor}
+            labelSize={sliderLabelSize}
           />
         </div>
       </div>
