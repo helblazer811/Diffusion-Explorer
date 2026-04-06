@@ -36,6 +36,7 @@
   export let sourcePointColor = settings.stylingSettings.scatterPlot.color;
   export let targetPointColor = settings.stylingSettings.scatterPlot.color;
   export let arrowWidth = 4;
+  export let arrowHeadSize = 6;
   export let yShiftFactor = settings.stylingSettings.scatterPlot.yShiftFactor;
 
   export let labelFontSize = settings.stylingSettings.label.fontSize;
@@ -309,7 +310,7 @@
       ctx.strokeStyle = arrowColor;
       ctx.fillStyle = arrowColor;
       ctx.lineWidth = arrowWidth;
-      drawArrow(ctx, intersection.x, intersection.y, arrow1End.x, arrow1End.y, 6);
+      drawArrow(ctx, intersection.x, intersection.y, arrow1End.x, arrow1End.y, arrowHeadSize);
       ctx.restore();
 
       // Arrow 2 (dir2 - orange)
@@ -317,7 +318,7 @@
       ctx.strokeStyle = arrowColor;
       ctx.fillStyle = arrowColor;
       ctx.lineWidth = arrowWidth;
-      drawArrow(ctx, intersection.x, intersection.y, arrow2End.x, arrow2End.y, 6);
+      drawArrow(ctx, intersection.x, intersection.y, arrow2End.x, arrow2End.y, arrowHeadSize);
       ctx.restore();
 
       // Mean arrow (green)
@@ -325,7 +326,7 @@
       ctx.strokeStyle = meanVectorColor;
       ctx.fillStyle = meanVectorColor;
       ctx.lineWidth = arrowWidth;
-      drawArrow(ctx, intersection.x, intersection.y, meanEnd.x, meanEnd.y, 6);
+      drawArrow(ctx, intersection.x, intersection.y, meanEnd.x, meanEnd.y, arrowHeadSize);
       ctx.restore();
 
       // Draw intersection point
