@@ -259,6 +259,7 @@
     generateStageData();
     setupTimeline();
     isInitialized = true;
+    timeline.play();
   }
 
   onMount(async () => {

@@ -75,6 +75,16 @@ const CACHES: CacheConfig[] = [
     dim: 2,
     hidden: 64,
   },
+  // Dense sample trajectories for CNF grid+Jacobian slide
+  {
+    modelPath: 'static/models/flow_matching_model.json',
+    outputPath: 'static/cached_samples/flow_matching_dense_trajectories.json',
+    numSamples: 400,
+    numSteps: 200,
+    type: 'random',
+    dim: 2,
+    hidden: 64,
+  },
   // Vector field caches
   {
     modelPath: 'static/models/flow_matching_model.json',
