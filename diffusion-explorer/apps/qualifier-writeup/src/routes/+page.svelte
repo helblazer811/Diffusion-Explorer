@@ -40,11 +40,11 @@
   import EulerStepComparison from "$lib/figures/EulerStepComparison.svelte";
   // Cross-app imports from qualifier-slides (normalizing flows figures)
   import NormalizingFlowStages from "$qualifier-slides/figures/NormalizingFlowStages.svelte";
-  import ChangeOfVariables from "$qualifier-slides/figures/ChangeOfVariables.svelte";
+  import ChangeOfVariablesFigure from "$qualifier-slides/figures/ChangeOfVariablesFigure.svelte";
   import MaxLikelihoodTraining from "$qualifier-slides/figures/MaxLikelihoodTraining.svelte";
   import FlowInvertibilitySimple from "$qualifier-slides/figures/FlowInvertibilitySimple.svelte";
   import DataLikelihood from "$qualifier-slides/figures/DataLikelihood.svelte";
-  import ChangeOfVariablesIntro from "$qualifier-slides/figures/ChangeOfVariablesIntro.svelte";
+  import CNFGridJacobian from "$qualifier-slides/figures/CNFGridJacobian.svelte";
   import StochasticInterpolation from "$qualifier-slides/figures/StochasticInterpolation.svelte";
   import { Bibliography, HoverableReference, Katex, ArticleHeader } from "@diffusion-explorer/ui";
   import { base } from "$app/paths";
@@ -67,6 +67,8 @@
 
   // Grid trajectory stores
   const flowMatchingGridTrajectories: Writable<number[][][] | null> =
+    writable(null);
+  const flowMatchingDenseTrajectories: Writable<number[][][] | null> =
     writable(null);
   const rectifiedFlowGridTrajectories: Writable<number[][][][] | null> =
     writable(null);
@@ -256,6 +258,13 @@
 
     if (settings.cachedFlowMatchingGridTrajectoriesPath) {
       await loadCachedGridTrajectories(`${base}/${settings.cachedFlowMatchingGridTrajectoriesPath}`, false);
+    }
+
+    if (settings.cachedFlowMatchingDenseTrajectoriesPath) {
+      try {
+        const result = await sample.loadCachedTrajectories(`${base}/${settings.cachedFlowMatchingDenseTrajectoriesPath}`);
+        if (result) flowMatchingDenseTrajectories.set(result.trajectories);
+      } catch (e) { console.warn('Failed to load FM dense trajectories:', e); }
     }
 
     if (settings.cachedRectifiedFlowTrajectoriesPath) {
@@ -563,15 +572,21 @@
         width={figureWidth}
         height={400}
         {allTimeSamples}
-        distributionScaleFactor={1.0}
-      />
-      <div class="caption">
-        <span class="figure-number">Figure 5:</span>
-        It is easy to evaluate the density for a <span style="color: #4594e3;">simple distribution</span>,
-        but not straightforward for a <span style="color: #f17720;">complex distribution</span>.
-        Normalizing flows provide a way to compute the density of a data point under the complex
-        distribution by mapping it back to the simple distribution.
-      </div>
+        distributionScaleFactor={1.3}
+        labelFontSize={28}
+        pointRadius={3}
+        highlightRadius={7}
+        annotationFontSize={28}
+        annotationLineWidth={1.5}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 5:</span>
+          It is easy to evaluate the density for a <span style="color: #4594e3;">simple distribution</span>,
+          but not straightforward for a <span style="color: #f17720;">complex distribution</span>.
+          Normalizing flows provide a way to compute the density of a data point under the complex
+          distribution by mapping it back to the simple distribution.
+        </div>
+      </DataLikelihood>
     </div>
   {/if}
 
@@ -597,15 +612,24 @@
 
   {#if showOtherFigures}
     <div id="figure-6">
-      <ChangeOfVariables
+      <ChangeOfVariablesFigure
         width={figureWidth}
         height={350}
-      />
-      <div class="caption">
-        <span class="figure-number">Figure 6:</span>
-        The change of variables formula tracks how probability density changes
-        through an invertible transformation using the Jacobian determinant.
-      </div>
+        {allTimeSamples}
+        distributionScaleFactor={1.3}
+        pointRadius={3}
+        labelFontSize={24}
+        highlightRadius={8}
+        arrowWidth={2}
+        arrowHeadRadius={8}
+        fLabelFontSize={28}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 6:</span>
+          The change of variables formula tracks how probability density changes
+          through an invertible transformation using the Jacobian determinant.
+        </div>
+      </ChangeOfVariablesFigure>
     </div>
   {/if}
 
@@ -625,20 +649,25 @@
 
   {#if showOtherFigures}
     <div id="figure-7">
-      <ChangeOfVariablesIntro
-        width={figureWidth}
-        height={400}
+      <CNFGridJacobian
+        {flowMatchingClient}
+        cachedGridTrajectories={$flowMatchingGridTrajectories}
+        cachedDenseTrajectories={$flowMatchingDenseTrajectories}
         {allTimeSamples}
-        numFrames={5}
-        distributionScaleFactor={1.0}
-      />
-      <div class="caption">
-        <span class="figure-number">Figure 7:</span>
-        The determinant of the Jacobian
-        <Katex math={"\\left| \\det \\frac{\\partial f}{\\partial z} \\right|"} />
-        measures how the transformation <Katex math={"f"} /> locally stretches and
-        compresses space, providing geometric intuition for the change of variables formula.
-      </div>
+        sourceDistributionSamples={$sourceDistributionSamples}
+        width={figureWidth}
+        height={350}
+        labelFontSize="1em"
+        showDetLabel={false}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 7:</span>
+          The determinant of the Jacobian
+          <Katex math={"\\color{#2ecc71}{\\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"} />
+          measures how the transformation <Katex math={"f"} /> locally stretches and
+          compresses space, providing geometric intuition for the change of variables formula.
+        </div>
+      </CNFGridJacobian>
     </div>
   {/if}
 
@@ -972,6 +1001,7 @@
         allTimeSamples={$allTimeSamples}
         isTraining={$isTraining}
         reverse={true}
+        interactive={false}
       >
         <div class="caption">
           <span class="figure-number">Figure 14:</span>

@@ -84,6 +84,7 @@
   // LaTeX label styling
   export let latexLabelOffsetY = 20;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
+  export let sliderLabelSize = '1.1em';
 
   // ----------------------------------------------------------------
   // State
@@ -575,7 +576,7 @@
         ></canvas>
       </div>
       {#if showTimeSlider}
-        <TimeSlider {timeline} color="#f17720" />
+        <TimeSlider {timeline} color="#f17720" labelSize={sliderLabelSize} />
       {/if}
     </div>
   {/snippet}

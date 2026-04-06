@@ -80,6 +80,7 @@
   export let onInitialized: (() => void) | undefined = undefined;
   export let backgroundVisible: boolean = true;
   export let children: unknown = undefined;
+  export let sliderLabelSize = '1.1em';
 
   // ----------------------------------------------------------------
   // State
@@ -643,6 +644,7 @@
             dragEnabled={true}
             onInput={handleLeftTimeInput}
             hideSpacerOnMobile={true}
+            labelSize={sliderLabelSize}
           />
         </div>
         <div class="duration-label">Sampling Duration</div>
@@ -683,6 +685,7 @@
             dragEnabled={true}
             onInput={handleRightTimeInput}
             hideSpacerOnMobile={true}
+            labelSize={sliderLabelSize}
           />
         </div>
         <div class="duration-label">Sampling Duration</div>

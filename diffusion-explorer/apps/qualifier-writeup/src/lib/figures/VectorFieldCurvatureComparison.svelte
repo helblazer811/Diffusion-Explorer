@@ -47,6 +47,7 @@
   // Callbacks & misc
   export let backgroundVisible = true;
   export let children: Snippet | undefined = undefined;
+  export let sliderLabelSize = '1.1em';
 
   // ----------------------------------------------------------------
   // State
@@ -281,7 +282,7 @@
     {/snippet}
 
     {#snippet footer()}
-      <TimeSlider {timeline} color="#f17720" />
+      <TimeSlider {timeline} color="#f17720" labelSize={sliderLabelSize} />
     {/snippet}
   </DoubleFigure>
 {:else}

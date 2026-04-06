@@ -80,6 +80,7 @@
   export let showGroundTruth = true;
   export let showLegend = true;
   export let showTimeSlider = true;
+  export let sliderLabelSize = '1.1em';
 
   // Constants
   const NUM_STEPS = 16;
@@ -556,6 +557,7 @@
           step={1 / NUM_STEPS}
           discreteFill={true}
           color={approximationColor}
+          labelSize={sliderLabelSize}
         />
       {/if}
     </div>

@@ -62,6 +62,7 @@
   export let onInitialized: (() => void) | undefined = undefined;
   export let backgroundVisible: boolean = true;
   export let children: Snippet | undefined = undefined;
+  export let sliderLabelSize = '1.1em';
 
   // ----------------------------------------------------------------
   // State
@@ -472,6 +473,7 @@
       <TimeSlider
         {timeline}
         color="#f17720"
+        labelSize={sliderLabelSize}
       />
     {/snippet}
   </DoubleFigure>

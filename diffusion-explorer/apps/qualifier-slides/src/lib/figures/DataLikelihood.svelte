@@ -16,6 +16,9 @@
   export let highlightColor = '#f17720';
   export let highlightRadius = 10;
   export let highlightIndex = 15;
+  export let annotationFontSize = 46;
+  export let annotationLineWidth = 2.5;
+  export let children = undefined;
 
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
@@ -89,52 +92,54 @@
   }
 </script>
 
-<div style="position: relative; width: 100%; max-width: {width}px; margin: 0 auto; aspect-ratio: {width}/{height};">
+<figure style="width: 100%; max-width: {width}px; margin: 2rem auto; display: flex; flex-direction: column; gap: 0.75rem;">
+<div style="position: relative; width: 100%; aspect-ratio: {width}/{height};">
   <canvas
     bind:this={canvas}
     use:canvas2d.bindCanvas
     style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
   />
   {#if isInitialized}
+    {@const s = annotationFontSize / 46}
     <svg
       viewBox="0 0 {width} {height}"
       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible;"
     >
       <!-- Source annotation (below point, offset left) -->
       <line
-        x1={highlightSourcePixel[0] - 60}
-        y1={highlightSourcePixel[1] + 90}
+        x1={highlightSourcePixel[0] - 60 * s}
+        y1={highlightSourcePixel[1] + 90 * s}
         x2={highlightSourcePixel[0] - 5}
         y2={highlightSourcePixel[1] + 8}
-        stroke="#333" stroke-width="2.5" />
+        stroke="#333" stroke-width={annotationLineWidth} />
       <rect
-        x={highlightSourcePixel[0] - 250}
-        y={highlightSourcePixel[1] + 95}
-        width="470" height="55" rx="6"
+        x={highlightSourcePixel[0] - 250 * s}
+        y={highlightSourcePixel[1] + 95 * s}
+        width={470 * s} height={55 * s} rx="6"
         fill="white" fill-opacity="0.8" />
       <text
-        x={highlightSourcePixel[0] - 240}
-        y={highlightSourcePixel[1] + 135}
-        fill="#333" font-size="46" font-family="Libre Baskerville, Georgia, serif">
+        x={highlightSourcePixel[0] - 240 * s}
+        y={highlightSourcePixel[1] + 95 * s + 40 * s}
+        fill="#333" font-size={annotationFontSize} font-family="Libre Baskerville, Georgia, serif">
         Easy to evaluate p(z)
       </text>
 
       <!-- Target annotation (below point, offset right) -->
       <line
-        x1={highlightTargetPixel[0] + 60}
-        y1={highlightTargetPixel[1] + 90}
+        x1={highlightTargetPixel[0] + 60 * s}
+        y1={highlightTargetPixel[1] + 90 * s}
         x2={highlightTargetPixel[0] + 5}
         y2={highlightTargetPixel[1] + 8}
-        stroke="#333" stroke-width="2.5" />
+        stroke="#333" stroke-width={annotationLineWidth} />
       <rect
         x={highlightTargetPixel[0] - 10}
-        y={highlightTargetPixel[1] + 95}
-        width="420" height="55" rx="6"
+        y={highlightTargetPixel[1] + 95 * s}
+        width={420 * s} height={55 * s} rx="6"
         fill="white" fill-opacity="0.8" />
       <text
         x={highlightTargetPixel[0]}
-        y={highlightTargetPixel[1] + 135}
-        fill="#333" font-size="46" font-family="Libre Baskerville, Georgia, serif">
+        y={highlightTargetPixel[1] + 95 * s + 40 * s}
+        fill="#333" font-size={annotationFontSize} font-family="Libre Baskerville, Georgia, serif">
         Less straightforward
       </text>
 
@@ -142,7 +147,7 @@
       <text
         x={scales.sourceCenterPixelX}
         y={height - 30}
-        fill="#4594e3" font-size="46" font-family="Libre Baskerville, Georgia, serif"
+        fill="#4594e3" font-size={annotationFontSize} font-family="Libre Baskerville, Georgia, serif"
         text-anchor="middle">
         Multivariate Gaussian
       </text>
@@ -161,3 +166,9 @@
     </svg>
   {/if}
 </div>
+{#if children}
+  <figcaption style="font-size: 1.1rem; line-height: 1.5; color: #666; text-align: left;">
+    {@render children?.()}
+  </figcaption>
+{/if}
+</figure>

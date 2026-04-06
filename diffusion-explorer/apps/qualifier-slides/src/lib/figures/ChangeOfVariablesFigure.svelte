@@ -16,6 +16,9 @@
   export let arrowWidth = 4;
   export let highlightIndex = 15;
   export let highlightRadius = 12;
+  export let arrowHeadRadius = 12;
+  export let fLabelFontSize = 44;
+  export let children = undefined;
 
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
@@ -112,11 +115,11 @@
     ctx.fillStyle = arrowColor;
     const prevX = (tx - highlightRadius - 4) - ((tx - highlightRadius - 4) - mx) * 0.05;
     const prevY = ty - (ty - my) * 0.05;
-    drawArrowHead(ctx, prevX, prevY, tx - highlightRadius - 4, ty, 12);
+    drawArrowHead(ctx, prevX, prevY, tx - highlightRadius - 4, ty, arrowHeadRadius);
     ctx.restore();
 
     // f(z) label above arrow
-    drawMathjax(ctx, "f(z)", mx, my - 5, 44, 0, 0, { color: arrowColor }, requestRedraw);
+    drawMathjax(ctx, "f(z)", mx, my - 5, fLabelFontSize, 0, 0, { color: arrowColor }, requestRedraw);
   }
 
   export function restart() { draw(); }
@@ -129,10 +132,15 @@
   }
 </script>
 
-<div style="position: relative; width: 100%; max-width: {width}px; margin: 0 auto; aspect-ratio: {width}/{height};">
+<figure style="width: 100%; max-width: {width}px; margin: 0 auto; display: flex; flex-direction: column; gap: 0.75rem;">
   <canvas
     bind:this={canvas}
     use:canvas2d.bindCanvas
     style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
   />
-</div>
+  {#if children}
+    <figcaption style="font-size: 1.1rem; line-height: 1.5; color: #666; text-align: left;">
+      {@render children?.()}
+    </figcaption>
+  {/if}
+</figure>
