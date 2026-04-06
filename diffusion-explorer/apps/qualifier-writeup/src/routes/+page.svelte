@@ -46,7 +46,7 @@
   import DataLikelihood from "$qualifier-slides/figures/DataLikelihood.svelte";
   import CNFGridJacobian from "$qualifier-slides/figures/CNFGridJacobian.svelte";
   import StochasticInterpolation from "$qualifier-slides/figures/StochasticInterpolation.svelte";
-  import { Bibliography, HoverableReference, Katex, ArticleHeader } from "@diffusion-explorer/ui";
+  import { Bibliography, HoverableReference, Katex, ArticleHeader, AnnotatedEquation } from "@diffusion-explorer/ui";
   import { base } from "$app/paths";
 
   // ========== DATA MANAGEMENT STATE ==========
@@ -608,6 +608,7 @@
     It measures how much the transformation locally stretches or compresses volume.
     When the transformation expands a region of space, the density must decrease
     proportionally (and vice versa) so that the total probability mass is conserved.
+    It is often convenient to work with the log form:
   </p>
 
   {#if showOtherFigures}
@@ -624,6 +625,19 @@
         arrowHeadRadius={8}
         fLabelFontSize={28}
       >
+        {#snippet header()}
+          <AnnotatedEquation
+            scale={1.8}
+            verticalGap={36}
+            labelFontSize={20}
+            boxPadding={4}
+            tex={"{\\color{#4594e3} \\log p(z)} - \\log \\left| \\det \\frac{\\partial f}{\\partial z} \\right| = {\\color{#f17720} \\log p(x)}"}
+            annotations={[
+              { color: '#4594e3', label: 'Source Log-Density', side: 'above', align: 'left' },
+              { color: '#f17720', label: 'Data Log-Density', side: 'above', align: 'right' },
+            ]}
+          />
+        {/snippet}
         <div class="caption">
           <span class="figure-number">Figure 6:</span>
           The change of variables formula tracks how probability density changes
@@ -725,13 +739,16 @@
         reversed={true}
         highlightPointIndices={[15]}
         highlightColor="#3b82f6"
-      />
-      <div class="caption">
-        <span class="figure-number">Figure 9:</span>
-        To compute the likelihood of a <span style="color: #3b82f6;">data point</span>,
-        we map it backward through the inverse transformations, accumulating the
-        log-determinant of the Jacobian at each stage.
-      </div>
+        pointRadius={3}
+        highlightPointRadius={6}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 9:</span>
+          To compute the likelihood of a <span style="color: #3b82f6;">data point</span>,
+          we map it backward through the inverse transformations, accumulating the
+          log-determinant of the Jacobian at each stage.
+        </div>
+      </MaxLikelihoodTraining>
     </div>
   {/if}
 
@@ -757,13 +774,16 @@
       <MaxLikelihoodTraining
         width={figureWidth}
         height={350}
-      />
-      <div class="caption">
-        <span class="figure-number">Figure 10:</span>
-        Maximum likelihood training learns flow transformations that maximize the
-        log-likelihood of the observed data by propagating data points backward
-        through the inverse flow.
-      </div>
+        pointRadius={3}
+        highlightPointRadius={6}
+      >
+        <div class="caption">
+          <span class="figure-number">Figure 10:</span>
+          Maximum likelihood training learns flow transformations that maximize the
+          log-likelihood of the observed data by propagating data points backward
+          through the inverse flow.
+        </div>
+      </MaxLikelihoodTraining>
     </div>
   {/if}
 
@@ -855,7 +875,7 @@
     </div>
   {/if}
 
-  <h2 id="sampling-trajectories">Sampling Trajectories From a CNF</h2>
+  <h2 id="sampling-trajectories">Sampling Trajectories</h2>
   <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
   <p>
     Individual samples drawn from the source distribution <Katex math={"p_0"} />
@@ -1001,6 +1021,7 @@
         allTimeSamples={$allTimeSamples}
         isTraining={$isTraining}
         reverse={true}
+        reverseSlider={true}
         interactive={false}
       >
         <div class="caption">

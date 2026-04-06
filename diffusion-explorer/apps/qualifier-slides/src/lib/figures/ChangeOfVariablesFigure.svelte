@@ -19,6 +19,7 @@
   export let arrowHeadRadius = 12;
   export let fLabelFontSize = 44;
   export let children = undefined;
+  export let header = undefined;
 
   let canvas = null;
   const canvas2d = useCanvas2D(width, height);
@@ -119,7 +120,7 @@
     ctx.restore();
 
     // f(z) label above arrow
-    drawMathjax(ctx, "f(z)", mx, my - 5, fLabelFontSize, 0, 0, { color: arrowColor }, requestRedraw);
+    drawMathjax(ctx, "f(z)", mx, my + 15, fLabelFontSize, 0, 0, { color: arrowColor }, requestRedraw);
   }
 
   export function restart() { draw(); }
@@ -133,6 +134,9 @@
 </script>
 
 <figure style="width: 100%; max-width: {width}px; margin: 0 auto; display: flex; flex-direction: column; gap: 0.75rem;">
+  {#if header}
+    <div>{@render header?.()}</div>
+  {/if}
   <canvas
     bind:this={canvas}
     use:canvas2d.bindCanvas

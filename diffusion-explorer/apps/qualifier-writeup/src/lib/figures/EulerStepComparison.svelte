@@ -595,7 +595,8 @@
   }
 
   // Draw approximation trajectories with current animation state
-  function drawApproximation(ctx: HTMLCanvasElement | null, trajectories: number[][][], state: { segmentIndex: number; segmentProgress: number; inEndPause: boolean }) {
+  function drawApproximation(ctx: CanvasRenderingContext2D | null, trajectories: number[][][], state: { segmentIndex: number; segmentProgress: number; inEndPause: boolean }) {
+    if (!ctx) return;
     // Convert domain coordinates to pixel coordinates
     const scaledTrajectories = trajectories.map(traj =>
       traj.map(point => [xScale(point[0]), yScale(point[1])])
@@ -695,7 +696,7 @@
       segmentProgress: state.leftSegmentProgress,
       inEndPause: state.leftInEndPause
     };
-    drawApproximation(leftCanvas, leftApprox, leftState);
+    drawApproximation(leftCtx, leftApprox, leftState);
     if (state.leftInEndPause) {
       drawLeftErrorLines();
     }
@@ -710,7 +711,7 @@
       segmentProgress: state.rightSegmentProgress,
       inEndPause: state.rightInEndPause
     };
-    drawApproximation(rightCanvas, rightApprox, rightState);
+    drawApproximation(rightCtx, rightApprox, rightState);
     if (state.rightInEndPause) {
       drawRightErrorLines();
     }
