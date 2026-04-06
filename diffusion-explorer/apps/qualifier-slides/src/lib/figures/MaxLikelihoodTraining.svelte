@@ -32,6 +32,14 @@
     flowerPointIndex = 30,
     noisePointIndex = 42,
     imageSize = 120,
+    margin = undefined as number | undefined,
+    scaleFactor = undefined as number | undefined,
+    labelFontSize = undefined as number | undefined,
+    pointRadius = undefined as number | undefined,
+    arrowHeadRadius = undefined as number | undefined,
+    arrowLineWidth = undefined as number | undefined,
+    highlightPointRadius = undefined as number | undefined,
+    children = undefined as any,
   }: {
     width?: number;
     height?: number;
@@ -49,7 +57,26 @@
     flowerPointIndex?: number;
     noisePointIndex?: number;
     imageSize?: number;
+    margin?: number;
+    scaleFactor?: number;
+    labelFontSize?: number;
+    pointRadius?: number;
+    arrowHeadRadius?: number;
+    arrowLineWidth?: number;
+    highlightPointRadius?: number;
+    children?: any;
   } = $props();
+
+  // Scale all sizing proportionally to width (designed for 1720px)
+  const s = width / 1720;
+  const _margin = margin ?? Math.round(180 * s);
+  const _scaleFactor = scaleFactor ?? 70 * s;
+  const _labelFontSize = labelFontSize ?? Math.round(34 * s);
+  const _pointRadius = pointRadius ?? Math.max(2, Math.round(5 * s));
+  const _arrowHeadRadius = arrowHeadRadius ?? Math.max(4, Math.round(7 * s));
+  const _arrowLineWidth = arrowLineWidth ?? Math.max(1, 2.5 * s);
+  const _highlightPointRadius = highlightPointRadius ?? Math.max(4, Math.round(8 * s));
+  const _arrowOffset = Math.round(165 * s);
 
   // ----------------------------------------------------------------
   // State
@@ -137,17 +164,15 @@
       targetSamples.push([gx * 0.35, gy * 0.35]);
     }
 
-    const margin = 180;
-    const usableWidth = width - 2 * margin;
+    const usableWidth = width - 2 * _margin;
     const spacing = usableWidth / (numStages - 1);
     const vertCenter = height * 0.42;
-    const scaleFactor = 70;
 
     const allStages: StageData[] = [];
 
     for (let s = 0; s < numStages; s++) {
       const t = s / (numStages - 1);
-      const centerX = margin + s * spacing;
+      const centerX = _margin + s * spacing;
 
       const samples = sourceSamples.map((src, i) => {
         const tgt = targetSamples[i];
@@ -158,8 +183,8 @@
       });
 
       const pixelCoords = samples.map((p) => [
-        centerX + p[0] * scaleFactor,
-        vertCenter - p[1] * scaleFactor,
+        centerX + p[0] * _scaleFactor,
+        vertCenter - p[1] * _scaleFactor,
       ]);
 
       const contours = computeContours(samples as [number, number][], {
@@ -180,8 +205,8 @@
           ...srcStage,
           centerX: allStages[s].centerX,
           pixelCoords: srcStage.samples.map((p) => [
-            allStages[s].centerX + p[0] * scaleFactor,
-            vertCenter - p[1] * scaleFactor,
+            allStages[s].centerX + p[0] * _scaleFactor,
+            vertCenter - p[1] * _scaleFactor,
           ]),
         });
       }
@@ -266,7 +291,6 @@
     ctx.clearRect(0, 0, width, height);
 
     const vertCenter = height * 0.42;
-    const scaleFactor = 70;
 
     // Draw all stages
     for (let s = 0; s < stages.length; s++) {
@@ -277,8 +301,8 @@
       ctx.save();
       ctx.globalAlpha = opacity;
 
-      const xScale = (dataX: number) => stage.centerX + dataX * scaleFactor;
-      const yScale = (dataY: number) => vertCenter - dataY * scaleFactor;
+      const xScale = (dataX: number) => stage.centerX + dataX * _scaleFactor;
+      const yScale = (dataY: number) => vertCenter - dataY * _scaleFactor;
 
       plotContours(ctx, stage.contours, {
         xScale, yScale,
@@ -287,16 +311,16 @@
         fill: true, stroke: false,
       });
 
-      drawScatterPlot(ctx, stage.pixelCoords, 5, contourFillColor, 0.1 * opacity);
+      drawScatterPlot(ctx, stage.pixelCoords, _pointRadius, contourFillColor, 0.1 * opacity);
 
       // Labels
       const labelY = height - 30;
       if (reversed) {
-        if (s === 0) drawMathjax(ctx, `p(x)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
-        else if (s === stages.length - 1) drawMathjax(ctx, `p(z)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
+        if (s === 0) drawMathjax(ctx, `p(x)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
+        else if (s === stages.length - 1) drawMathjax(ctx, `p(z)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
       } else {
-        if (s === 0) drawMathjax(ctx, `p(z)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
-        else if (s === stages.length - 1) drawMathjax(ctx, `p(x)`, stage.centerX, labelY, 34, 0, 0, { color: '#333' }, requestRedraw);
+        if (s === 0) drawMathjax(ctx, `p(z)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
+        else if (s === stages.length - 1) drawMathjax(ctx, `p(x)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
       }
 
       ctx.restore();
@@ -309,22 +333,20 @@
         ctx.save();
         ctx.globalAlpha = 1;
         ctx.strokeStyle = '#555';
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = _arrowLineWidth;
 
         if (reversed) {
-          // Arrow left to right: f^{-1}
-          const arrowFromX = stage.centerX + 165;
-          const arrowToX = nextStage.centerX - 165;
-          drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, 7);
+          const arrowFromX = stage.centerX + _arrowOffset;
+          const arrowToX = nextStage.centerX - _arrowOffset;
+          drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, _arrowHeadRadius);
           const arrowMidX = (arrowFromX + arrowToX) / 2;
-          drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, 34, 0, 0, { color: '#555' }, requestRedraw);
+          drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
         } else {
-          // Arrow right to left: f^{-1}
-          const arrowFromX = nextStage.centerX - 165;
-          const arrowToX = stage.centerX + 165;
-          drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, 7);
+          const arrowFromX = nextStage.centerX - _arrowOffset;
+          const arrowToX = stage.centerX + _arrowOffset;
+          drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, _arrowHeadRadius);
           const arrowMidX = (arrowFromX + arrowToX) / 2;
-          drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, 34, 0, 0, { color: '#555' }, requestRedraw);
+          drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
         }
 
         ctx.restore();
@@ -363,7 +385,7 @@
         ctx.save();
         ctx.globalAlpha = ptVisible;
         ctx.beginPath();
-        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.arc(x, y, _highlightPointRadius, 0, Math.PI * 2);
         ctx.fillStyle = highlightColor;
         ctx.fill();
         ctx.strokeStyle = '#fff';
@@ -376,7 +398,7 @@
       if (showDatasetLabel) {
         const dataStageIdx = reversed ? 0 : lastIdx;
         const dataStage = stages[dataStageIdx];
-        drawMathjax(ctx, `\\mathcal{D}`, dataStage.centerX, height * 0.08, 44, 0, 0, { color: highlightColor }, requestRedraw);
+        drawMathjax(ctx, `\\mathcal{D}`, dataStage.centerX, height * 0.08, Math.round(44 * s), 0, 0, { color: highlightColor }, requestRedraw);
       }
     }
   }
@@ -407,6 +429,7 @@
     generateStageData();
     setupTimeline();
     isInitialized = true;
+    timeline.play();
   }
 
   onDestroy(() => {
@@ -488,3 +511,8 @@
     {/if}
   {/if}
 </div>
+{#if children}
+  <figcaption style="font-size: 1.1rem; line-height: 1.5; color: #666; text-align: left;">
+    {@render children()}
+  </figcaption>
+{/if}

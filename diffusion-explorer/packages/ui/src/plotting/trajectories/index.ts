@@ -52,6 +52,8 @@ export { GPUTrajectoryRenderer, type GPUTrajectoryRendererOptions } from './gpu'
 // Cache GPU renderers per canvas to avoid recreating WebGPU context each frame
 const gpuRendererCache = new WeakMap<HTMLCanvasElement, GPUTrajectoryRenderer>();
 const gpuRendererInitializing = new WeakMap<HTMLCanvasElement, Promise<GPUTrajectoryRenderer | null>>();
+// Track canvases that failed GPU init so we skip silently on subsequent calls
+const gpuFailed = new WeakSet<HTMLCanvasElement>();
 
 /**
  * Get or create a cached GPU renderer for a canvas.
@@ -160,9 +162,19 @@ export async function drawTrajectories(
   if (isCanvasElement) {
     // GPU path - canvas element passed directly (pristine, no 2D context)
     const canvas = target;
-    const cached = gpuRendererCache.get(canvas);
     const clearColor = shouldClear ? [0, 0, 0, 0] as [number, number, number, number] : undefined;
 
+    // If GPU already failed for this canvas, go straight to CPU
+    if (gpuFailed.has(canvas)) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        if (shouldClear) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        cpuDrawTrajectories(ctx, trajectories, segmentIndex, normalizedStyle);
+      }
+      return;
+    }
+
+    const cached = gpuRendererCache.get(canvas);
     if (cached) {
       // Use cached GPU renderer
       cached.draw(trajectories, segmentIndex, normalizedStyle, clearColor);
@@ -172,7 +184,13 @@ export async function drawTrajectories(
     // First call - await GPU renderer creation
     const renderer = await getGPURenderer(canvas);
     if (!renderer) {
-      console.warn('[drawTrajectories] GPU renderer creation failed');
+      // GPU unavailable - mark as failed and fall back to CPU
+      gpuFailed.add(canvas);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        if (shouldClear) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        cpuDrawTrajectories(ctx, trajectories, segmentIndex, normalizedStyle);
+      }
       return;
     }
 

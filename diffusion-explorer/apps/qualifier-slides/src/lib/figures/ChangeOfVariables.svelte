@@ -217,7 +217,7 @@
 
       drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, arrowHeadRadius);
       const arrowMidX = (arrowFromX + arrowToX) / 2;
-      drawMathjax(ctx, 'f', arrowMidX, arrowY - 20, labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
+      drawMathjax(ctx, 'f', arrowMidX, arrowY - 8, labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
 
       ctx.restore();
     }

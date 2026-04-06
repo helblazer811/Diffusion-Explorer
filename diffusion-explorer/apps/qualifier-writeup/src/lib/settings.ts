@@ -32,6 +32,7 @@ export const settings = {
   cachedFlowMatchingTrajectoriesPath: "cached_samples/flow_matching_trajectories.json" as string | null,
   cachedFlowMatchingVectorFieldPath: "cached_samples/flow_matching_vector_field.json" as string | null,
   cachedFlowMatchingGridTrajectoriesPath: "cached_samples/flow_matching_grid_trajectories.json" as string | null,
+  cachedFlowMatchingDenseTrajectoriesPath: "cached_samples/flow_matching_dense_trajectories.json" as string | null,
   cachedRectifiedFlowTrajectoriesPath: "cached_samples/rectified_flow_trajectories.json" as string | null,
   cachedRectifiedFlowGridTrajectoriesPath: "cached_samples/rectified_flow_grid_trajectories.json" as string | null,
   cachedRectifiedFlowVectorFieldPath: "cached_samples/rectified_flow_vector_field.json" as string | null,

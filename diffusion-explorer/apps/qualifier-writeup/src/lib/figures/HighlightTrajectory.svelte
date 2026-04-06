@@ -55,6 +55,8 @@
 
   // Reverse mode (animate trajectory from target → source)
   export let reverse = false;
+  // Reverse the slider direction (show t=1→t=0 instead of t=0→t=1)
+  export let reverseSlider = false;
 
   // Distribution scale
   export let distributionScaleFactor: number | undefined = undefined;
@@ -91,6 +93,9 @@
 
   // PathlineAnimation instance
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
+
+  // Current animation time for reverse slider display
+  let currentDisplayTime: number = 0;
 
   // Cached values for clip closure
   let cachedNumTimesteps = 1;
@@ -284,6 +289,7 @@
 
     // Register tick callback
     timeline.onTick((_t, state) => {
+      currentDisplayTime = reverseSlider ? 1 - _t : _t;
       draw(state);
     });
   }
@@ -576,6 +582,10 @@
           {timeline}
           color={settings.stylingSettings.trajectory.color}
           labelSize={sliderLabelSize}
+          minLabel={reverseSlider ? 't=1' : 't=0'}
+          maxLabel={reverseSlider ? 't=0' : 't=1'}
+          displayTime={reverseSlider ? currentDisplayTime : null}
+          onSeekByDisplayTime={reverseSlider ? (t) => { if (timeline) timeline.seek(1 - t); } : null}
         />
       {/if}
     </div>
