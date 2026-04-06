@@ -762,7 +762,6 @@
   <!-- ============================================================ -->
   <h1 id="continuous-normalizing-flows" class="section-heading">Continuous Normalizing Flows</h1>
 
-  <h2 id="discrete-to-continuous">From Discrete to Continuous</h2>
   <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
   <p>
     Rather than composing a fixed number of discrete transformations, continuous
@@ -862,7 +861,7 @@
     </div>
   {/if}
 
-  <h2 id="velocity-fields">CNFs Learn to Represent Velocity Fields</h2>
+  <h2 id="velocity-fields">CNFs Learn Velocity Fields</h2>
   <p>
     Rather than directly modeling the flow
     <Katex math={"\\psi_t(x)"} />, continuous normalizing flows model a
@@ -922,7 +921,7 @@
     </EulerStepDemo>
   {/if}
 
-  <h2 id="efficient-likelihood">CNFs Allow More Efficient Training</h2>
+  <h2 id="training-efficiency">Training Efficiency</h2>
   <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
   <p>
     A key advantage of the continuous-time formulation is that it enables more
@@ -943,11 +942,8 @@
     normalizing flows with unrestricted architectures would be computationally
     prohibitive.
   </p>
-
-  <h2 id="training-expensive">Training is Still Expensive</h2>
-  <p style="color: red; font-style: italic;">[Draft content — to be revised]</p>
   <p>
-    Despite the efficiency gains from using the trace, likelihood-based training of
+    Despite this efficiency gain, likelihood-based training of
     CNFs still has a significant drawback: it requires solving an ODE at
     <em>every training step</em>. To compute the log-likelihood of a data point, we
     must integrate the trace of the Jacobian along the entire trajectory from
@@ -1257,7 +1253,7 @@
     schedules.
   </p>
 
-  <h1 id="the-problem" class="section-heading">The Problem</h1>
+  <h1 id="curvature-speed" class="section-heading">Curvature is the Enemy of Speed</h1>
 
   <p>
     With the fundamentals of flow models and flow matching established, we can
@@ -1307,8 +1303,6 @@
     is this an issue? Answering the latter question—why curvature is a problem—is
     more straightforward: the answer is speed.
   </p>
-
-  <h2 id="curvature">Curvature is the Enemy of Speed</h2>
 
   <p>
     When drawing new samples from a flow model we perform numerical integration

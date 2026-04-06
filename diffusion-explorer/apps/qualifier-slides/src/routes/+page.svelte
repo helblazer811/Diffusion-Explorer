@@ -47,7 +47,7 @@
   import IndependentCouplingAnimated from '$lib/figures/IndependentCouplingAnimated.svelte';
   import CouplingPairsAnimated from '$lib/figures/CouplingPairsAnimated.svelte';
   import FlowInvertibilitySimple from '$lib/figures/FlowInvertibilitySimple.svelte';
-  import ChangeOfVariablesIntro from '$lib/figures/ChangeOfVariablesIntro.svelte';
+  import CNFGridJacobian from '$lib/figures/CNFGridJacobian.svelte';
   import FlowerImageDistribution from '$lib/figures/FlowerImageDistribution.svelte';
   import TransformingNoiseIntoData from '$lib/figures/TransformingNoiseIntoData.svelte';
   import DiffusionVsFlow from '$lib/figures/DiffusionVsFlow.svelte';
@@ -72,7 +72,7 @@
   let encodeFigure: MaxLikelihoodTraining;
   let invertibilityFigure: FlowInvertibilitySimple;
   let massFigure: FlowInvertibilitySimple;
-  let jacobianFigure: ChangeOfVariablesIntro;
+  let gridJacobianFigure: CNFGridJacobian;
   let trajFigure: HighlightTrajectory;
 
   // Provide reveal instance to Slide components via context
@@ -97,6 +97,7 @@
   let vectorFieldData: any = null;
   let rectifiedFlowVectorFieldData: any = null;
   let flowMatchingGridTrajectories: number[][][] | null = null;
+  let flowMatchingDenseTrajectories: number[][][] | null = null;
   let rectifiedFlowGridTrajectories: number[][][][] | null = null;
   let otCouplingData: any = null;
 
@@ -202,6 +203,14 @@
         flowMatchingGridTrajectories = result.trajectories;
       }
     } catch (e) { console.warn('Failed to load FM grid trajectories:', e); }
+
+    // Load dense flow matching trajectories (for CNF grid+Jacobian slide)
+    try {
+      const result = await loadCachedTraj(`${base}/${settings.rf.cachedFlowMatchingDenseTrajectoriesPath}`);
+      if (result) {
+        flowMatchingDenseTrajectories = result.trajectories;
+      }
+    } catch (e) { console.warn('Failed to load FM dense trajectories:', e); }
 
     // Load rectified flow grid trajectories
     try {
@@ -500,20 +509,21 @@
     </section>
 
     <!-- Slide: Jacobian Measures Local Volume Change -->
-    <Slide figure={jacobianFigure}>
+    <Slide figure={gridJacobianFigure}>
       <h2 class="slide-title">Jacobian Measures Local Volume Change</h2>
       <p style="margin-top: 0.5em;">
-        Determinant of the Jacobian <Katex math={"\\color{#2ecc71}{\\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"} /> measures how <Katex math={"f"} /> locally stretches and compresses space.
+        The Jacobian <Katex math={"\\color{#2ecc71}{\\frac{\\partial f}{\\partial z}}"} /> describes how <Katex math={"f"} /> locally stretches and compresses space. Its determinant equals the area of the transformed parallelogram.
       </p>
-      <div class="figure-container" style="margin-top: 1.5em;">
+      <div class="figure-container" style="margin-top: 1em;">
         {#if dataLoaded}
-          <ChangeOfVariablesIntro
-            bind:this={jacobianFigure}
-            width={1800}
-            height={800}
+          <CNFGridJacobian
+            bind:this={gridJacobianFigure}
+            {flowMatchingClient}
+            cachedGridTrajectories={flowMatchingGridTrajectories}
+            cachedDenseTrajectories={flowMatchingDenseTrajectories}
             {allTimeSamples}
-            numFrames={5}
-            distributionScaleFactor={1.0}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
           />
         {/if}
       </div>

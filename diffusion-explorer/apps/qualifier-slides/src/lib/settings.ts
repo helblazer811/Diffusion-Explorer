@@ -7,6 +7,7 @@ export const settings = {
     cachedFlowMatchingTrajectoriesPath: 'rf_cached_samples/flow_matching_trajectories.json',
     cachedFlowMatchingVectorFieldPath: 'rf_cached_samples/flow_matching_vector_field.json',
     cachedFlowMatchingGridTrajectoriesPath: 'rf_cached_samples/flow_matching_grid_trajectories.json',
+    cachedFlowMatchingDenseTrajectoriesPath: 'rf_cached_samples/flow_matching_dense_trajectories.json',
     cachedRectifiedFlowTrajectoriesPath: 'rf_cached_samples/rectified_flow_trajectories.json',
     cachedRectifiedFlowGridTrajectoriesPath: 'rf_cached_samples/rectified_flow_grid_trajectories.json',
     cachedRectifiedFlowVectorFieldPath: 'rf_cached_samples/rectified_flow_vector_field.json',

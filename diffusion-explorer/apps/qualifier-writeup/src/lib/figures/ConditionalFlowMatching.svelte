@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { writable } from "svelte/store";
   import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, mathjaxInitialized } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import type { Snippet } from "svelte";
@@ -93,6 +94,9 @@
     targetMeanX: number;
   } | null = null;
   let isInitialized: boolean = false;
+
+  // Visibility tracking (from Figure's IntersectionObserver)
+  let figureIsActive = writable(false);
 
   // Pre-computed pixel coordinates
   let sourcePixelCoords: number[][] = [];
@@ -315,9 +319,14 @@
   $: if (isInitialized) {
     mathjaxInitialized.then(() => draw());
   }
+
+  // Redraw when figure becomes visible (handles Reveal.js slide changes and scroll)
+  $: if ($figureIsActive && isInitialized) {
+    draw();
+  }
 </script>
 
-<Figure {caption} {backgroundVisible}>
+<Figure {caption} {backgroundVisible} isActive={figureIsActive}>
   {#snippet children()}
     <div style="width:100%;max-width:{width}px;">
       <canvas
