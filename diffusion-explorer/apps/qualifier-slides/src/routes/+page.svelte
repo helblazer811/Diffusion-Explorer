@@ -1149,7 +1149,7 @@
       <p style="margin-top: 0.5em;">
         We train the velocity field <Katex math={"v_\\theta"} /> to match straight paths — why does this produce curvature?
       </p>
-      <div class="figure-container" style="margin-top: 0.3em; max-height: 650px; overflow: hidden;">
+      <div class="figure-container" style="margin-top: 1em; max-height: 650px; overflow: hidden;">
         {#if dataLoaded}
           <ConditionalFlowMatching
             width={1800}
@@ -1161,7 +1161,8 @@
             yShiftFactor={-0.8}
             sourceCenterX={0.25}
             targetCenterX={0.75}
-            x1Pixel={{ x: 1600, y: 350 }}
+            x0Pixel={{ x: 350, y: 250 }}
+            x1Pixel={{ x: 1450, y: 350 }}
             vectorScale={350}
             vectorWidth={4}
             lineWidth={4}
@@ -1211,7 +1212,7 @@
     <section>
       <h2 class="slide-title">The Naive Independent Coupling</h2>
       <p style="margin-top: 0.5em;">
-        The simplest choice of coupling is the <em>independent coupling</em>, where <Katex math={"\\pi(X_0)"} /> and <Katex math={"\\pi(X_1)"} /> are independent of each other.
+        The simplest choice of coupling is the <em>independent coupling</em>, where <Katex math={"\\pi({\\color{#3b82f6}{X_0}})"} /> and <Katex math={"\\pi({\\color{#f17720}{X_1}})"} /> are independent of each other.
       </p>
       <div class="figure-container" style="margin-top: 1.5em;">
         {#if dataLoaded}
@@ -1224,8 +1225,8 @@
             numScatterSamples={150}
             numLinesToDraw={100}
             useLatexLabels={true}
-            sourceLabel={"\\pi(X_0)"}
-            targetLabel={"\\pi(X_1)"}
+            sourceLabel={"\\pi({\\color{#3b82f6}{X_0}})"}
+            targetLabel={"\\pi({\\color{#f17720}{X_1}})"}
             labelFontSize={50}
             sourceCenterX={0.2}
             targetCenterX={0.8}
@@ -1243,7 +1244,7 @@
     <section>
       <h2 class="slide-title">Our Paths Crossed at the Wrong Time</h2>
       <p style="margin-top: 0.5em;">
-        The velocity field <Katex math={"v_t^\\theta"} /> cannot accurately resolve conflicting paths — the best it can do is average. This averaging leads to curved trajectories.
+        The velocity field <Katex math={"\\color{#22c55e}{v_t^\\theta}"} /> cannot accurately resolve conflicting paths — the best it can do is average. This averaging leads to curved trajectories.
       </p>
       <div class="figure-container" style="margin-top: 2.5em;">
         {#if dataLoaded}
@@ -1252,12 +1253,13 @@
             height={800}
             sourceCenterX={0.2}
             targetCenterX={0.8}
+            arrowHeadSize={10}
             latexFontSize={40}
             labelFontSize={50}
             labelFontFamily="Libre Baskerville, Georgia, serif"
-            meanArrowLabelOffset={{ x: 60, y: -18 }}
-            topArrowLabelOffset={{ x: -55, y: -60 }}
-            bottomArrowLabelOffset={{ x: -55, y: 20 }}
+            meanArrowLabelOffset={{ x: 220, y: -18 }}
+            topArrowLabelOffset={{ x: -55, y: 25 }}
+            bottomArrowLabelOffset={{ x: -55, y: -15 }}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             backgroundVisible={false}
@@ -1267,6 +1269,31 @@
       <aside class="notes">
         Intersecting paths create conflicts for the velocity field, which must average, producing curved trajectories.
       </aside>
+    </section>
+
+    <!-- Slide: Ambiguities Lead to Curved Trajectories -->
+    <section>
+      <h2 class="slide-title">Ambiguities Lead to Curved Trajectories</h2>
+      <div class="figure-container" style="margin-top: 1.5em;">
+        {#if dataLoaded}
+          <ChangeOfVariablesAnnotated
+            flowMatchingClient={flowMatchingClient}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            allTimeSamples={$allTimeSamples}
+            width={1600}
+            height={700}
+            distributionPointRadius={8}
+            trajectoryStrokeWidth={5}
+            trajectoryEndpointRadius={5}
+            trajectoryColor="#f17720"
+            labelFontSize={50}
+            sourceCenterX={0.2}
+            targetCenterX={0.8}
+            playingByDefault={true}
+          />
+        {/if}
+      </div>
     </section>
 
     <!-- Slide: Rectified Flows -->
@@ -1353,7 +1380,7 @@
             playingByDefault={true}
             backgroundVisible={false}
             showTimeSlider={false}
-            labelFontSize={40}
+            labelFontSize={50}
             trajectoryStrokeWidth={4}
           />
         {/if}
