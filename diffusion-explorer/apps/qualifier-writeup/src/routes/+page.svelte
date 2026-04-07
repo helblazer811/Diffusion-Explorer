@@ -76,6 +76,13 @@
   // OT coupling data store
   const otCouplingData: Writable<OTCouplingData | null> = writable(null);
 
+  // Euler trajectory caches (for EulerStepDemo and EulerStepComparison)
+  let eulerFmGt64: number[][][] | null = null;
+  let eulerFmApprox16: number[][][] | null = null;
+  let eulerRfGt64: number[][][] | null = null;
+  let eulerFmApproxSteps: Record<number, number[][][]> | null = null;
+  let eulerRfApproxSteps: Record<number, number[][][]> | null = null;
+
   // Defer other figures until first frame renders
   let showOtherFigures = false;
 
@@ -282,6 +289,20 @@
     if (settings.cachedOTCouplingPath) {
       await loadCachedOTCoupling(`${base}/${settings.cachedOTCouplingPath}`);
     }
+
+    // Load Euler trajectory caches
+    async function fetchJson(p: string | null) {
+      if (!p) return null;
+      try {
+        const res = await fetch(`${base}/${p}`);
+        return res.ok ? await res.json() : null;
+      } catch { return null; }
+    }
+    eulerFmGt64 = await fetchJson(settings.cachedEulerFmGt64Path);
+    eulerFmApprox16 = await fetchJson(settings.cachedEulerFmApprox16Path);
+    eulerRfGt64 = await fetchJson(settings.cachedEulerRfGt64Path);
+    eulerFmApproxSteps = await fetchJson(settings.cachedEulerFmApproxStepsPath);
+    eulerRfApproxSteps = await fetchJson(settings.cachedEulerRfApproxStepsPath);
 
     // Load bibliography (citations will be collected after showOtherFigures becomes true)
     try {
@@ -961,6 +982,8 @@
       showGroundTruth={false}
       showLegend={false}
       showArrowHeads={true}
+      cachedGroundTruth={eulerFmGt64}
+      cachedApproximation={eulerFmApprox16}
     >
       <div class="caption">
         <span class="figure-number">Figure 13:</span>
@@ -1703,6 +1726,10 @@
         targetDistribution={$targetDistributionSamples}
         backgroundVisible={false}
         maxUserTrajectories={1}
+        cachedFmGroundTruth={eulerFmGt64}
+        cachedRfGroundTruth={eulerRfGt64}
+        cachedFmApproxSteps={eulerFmApproxSteps}
+        cachedRfApproxSteps={eulerRfApproxSteps}
       >
         <div class="caption">
           <span class="figure-number">Figure 26:</span>
@@ -1760,12 +1787,10 @@
 <h1 id="cite" class="section-heading">How to Cite</h1>
 <div class="cite-section">
   <p>If you found this explainer helpful, please consider citing it:</p>
-  <pre><code
-      >@article{"{"}helbling2026flowsurvey,
-title = {"{"}A Visual Survey of Flow-Based Generative Models{"}"},
-author = {"{"}Helbling, Alec{"}"},
-year = {"{"}2026{"}"},
-url = {"{"}https://alechelbling.com/qualifier-writeup{"}"}
-{"}"}</code
-    ></pre>
+  <pre style="overflow-x: auto; max-width: 100%;"><code>{@html `@article&#123;helbling2026flowsurvey,
+  title   = &#123;A Visual Survey of Flow-Based Generative Models&#125;,
+  author  = &#123;Helbling, Alec&#125;,
+  year    = &#123;2026&#125;,
+  url     = &#123;https://alechelbling.com/qualifier-writeup&#125;
+&#125;`}</code></pre>
 </div>

@@ -74,6 +74,12 @@
   export let backgroundVisible: boolean = true;
   export let children: Snippet | undefined = undefined;
 
+  // Cached Euler trajectories (skip model sampling if provided)
+  export let cachedFmGroundTruth: number[][][] | null = null; // [steps][points][2]
+  export let cachedRfGroundTruth: number[][][] | null = null;
+  export let cachedFmApproxSteps: Record<number, number[][][]> | null = null;
+  export let cachedRfApproxSteps: Record<number, number[][][]> | null = null;
+
   // ===== CONSTANTS =====
 
   const stepValues = [1, 2, 4, 8, 16];
@@ -313,6 +319,17 @@
     }
   }
 
+  // Convert cached [steps][points][2] → per-point trajectory arrays [[startPt, step1, ...]]
+  function cachedToTrajectories(cached: number[][][], startPoints: number[][]): number[][][] {
+    return startPoints.map((pt, i) => {
+      const traj = [pt];
+      for (let s = 0; s < cached.length; s++) {
+        traj.push([cached[s][i][0], cached[s][i][1]]);
+      }
+      return traj;
+    });
+  }
+
   // Compute all trajectories for all start points
   // Streams all 4 requests in parallel for immediate feedback
   function computeAllTrajectories() {
@@ -333,6 +350,27 @@
     isLoading = false;
     setupTimeline();
     startApproxAnimation();
+
+    // Use cached data if available and using default start points
+    const usingDefaults = userStartPoints === defaultStartPoints ||
+      (userStartPoints.length === defaultStartPoints.length &&
+       userStartPoints.every((p, i) => p[0] === defaultStartPoints[i][0] && p[1] === defaultStartPoints[i][1]));
+
+    if (usingDefaults && cachedFmGroundTruth && cachedRfGroundTruth && cachedFmApproxSteps && cachedRfApproxSteps) {
+      flowMatchingGroundTruths = cachedToTrajectories(cachedFmGroundTruth, userStartPoints);
+      rectifiedFlowGroundTruths = cachedToTrajectories(cachedRfGroundTruth, userStartPoints);
+      // Load all step counts from cache
+      for (const steps of stepValues) {
+        if (cachedFmApproxSteps[steps] && cachedRfApproxSteps[steps]) {
+          flowMatchingTrajectories[steps] = cachedToTrajectories(cachedFmApproxSteps[steps], userStartPoints);
+          rectifiedFlowTrajectories[steps] = cachedToTrajectories(cachedRfApproxSteps[steps], userStartPoints);
+        }
+      }
+      return;
+    }
+
+    // Fall back to live sampling
+    if (!flowMatchingClient || !rectifiedFlowClient) return;
 
     let completedCount = 0;
     const checkComplete = () => {
@@ -386,7 +424,6 @@
         flowMatchingTrajectories[currentSteps] = flowMatchingTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
-        // Timeline tick callback will pick up updated trajectory data automatically
       }
     );
     fmApproxRequestId = fmApproxResult.requestId;
@@ -404,7 +441,6 @@
         rectifiedFlowTrajectories[currentSteps] = rectifiedFlowTrajectories[currentSteps].map((traj, i) => [
           ...traj, [x_t[i][0], x_t[i][1]]
         ]);
-        // Timeline tick callback will pick up updated trajectory data automatically
       }
     );
     rfApproxRequestId = rfApproxResult.requestId;
