@@ -389,10 +389,10 @@
 
     // Drop shadow
     ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
-    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(46, 204, 113, 0.35)';
+    ctx.shadowBlur = 20;
     ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 2;
+    ctx.shadowOffsetY = 4;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.roundRect(rX, rY, rSide, rSide, cornerRadius);

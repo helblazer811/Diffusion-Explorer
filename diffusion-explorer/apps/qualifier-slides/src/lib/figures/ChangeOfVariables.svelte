@@ -292,7 +292,7 @@
   });
 </script>
 
-<figure style="width: {width}px; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
+<figure style="width: {width}px; max-width: 100%; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
   <canvas
     bind:this={canvas}
     use:canvas2d.bindCanvas

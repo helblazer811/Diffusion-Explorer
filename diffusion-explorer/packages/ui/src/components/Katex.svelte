@@ -32,6 +32,12 @@
 		display: block;
 		width: 100%;
 		max-width: 100%;
+		overflow: hidden;
+	}
+
+	.katex-display-wrapper :global(.katex-display) {
+		margin: 0;
+		overflow: hidden !important;
 	}
 
 	@media (max-width: 600px) {
