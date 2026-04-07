@@ -22,13 +22,15 @@ interface CacheConfig {
   outputPath: string; // Relative path for output JSON
   numSamples: number;
   numSteps: number;
-  type: 'random' | 'grid' | 'vector_field';
+  type: 'random' | 'grid' | 'vector_field' | 'euler_from_points';
   isRectifiedFlow?: boolean; // If true, saves in RectifiedFlowData format
   gridResolution?: number;
   domainRange?: DomainRange;
   dim?: number;
   hidden?: number;
   numTimeSteps?: number; // For vector field: number of time steps to evaluate
+  initialPoints?: number[][]; // For euler_from_points
+  stepCounts?: number[]; // For euler_from_points: generate trajectories at multiple step counts
 }
 
 // Cache configurations
@@ -97,6 +99,59 @@ const CACHES: CacheConfig[] = [
     gridResolution: 9,
     domainRange: { xMin: -1.7, xMax: 1.7, yMin: -1.7, yMax: 1.7 },
     numTimeSteps: 20,
+    dim: 2,
+    hidden: 64,
+  },
+  // Euler trajectory caches for EulerStepDemo and EulerStepComparison
+  {
+    modelPath: 'static/models/flow_matching_model.json',
+    outputPath: 'static/cached_samples/euler_fm_gt_64.json',
+    numSamples: 1,
+    numSteps: 64,
+    type: 'euler_from_points',
+    initialPoints: [[-1.5, -0.2]],
+    dim: 2,
+    hidden: 64,
+  },
+  {
+    modelPath: 'static/models/flow_matching_model.json',
+    outputPath: 'static/cached_samples/euler_fm_approx_16.json',
+    numSamples: 1,
+    numSteps: 16,
+    type: 'euler_from_points',
+    initialPoints: [[-1.5, -0.2]],
+    dim: 2,
+    hidden: 64,
+  },
+  {
+    modelPath: 'static/models/rectified_flow_model.json',
+    outputPath: 'static/cached_samples/euler_rf_gt_64.json',
+    numSamples: 1,
+    numSteps: 64,
+    type: 'euler_from_points',
+    initialPoints: [[-1.5, -0.2]],
+    dim: 2,
+    hidden: 64,
+  },
+  {
+    modelPath: 'static/models/flow_matching_model.json',
+    outputPath: 'static/cached_samples/euler_fm_approx_steps.json',
+    numSamples: 1,
+    numSteps: 0,
+    type: 'euler_from_points',
+    initialPoints: [[-1.5, -0.2]],
+    stepCounts: [1, 2, 4, 8, 16],
+    dim: 2,
+    hidden: 64,
+  },
+  {
+    modelPath: 'static/models/rectified_flow_model.json',
+    outputPath: 'static/cached_samples/euler_rf_approx_steps.json',
+    numSamples: 1,
+    numSteps: 0,
+    type: 'euler_from_points',
+    initialPoints: [[-1.5, -0.2]],
+    stepCounts: [1, 2, 4, 8, 16],
     dim: 2,
     hidden: 64,
   },
@@ -269,6 +324,54 @@ async function generateCache(config: CacheConfig): Promise<void> {
     console.log(`  Format: VectorFieldData`);
     console.log(`  Saved to: ${config.outputPath}`);
     console.log(`  Time: ${formatDuration(Date.now() - startTime)}`);
+
+    tfModel.dispose();
+    return;
+  }
+
+  // Handle Euler from fixed initial points
+  if (config.type === 'euler_from_points') {
+    const points = config.initialPoints!;
+
+    if (config.stepCounts) {
+      // Multiple step counts → save as { stepCount: trajectoryData }
+      console.log(`  Points: ${JSON.stringify(points)}`);
+      console.log(`  Step counts: ${config.stepCounts.join(', ')}`);
+      const result: Record<number, number[][][]> = {};
+
+      for (const steps of config.stepCounts) {
+        const pointsTensor = tf.tensor2d(points);
+        const traj = await model.sample_from_initial_points(
+          pointsTensor, steps, { scheduler: 'euler' }
+        );
+        if (traj) {
+          result[steps] = traj.arraySync() as number[][][];
+          traj.dispose();
+        }
+        pointsTensor.dispose();
+      }
+
+      fs.writeFileSync(outputFile, JSON.stringify(result));
+      console.log(`  Format: { stepCount: [steps+1][points][2] }`);
+      console.log(`  Saved to: ${config.outputPath}`);
+      console.log(`  Time: ${formatDuration(Date.now() - startTime)}`);
+    } else {
+      // Single step count
+      console.log(`  Points: ${JSON.stringify(points)}, Steps: ${config.numSteps}`);
+      const pointsTensor = tf.tensor2d(points);
+      const traj = await model.sample_from_initial_points(
+        pointsTensor, config.numSteps, { scheduler: 'euler' }
+      );
+      if (traj) {
+        const rawData = traj.arraySync();
+        fs.writeFileSync(outputFile, JSON.stringify(rawData));
+        console.log(`  Shape: [${traj.shape.join(', ')}]`);
+        console.log(`  Saved to: ${config.outputPath}`);
+        console.log(`  Time: ${formatDuration(Date.now() - startTime)}`);
+        traj.dispose();
+      }
+      pointsTensor.dispose();
+    }
 
     tfModel.dispose();
     return;

@@ -82,6 +82,10 @@
   export let showTimeSlider = true;
   export let sliderLabelSize = '1.1em';
 
+  // Cached Euler trajectories (skip model sampling if provided)
+  export let cachedGroundTruth: number[][][] | null = null; // [steps][points][2]
+  export let cachedApproximation: number[][][] | null = null;
+
   // Constants
   const NUM_STEPS = 16;
   const GROUND_TRUTH_STEPS = 64;
@@ -212,6 +216,17 @@
     computeAllTrajectories();
   }
 
+  // Convert cached [steps][points][2] → per-point trajectory arrays [[startPt, step1, step2, ...]]
+  function cachedToTrajectories(cached: number[][][], startPoints: number[][]): number[][][] {
+    return startPoints.map((pt, i) => {
+      const traj = [pt];
+      for (let s = 0; s < cached.length; s++) {
+        traj.push([cached[s][i][0], cached[s][i][1]]);
+      }
+      return traj;
+    });
+  }
+
   function computeAllTrajectories() {
     cancelAllRequests();
 
@@ -225,6 +240,21 @@
     resetAnimation();
     draw(timeline!.initialState);
     startAnimation();
+
+    // Use cached data if available and using default start points
+    const usingDefaults = userStartPoints === defaultStartPoints ||
+      (userStartPoints.length === defaultStartPoints.length &&
+       userStartPoints.every((p, i) => p[0] === defaultStartPoints[i][0] && p[1] === defaultStartPoints[i][1]));
+
+    if (usingDefaults && cachedGroundTruth && cachedApproximation) {
+      groundTruthTrajectories = cachedToTrajectories(cachedGroundTruth, userStartPoints);
+      approximationTrajectories = cachedToTrajectories(cachedApproximation, userStartPoints);
+      isStreamingTrajectory = false;
+      return;
+    }
+
+    // Fall back to live sampling
+    if (!flowMatchingClient) return;
 
     let completedCount = 0;
     const checkComplete = () => {

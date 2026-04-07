@@ -39,6 +39,13 @@ export const settings = {
   cachedRecursiveRectifiedFlowTrajectoriesPath: null, //"cached_samples/recursive_rectified_flow_grid_trajectories.json" as string | null,
   cachedOTCouplingPath: "cached_samples/ot_coupling.json" as string | null,
 
+  // Euler trajectory caches (for EulerStepDemo and EulerStepComparison)
+  cachedEulerFmGt64Path: "cached_samples/euler_fm_gt_64.json" as string | null,
+  cachedEulerFmApprox16Path: "cached_samples/euler_fm_approx_16.json" as string | null,
+  cachedEulerRfGt64Path: "cached_samples/euler_rf_gt_64.json" as string | null,
+  cachedEulerFmApproxStepsPath: "cached_samples/euler_fm_approx_steps.json" as string | null,
+  cachedEulerRfApproxStepsPath: "cached_samples/euler_rf_approx_steps.json" as string | null,
+
   // Worker URL (bundled to static/workers/ for production)
   // Note: These are relative paths. The page component prefixes with base when creating clients.
   flowModelWorkerUrl: '/workers/flow_model.worker.js',
