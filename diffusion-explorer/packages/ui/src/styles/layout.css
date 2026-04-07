@@ -114,6 +114,13 @@
   font-weight: 600;
 }
 
+.figure-caption {
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: #666;
+  text-align: left;
+}
+
 /* ==========================================================================
    Article Footer (Acknowledgements, References, Citations)
    ========================================================================== */

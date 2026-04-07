@@ -26,28 +26,24 @@
       activeId = headings[0].id;
     }
 
-    // Set up IntersectionObserver for active section tracking
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Don't update during programmatic smooth scrolling
-        if (isScrolling) return;
-
-        // Find all currently visible headings
-        const visibleEntries = entries.filter(entry => entry.isIntersecting);
-
-        if (visibleEntries.length > 0) {
-          // Sort by position and pick the topmost one
-          visibleEntries.sort((a, b) => {
-            return a.boundingClientRect.top - b.boundingClientRect.top;
-          });
-          activeId = visibleEntries[0].target.id;
+    // Set up scroll-based active section tracking
+    function updateActiveHeading() {
+      if (isScrolling) return;
+      const threshold = window.innerHeight * 0.25;
+      let bestId = headings[0]?.id ?? '';
+      for (const heading of headings) {
+        const el = document.getElementById(heading.id);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= threshold) {
+          bestId = heading.id;
         }
-      },
-      { rootMargin: '-20% 0% -60% 0%', threshold: 0 }
-    );
+      }
+      activeId = bestId;
+    }
 
-    elements.forEach(el => observer.observe(el));
-    return () => observer.disconnect();
+    window.addEventListener('scroll', updateActiveHeading, { passive: true });
+    updateActiveHeading();
+    return () => window.removeEventListener('scroll', updateActiveHeading);
   });
 
   function scrollTo(id) {

@@ -60,17 +60,24 @@
 
   let resizeTimer = null;
   let revealHandlers = [];
+  let scaleDown = 1; // dynamic scale to fit within parent width
+  let insideReveal = false; // skip scaleDown when Reveal.js handles scaling
 
   onMount(async () => {
+    // Detect Reveal.js early — it handles viewport scaling, so skip scaleDown
+    if (typeof window !== 'undefined' && window.Reveal) {
+      insideReveal = true;
+    }
+
     await loadMathJax();
     mounted = true;
     await renderAndAnnotate();
 
     resizeObserver = new ResizeObserver(() => {
       if (resizeTimer) clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => drawAnnotations(), 300);
+      resizeTimer = setTimeout(() => { updateScaleDown(); drawAnnotations(); }, 300);
     });
-    resizeObserver.observe(container);
+    resizeObserver.observe(container.parentElement || container);
 
     // Listen to Reveal.js lifecycle events for overview mode transitions
     if (typeof window !== 'undefined' && window.Reveal) {
@@ -143,7 +150,39 @@
     container.style.paddingRight = '0px';
 
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    updateScaleDown();
     drawAnnotations();
+  }
+
+  let measuring = false;
+  function updateScaleDown() {
+    if (!container || measuring) return;
+    // Reveal.js already scales the entire slide to fit the viewport —
+    // applying our own scaleDown fights with it and causes equations to
+    // overflow on mobile or disappear when switching back to desktop.
+    if (insideReveal) {
+      scaleDown = 1;
+      container.style.transform = 'none';
+      return;
+    }
+    measuring = true;
+    // Temporarily reset scale to measure natural width
+    const prevTransform = container.style.transform;
+    container.style.transform = 'none';
+    const parent = container.parentElement;
+    if (!parent) { container.style.transform = prevTransform; measuring = false; return; }
+    const parentWidth = parent.clientWidth;
+    const naturalWidth = container.scrollWidth;
+    const newScale = (naturalWidth > parentWidth && parentWidth > 0)
+      ? parentWidth / naturalWidth
+      : 1;
+    // Only update if meaningfully different
+    if (Math.abs(newScale - scaleDown) > 0.01) {
+      scaleDown = newScale;
+    }
+    container.style.transform = scaleDown < 1 ? `scale(${scaleDown})` : 'none';
+    container.style.transformOrigin = 'center top';
+    measuring = false;
   }
 
   function clearOverlay() {
@@ -421,7 +460,7 @@
   }
 </script>
 
-<div class="eq-wrap" bind:this={container} style="font-size: {scale}em;">
+<div class="eq-wrap" bind:this={container} style="font-size: {scale}em; transform: {scaleDown < 1 ? `scale(${scaleDown})` : 'none'}; transform-origin: center top;">
   <svg bind:this={svgOverlay} class="annot-overlay" aria-hidden="true"></svg>
 
   <div class="eq-content" bind:this={eqDiv}></div>
@@ -433,6 +472,7 @@
     display: block;
     margin: 0 auto;
     width: fit-content;
+    max-width: 100%;
     padding: 8px;
     overflow: visible;
   }

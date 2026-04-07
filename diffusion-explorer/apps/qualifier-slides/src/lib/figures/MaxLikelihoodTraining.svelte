@@ -437,7 +437,7 @@
   });
 </script>
 
-<div style="width: {width}px; position: relative;">
+<div style="width: {width}px; max-width: 100%; position: relative;">
   <canvas
     bind:this={canvas}
     use:canvas2d.bindCanvas

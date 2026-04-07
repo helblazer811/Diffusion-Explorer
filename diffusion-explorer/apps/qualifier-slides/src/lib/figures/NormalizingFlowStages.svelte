@@ -322,7 +322,7 @@
   });
 </script>
 
-<div style="width: {width}px;">
+<div style="width: {width}px; max-width: 100%;">
   <canvas
     bind:this={canvas}
     use:canvas2d.bindCanvas

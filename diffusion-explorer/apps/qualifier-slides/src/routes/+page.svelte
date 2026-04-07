@@ -512,7 +512,7 @@
     <Slide figure={gridJacobianFigure}>
       <h2 class="slide-title">Jacobian Measures Local Volume Change</h2>
       <p style="margin-top: 0.5em;">
-        The Jacobian <Katex math={"\\color{#2ecc71}{\\frac{\\partial f}{\\partial z}}"} /> describes how <Katex math={"f"} /> locally stretches and compresses space. Its determinant equals the area of the transformed parallelogram.
+        The Jacobian <Katex math={"\\color{#2ecc71}{\\frac{\\partial f}{\\partial z}}"} /> describes how <Katex math={"f"} /> locally stretches and compresses space.
       </p>
       <div class="figure-container" style="margin-top: 1em;">
         {#if dataLoaded}
