@@ -39,6 +39,8 @@
     arrowHeadRadius = undefined as number | undefined,
     arrowLineWidth = undefined as number | undefined,
     highlightPointRadius = undefined as number | undefined,
+    looping = true,
+    endPause = 3.0,
     children = undefined as any,
   }: {
     width?: number;
@@ -64,6 +66,8 @@
     arrowHeadRadius?: number;
     arrowLineWidth?: number;
     highlightPointRadius?: number;
+    looping?: boolean;
+    endPause?: number;
     children?: any;
   } = $props();
 
@@ -222,8 +226,8 @@
 
   const timeline = new Timeline<AnimState>();
   timeline.duration = animationDuration / 1000;
-  timeline.looping = true;
-  timeline.setEndPause(3.0);
+  timeline.looping = looping;
+  timeline.setEndPause(endPause);
 
   function setupTimeline() {
     const initState: AnimState = {};

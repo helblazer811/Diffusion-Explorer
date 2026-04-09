@@ -1054,6 +1054,7 @@
         sourceDistributionSamples={$sourceDistributionSamples}
         targetDistributionSamples={$targetDistributionSamples}
         backgroundVisible={false}
+        {flowMatchingClient}
       >
         <div class="caption">
           <span class="figure-number">Figure 13:</span>

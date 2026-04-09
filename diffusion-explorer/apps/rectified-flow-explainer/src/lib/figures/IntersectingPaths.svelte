@@ -1,8 +1,11 @@
 <!-- Visualizes intersecting linear paths between source and target distributions with velocity vectors at intersection. -->
 
 <script lang="ts">
-  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjax, createSourceTargetScales, dataToPixelX, useCanvas2D, mathjaxInitialized } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjax, createSourceTargetScales, dataToPixelX, useCanvas2D, mathjaxInitialized, Timeline, useVisibilityHandler } from "@diffusion-explorer/ui";
   import type { Snippet } from "svelte";
+  import type { Writable } from "svelte/store";
+  import { onDestroy } from "svelte";
+  import type { FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -65,6 +68,17 @@
   export let latexLabelOffsetY = settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
 
+  // Flow model + animation
+  export let flowMatchingClient: FlowModelClient | null = null;
+  export let trajectoryColor = '#3b82f6';
+  export let trajectoryLineWidth = 3;
+  export let animationDuration = 4000;
+  export let samplingSteps = 100;
+  export let trajectoryStartTime = 0.5;
+
+  // Click-to-toggle: hides all scaffolding and shows only trajectory + intersection point
+  export let clickToToggle = false;
+
   // ----------------------------------------------------------------
   // State
   // ----------------------------------------------------------------
@@ -88,6 +102,16 @@
   let line1Coords: { x1: number; y1: number; x2: number; y2: number } | null = null; // sourcePointB -> targetPointB
   let line2Coords: { x1: number; y1: number; x2: number; y2: number } | null = null; // sourcePointA -> targetPointA
   let intersection: { x: number; y: number; t: number } | null = null;
+
+  // Animation
+  type AnimationState = { progress: number };
+  const initialState: AnimationState = { progress: 0 };
+  let timeline: Timeline<AnimationState> | null = null;
+  let combinedTrajectoryPixels: number[][] = []; // source → intersection → target
+  let combinedMeanX = 0;
+  let trajectoryOnly = false;
+  let figureIsActive: Writable<boolean>;
+  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -155,6 +179,18 @@
     intersection = findIntersection(line1Coords, line2Coords);
   }
 
+  function getPixelX(dataX: number, t: number): number {
+    const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    return centerPixelX + (dataX - combinedMeanX) * scales.xScaleFactor;
+  }
+
+  function pixelToDataXY(pixelX: number, pixelY: number, t: number): [number, number] {
+    const centerPixelX = scales.sourceCenterPixelX + t * (scales.targetCenterPixelX - scales.sourceCenterPixelX);
+    const dataX = (pixelX - centerPixelX) / scales.xScaleFactor + combinedMeanX;
+    const dataY = scales.yScale.invert(pixelY);
+    return [dataX, dataY];
+  }
+
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
@@ -177,15 +213,101 @@
     computeLineCoords();
   }
 
+  async function computeFlowTrajectories() {
+    if (!flowMatchingClient || !intersection || !scales) return;
+
+    const allX = [
+      ...sourceDistributionSamples.map((p) => p[0]),
+      ...targetDistributionSamples.map((p) => p[0]),
+    ];
+    combinedMeanX = allX.reduce((a, b) => a + b, 0) / allX.length;
+
+    const [dataX, dataY] = pixelToDataXY(intersection.x, intersection.y, trajectoryStartTime);
+    const startPoint: [number, number] = [dataX, dataY];
+
+    const reversePixels: number[][] = [[intersection.x, intersection.y]];
+    const forwardPixels: number[][] = [[intersection.x, intersection.y]];
+
+    const revResult = flowMatchingClient.sampleFromInitialPoints(
+      [startPoint],
+      samplingSteps,
+      { reverse: true, t_start: trajectoryStartTime, t_end: 0 },
+      (step: number, x_t: number[][]) => {
+        const t = trajectoryStartTime - ((step + 1) / samplingSteps) * trajectoryStartTime;
+        reversePixels.push([getPixelX(x_t[0][0], t), scales.yScale(x_t[0][1])]);
+      }
+    );
+
+    const fwdResult = flowMatchingClient.sampleFromInitialPoints(
+      [startPoint],
+      samplingSteps,
+      { t_start: trajectoryStartTime, t_end: 1.0 },
+      (step: number, x_t: number[][]) => {
+        const t = trajectoryStartTime + ((step + 1) / samplingSteps) * (1 - trajectoryStartTime);
+        forwardPixels.push([getPixelX(x_t[0][0], t), scales.yScale(x_t[0][1])]);
+      }
+    );
+
+    await Promise.all([revResult.promise, fwdResult.promise]);
+
+    // Build combined: source → intersection → target
+    // reversePixels is [intersection, ..., source] so reverse it, then append forward (skipping shared intersection point)
+    combinedTrajectoryPixels = [...reversePixels.slice().reverse(), ...forwardPixels.slice(1)];
+    console.log('[IntersectingPaths] Trajectories ready:', combinedTrajectoryPixels.length, 'combined points');
+  }
+
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  function setupTimeline() {
+    timeline = new Timeline<AnimationState>();
+    timeline.initialState = initialState;
+    timeline.duration = animationDuration / 1000;
+    timeline.looping = true;
+    timeline.setEndPause(1);
+
+    timeline.add(
+      { name: 'Trajectory', reduce(t: number) { return { progress: t }; } },
+      { start: 0, end: 1 }
+    );
+
+    timeline.onTick((_t, state) => draw(state));
+  }
+
   // ----------------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------------
 
-  function draw() {
+  function draw(state: AnimationState = initialState) {
     if (!ctx || !scales) return;
     ctx.clearRect(0, 0, width, height);
 
     const latexColor = settings.stylingSettings.figureLatex.color;
+    const requestRedrawFn = () => draw(timeline?.state ?? initialState);
+
+    if (trajectoryOnly) {
+      // --- Trajectory-only mode: scatter plots + distribution labels + intersection point + trajectory ---
+      drawScatterPlot(ctx, sourcePixelCoords, pointRadius, sourcePointColor, pointOpacity);
+      drawScatterPlot(ctx, targetPixelCoords, pointRadius, targetPointColor, pointOpacity);
+      drawText(ctx, sourceLabelText, scales.sourceCenterPixelX, marginHeight / 2, {
+        font: `${labelFontWeight} ${labelFontSize}px ${labelFontFamily}`,
+        color: labelColor, opacity: labelOpacity, align: "center", baseline: "top",
+      });
+      drawText(ctx, targetLabelText, scales.targetCenterPixelX, marginHeight / 2, {
+        font: `${labelFontWeight} ${labelFontSize}px ${labelFontFamily}`,
+        color: labelColor, opacity: labelOpacity, align: "center", baseline: "top",
+      });
+      if (intersection) {
+        ctx.beginPath();
+        ctx.arc(intersection.x, intersection.y, pointRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = lineColor;
+        ctx.fill();
+        drawMathjax(ctx, "x", intersection.x, intersection.y, latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, requestRedrawFn);
+      }
+      drawTrajectory(state);
+      return;
+    }
 
     // Draw scatter plots
     drawScatterPlot(
@@ -346,55 +468,117 @@
       };
 
       // Draw arrow labels
+      const arrowRequestRedraw = () => draw(timeline?.state ?? initialState);
       drawMathjax(
         ctx, "v_t(x|x_0^a, x_1^a)",
         arrow2Mid.x + topArrowLabelOffset.x,
         arrow2Mid.y + topArrowLabelOffset.y,
-        latexFontSize, 60, 100, { color: arrowColor }, draw
+        latexFontSize, 60, 100, { color: arrowColor }, arrowRequestRedraw
       );
 
       drawMathjax(
         ctx, "v_t(x|x_0^b, x_1^b)",
         arrow1Mid.x + bottomArrowLabelOffset.x,
         arrow1Mid.y + bottomArrowLabelOffset.y,
-        latexFontSize, 60, -35, { color: arrowColor }, draw
+        latexFontSize, 60, -35, { color: arrowColor }, arrowRequestRedraw
       );
 
       drawMathjax(
         ctx, "v_t^\\theta(x) = \\mathbb{E}[X_1 - X_0 | x_t = x]",
         meanEnd.x + meanArrowLabelOffset.x,
         meanEnd.y + meanArrowLabelOffset.y,
-        latexFontSize, 150, 30, { color: meanVectorColor }, draw
+        latexFontSize, 150, 30, { color: meanVectorColor }, arrowRequestRedraw
       );
 
       // Draw intersection label 'x'
+      const requestRedraw = () => draw(timeline?.state ?? initialState);
       drawMathjax(
         ctx, "x", intersection.x, intersection.y,
-        latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
+        latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, requestRedraw
       );
     }
 
     // Draw endpoint labels
+    const requestRedraw = () => draw(timeline?.state ?? initialState);
     drawMathjax(
       ctx, "x_0^a", line2Coords.x1, line2Coords.y1,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, requestRedraw
     );
 
     drawMathjax(
       ctx, "x_0^b", line1Coords.x1, line1Coords.y1,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, requestRedraw
     );
 
     drawMathjax(
       ctx, "x_1^a", line2Coords.x2, line2Coords.y2,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, requestRedraw
     );
 
     drawMathjax(
       ctx, "x_1^b", line1Coords.x2, line1Coords.y2,
-      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, draw
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }, requestRedraw
     );
+
+    // --- Dynamic Foreground: Blue trajectory ---
+    drawTrajectory(state);
   }
+
+  function drawTrajectory(state: AnimationState) {
+    if (!ctx || combinedTrajectoryPixels.length < 2) return;
+    const end = Math.floor(state.progress * (combinedTrajectoryPixels.length - 1)) + 1;
+
+    ctx.save();
+    ctx.fillStyle = trajectoryColor;
+    ctx.strokeStyle = trajectoryColor;
+    ctx.lineWidth = trajectoryLineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const dotRadius = trajectoryLineWidth * 1.2;
+
+    if (end >= 2) {
+      // Dot at start
+      ctx.beginPath();
+      ctx.arc(combinedTrajectoryPixels[0][0], combinedTrajectoryPixels[0][1], dotRadius, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(combinedTrajectoryPixels[0][0], combinedTrajectoryPixels[0][1]);
+      for (let i = 1; i < end; i++) ctx.lineTo(combinedTrajectoryPixels[i][0], combinedTrajectoryPixels[i][1]);
+      ctx.stroke();
+
+      // Dot at current leading position
+      const cur = combinedTrajectoryPixels[end - 1];
+      ctx.beginPath();
+      ctx.arc(cur[0], cur[1], dotRadius, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
+
+  function handleCanvasClick() {
+    if (!clickToToggle || combinedTrajectoryPixels.length === 0) return;
+    trajectoryOnly = !trajectoryOnly;
+    if (trajectoryOnly && timeline) {
+      timeline.seek(0);
+      timeline.play();
+    } else if (!trajectoryOnly && timeline) {
+      timeline.pause();
+      draw(initialState);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
+
+  onDestroy(() => { if (timeline) timeline.pause(); });
 
   // ----------------------------------------------------------------
   // Reactive Blocks
@@ -408,22 +592,33 @@
   ) {
     runInitialComputation();
     isInitialized = true;
-    draw();
+    draw(initialState);
+    if (flowMatchingClient) {
+      computeFlowTrajectories().then(() => {
+        setupTimeline();
+        if (!clickToToggle) timeline!.play();
+      }).catch(err => console.error('[IntersectingPaths] Flow trajectory error:', err));
+    }
   }
 
   // Redraw when MathJax finishes initializing (for LaTeX labels)
   $: if (isInitialized) {
-    mathjaxInitialized.then(() => draw());
+    mathjaxInitialized.then(() => draw(timeline?.state ?? initialState));
+  }
+
+  $: if (figureIsActive !== undefined && isInitialized) {
+    handleVisibilityChange($figureIsActive);
   }
 </script>
 
-<Figure {caption} {backgroundVisible}>
+<Figure {caption} bind:isActive={figureIsActive} {backgroundVisible}>
   {#snippet children()}
     <div style="width:100%;max-width:{width}px;">
       <canvas
         bind:this={canvas}
         use:canvas2d.bindCanvas
-        style="width:100%;height:auto;aspect-ratio:{width}/{height};"
+        onclick={handleCanvasClick}
+        style="width:100%;height:auto;aspect-ratio:{width}/{height};{clickToToggle ? 'cursor:pointer;' : ''}"
       ></canvas>
     </div>
   {/snippet}

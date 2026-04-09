@@ -77,6 +77,7 @@
 
   // Provide reveal instance to Slide components via context
   setContext('getReveal', () => revealInstance);
+  setContext('annotatedEquationDefaults', { connectorStyle: 'curve' });
 
   // ========== REVEAL.JS ==========
 
@@ -302,7 +303,6 @@
       <div class="title-content">
         <h1>A Visual Survey of Flow Based Generative Models</h1>
         <p style="font-size: 1.8em; color: #666; margin-top: 1em;">Alec Helbling</p>
-        <p style="font-size: 1.2em; color: #666; margin-top: 0.3em;">ML PhD Qualifier</p>
       </div>
       <aside class="notes">
         Qualifier presentation. Focus on building intuition through interactive visualizations.
@@ -423,7 +423,7 @@
         distribution <Katex math={"p(x)"}/> by a sequence of mappings <Katex math={"f_i(z)"}/>.
       </p>
       <div class="figure-container" style="margin-top: -50px;">
-        <NormalizingFlowStages bind:this={normFlowFigure} width={1720} numStages={4} showLabels={true} looping={false} />
+        <NormalizingFlowStages bind:this={normFlowFigure} width={1720} numStages={4} showLabels={true} looping={false} animationDuration={5000} />
       </div>
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
         <p style="font-size: 0.7em; color: #888; margin: 0;">
@@ -568,7 +568,7 @@
         />
       </div>
       <div class="figure-container" style="margin-top: -20px; height: 580px; overflow: visible;">
-        <MaxLikelihoodTraining bind:this={encodeFigure} width={1720} height={580} numStages={4} reversed={true} highlightPointIndices={[15]} highlightColor="#3b82f6" showImages={true} />
+        <MaxLikelihoodTraining bind:this={encodeFigure} width={1720} height={580} numStages={4} reversed={true} highlightPointIndices={[15]} highlightColor="#3b82f6" showImages={true} looping={true} endPause={1} />
       </div>
     </Slide>
 
@@ -592,7 +592,7 @@
         />
       </div>
       <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: visible;">
-        <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={520} numStages={4} reversed={true} showImages={true} />
+        <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={520} numStages={4} reversed={true} showImages={true} looping={true} endPause={1} />
       </div>
     </Slide>
 
@@ -648,9 +648,9 @@
       </ol>
     </section>
 
-    <!-- Slide: Continuous Normalizing Flows -->
+    <!-- Slide: Continuous Normalizing Flows (CNF) -->
     <section>
-      <h2 class="slide-title">Continuous Normalizing Flows</h2>
+      <h2 class="slide-title">Continuous Normalizing Flows (CNF)</h2>
       <p style="margin-top: 0.3em;">
         CNFs replace discrete transformations with a continuous-time ODE modeled by a neural network.
       </p>
@@ -782,6 +782,7 @@
         <AnnotatedEquation
           scale={1.5}
           verticalGap={60}
+          labelFontSize={48}
           tex={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 {\\color{#22c55e} \\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"}
           annotations={[
             { color: '#22c55e', label: 'Trace is only O(d)', side: 'above', align: 'left' },
@@ -796,22 +797,22 @@
       <p style="margin-top: 0.5em;">
         Requires solving an ODE at <em style="color: #e74c3c;">every training step</em>.
       </p>
-      <div style="margin-top: 0.3em;">
+      <div style="margin-top: 1.5em;">
         <AnnotatedEquation
           scale={1.3}
           verticalGap={60}
-          labelFontSize={36}
+          labelFontSize={44}
           tex={"\\log p_1(x_1) = \\log p_0(x_0) - {\\color{#e74c3c} \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_t}{\\partial x}\\right) \\, dt}"}
           annotations={[
             { color: '#e74c3c', label: 'Requires O(n) ODE solves', side: 'below', align: 'left' },
           ]}
         />
       </div>
-      <div class="figure-container" style="margin-top: 0.3em; max-height: 600px; overflow: hidden;">
+      <div class="figure-container" style="margin-top: 0.3em; max-height: 450px; overflow: hidden;">
         {#if dataLoaded}
           <HighlightTrajectory
             width={1800}
-            height={600}
+            height={450}
             {flowMatchingClient}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
@@ -884,6 +885,7 @@
             latexFontSize={36}
             distributionLabelOffsetY={40}
             vtLabelOffsetY={65}
+            arrowHeadSize={12}
           />
         {/if}
       </div>
@@ -1016,6 +1018,7 @@
             latexFontSize={36}
             distributionLabelOffsetY={40}
             vtLabelOffsetY={65}
+            arrowHeadSize={12}
           />
         {/if}
       </div>
@@ -1069,21 +1072,45 @@
     </section>
 
     <!-- Slide: Developed Independently in Parallel -->
-    <section>
+    <section style="position: relative; overflow: visible;">
       <h2 class="slide-title">Two Frameworks, One Idea</h2>
       <p style="margin-top: 0.5em;">
         Flow Matching and Stochastic Interpolants were developed independently and in parallel, arriving at the same core insight.
       </p>
-      <div style="display: flex; align-items: flex-start; justify-content: center; gap: 3em; margin-top: 2em;">
-        <div style="flex: 1; text-align: center;">
-          <img src="{base}/images/flow_matching_paper.png" alt="Flow Matching paper" style="max-height: 600px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
-          <p style="font-size: 0.7em; color: #888; margin-top: 0.5em;">Lipman et al., 2023</p>
-        </div>
-        <div style="flex: 1; text-align: center;">
-          <img src="{base}/images/stochastic_interpolants_paper.png" alt="Stochastic Interpolants paper" style="max-height: 600px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
-          <p style="font-size: 0.7em; color: #888; margin-top: 0.5em;">Albergo & Vanden-Eijnden, 2023</p>
-        </div>
-      </div>
+
+      <!-- Flow Matching paper — left card, angled left -->
+      <img
+        src="{base}/images/flow_matching_paper.png"
+        alt="Flow Matching paper"
+        style="
+          position: absolute;
+          bottom: -380px;
+          right: 380px;
+          height: 980px;
+          border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+          transform: rotate(-4deg);
+          transform-origin: bottom center;
+          z-index: 2;
+        "
+      />
+
+      <!-- Stochastic Interpolants paper — right card, angled right -->
+      <img
+        src="{base}/images/stochastic_interpolants_paper.png"
+        alt="Stochastic Interpolants paper"
+        style="
+          position: absolute;
+          bottom: -200px;
+          right: 680px;
+          height: 980px;
+          border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+          transform: rotate(-11deg);
+          transform-origin: bottom center;
+          z-index: 1;
+        "
+      />
     </section>
 
     <!-- Roadmap: Rectified Flows -->
@@ -1149,6 +1176,10 @@
           backgroundVisible={false}
           labelFontSize={56}
           showPlayButton={false}
+          perStepDuration={200}
+          perStepDelay={125}
+          fullAnimationDelay={250}
+          repeatDelay={750}
         />
       </div>
     </section>
@@ -1180,6 +1211,7 @@
             latexFontSize={36}
             distributionLabelOffsetY={40}
             vtLabelOffsetY={65}
+            arrowHeadSize={12}
           />
         {/if}
       </div>
@@ -1273,6 +1305,10 @@
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
             backgroundVisible={false}
+            {flowMatchingClient}
+            trajectoryStartTime={0.3}
+            trajectoryLineWidth={6}
+            clickToToggle={true}
           />
         {/if}
       </div>
@@ -1409,20 +1445,15 @@
       </div>
     </section>
 
-    <!-- Slide: Conclusion -->
+    <!-- Slide: Thank You / Conclusion -->
     <section>
-      <h2 class="slide-title">Conclusion</h2>
+      <h2 class="slide-title">Thank You</h2>
       <ul style="margin-top: 1em; font-size: 1.05em; line-height: 1.8;">
         <li><strong>Normalizing Flows</strong> — invertible mappings with tractable densities via the change of variables formula</li>
         <li><strong>Continuous Normalizing Flows</strong> — replace discrete layers with a continuous-time ODE, avoiding expensive Jacobian determinants</li>
         <li><strong>Flow Matching &amp; Stochastic Interpolants</strong> — scalable training via regression on conditional velocity fields</li>
         <li><strong>Rectified Flows</strong> — straighten trajectories through reflow for efficient few-step sampling</li>
       </ul>
-    </section>
-
-    <!-- Slide: Thank You -->
-    <section>
-      <h2 class="slide-title">Thank You</h2>
     </section>
 
   </div>
