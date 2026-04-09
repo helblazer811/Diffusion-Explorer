@@ -49,6 +49,7 @@
   export let vectorOpacity: number = 1.0;
   export let vectorWidth: number = 4.5;
   export let vectorScale: number = 0.4; // Multiplier for vector magnitude
+  export let arrowHeadSize: number = 8;
 
   // Animation timing (normalized 0-1, scaled by animationDuration)
   export let animationDuration: number = 8000;
@@ -385,7 +386,7 @@
       ctx.fillStyle = vectorColor;
       ctx.lineWidth = vectorWidth;
       ctx.globalAlpha = vectorOpacity;
-      drawArrow(ctx, interpPixel.x, interpPixel.y, vectorEndX, vectorEndY, 8);
+      drawArrow(ctx, interpPixel.x, interpPixel.y, vectorEndX, vectorEndY, arrowHeadSize);
       ctx.restore();
     }
 

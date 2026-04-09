@@ -18,6 +18,7 @@
   export let highlightRadius = 12;
   export let arrowHeadRadius = 12;
   export let fLabelFontSize = 44;
+  export let showLog = false;
   export let children = undefined;
   export let header = undefined;
 
@@ -119,8 +120,16 @@
     drawArrowHead(ctx, prevX, prevY, tx - highlightRadius - 4, ty, arrowHeadRadius);
     ctx.restore();
 
+    const outline = { stroke: 'white', strokeWidth: 6, strokeOpacity: 0.5 };
+
     // f(z) label above arrow
-    drawMathjax(ctx, "f(z)", mx, my + 15, fLabelFontSize, 0, 0, { color: arrowColor }, requestRedraw);
+    drawMathjax(ctx, "f(z)", mx, my + 15, fLabelFontSize, 0, 0, { color: arrowColor, ...outline }, requestRedraw);
+
+    // p(z)/log p(z) above source point, p(x)/log p(x) above target point
+    const srcLabel = showLog ? '\\log p(z)' : 'p(z)';
+    const tgtLabel = showLog ? '\\log p(x)' : 'p(x)';
+    drawMathjax(ctx, srcLabel, highlightSourcePt[0], highlightSourcePt[1], fLabelFontSize, 0, -(highlightRadius + 14), { color: '#4594e3', ...outline }, requestRedraw);
+    drawMathjax(ctx, tgtLabel, highlightTargetPt[0], highlightTargetPt[1], fLabelFontSize, 0, -(highlightRadius + 14), { color: '#f17720', ...outline }, requestRedraw);
   }
 
   export function restart() { draw(); }
@@ -130,6 +139,10 @@
 
   $: if (ctx && !isInitialized && $allTimeSamples && $allTimeSamples.length > 0) {
     runInitialComputation();
+  }
+
+  $: if (isInitialized && showLog !== undefined) {
+    draw();
   }
 </script>
 

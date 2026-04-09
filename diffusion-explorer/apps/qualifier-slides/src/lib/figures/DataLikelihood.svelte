@@ -1,174 +1,369 @@
-<script>
-  import { onDestroy } from "svelte";
-  import { drawScatterPlot, drawMathjax, createSourceTargetScales, useCanvas2D } from "@diffusion-explorer/ui";
-  import { settings } from "$lib/settings";
+<script lang="ts">
+  import { onDestroy } from 'svelte';
+  import {
+    Timeline,
+    TimelineBuilder,
+    drawScatterPlot,
+    drawMathjax,
+    computeContours,
+    plotContours,
+    createSourceTargetScales,
+    useCanvas2D,
+    mathjaxInitialized,
+  } from '@diffusion-explorer/ui';
+  import { settings } from '$lib/settings';
 
-  export let allTimeSamples;
+  // ----------------------------------------------------------------
+  // Props
+  // ----------------------------------------------------------------
+
+  export let allTimeSamples: any; // Writable<number[][][]>
   export let width = 1800;
-  export let height = 800;
-  export let pointColor = '#4594e3';
-  export let pointRadius = 5;
-  export let pointOpacity = 0.5;
-  export let labelFontSize = 50;
+  export let height = 850;
   export let sourceCenterX = 0.25;
   export let targetCenterX = 0.75;
-  export let distributionScaleFactor = 0.85;
-  export let highlightColor = '#f17720';
-  export let highlightRadius = 10;
+  export let distributionScaleFactor = 1.0;
   export let highlightIndex = 15;
-  export let annotationFontSize = 46;
-  export let annotationLineWidth = 2.5;
-  export let children = undefined;
+  export let looping = true;
+  export let endPause = 5000; // ms
 
-  let canvas = null;
+  // ----------------------------------------------------------------
+  // State
+  // ----------------------------------------------------------------
+
+  type AnimationState = {
+    dotContourOpacity: number;  // Phase 1: z dot + Gaussian contours
+    dashProgress: number;       // Phase 2: dashed line mean → z
+    easyCalloutOpacity: number; // Phase 3: z label + "Easy to evaluate" callout
+    dimOpacity: number;         // Phase 4: white overlay on left side
+    xCalloutOpacity: number;    // Phase 5: x dot + x label + right callout
+  };
+
+  const initialState: AnimationState = {
+    dotContourOpacity: 0,
+    dashProgress: 0,
+    easyCalloutOpacity: 0,
+    dimOpacity: 0,
+    xCalloutOpacity: 0,
+  };
+
+  const s = width / 1800;
+
+  let canvas: HTMLCanvasElement | null = null;
   const canvas2d = useCanvas2D(width, height);
+  $: ctx = canvas && canvas2d.ctx;
 
-  let scales = null;
-  let sourcePixelCoords = [];
-  let targetPixelCoords = [];
+  let scales: ReturnType<typeof createSourceTargetScales> | null = null;
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
   let highlightSourcePixel = [0, 0];
   let highlightTargetPixel = [0, 0];
+  let sourceMeanPixelY = 0;
+  let sourceContours: any = null;
+  let timeline: Timeline<AnimationState> | null = null;
   let isInitialized = false;
 
+  // Styling
+  const sourceColor = '#4594e3';
+  const targetColor = '#f17720';
+  const labelFontSize = Math.round(52 * s);
+  const pointRadius = 5 * s;
+  const highlightRadius = 13 * s;
+  const annotFontSize = Math.round(44 * s);
+  const annotFont = `${annotFontSize}px Libre Baskerville, Georgia, serif`;
+
+  // ----------------------------------------------------------------
+  // Setup
+  // ----------------------------------------------------------------
+
   function runInitialComputation() {
-    if (!canvas) return;
-    const samples = $allTimeSamples;
-    if (!samples || samples.length === 0) return;
+    const samples = $allTimeSamples as number[][][];
+    if (!samples?.length) return;
 
     const sourceSamples = samples[0];
     const targetSamples = samples[samples.length - 1];
-    if (!sourceSamples || !targetSamples) return;
 
     scales = createSourceTargetScales(sourceSamples, targetSamples, {
-      width, height,
-      marginWidth: 50, marginHeight: 20,
-      sourceCenterX, targetCenterX,
+      width,
+      height,
+      marginWidth: 60,
+      marginHeight: 40,
+      sourceCenterX,
+      targetCenterX,
       yShiftFactor: settings.stylingSettings.scatterPlot.yShiftFactor,
       distributionScaleFactor,
     });
 
-    sourcePixelCoords = sourceSamples.map(p => [
+    sourcePixelCoords = sourceSamples.map((p: number[]) => [
       scales.sourceCenterPixelX + (p[0] - scales.sourceMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
-    targetPixelCoords = targetSamples.map(p => [
+    targetPixelCoords = targetSamples.map((p: number[]) => [
       scales.targetCenterPixelX + (p[0] - scales.targetMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
 
-    const idx = highlightIndex % sourceSamples.length;
-    highlightSourcePixel = sourcePixelCoords[idx];
-    highlightTargetPixel = targetPixelCoords[idx];
+    // Find z point: right of source distribution, slightly above center (high x, moderate y)
+    const srcIdx = sourceSamples.reduce((bestIdx: number, p: number[], i: number) => {
+      const best = sourceSamples[bestIdx];
+      return (3 * p[0] - 2 * p[1] > 3 * best[0] - 2 * best[1]) ? i : bestIdx;
+    }, 0);
+    highlightSourcePixel = sourcePixelCoords[srcIdx];
 
-    isInitialized = true;
-    draw();
+    // Find x point: right of target distribution, slightly above center
+    const tgtIdx = targetSamples.reduce((bestIdx: number, p: number[], i: number) => {
+      const best = targetSamples[bestIdx];
+      return (3 * p[0] - 3 * p[1] > 3 * best[0] - 3 * best[1]) ? i : bestIdx;
+    }, 0);
+    highlightTargetPixel = targetPixelCoords[tgtIdx];
+
+    // Source mean in pixel space (x = center, y = mean of y values)
+    const meanY = sourceSamples.reduce((sum: number, p: number[]) => sum + p[1], 0) / sourceSamples.length;
+    sourceMeanPixelY = scales.yScale(meanY);
+
+    // Pre-compute Gaussian contours in data space
+    sourceContours = computeContours(sourceSamples as [number, number][], {
+      bandwidth: 12,
+      thresholds: 4,
+    });
   }
 
-  function draw() {
+  // ----------------------------------------------------------------
+  // Animations
+  // ----------------------------------------------------------------
+
+  function setupTimeline() {
+    const builder = new TimelineBuilder<AnimationState>()
+      .setInitialState(initialState)
+      .setLooping(looping)
+      .setEndPause(endPause);
+
+    // Phase 1: z dot + contours fade in
+    builder.add({ name: 'DotContour', reduce(t) { return { dotContourOpacity: t }; } }, { durationMs: 900 });
+    // Phase 2: dashed line grows from z point to mean
+    builder.add({ name: 'Dash', reduce(t) { return { dashProgress: t }; } }, { durationMs: 1200 });
+    // Phase 3: easy callout
+    builder.add({ name: 'EasyCallout', reduce(t) { return { easyCalloutOpacity: t }; } }, { durationMs: 800 });
+    // Pause before dimming
+    builder.add({ name: 'Pause', reduce() { return null; } }, { durationMs: 1500 });
+    // Phase 4: dim left side
+    builder.add({ name: 'Dim', reduce(t) { return { dimOpacity: t }; } }, { durationMs: 800 });
+    // Phase 5: x dot + x label + right callout
+    builder.add({ name: 'XCallout', reduce(t) { return { xCalloutOpacity: t }; } }, { durationMs: 800 });
+
+    timeline = builder.build();
+    timeline.onTick((_t, state) => draw(state));
+  }
+
+  // ----------------------------------------------------------------
+  // Drawing
+  // ----------------------------------------------------------------
+
+  function draw(state: AnimationState = initialState) {
     if (!ctx || !scales) return;
     ctx.clearRect(0, 0, width, height);
 
-    const requestRedraw = () => draw();
+    const requestRedraw = () => draw(timeline?.state ?? initialState);
 
-    // Labels above
-    drawMathjax(ctx, "p(z)", scales.sourceCenterPixelX, 100, labelFontSize, 0, 0, { color: '#4594e3' }, requestRedraw);
-    drawMathjax(ctx, "p(x)", scales.targetCenterPixelX, 100, labelFontSize, 0, 0, { color: '#f17720' }, requestRedraw);
+    // ---- Static Background ----
+
+    // Left scatter plot (always visible)
+    drawScatterPlot(ctx, sourcePixelCoords, pointRadius, sourceColor, 0.45);
+
+    // Right scatter plot — only after dim phase
+    if (state.xCalloutOpacity > 0) {
+      ctx.save();
+      ctx.globalAlpha = state.xCalloutOpacity;
+      drawScatterPlot(ctx, targetPixelCoords, pointRadius, targetColor, 0.45);
+      ctx.restore();
+    }
+
+    // Distribution labels at top
+    const labelY = Math.round(72 * s);
+    ctx.save();
+    ctx.font = `italic ${Math.round(64 * s)}px Libre Baskerville, Georgia, serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = sourceColor;
+    ctx.fillText('Z', scales.sourceCenterPixelX, labelY);
+    if (state.xCalloutOpacity > 0) {
+      ctx.globalAlpha = state.xCalloutOpacity;
+      ctx.fillStyle = targetColor;
+      ctx.fillText('X', scales.targetCenterPixelX, labelY);
+    }
+    ctx.restore();
 
 
-    // Scatter plots
-    drawScatterPlot(ctx, sourcePixelCoords, pointRadius, '#4594e3', pointOpacity);
-    drawScatterPlot(ctx, targetPixelCoords, pointRadius, '#f17720', pointOpacity);
+    // ---- Phase 1: z dot + Gaussian contours ----
+    if (state.dotContourOpacity > 0) {
+      const op = state.dotContourOpacity;
 
-    // Highlight points are drawn in SVG so they appear above the lines
+      // Contours
+      const xScaleFn = (dataX: number) =>
+        scales.sourceCenterPixelX + (dataX - scales.sourceMeanX) * scales.xScaleFactor;
+      const yScaleFn = (dataY: number) => scales.yScale(dataY);
+
+      plotContours(ctx, sourceContours, {
+        xScale: xScaleFn,
+        yScale: yScaleFn,
+        fillColor: sourceColor,
+        opacity: 0.12 * op,
+        fill: true,
+        stroke: true,
+        strokeColor: sourceColor,
+        strokeWidth: 1.5 * s,
+      });
+
+      // z dot
+      ctx.save();
+      ctx.globalAlpha = op;
+      ctx.fillStyle = sourceColor;
+      ctx.beginPath();
+      ctx.arc(highlightSourcePixel[0], highlightSourcePixel[1], highlightRadius, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+
+      // z label and p(z) above dot (appear with the dot)
+      ctx.save();
+      ctx.globalAlpha = op;
+      drawMathjax(ctx, 'p(z)', highlightSourcePixel[0], highlightSourcePixel[1], Math.round(46 * s), 0, -(highlightRadius + 14 * s), { color: sourceColor }, requestRedraw);
+      ctx.restore();
+    }
+
+    // ---- Phase 2: dashed line from mean to z ----
+    if (state.dashProgress > 0 && state.dotContourOpacity > 0) {
+      const prog = Math.min(state.dashProgress, 1);
+      const mx = scales.sourceCenterPixelX;
+      const my = sourceMeanPixelY;
+      const px = highlightSourcePixel[0];
+      const py = highlightSourcePixel[1];
+      const endX = px + prog * (mx - px);
+      const endY = py + prog * (my - py);
+
+      ctx.save();
+      ctx.strokeStyle = sourceColor;
+      ctx.lineWidth = 5 * s;
+      ctx.setLineDash([14 * s, 8 * s]);
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Small dot at mean
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = sourceColor;
+      ctx.beginPath();
+      ctx.arc(mx, my, 5 * s, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // ---- Phase 3: easy callout — bottom center of left side ----
+    if (state.easyCalloutOpacity > 0) {
+      const op = state.easyCalloutOpacity;
+      const boxW = 460 * s;
+      const boxH = 60 * s;
+      const boxX = scales.sourceCenterPixelX - boxW / 2;
+      const boxY = height - boxH - 18 * s;
+
+      ctx.save();
+      ctx.globalAlpha = op;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 7 * s);
+      ctx.fill();
+      ctx.fillStyle = sourceColor;
+      ctx.font = annotFont;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Easy to evaluate p(z)', scales.sourceCenterPixelX, boxY + boxH / 2);
+      ctx.restore();
+    }
+
+    // ---- Phase 4: white overlay on left half ----
+    if (state.dimOpacity > 0) {
+      ctx.save();
+      ctx.globalAlpha = state.dimOpacity * 0.6;
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, width / 2, height);
+      ctx.restore();
+    }
+
+    // ---- Phase 5: x dot + x label + right callout ----
+    if (state.xCalloutOpacity > 0) {
+      const op = state.xCalloutOpacity;
+      const hx = highlightTargetPixel[0];
+      const hy = highlightTargetPixel[1];
+
+      ctx.save();
+      ctx.globalAlpha = op;
+
+      // x dot
+      ctx.fillStyle = targetColor;
+      ctx.beginPath();
+      ctx.arc(hx, hy, highlightRadius, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+
+      // x label and p(x) above dot
+      ctx.save();
+      ctx.globalAlpha = op;
+      drawMathjax(ctx, 'p(x)', hx, hy, Math.round(46 * s), 0, -(highlightRadius + 14 * s), { color: targetColor }, requestRedraw);
+      ctx.restore();
+
+      // Callout box — bottom center of right side
+      const boxW = 560 * s;
+      const boxH = 60 * s;
+      const boxX = scales.targetCenterPixelX - boxW / 2;
+      const boxY = height - boxH - 18 * s;
+
+      ctx.save();
+      ctx.globalAlpha = op;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 7 * s);
+      ctx.fill();
+      ctx.fillStyle = targetColor;
+      ctx.font = annotFont;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Less straightforward', scales.targetCenterPixelX, boxY + boxH / 2);
+      ctx.restore();
+    }
   }
 
-  export function restart() { draw(); }
-  export function pause() {}
+  // ----------------------------------------------------------------
+  // Lifecycle
+  // ----------------------------------------------------------------
 
-  $: ctx = canvas && canvas2d.ctx;
+  export function restart() {
+    if (timeline) { timeline.reset(); timeline.play(); }
+  }
+  export function pause() {
+    if (timeline) timeline.pause();
+  }
 
-  $: if (ctx && !isInitialized && $allTimeSamples && $allTimeSamples.length > 0) {
+  onDestroy(() => { if (timeline) timeline.pause(); });
+
+  // ----------------------------------------------------------------
+  // Reactive Blocks
+  // ----------------------------------------------------------------
+
+  $: if (ctx && !isInitialized && $allTimeSamples?.length > 0) {
     runInitialComputation();
+    setupTimeline();
+    isInitialized = true;
+    mathjaxInitialized.then(() => draw(initialState));
+    timeline!.play();
   }
 </script>
 
-<figure style="width: 100%; max-width: {width}px; margin: 2rem auto; display: flex; flex-direction: column; gap: 0.75rem;">
-<div style="position: relative; width: 100%; aspect-ratio: {width}/{height};">
+<div style="width: {width}px; max-width: 100%;">
   <canvas
     bind:this={canvas}
     use:canvas2d.bindCanvas
     style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
-  />
-  {#if isInitialized}
-    {@const s = annotationFontSize / 46}
-    <svg
-      viewBox="0 0 {width} {height}"
-      style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible;"
-    >
-      <!-- Source annotation (below point, offset left) -->
-      <line
-        x1={highlightSourcePixel[0] - 60 * s}
-        y1={highlightSourcePixel[1] + 90 * s}
-        x2={highlightSourcePixel[0] - 5}
-        y2={highlightSourcePixel[1] + 8}
-        stroke="#333" stroke-width={annotationLineWidth} />
-      <rect
-        x={highlightSourcePixel[0] - 250 * s}
-        y={highlightSourcePixel[1] + 95 * s}
-        width={470 * s} height={55 * s} rx="6"
-        fill="white" fill-opacity="0.8" />
-      <text
-        x={highlightSourcePixel[0] - 240 * s}
-        y={highlightSourcePixel[1] + 95 * s + 40 * s}
-        fill="#333" font-size={annotationFontSize} font-family="Libre Baskerville, Georgia, serif">
-        Easy to evaluate p(z)
-      </text>
-
-      <!-- Target annotation (below point, offset right) -->
-      <line
-        x1={highlightTargetPixel[0] + 60 * s}
-        y1={highlightTargetPixel[1] + 90 * s}
-        x2={highlightTargetPixel[0] + 5}
-        y2={highlightTargetPixel[1] + 8}
-        stroke="#333" stroke-width={annotationLineWidth} />
-      <rect
-        x={highlightTargetPixel[0] - 10}
-        y={highlightTargetPixel[1] + 95 * s}
-        width={420 * s} height={55 * s} rx="6"
-        fill="white" fill-opacity="0.8" />
-      <text
-        x={highlightTargetPixel[0]}
-        y={highlightTargetPixel[1] + 95 * s + 40 * s}
-        fill="#333" font-size={annotationFontSize} font-family="Libre Baskerville, Georgia, serif">
-        Less straightforward
-      </text>
-
-      <!-- Source distribution label below scatter plot -->
-      <text
-        x={scales.sourceCenterPixelX}
-        y={height - 30}
-        fill="#4594e3" font-size={annotationFontSize} font-family="Libre Baskerville, Georgia, serif"
-        text-anchor="middle">
-        Multivariate Gaussian
-      </text>
-
-      <!-- Highlight points (drawn last so they appear above lines) -->
-      <circle
-        cx={highlightSourcePixel[0] - 5}
-        cy={highlightSourcePixel[1] + 8}
-        r={highlightRadius}
-        fill="#4594e3" />
-      <circle
-        cx={highlightTargetPixel[0] + 5}
-        cy={highlightTargetPixel[1] + 8}
-        r={highlightRadius}
-        fill="#f17720" />
-    </svg>
-  {/if}
+  ></canvas>
 </div>
-{#if children}
-  <figcaption style="font-size: 1.1rem; line-height: 1.5; color: #666; text-align: left;">
-    {@render children?.()}
-  </figcaption>
-{/if}
-</figure>

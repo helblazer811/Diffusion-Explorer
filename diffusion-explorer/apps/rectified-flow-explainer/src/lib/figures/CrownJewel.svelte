@@ -79,6 +79,10 @@
   // Callbacks & misc
   export let onInitialized: (() => void) | undefined = undefined;
   export let backgroundVisible: boolean = true;
+  export let interactive: boolean = true;
+  export let showPlayButton: boolean = true;
+  export let durationLabelFontSize: number = 16;
+  export let durationLabelSpacing: number = -14;
   export let children: unknown = undefined;
 
   // ----------------------------------------------------------------
@@ -627,8 +631,8 @@
           bind:this={leftCanvas}
           use:leftCanvas2d.bindCanvas
           class="panel-canvas"
-          onclick={(e) => handleCanvasClick(e, "left")}
-          style="cursor: pointer;"
+          onclick={interactive ? (e) => handleCanvasClick(e, "left") : undefined}
+          style={interactive ? "cursor: pointer;" : "pointer-events: none;"}
         ></canvas>
         <div class="slider-wrapper">
           <TimeSlider
@@ -643,9 +647,10 @@
             dragEnabled={true}
             onInput={handleLeftTimeInput}
             hideSpacerOnMobile={true}
+            {showPlayButton}
           />
         </div>
-        <div class="duration-label">Sampling Duration</div>
+        <div class="duration-label" style="font-size: {durationLabelFontSize}px; margin-top: {durationLabelSpacing}px;">Sampling Duration</div>
       </div>
     {/snippet}
 
@@ -667,8 +672,8 @@
           bind:this={rightCanvas}
           use:rightCanvas2d.bindCanvas
           class="panel-canvas"
-          onclick={(e) => handleCanvasClick(e, "right")}
-          style="cursor: pointer;"
+          onclick={interactive ? (e) => handleCanvasClick(e, "right") : undefined}
+          style={interactive ? "cursor: pointer;" : "pointer-events: none;"}
         ></canvas>
         <div class="slider-wrapper">
           <TimeSlider
@@ -683,9 +688,10 @@
             dragEnabled={true}
             onInput={handleRightTimeInput}
             hideSpacerOnMobile={true}
+            {showPlayButton}
           />
         </div>
-        <div class="duration-label">Sampling Duration</div>
+        <div class="duration-label" style="font-size: {durationLabelFontSize}px; margin-top: {durationLabelSpacing}px;">Sampling Duration</div>
       </div>
     {/snippet}
   </DoubleFigure>

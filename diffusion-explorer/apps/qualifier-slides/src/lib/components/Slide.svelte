@@ -43,9 +43,6 @@
     }
   }
 
-  function handleClick() {
-    figure?.restart?.();
-  }
 
   onMount(() => {
     // Poll for reveal instance (it's initialized async)
@@ -72,8 +69,7 @@
 <section
   bind:this={sectionEl}
   class={className}
-  style="{style}{figure ? ' cursor: pointer;' : ''}"
-  onclick={figure ? handleClick : undefined}
+  style={style}
 >
   {@render children()}
 </section>
