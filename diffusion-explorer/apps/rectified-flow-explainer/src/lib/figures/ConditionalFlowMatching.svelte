@@ -55,6 +55,7 @@
   // Noisy vector styling (v_t^\theta)
   export let noisyVectorColor: string = "#22c55e";
   export let noiseVector: [number, number] = [15, -90]; // [dx, dy] in pixels
+  export let arrowHeadSize: number = 6;
 
   // Dashed line styling
   export let dashedLineColor: string = "#ef4444";
@@ -220,7 +221,7 @@
       ctx.fillStyle = vectorColor;
       ctx.lineWidth = vectorWidth;
       ctx.globalAlpha = vectorOpacity;
-      drawArrow(ctx, interpX, interpY, vtEndX, vtEndY, 6);
+      drawArrow(ctx, interpX, interpY, vtEndX, vtEndY, arrowHeadSize);
       ctx.restore();
 
       // v_t^theta vector endpoint
@@ -233,7 +234,7 @@
       ctx.fillStyle = noisyVectorColor;
       ctx.lineWidth = vectorWidth;
       ctx.globalAlpha = vectorOpacity;
-      drawArrow(ctx, interpX, interpY, vtThetaEndX, vtThetaEndY, 6);
+      drawArrow(ctx, interpX, interpY, vtThetaEndX, vtThetaEndY, arrowHeadSize);
       ctx.restore();
 
       // Draw dashed line between vector tips (red)

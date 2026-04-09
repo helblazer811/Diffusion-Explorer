@@ -1,6 +1,8 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, getContext } from "svelte";
   import { loadMathJax } from "../plotting/mathjax";
+
+  const _ctx = getContext('annotatedEquationDefaults') ?? {};
 
   /**
    * LaTeX string. Use {\\color{#hex} content} to mark annotatable terms.
@@ -49,6 +51,12 @@
 
   /** @type {boolean} Show debug bounding boxes */
   export let debug = false;
+
+  /** @type {'elbow' | 'curve'} Connector style: L-shaped elbow or smooth cubic bezier */
+  export let connectorStyle = _ctx.connectorStyle ?? 'elbow';
+
+  /** @type {number} Extra horizontal push applied to label text in curve mode (px) */
+  export let curveOffset = _ctx.curveOffset ?? 40;
 
   let container;
   let svgOverlay;
@@ -264,7 +272,8 @@
     const labelGapX = 12;
     for (const item of resolved) {
       const cx = item.box.x + item.box.w / 2;
-      const textStartX = item.resolvedAlign === "left" ? cx - labelGapX : cx + labelGapX;
+      const extraPush = connectorStyle === 'curve' ? curveOffset : 0;
+      const textStartX = item.resolvedAlign === "left" ? cx - labelGapX - extraPush : cx + labelGapX + extraPush;
       const tmpText = makeSVG("text", {
         x: textStartX,
         y: 0,
@@ -419,7 +428,8 @@
     const labelGapX = 12;
     const textAnchor = resolvedAlign === "left" ? "end" : "start";
     const textY = elbowY - labelGapY;
-    const textStartX = resolvedAlign === "left" ? cx - labelGapX : cx + labelGapX;
+    const extraPush = connectorStyle === 'curve' ? curveOffset : 0;
+    const textStartX = resolvedAlign === "left" ? cx - labelGapX - extraPush : cx + labelGapX + extraPush;
 
     const text = makeSVG("text", {
       x: textStartX,
@@ -433,24 +443,43 @@
     text.textContent = label;
     svgOverlay.appendChild(text);
 
-    const textWidth = text.getComputedTextLength();
-    const elbowOverhang = 10;
-    let endX;
-    if (resolvedAlign === "left") {
-      endX = textStartX - textWidth - elbowOverhang;
+    if (connectorStyle === 'curve') {
+      // Arrow departs from the vertical center of the label text, with a small gap
+      const textCenterY = textY - labelFontSize * 0.3;
+      const arrowGapX = 10;
+      const arrowStartX = resolvedAlign === "left" ? textStartX + arrowGapX : textStartX - arrowGapX;
+      // Cubic bezier: CP1 pulls horizontally to cx at text center; CP2 guides approach along cx
+      const cp1x = cx, cp1y = textCenterY;
+      const cp2x = cx, cp2y = (textCenterY + tipY) / 2;
+      svgOverlay.appendChild(
+        makeSVG("path", {
+          d: `M ${arrowStartX} ${textCenterY} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${cx} ${tipY}`,
+          fill: "none",
+          stroke: color,
+          "stroke-width": 2.5,
+          "marker-end": `url(#${markerId})`,
+        })
+      );
     } else {
-      endX = textStartX + textWidth + elbowOverhang;
+      // Elbow: horizontal arm from label end to cx, then vertical to term
+      const textWidth = text.getComputedTextLength();
+      const elbowOverhang = 10;
+      let endX;
+      if (resolvedAlign === "left") {
+        endX = textStartX - textWidth - elbowOverhang;
+      } else {
+        endX = textStartX + textWidth + elbowOverhang;
+      }
+      svgOverlay.appendChild(
+        makeSVG("path", {
+          d: `M ${endX} ${elbowY} L ${cx} ${elbowY} L ${cx} ${tipY}`,
+          fill: "none",
+          stroke: color,
+          "stroke-width": 2.5,
+          "marker-end": `url(#${markerId})`,
+        })
+      );
     }
-
-    svgOverlay.appendChild(
-      makeSVG("path", {
-        d: `M ${endX} ${elbowY} L ${cx} ${elbowY} L ${cx} ${tipY}`,
-        fill: "none",
-        stroke: color,
-        "stroke-width": 2.5,
-        "marker-end": `url(#${markerId})`,
-      })
-    );
   }
 
   function makeSVG(tag, attrs) {

@@ -35,7 +35,7 @@
   export let scatterPointRadius: number = 4;
   export let scatterPointOpacity: number = 0.5;
   export let backgroundVisible: boolean = false;
-  export let labelFontSize: string = '0.7em';
+  export let labelFontSize: string = '1em';
   export let showDetLabel: boolean = true;
   export let children: unknown = undefined;
 
@@ -352,7 +352,7 @@
 
     ctx.save();
     ctx.globalAlpha = 0.07;
-    ctx.fillStyle = vecColor;
+    ctx.fillStyle = '#888888';
     ctx.beginPath();
     ctx.moveTo(miniRight, miniTop);
     ctx.lineTo(rBoxLeft, rBoxTop);
@@ -363,7 +363,7 @@
     ctx.restore();
 
     ctx.save();
-    ctx.strokeStyle = vecColor;
+    ctx.strokeStyle = '#888888';
     ctx.lineWidth = 1;
     ctx.globalAlpha = 0.25;
     ctx.setLineDash([6, 4]);
@@ -389,7 +389,7 @@
 
     // Drop shadow
     ctx.save();
-    ctx.shadowColor = 'rgba(46, 204, 113, 0.35)';
+    ctx.shadowColor = 'rgba(100, 100, 100, 0.35)';
     ctx.shadowBlur = 20;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 4;
