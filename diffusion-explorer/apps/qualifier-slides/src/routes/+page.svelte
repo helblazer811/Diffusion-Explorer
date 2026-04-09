@@ -303,6 +303,7 @@
       <div class="title-content">
         <h1>A Visual Survey of Flow Based Generative Models</h1>
         <p style="font-size: 1.8em; color: #666; margin-top: 1em;">Alec Helbling</p>
+        <p style="font-size: 1.2em; color: #999; margin-top: 0.4em;"><a href="https://alechelbling.com" style="color: #999;">alechelbling.com</a></p>
       </div>
       <aside class="notes">
         Qualifier presentation. Focus on building intuition through interactive visualizations.
@@ -1448,12 +1449,29 @@
     <!-- Slide: Thank You / Conclusion -->
     <section>
       <h2 class="slide-title">Thank You</h2>
-      <ul style="margin-top: 1em; font-size: 1.05em; line-height: 1.8;">
-        <li><strong>Normalizing Flows</strong> — invertible mappings with tractable densities via the change of variables formula</li>
-        <li><strong>Continuous Normalizing Flows</strong> — replace discrete layers with a continuous-time ODE, avoiding expensive Jacobian determinants</li>
-        <li><strong>Flow Matching &amp; Stochastic Interpolants</strong> — scalable training via regression on conditional velocity fields</li>
-        <li><strong>Rectified Flows</strong> — straighten trajectories through reflow for efficient few-step sampling</li>
-      </ul>
+      <p style="margin-top: 0.6em; font-size: 1.0em; line-height: 1.6; width: 100%;">
+        Normalizing flows learn invertible transformations of probability distributions, enabling exact likelihood evaluation and novel sample generation. Continuous normalizing flows, flow matching, and rectified flows extend normalizing flows making them more scalable, efficient, and general.
+      </p>
+      <div class="figure-container" style="margin-top: 0.3em;">
+        {#if dataLoaded}
+          <ProbabilityPath
+            width={1800}
+            height={600}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            {allTimeSamples}
+            {isTraining}
+            playingByDefault={true}
+            backgroundVisible={false}
+            showContours={true}
+            distributionScaleFactor={0.7}
+            showTimeSlider={false}
+            labelFontSize={50}
+            labelFontFamily="Libre Baskerville, Georgia, serif"
+            latexFontSize={43}
+          />
+        {/if}
+      </div>
     </section>
 
   </div>
