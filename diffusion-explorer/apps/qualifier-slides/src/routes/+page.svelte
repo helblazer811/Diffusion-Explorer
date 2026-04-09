@@ -19,7 +19,7 @@
 
   // From continuity-equation-explainer
   import ProbabilityPathIntro from '$continuity/figures/ProbabilityPathIntro.svelte';
-  import { CrownJewel } from '$continuity/figures/CrownJewel';
+  import CrownJewel from '$rectified-flow/figures/CrownJewel.svelte';
   import MassConservation from '$continuity/figures/MassConservation.svelte';
   import InvertibilityExplanation from '$continuity/figures/InvertibilityExplanation.svelte';
   import FlowInvertibility from '$continuity/figures/FlowInvertibility.svelte';
@@ -74,6 +74,7 @@
   let massFigure: FlowInvertibilitySimple;
   let gridJacobianFigure: CNFGridJacobian;
   let trajFigure: HighlightTrajectory;
+  let dataLikelihoodFigure: any;
 
   // Provide reveal instance to Slide components via context
   setContext('getReveal', () => revealInstance);
@@ -116,6 +117,7 @@
 
   let dataLoaded = false;
   let covShowLog = false;
+  let intersectingPathsSource: number[][] = [];
 
   // ========== HELPERS ==========
 
@@ -155,6 +157,13 @@
     });
 
     await revealInstance.initialize();
+
+    // Click anywhere (non-interactive) to advance
+    deckEl.addEventListener('click', (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('a, button, input, select, textarea, [data-no-advance]')) return;
+      revealInstance.next();
+    });
 
     // ========== LOAD DATA ==========
 
@@ -283,6 +292,9 @@
       }
     } catch (e) { console.warn('Failed to load CE data:', e); }
 
+    // Source distribution for IntersectingPaths: needs to match smiley face point count (500)
+    intersectingPathsSource = clipSamplesToRadius(generateClippedGaussianSamples(500), 2.0);
+
     dataLoaded = true;
   });
 
@@ -371,46 +383,46 @@
 
     <!-- Slide 6: Roadmap -->
     <section class="roadmap-slide">
-      <h2 class="slide-title">Presentation Roadmap</h2>
+      <h2 class="slide-title">What Will You Learn?</h2>
       <ol class="roadmap">
         <li class="roadmap-item">
-          <p class="roadmap-title">Normalizing Flows</p>
-          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+          <p class="roadmap-question">What is a normalizing flow?</p>
+          <p class="roadmap-ref">Normalizing Flows — Rezende & Mohamed, 2015</p>
         </li>
         <li class="roadmap-item">
-          <p class="roadmap-title">Continuous Normalizing Flows</p>
-          <p class="roadmap-ref">Chen et al., 2018</p>
+          <p class="roadmap-question">How to make them continuous?</p>
+          <p class="roadmap-ref">Continuous Normalizing Flows — Chen et al., 2018</p>
         </li>
         <li class="roadmap-item">
-          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
-          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+          <p class="roadmap-question">How to train them efficiently?</p>
+          <p class="roadmap-ref">Flow Matching, Stochastic Interpolants — Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
         </li>
         <li class="roadmap-item">
-          <p class="roadmap-title">Rectified Flows</p>
-          <p class="roadmap-ref">Liu et al., 2023</p>
+          <p class="roadmap-question">How can we make them low latency?</p>
+          <p class="roadmap-ref">Rectified Flows — Liu et al., 2023</p>
         </li>
       </ol>
     </section>
 
     <!-- Roadmap: Normalizing Flows -->
     <section class="roadmap-slide">
-      <h2 class="slide-title">Presentation Roadmap</h2>
+      <h2 class="slide-title">What Will You Learn?</h2>
       <ol class="roadmap">
         <li class="roadmap-item roadmap-active">
-          <p class="roadmap-title">Normalizing Flows</p>
-          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+          <p class="roadmap-question">What is a normalizing flow?</p>
+          <p class="roadmap-ref">Normalizing Flows — Rezende & Mohamed, 2015</p>
         </li>
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Continuous Normalizing Flows</p>
-          <p class="roadmap-ref">Chen et al., 2018</p>
+          <p class="roadmap-question">How to make them continuous?</p>
+          <p class="roadmap-ref">Continuous Normalizing Flows — Chen et al., 2018</p>
         </li>
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
-          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+          <p class="roadmap-question">How to train them efficiently?</p>
+          <p class="roadmap-ref">Flow Matching, Stochastic Interpolants — Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
         </li>
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Rectified Flows</p>
-          <p class="roadmap-ref">Liu et al., 2023</p>
+          <p class="roadmap-question">How can we make them low latency?</p>
+          <p class="roadmap-ref">Rectified Flows — Liu et al., 2023</p>
         </li>
       </ol>
     </section>
@@ -455,22 +467,28 @@
     </Slide>
 
     <!-- Slide: How Likely is My Data? -->
-    <section>
+    <Slide figure={dataLikelihoodFigure}>
       <h2 class="slide-title">How Likely is My Data?</h2>
       <p style="margin-top: 0.5em;">
-        It is easy to evaluate the density for a <span style="color: #4594e3;">simple distribution</span> <Katex math={"\\color{#4594e3}{p(z)}"} />, but not straightforward for a <span style="color: #f17720;">complex distribution</span> <Katex math={"\\color{#f17720}{p(x)}"} />.
+        It is easy to evaluate the likelihood for <span style="color:#4594e3;">a sample <Katex math={"z"} /> from a simple distribution <Katex math={"p(z)"} /></span>, but not for a <span style="color:#f17720;">complex distribution <Katex math={"p(x)"} /></span>.
       </p>
-      <div class="figure-container" style="margin-top: 1.5em;">
+      <div class="figure-container" style="margin-top: 0.8em;">
         {#if dataLoaded}
-          <DataLikelihood width={1800} height={850} {allTimeSamples} distributionScaleFactor={1.0} />
+          <DataLikelihood
+            bind:this={dataLikelihoodFigure}
+            width={1800}
+            height={780}
+            {allTimeSamples}
+            distributionScaleFactor={1.0}
+          />
         {/if}
       </div>
-    </section>
+    </Slide>
 
     <!-- Slide: Change of Variables Formula (click to toggle log form) -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <section on:click={() => covShowLog = !covShowLog} style="cursor: pointer;">
+    <section on:click={(e) => { if (!covShowLog) { e.stopPropagation(); covShowLog = true; } else { covShowLog = false; } }} style="cursor: pointer;">
       <h2 class="slide-title">Change of Variables Formula</h2>
       <p style="margin-top: 0.3em;">
         Flows link the <span style="color: #4594e3;">source density</span> <Katex math={"\\color{#4594e3}{p(z)}"} /> to the <span style="color: #f17720;">data density</span> <Katex math={"\\color{#f17720}{p(x)}"} />.
@@ -504,7 +522,7 @@
       </div>
       <div class="figure-container" style="margin-top: 0px; position: relative; z-index: 1;">
         {#if dataLoaded}
-          <ChangeOfVariablesFigure width={1800} height={800} {allTimeSamples} distributionScaleFactor={0.8} />
+          <ChangeOfVariablesFigure width={1800} height={800} {allTimeSamples} distributionScaleFactor={0.8} showLog={covShowLog} />
         {/if}
       </div>
     </section>
@@ -628,23 +646,23 @@
 
     <!-- Roadmap: Continuous Normalizing Flows -->
     <section class="roadmap-slide">
-      <h2 class="slide-title">Presentation Roadmap</h2>
+      <h2 class="slide-title">What Will You Learn?</h2>
       <ol class="roadmap">
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Normalizing Flows</p>
-          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+          <p class="roadmap-question">What is a normalizing flow?</p>
+          <p class="roadmap-ref">Normalizing Flows — Rezende & Mohamed, 2015</p>
         </li>
         <li class="roadmap-item roadmap-active">
-          <p class="roadmap-title">Continuous Normalizing Flows</p>
-          <p class="roadmap-ref">Chen et al., 2018</p>
+          <p class="roadmap-question">How to make them continuous?</p>
+          <p class="roadmap-ref">Continuous Normalizing Flows — Chen et al., 2018</p>
         </li>
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
-          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+          <p class="roadmap-question">How to train them efficiently?</p>
+          <p class="roadmap-ref">Flow Matching, Stochastic Interpolants — Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
         </li>
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Rectified Flows</p>
-          <p class="roadmap-ref">Liu et al., 2023</p>
+          <p class="roadmap-question">How can we make them low latency?</p>
+          <p class="roadmap-ref">Rectified Flows — Liu et al., 2023</p>
         </li>
       </ol>
     </section>
@@ -838,23 +856,23 @@
 
     <!-- Roadmap: Flow Matching -->
     <section class="roadmap-slide">
-      <h2 class="slide-title">Presentation Roadmap</h2>
+      <h2 class="slide-title">What Will You Learn?</h2>
       <ol class="roadmap">
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Normalizing Flows</p>
-          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+          <p class="roadmap-question">What is a normalizing flow?</p>
+          <p class="roadmap-ref">Normalizing Flows — Rezende & Mohamed, 2015</p>
         </li>
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Continuous Normalizing Flows</p>
-          <p class="roadmap-ref">Chen et al., 2018</p>
+          <p class="roadmap-question">How to make them continuous?</p>
+          <p class="roadmap-ref">Continuous Normalizing Flows — Chen et al., 2018</p>
         </li>
         <li class="roadmap-item roadmap-active">
-          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
-          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+          <p class="roadmap-question">How to train them efficiently?</p>
+          <p class="roadmap-ref">Flow Matching, Stochastic Interpolants — Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
         </li>
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Rectified Flows</p>
-          <p class="roadmap-ref">Liu et al., 2023</p>
+          <p class="roadmap-question">How can we make them low latency?</p>
+          <p class="roadmap-ref">Rectified Flows — Liu et al., 2023</p>
         </li>
       </ol>
     </section>
@@ -986,6 +1004,7 @@
             latexFontSize={43}
             vectorScale={0.4}
             vectorWidth={4.5}
+            arrowHeadSize={14}
             animationDuration={8000}
           />
         {/if}
@@ -1116,23 +1135,23 @@
 
     <!-- Roadmap: Rectified Flows -->
     <section class="roadmap-slide">
-      <h2 class="slide-title">Presentation Roadmap</h2>
+      <h2 class="slide-title">What Will You Learn?</h2>
       <ol class="roadmap">
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Normalizing Flows</p>
-          <p class="roadmap-ref">Rezende & Mohamed, 2015</p>
+          <p class="roadmap-question">What is a normalizing flow?</p>
+          <p class="roadmap-ref">Normalizing Flows — Rezende & Mohamed, 2015</p>
         </li>
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Continuous Normalizing Flows</p>
-          <p class="roadmap-ref">Chen et al., 2018</p>
+          <p class="roadmap-question">How to make them continuous?</p>
+          <p class="roadmap-ref">Continuous Normalizing Flows — Chen et al., 2018</p>
         </li>
         <li class="roadmap-item roadmap-inactive">
-          <p class="roadmap-title">Flow Matching, Stochastic Interpolants</p>
-          <p class="roadmap-ref">Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
+          <p class="roadmap-question">How to train them efficiently?</p>
+          <p class="roadmap-ref">Flow Matching, Stochastic Interpolants — Lipman et al., 2023; Albergo & Vanden-Eijnden, 2023</p>
         </li>
         <li class="roadmap-item roadmap-active">
-          <p class="roadmap-title">Rectified Flows</p>
-          <p class="roadmap-ref">Liu et al., 2023</p>
+          <p class="roadmap-question">How can we make them low latency?</p>
+          <p class="roadmap-ref">Rectified Flows — Liu et al., 2023</p>
         </li>
       </ol>
     </section>
@@ -1303,13 +1322,14 @@
             meanArrowLabelOffset={{ x: 220, y: -18 }}
             topArrowLabelOffset={{ x: -55, y: 25 }}
             bottomArrowLabelOffset={{ x: -55, y: -15 }}
-            sourceDistributionSamples={$sourceDistributionSamples}
+            sourceDistributionSamples={intersectingPathsSource}
             targetDistributionSamples={$targetDistributionSamples}
             backgroundVisible={false}
             {flowMatchingClient}
+            showCouplingAnimation={true}
             trajectoryStartTime={0.3}
             trajectoryLineWidth={6}
-            clickToToggle={true}
+            trajectoryColor={'#22c55e'}
           />
         {/if}
       </div>
@@ -1407,13 +1427,12 @@
     <!-- Slide: Reflow Produces Straighter Trajectories -->
     <section>
       <h2 class="slide-title">Reflow Produces Straighter Trajectories</h2>
-      <div class="figure-container" style="margin-top: 2em;">
+      <div class="figure-container" style="margin-top: 2.5em;">
         {#if dataLoaded}
-          <RectifiedFlowSuperimposed
-            width={1800}
-            canvasWidth={650}
+          <CrownJewel
+            canvasWidth={750}
             canvasHeight={650}
-            gap={20}
+            gap={40}
             {flowMatchingClient}
             {rectifiedFlowClient}
             leftTrajectories={flowMatchingGridTrajectories ?? []}
@@ -1426,9 +1445,13 @@
             targetDistribution={$targetDistributionSamples}
             playingByDefault={true}
             backgroundVisible={false}
-            showTimeSlider={false}
             labelFontSize={50}
+            subtitleFontSize={36}
             trajectoryStrokeWidth={4}
+            interactive={false}
+            showPlayButton={false}
+            durationLabelFontSize={28}
+            durationLabelSpacing={10}
           />
         {/if}
       </div>
@@ -1549,7 +1572,7 @@
     flex-direction: column;
   }
 
-  .roadmap {
+  :global(.roadmap) {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1558,22 +1581,36 @@
     padding-left: 2em;
   }
 
-  .roadmap-item {
+  :global(.roadmap-item) {
     list-style-type: decimal;
     transition: opacity 0.3s;
   }
 
-  .roadmap-active {
+  :global(.roadmap-active) {
     opacity: 1;
   }
 
-  .roadmap-active .roadmap-title {
+  :global(.roadmap-active) :global(.roadmap-question) {
     color: #f17720;
     font-weight: bold;
   }
 
-  .roadmap-inactive {
-    opacity: 0.35;
+  :global(.roadmap-active)::marker {
+    color: #f17720;
+  }
+
+  :global(.roadmap-active) :global(.roadmap-ref) {
+    color: #f17720 !important;
+    opacity: 0.45 !important;
+  }
+
+  :global(.roadmap-inactive) {
+    opacity: 0.12;
+  }
+
+  :global(.roadmap-inactive) :global(.roadmap-ref) {
+    opacity: 1 !important;
+    color: inherit !important;
   }
 
   :global(.bib-entry) {
@@ -1583,19 +1620,22 @@
     break-inside: avoid;
   }
 
-  .roadmap-title {
+  :global(.roadmap-question) {
     font-size: 1.2em;
     margin: 0;
   }
 
-  .roadmap-ref {
-    font-size: 0.75em;
-    color: #aaa;
-    font-style: italic;
-    margin: 0.2em 0 0 0;
+  :global(.roadmap-ref) {
+    font-size: 1.2em !important;
+    font-family: Georgia, serif !important;
+    font-weight: 100 !important;
+    opacity: 0.65 !important;
+    color: #bbb !important;
+    font-style: normal !important;
+    margin: 0.2em 0 0 0 !important;
   }
 
-  .roadmap-desc {
+  :global(.roadmap-desc) {
     font-size: 1.06em;
     color: #888;
     margin: 0.15em 0 0 0;
