@@ -118,6 +118,7 @@
 
   let dataLoaded = false;
   let covShowLog = false;
+  let efficientTrainingPhase = 0; // 0 = show NF equation, 1 = X over it + show CNF equation
   let intersectingPathsSource: number[][] = [];
   let intersectingPathsFigure: any;
 
@@ -303,6 +304,21 @@
   onDestroy(() => {
     revealInstance?.destroy();
   });
+
+  // Svelte action: handle CNFs efficient training slide clicks
+  function efficientTrainingClickHandler(node: HTMLElement) {
+    function handleClick(e: MouseEvent) {
+      e.stopPropagation();
+      if (efficientTrainingPhase < 1) {
+        efficientTrainingPhase = 1;
+      } else {
+        efficientTrainingPhase = 0;
+        revealInstance?.next();
+      }
+    }
+    node.addEventListener('click', handleClick);
+    return { destroy() { node.removeEventListener('click', handleClick); } };
+  }
 
   // Svelte action: handle COV slide clicks — first toggles log form, second advances slide
   function covClickHandler(node: HTMLElement) {
@@ -575,9 +591,12 @@
     <Slide figure={gridJacobianFigure}>
       <h2 class="slide-title">Jacobian Measures Local Volume Change</h2>
       <p style="margin-top: 0.5em;">
-        The Jacobian <Katex math={"\\color{#2ecc71}{\\frac{\\partial f}{\\partial z}}"} /> describes how <Katex math={"f"} /> locally stretches and compresses space.
+        Jacobian <Katex math={"\\color{#2ecc71}{\\frac{\\partial f}{\\partial z}}"} /> describes how <Katex math={"f"} /> locally stretches and compresses space
       </p>
-      <div class="figure-container" style="margin-top: 1em;">
+      <div style="margin-top: 0.8em;">
+        <Katex math={"\\log p(x) = \\log p(z) - {\\color{#2ecc71} \\log \\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"} displayMode={true} />
+      </div>
+      <div class="figure-container" style="margin-top: 0.5em;">
         {#if dataLoaded}
           <CNFGridJacobian
             bind:this={gridJacobianFigure}
@@ -587,6 +606,7 @@
             {allTimeSamples}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
+            showDetLabel={false}
           />
         {/if}
       </div>
@@ -659,6 +679,19 @@
       </div>
     </Slide>
 
+    <!-- Slide: Why Do We Care About Likelihoods? -->
+    <section>
+      <h2 class="slide-title">Why Do We Care About Likelihoods?</h2>
+      <ol style="font-size: 1.05em; line-height: 1.8; padding-left: 1.2em; margin-top: 0.5em;">
+        <li style="margin-bottom: 0.3em;"><strong>Training</strong> — maximize <Katex math={"\\log p(x)"} /> over data</li>
+        <li style="margin-bottom: 0.3em;"><strong>Model evaluation</strong> — compare density estimates</li>
+        <li><strong>Anomaly detection</strong> — flag low-likelihood inputs</li>
+      </ol>
+      <div class="figure-container" style="margin-top: 0.5em; height: 520px; overflow: visible;">
+        <MaxLikelihoodTraining width={1720} height={520} numStages={4} reversed={true} highlightPointIndices={[15]} highlightColor="#3b82f6" showImages={true} looping={true} endPause={1} />
+      </div>
+    </section>
+
     <!-- Slide: Normalizing Flow Recap -->
     <section>
       <h2 class="slide-title">Normalizing Flow Recap</h2>
@@ -689,7 +722,7 @@
         />
       </div>
       <p style="margin-top: 2em;">
-        A substantial body of work restricts <Katex math={"f_i"} /> to make evaluating the determinants more efficient.
+        Many works restrict <Katex math={"f_i"} /> for cheaper determinants.
       </p>
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
         <p style="font-size: 0.7em; color: #888; margin: 0;">
@@ -727,7 +760,7 @@
     <section>
       <h2 class="slide-title">Continuous Normalizing Flows (CNF)</h2>
       <p style="margin-top: 0.3em;">
-        CNFs replace discrete transformations with a continuous-time ODE modeled by a neural network.
+        CNFs replace discrete transformations with continuous
       </p>
       <div class="figure-container" style="margin-top: 0.5em;">
         {#if dataLoaded}
@@ -802,10 +835,10 @@
       <div style="display: flex; align-items: center; gap: 2em; margin-top: 1em;">
         <div style="flex: 1;">
           <p style="margin-top: 0;">
-            CNFs model a velocity field <Katex math={"\\color{#3b82f6}{v_\\theta}"} />.
+            CNFs model a <span style="color: #3b82f6; font-weight: bold;">velocity field</span> <Katex math={"\\color{#3b82f6}{v_\\theta}"} />.
           </p>
           <p style="margin-top: 0.5em;">
-            Generate sample trajectories by solving an ODE:
+            Generate sample <span style="color: #f17720; font-weight: bold;">trajectories</span> by solving an ODE:
           </p>
           <div style="margin-top: 0.2em;">
             <Katex math={"\\frac{d\\color{#f17720}{x}}{dt} = \\color{#3b82f6}{v_\\theta(x, t)}"} displayMode={true} />
@@ -848,33 +881,39 @@
     </section>
 
     <!-- Slide: CNFs Allow More Efficient Likelihood Based Training -->
-    <section>
+    <section use:efficientTrainingClickHandler>
       <h2 class="slide-title">CNFs Allow More Efficient Training</h2>
-      <p style="margin-top: 0.6em;">
-        The instantaneous change of variables replaces the <span style="color: #e74c3c;">expensive Jacobian determinant</span> with a <span style="color: #22c55e;">trace</span>:
-      </p>
-      <div style="margin-top: 2em;">
-        <AnnotatedEquation
-          scale={1.4}
-          verticalGap={60}
-          labelFontSize={44}
-          tex={"\\log p_1(x_1) = \\log p_0(x_0) - {\\color{#e74c3c} \\log \\left| \\det \\dfrac{\\partial \\phi_1}{\\partial x_0} \\right|}"}
-          annotations={[
-            { color: '#e74c3c', label: 'O(d³) — full Jacobian determinant', side: 'above', align: 'left' },
-          ]}
-        />
+      <div style="position: relative; margin-top: 1.5em;">
+        <div style="opacity: {efficientTrainingPhase >= 1 ? 0.3 : 1}; transition: opacity 0.5s;">
+          <p style="font-size: 1.25em; color: #888; margin-bottom: 1em; text-align: center;">Change of Variables (Normalizing Flows)</p>
+          <AnnotatedEquation
+            scale={1.2}
+            verticalGap={50}
+            labelFontSize={36}
+            tex={"\\log p_1(x_1) = \\log p_0(x_0) - {\\color{#e74c3c} \\log \\left| \\det \\dfrac{\\partial f}{\\partial z} \\right|}"}
+            annotations={[
+              { color: '#e74c3c', label: 'This is slow — O(d³)', side: 'above', align: 'left' },
+            ]}
+          />
+        </div>
+        {#if efficientTrainingPhase >= 1}
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 8em; color: #e74c3c; opacity: 0.7; font-weight: bold; pointer-events: none;">✗</div>
+        {/if}
       </div>
-      <div style="margin-top: 3.5em;">
-        <AnnotatedEquation
-          scale={1.4}
-          verticalGap={60}
-          labelFontSize={44}
-          tex={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 {\\color{#22c55e} \\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"}
-          annotations={[
-            { color: '#22c55e', label: 'O(d) — trace only', side: 'above', align: 'left' },
-          ]}
-        />
-      </div>
+      {#if efficientTrainingPhase >= 1}
+        <div style="margin-top: 2.5em;">
+          <p style="font-size: 1.25em; color: #22c55e; margin-bottom: 1em; font-weight: bold; text-align: center;">Continuous Normalizing Flows</p>
+          <AnnotatedEquation
+            scale={1.2}
+            verticalGap={50}
+            labelFontSize={36}
+            tex={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 {\\color{#22c55e} \\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"}
+            annotations={[
+              { color: '#22c55e', label: 'This is much faster — O(d)', side: 'above', align: 'left' },
+            ]}
+          />
+        </div>
+      {/if}
     </section>
 
     <!-- Slide: Likelihood Based Training is Expensive -->
@@ -951,7 +990,16 @@
         Flow matching enables <strong>simulation-free training</strong> — training CNFs without running expensive ODE solvers at each step.
       </p>
       <div style="margin-top: 0.3em;">
-        <Katex math={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| {\\color{#22c55e} v_t^\\theta(x_t)} - {\\color{#f17720} v_t(x_t|x_1)} \\right\\|^2"} displayMode={true} />
+        <AnnotatedEquation
+          scale={1.2}
+          verticalGap={50}
+          labelFontSize={36}
+          tex={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| {\\color{#22c55e} v_t^\\theta(x_t)} - {\\color{#f17720} v_t(x_t|x_1)} \\right\\|^2"}
+          annotations={[
+            { color: '#22c55e', label: 'Our Model', side: 'above', align: 'left' },
+            { color: '#f17720', label: 'Target Velocity', side: 'above', align: 'right' },
+          ]}
+        />
       </div>
       <div class="figure-container" style="margin-top: 0.3em; max-height: 550px; overflow: hidden;">
         {#if dataLoaded}
@@ -982,7 +1030,8 @@
       </div>
     </section>
 
-    <!-- Slide: The Probability Path -->
+    <!-- Slide: The Probability Path (hidden) -->
+    <!--
     <section>
       <h2 class="slide-title">The Probability Path</h2>
       <p style="margin-top: 0.5em;">
@@ -1012,6 +1061,7 @@
         {/if}
       </div>
     </section>
+    -->
 
     <!-- Slide: Specifying the Probability Path -->
     <section>
@@ -1085,7 +1135,16 @@
         Given a point <Katex math={"x_t"} /> we want to predict the velocity <Katex math={"\\color{#22c55e}{v_t^\\theta(x_t)}"} /> that matches the target conditional velocity <Katex math={"\\color{#f17720}{v_t(x_t | x_1)}"} />.
       </p>
       <div style="margin-top: 0.3em;">
-        <Katex math={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| {\\color{#22c55e} v_t^\\theta(x_t)} - {\\color{#f17720} v_t(x_t|x_1)} \\right\\|^2"} displayMode={true} />
+        <AnnotatedEquation
+          scale={1.2}
+          verticalGap={50}
+          labelFontSize={36}
+          tex={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| {\\color{#22c55e} v_t^\\theta(x_t)} - {\\color{#f17720} v_t(x_t|x_1)} \\right\\|^2"}
+          annotations={[
+            { color: '#22c55e', label: 'Our Model', side: 'above', align: 'left' },
+            { color: '#f17720', label: 'Target Velocity', side: 'above', align: 'right' },
+          ]}
+        />
       </div>
       <div class="figure-container" style="margin-top: 1.2em; max-height: 550px; overflow: hidden;">
         {#if dataLoaded}
@@ -1732,7 +1791,7 @@
     font-family: Georgia, serif !important;
     font-weight: 100 !important;
     opacity: 0.65 !important;
-    color: #bbb !important;
+    color: #888 !important;
     font-style: normal !important;
     margin: 0.2em 0 0 0 !important;
   }
