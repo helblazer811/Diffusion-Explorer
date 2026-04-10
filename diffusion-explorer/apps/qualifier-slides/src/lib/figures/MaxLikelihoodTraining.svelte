@@ -344,13 +344,13 @@
           const arrowToX = nextStage.centerX - _arrowOffset;
           drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, _arrowHeadRadius);
           const arrowMidX = (arrowFromX + arrowToX) / 2;
-          drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
+          drawMathjax(ctx, `f_{${s},\\theta}^{-1}`, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
         } else {
           const arrowFromX = nextStage.centerX - _arrowOffset;
           const arrowToX = stage.centerX + _arrowOffset;
           drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, _arrowHeadRadius);
           const arrowMidX = (arrowFromX + arrowToX) / 2;
-          drawMathjax(ctx, `f_{${s}}^{-1}`, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
+          drawMathjax(ctx, `f_{${s},\\theta}^{-1}`, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
         }
 
         ctx.restore();
