@@ -74,6 +74,7 @@
   let massFigure: FlowInvertibilitySimple;
   let gridJacobianFigure: CNFGridJacobian;
   let trajFigure: HighlightTrajectory;
+  let rectifiedFlowFigure: InducedCouplingAnimated;
   let dataLikelihoodFigure: any;
 
   // Provide reveal instance to Slide components via context
@@ -118,6 +119,7 @@
   let dataLoaded = false;
   let covShowLog = false;
   let intersectingPathsSource: number[][] = [];
+  let intersectingPathsFigure: any;
 
   // ========== HELPERS ==========
 
@@ -301,6 +303,32 @@
   onDestroy(() => {
     revealInstance?.destroy();
   });
+
+  // Svelte action: play the video in a section when that slide becomes active
+  function playVideoOnSlide(sectionEl: HTMLElement) {
+    function playVideo() {
+      const video = sectionEl.querySelector('video');
+      if (video) video.play().catch(() => {});
+    }
+    function onSlideChanged(event: any) {
+      if (event.currentSlide === sectionEl) playVideo();
+    }
+    // Poll until revealInstance is ready
+    const interval = setInterval(() => {
+      if (revealInstance) {
+        clearInterval(interval);
+        revealInstance.on('slidechanged', onSlideChanged);
+        // Play immediately if this slide is already active
+        if (revealInstance.getCurrentSlide?.() === sectionEl) playVideo();
+      }
+    }, 100);
+    return {
+      destroy() {
+        clearInterval(interval);
+        revealInstance?.off?.('slidechanged', onSlideChanged);
+      }
+    };
+  }
 </script>
 
 <div class="reveal" bind:this={deckEl}>
@@ -447,11 +475,11 @@
 
     <!-- Slide: Normalizing Flows are Invertible (figure) -->
     <Slide figure={invertibilityFigure}>
-      <h2 class="slide-title">Flows are Invertible and Differentiable</h2>
+      <h2 class="slide-title">Flows Preserve Probability Mass</h2>
       <p style="margin-top: 0.5em;">
         Invertibility ensures probability mass is not created or destroyed.
       </p>
-      <div class="figure-container" style="margin-top: 2.5em;">
+      <div class="figure-container" style="margin-top: 1em;">
         {#if dataLoaded}
           <FlowInvertibilitySimple
             bind:this={invertibilityFigure}
@@ -460,9 +488,12 @@
             {allTimeSamples}
             numLines={5}
             distributionScaleFactor={1.0}
-            overlayText={"f(z) maps all points to distinct locations"}
           />
         {/if}
+      </div>
+      <div style="display:flex; justify-content:space-around; margin-top: 0.3em; font-size: 1.1em;">
+        <Katex math={"\\int p(z)\\, dz = 1"} />
+        <Katex math={"\\int p(x)\\, dx = 1"} />
       </div>
     </Slide>
 
@@ -488,7 +519,7 @@
     <!-- Slide: Change of Variables Formula (click to toggle log form) -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <section on:click={(e) => { if (!covShowLog) { e.stopPropagation(); covShowLog = true; } else { covShowLog = false; } }} style="cursor: pointer;">
+    <section onclick={(e) => { if (!covShowLog) { e.stopPropagation(); covShowLog = true; } else { covShowLog = false; } }} style="cursor: pointer;">
       <h2 class="slide-title">Change of Variables Formula</h2>
       <p style="margin-top: 0.3em;">
         Flows link the <span style="color: #4594e3;">source density</span> <Katex math={"\\color{#4594e3}{p(z)}"} /> to the <span style="color: #f17720;">data density</span> <Katex math={"\\color{#f17720}{p(x)}"} />.
@@ -614,6 +645,18 @@
         <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={520} numStages={4} reversed={true} showImages={true} looping={true} endPause={1} />
       </div>
     </Slide>
+
+    <!-- Slide: Normalizing Flow Recap -->
+    <section>
+      <h2 class="slide-title">Normalizing Flow Recap</h2>
+      <p style="margin-top: 0.5em; line-height: 1.7;">
+        Normalizing flows <strong>(a)</strong> transform simple probability distributions into more complex ones,
+        and <strong>(b)</strong> allow for evaluation of exact likelihoods.
+      </p>
+      <div class="figure-container" style="margin-top: -30px;">
+        <NormalizingFlowStages width={1720} numStages={4} showLabels={true} looping={true} animationDuration={5000} />
+      </div>
+    </section>
 
     <!-- Slide: Jacobian Determinants Are Expensive -->
     <section>
@@ -794,17 +837,28 @@
     <!-- Slide: CNFs Allow More Efficient Likelihood Based Training -->
     <section>
       <h2 class="slide-title">CNFs Allow More Efficient Training</h2>
-      <p style="margin-top: 0.8em;">
-        The instantaneous change of variables replaces the expensive Jacobian determinant with a <span style="color: #22c55e;">trace</span>:
+      <p style="margin-top: 0.6em;">
+        The instantaneous change of variables replaces the <span style="color: #e74c3c;">expensive Jacobian determinant</span> with a <span style="color: #22c55e;">trace</span>:
       </p>
-      <div style="margin-top: 3em;">
+      <div style="margin-top: 2em;">
         <AnnotatedEquation
-          scale={1.5}
+          scale={1.4}
           verticalGap={60}
-          labelFontSize={48}
+          labelFontSize={44}
+          tex={"\\log p_1(x_1) = \\log p_0(x_0) - {\\color{#e74c3c} \\log \\left| \\det \\dfrac{\\partial \\phi_1}{\\partial x_0} \\right|}"}
+          annotations={[
+            { color: '#e74c3c', label: 'O(d³) — full Jacobian determinant', side: 'above', align: 'left' },
+          ]}
+        />
+      </div>
+      <div style="margin-top: 3.5em;">
+        <AnnotatedEquation
+          scale={1.4}
+          verticalGap={60}
+          labelFontSize={44}
           tex={"\\log p_1(x_1) = \\log p_0(x_0) - \\int_0^1 {\\color{#22c55e} \\operatorname{tr}\\!\\left(\\dfrac{\\partial v_\\theta}{\\partial x}\\right)} \\, dt"}
           annotations={[
-            { color: '#22c55e', label: 'Trace is only O(d)', side: 'above', align: 'left' },
+            { color: '#22c55e', label: 'O(d) — trace only', side: 'above', align: 'left' },
           ]}
         />
       </div>
@@ -1020,7 +1074,7 @@
       <div style="margin-top: 0.3em;">
         <Katex math={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| {\\color{#22c55e} v_t^\\theta(x_t)} - {\\color{#f17720} v_t(x_t|x_1)} \\right\\|^2"} displayMode={true} />
       </div>
-      <div class="figure-container" style="margin-top: 0.3em; max-height: 550px; overflow: hidden;">
+      <div class="figure-container" style="margin-top: 1.2em; max-height: 550px; overflow: hidden;">
         {#if dataLoaded}
           <ConditionalFlowMatching
             width={1800}
@@ -1303,7 +1357,9 @@
     </section>
 
     <!-- Slide: Our Paths Crossed at the Wrong Time -->
-    <section>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <section onclick={(e) => { if (intersectingPathsFigure?.advance()) e.stopPropagation(); }}>
       <h2 class="slide-title">Our Paths Crossed at the Wrong Time</h2>
       <p style="margin-top: 0.5em;">
         The velocity field <Katex math={"\\color{#22c55e}{v_t^\\theta}"} /> cannot accurately resolve conflicting paths — the best it can do is average. This averaging leads to curved trajectories.
@@ -1311,6 +1367,8 @@
       <div class="figure-container" style="margin-top: 2.5em;">
         {#if dataLoaded}
           <IntersectingPaths
+            bind:this={intersectingPathsFigure}
+            onNextSlide={() => revealInstance?.next()}
             width={1800}
             height={800}
             sourceCenterX={0.2}
@@ -1341,7 +1399,10 @@
     <!-- Slide: Ambiguities Lead to Curved Trajectories -->
     <section>
       <h2 class="slide-title">Ambiguities Lead to Curved Trajectories</h2>
-      <div class="figure-container" style="margin-top: 1.5em;">
+      <p style="margin-top: 0.5em;">
+        The trajectories curve, but importantly, <strong>do not intersect</strong>.
+      </p>
+      <div class="figure-container" style="margin-top: 1em;">
         {#if dataLoaded}
           <ChangeOfVariablesAnnotated
             flowMatchingClient={flowMatchingClient}
@@ -1364,12 +1425,13 @@
     </section>
 
     <!-- Slide: Rectified Flows -->
-    <section>
+    <Slide figure={rectifiedFlowFigure}>
       <h2 class="slide-title">Rectified Flows</h2>
       <p style="margin-top: 0.5em;">Reflow recursively trains flow matching models and uses them to produce a better coupling.</p>
       <div class="figure-container" style="margin-top: 1em;">
         {#if dataLoaded}
           <InducedCouplingAnimated
+            bind:this={rectifiedFlowFigure}
             width={1800}
             height={600}
             targetDistribution={$targetDistributionSamples}
@@ -1390,7 +1452,7 @@
           Liu et al., <span style="font-style: italic;">Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow</span>, 2022
         </p>
       </div>
-    </section>
+    </Slide>
 
     <!-- Slide: The Reflow Algorithm (hidden for now) -->
     <!--
@@ -1466,6 +1528,33 @@
         <p class="bib-entry">[3] Y. Lipman et al. "Flow Matching for Generative Modeling." <em>ICLR</em>, 2023.</p>
         <p class="bib-entry">[4] M. Albergo & E. Vanden-Eijnden. "Stochastic Interpolants: A Unifying Framework for Flows and Diffusions." <em>ICML</em>, 2023.</p>
         <p class="bib-entry">[5] Q. Liu et al. "Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow." <em>ICLR</em>, 2023.</p>
+      </div>
+    </section>
+
+    <!-- Slide: Check Out Diffusion Explorer -->
+    <section use:playVideoOnSlide>
+      <h2 class="slide-title">Check Out Diffusion Explorer</h2>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 3em; margin-top: 1.5em;">
+        <video
+          src="{base}/GitHubRecording.mp4"
+          loop
+          muted
+          playsinline
+          style="height: 680px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);"
+        ></video>
+        <img
+          src="{base}/GitHubQRCode.png"
+          alt="GitHub QR Code"
+          style="width: 320px; height: 320px; border-radius: 8px;"
+        />
+      </div>
+      <div style="position: absolute; bottom: 1.2em; left: 0; right: 0; text-align: center;">
+        <a
+          href="https://github.com/helblazer811/Diffusion-Explorer"
+          style="font-size: 0.9em; color: #555; text-decoration: none;"
+        >
+          https://github.com/helblazer811/Diffusion-Explorer
+        </a>
       </div>
     </section>
 
