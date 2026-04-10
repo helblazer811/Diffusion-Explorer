@@ -304,6 +304,21 @@
     revealInstance?.destroy();
   });
 
+  // Svelte action: handle COV slide clicks — first toggles log form, second advances slide
+  function covClickHandler(node: HTMLElement) {
+    function handleClick(e: MouseEvent) {
+      e.stopPropagation();
+      if (!covShowLog) {
+        covShowLog = true;
+      } else {
+        covShowLog = false;
+        revealInstance?.next();
+      }
+    }
+    node.addEventListener('click', handleClick);
+    return { destroy() { node.removeEventListener('click', handleClick); } };
+  }
+
   // Svelte action: play the video in a section when that slide becomes active
   function playVideoOnSlide(sectionEl: HTMLElement) {
     function playVideo() {
@@ -517,9 +532,7 @@
     </Slide>
 
     <!-- Slide: Change of Variables Formula (click to toggle log form) -->
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <section onclick={(e) => { if (!covShowLog) { e.stopPropagation(); covShowLog = true; } else { covShowLog = false; } }} style="cursor: pointer;">
+    <section use:covClickHandler style="cursor: pointer;">
       <h2 class="slide-title">Change of Variables Formula</h2>
       <p style="margin-top: 0.3em;">
         Flows link the <span style="color: #4594e3;">source density</span> <Katex math={"\\color{#4594e3}{p(z)}"} /> to the <span style="color: #f17720;">data density</span> <Katex math={"\\color{#f17720}{p(x)}"} />.
