@@ -69,6 +69,9 @@
   export let looping = true;
   export let numCouplingPaths = 60;
 
+  // Called when all animation stages are complete and user clicks again
+  export let onNextSlide: (() => void) | null = null;
+
   // Flow trajectory (final phase)
   export let flowMatchingClient: FlowModelClient | null = null;
   export let trajectoryColor = '#22c55e'; // green
@@ -496,6 +499,17 @@
   // ----------------------------------------------------------------
   // Lifecycle
   // ----------------------------------------------------------------
+
+  // Advance animation stage. Returns true if animation is in progress, false if all done.
+  export function advance(): boolean {
+    if (!showCouplingAnimation) return false;
+    if (animationComplete) {
+      onNextSlide?.();
+      return false;
+    }
+    timeline?.advance(); // no-op if not at a waitForInput point
+    return true;
+  }
 
   export function restart() {
     animationComplete = false;

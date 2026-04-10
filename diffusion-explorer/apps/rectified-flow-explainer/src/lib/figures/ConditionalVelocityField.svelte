@@ -406,6 +406,17 @@
       latexFontSize, 0, 10, { color: latexColor }
     );
 
+    // x_0 above selected source point
+    const sourceX =
+      scales.sourceCenterPixelX +
+      (sourcePoint[0] - scales.sourceMeanX) * scales.xScaleFactor;
+    const sourceY = scales.yScale(sourcePoint[1]);
+    drawCircle(sourceX, sourceY, selectedTargetRadius, selectedTargetColor);
+    drawMathjax(
+      ctx, "x_0", sourceX, sourceY,
+      latexFontSize, 0, latexLabelOffsetY, { color: latexColor }
+    );
+
     // x_1 above selected target point
     drawMathjax(
       ctx, "x_1", targetX, targetY,

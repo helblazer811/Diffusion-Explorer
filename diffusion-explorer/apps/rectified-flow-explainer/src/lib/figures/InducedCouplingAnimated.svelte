@@ -413,6 +413,16 @@
     if (timeline) timeline.pause();
   }
 
+  export function restart() {
+    if (!timeline) return;
+    timeline.resetState();
+    timeline.play();
+  }
+
+  export function pause() {
+    if (timeline) timeline.pause();
+  }
+
   // ----------------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------------
@@ -594,9 +604,14 @@
     }
   }
 
-  // Handle visibility changes
+  // Handle visibility changes — reset on slide exit so next visit starts from stage 1
   $: if (figureIsActive !== undefined && initialized) {
-    handleVisibilityChange($figureIsActive);
+    if (!$figureIsActive) {
+      timeline?.pause();
+      timeline?.resetState();
+    } else {
+      timeline?.play();
+    }
   }
 </script>
 
