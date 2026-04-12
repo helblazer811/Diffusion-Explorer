@@ -12,7 +12,7 @@
     loadCachedVectorField as loadCachedVF,
     loadCachedRectifiedFlowTrajectories as loadCachedRFTraj,
   } from '@diffusion-explorer/diffusion';
-  import { Katex, AnnotatedEquation } from '@diffusion-explorer/ui';
+  import { Katex, AnnotatedEquation, Timeline } from '@diffusion-explorer/ui';
   import { settings } from '$lib/settings';
 
   // ========== FIGURE IMPORTS ==========
@@ -119,6 +119,42 @@
   let dataLoaded = false;
   let covShowLog = false;
   let efficientTrainingPhase = 0; // 0 = show NF equation, 1 = X over it + show CNF equation
+  let fmTrainingPhase = 0; // 0 = show ML equation, 1 = X over it + show FM equation
+  let stochIntPhase = 0; // 0 = normal slide, 1 = white overlay + same training objective
+
+  // SOTA image generation slide
+  const sotaImageFiles = [
+    'image_1.png', 'image_2.png', 'image_3.png', 'image_4.png', 'image_5.png',
+  ];
+  type SotaImage = { file: string; x: number; y: number; w: number; rotation: number };
+  const sotaImages: SotaImage[] = (() => {
+    const n = sotaImageFiles.length;
+    const spacing = 1600 / n;
+    return sotaImageFiles.map((file, i) => ({
+      file,
+      x: 80 + i * spacing,
+      y: i % 2 === 0 ? 40 : 380,
+      w: 500,
+      rotation: (i % 2 === 0 ? -4 : 4),
+    }));
+  })();
+  let sotaRevealCount = 0;
+
+  // Compute expensive slide images
+  const computeExpensiveFiles = ['image.png', 'image_2.png', 'image_3.png', 'image_4.png', 'image_5.png'];
+  type CEImage = { file: string; x: number; y: number; w: number; rotation: number };
+  const computeExpensiveImages: CEImage[] = (() => {
+    const n = computeExpensiveFiles.length;
+    const spacing = 1500 / n;
+    return computeExpensiveFiles.map((file, i) => ({
+      file,
+      x: 40 + i * spacing,
+      y: i % 2 === 0 ? 20 : 400,
+      w: 700,
+      rotation: (i % 2 === 0 ? -4 : 4),
+    }));
+  })();
+  let ceRevealCount = 0;
   let intersectingPathsSource: number[][] = [];
   let intersectingPathsFigure: any;
 
@@ -305,6 +341,69 @@
     revealInstance?.destroy();
   });
 
+  // Svelte action: reveal SOTA images one by one using Timeline
+  function sotaImageReveal(sectionEl: HTMLElement) {
+    type SotaState = { count: number };
+    const tl = new Timeline<SotaState>();
+    tl.initialState = { count: 0 };
+    tl.duration = sotaImages.length * 0.36; // 360ms per image
+    tl.looping = false;
+    tl.add({
+      name: 'Reveal',
+      reduce(t) { return { count: Math.floor(t * sotaImages.length + 0.999) }; },
+    }, { start: 0, end: 1 });
+    tl.onTick((_t, state) => { sotaRevealCount = state.count; });
+
+    function onSlideChanged(event: any) {
+      if (event.currentSlide === sectionEl) {
+        sotaRevealCount = 0;
+        tl.reset();
+        tl.play();
+      } else {
+        tl.pause();
+        sotaRevealCount = 0;
+      }
+    }
+    const poll = setInterval(() => {
+      if (revealInstance) {
+        clearInterval(poll);
+        revealInstance.on('slidechanged', onSlideChanged);
+      }
+    }, 100);
+    return { destroy() { clearInterval(poll); tl.pause(); revealInstance?.off?.('slidechanged', onSlideChanged); } };
+  }
+
+  // Svelte action: reveal compute expensive images using Timeline
+  function ceImageReveal(sectionEl: HTMLElement) {
+    const tl = new Timeline<{ count: number }>();
+    tl.initialState = { count: 0 };
+    tl.duration = computeExpensiveImages.length * 0.72;
+    tl.looping = false;
+    tl.add({
+      name: 'Reveal',
+      reduce(t) { return { count: Math.floor(t * computeExpensiveImages.length + 0.999) }; },
+    }, { start: 0, end: 1 });
+    tl.onTick((_t, state) => { ceRevealCount = state.count; });
+
+    function onSlideChanged(event: any) {
+      if (event.currentSlide === sectionEl) {
+        ceRevealCount = 0;
+        tl.reset();
+        tl.play();
+      } else {
+        tl.pause();
+        ceRevealCount = 0;
+      }
+    }
+    const poll = setInterval(() => {
+      if (revealInstance) {
+        clearInterval(poll);
+        revealInstance.on('slidechanged', onSlideChanged);
+      }
+    }, 100);
+    return { destroy() { clearInterval(poll); tl.pause(); revealInstance?.off?.('slidechanged', onSlideChanged); } };
+  }
+
   // Svelte action: handle CNFs efficient training slide clicks
   function efficientTrainingClickHandler(node: HTMLElement) {
     function handleClick(e: MouseEvent) {
@@ -313,6 +412,36 @@
         efficientTrainingPhase = 1;
       } else {
         efficientTrainingPhase = 0;
+        revealInstance?.next();
+      }
+    }
+    node.addEventListener('click', handleClick);
+    return { destroy() { node.removeEventListener('click', handleClick); } };
+  }
+
+  // Svelte action: handle stochastic interpolants slide clicks
+  function stochIntClickHandler(node: HTMLElement) {
+    function handleClick(e: MouseEvent) {
+      e.stopPropagation();
+      if (stochIntPhase < 1) {
+        stochIntPhase = 1;
+      } else {
+        stochIntPhase = 0;
+        revealInstance?.next();
+      }
+    }
+    node.addEventListener('click', handleClick);
+    return { destroy() { node.removeEventListener('click', handleClick); } };
+  }
+
+  // Svelte action: handle FM training slide clicks
+  function fmTrainingClickHandler(node: HTMLElement) {
+    function handleClick(e: MouseEvent) {
+      e.stopPropagation();
+      if (fmTrainingPhase < 1) {
+        fmTrainingPhase = 1;
+      } else {
+        fmTrainingPhase = 0;
         revealInstance?.next();
       }
     }
@@ -417,13 +546,32 @@
       </div>
     </Slide>
 
-    <!-- Slide 3: Transforming Noise into Data -->
+    <!-- Slide 3: Flow-based Generative Models -->
     <Slide figure={noiseFigure}>
-      <h2 class="slide-title">Transforming Noise into Data</h2>
-      <div class="figure-container" style="margin-top: 140px;">
-        <TransformingNoiseIntoData bind:this={noiseFigure} width={1720} height={975} />
+      <h2 class="slide-title">Flow-based Generative Models</h2>
+      <p style="margin-top: 0.5em;">
+        Flows learn transformations of probability distributions and enable novel sample generation.
+      </p>
+      <div class="figure-container" style="margin-top: 30px;">
+        <TransformingNoiseIntoData bind:this={noiseFigure} width={1720} height={780} />
       </div>
     </Slide>
+
+    <!-- Slide: Flows Underpin State of the Art Image Generation -->
+    <section use:sotaImageReveal>
+      <h2 class="slide-title">Flows Underpin State of the Art Image and Video Generation</h2>
+      <div style="position: relative; width: 100%; height: 900px; overflow: hidden;">
+        {#each sotaImages as img, i}
+          {#if i < sotaRevealCount}
+            <img
+              src="{base}/image_generation_slide/{img.file}"
+              alt=""
+              style="position: absolute; left: {img.x}px; top: {img.y}px; width: {img.w}px; height: auto; border-radius: 10px; transform: rotate({img.rotation}deg); animation: sotaFadeIn 0.35s ease forwards;"
+            />
+          {/if}
+        {/each}
+      </div>
+    </section>
 
     <!-- Slide 4: Diffusion vs Flow (hidden for now) -->
     <!--
@@ -432,13 +580,15 @@
     </Slide>
     -->
 
-    <!-- Slide 5: Flow-based Generative Models -->
+    <!-- Slide 5: Flow-based Generative Models (hidden for now) -->
+    <!--
     <Slide figure={flowPathFigure}>
       <h2 class="slide-title">Flow-based Generative Models</h2>
       <div class="figure-container" style="margin-top: 120px;">
         <FlowProbabilityPath bind:this={flowPathFigure} width={1720} height={850} contourBandwidth={20} contourGridSize={50} contourThresholds={3} />
       </div>
     </Slide>
+    -->
 
     <!-- Slide 6: Roadmap -->
     <section class="roadmap-slide">
@@ -587,6 +737,26 @@
       </div>
     </section>
 
+    <!-- Slide: Composing Multiple Transformations -->
+    <Slide figure={composeFigure}>
+      <h2 class="slide-title">Composing Multiple Transformations</h2>
+      <div style="margin-top: 1.5em; margin-bottom: 0.8em;">
+        <AnnotatedEquation
+          scale={1.3}
+          verticalGap={60}
+          rowSpacing={40}
+          labelFontSize={36}
+          tex={"\\log p(x) = \\log p(z_0) - \\sum_{i=0}^{K-1} \\log \\left| {\\color{#2ecc71} \\det \\frac{\\partial f_i}{\\partial z_i}} \\right|"}
+          annotations={[
+            { color: '#2ecc71', label: 'Sum of Log Volume Changes', side: 'above', align: 'left' },
+          ]}
+        />
+      </div>
+      <div class="figure-container" style="margin-top: 10px; height: 520px; overflow: hidden;">
+        <NormalizingFlowStages bind:this={composeFigure} width={1720} numStages={4} showLabels={true} static={true} />
+      </div>
+    </Slide>
+
     <!-- Slide: Jacobian Measures Local Volume Change -->
     <Slide figure={gridJacobianFigure}>
       <h2 class="slide-title">Jacobian Measures Local Volume Change</h2>
@@ -594,7 +764,7 @@
         Jacobian <Katex math={"\\color{#2ecc71}{\\frac{\\partial f}{\\partial z}}"} /> describes how <Katex math={"f"} /> locally stretches and compresses space
       </p>
       <div style="margin-top: 0.8em;">
-        <Katex math={"\\log p(x) = \\log p(z) - {\\color{#2ecc71} \\log \\left| \\det \\frac{\\partial f}{\\partial z} \\right|}"} displayMode={true} />
+        <Katex math={"\\log p(x) = \\log p(z_0) - \\sum_{i=0}^{K-1} \\log \\left| {\\color{#2ecc71} \\det \\frac{\\partial f_i}{\\partial z_i}} \\right|"} displayMode={true} />
       </div>
       <div class="figure-container" style="margin-top: 0.5em;">
         {#if dataLoaded}
@@ -612,25 +782,6 @@
       </div>
     </Slide>
 
-    <!-- Slide: Composing Multiple Transformations -->
-    <Slide figure={composeFigure}>
-      <h2 class="slide-title">Composing Multiple Transformations</h2>
-      <div style="margin-top: 1.5em; margin-bottom: 0.8em;">
-        <AnnotatedEquation
-          scale={1.3}
-          verticalGap={60}
-          rowSpacing={40}
-          labelFontSize={48}
-          tex={"\\log p(x) = \\log p(z_0) + {\\color{#2ecc71} \\sum_{i=0}^{K-1} \\log \\left| \\det \\frac{\\partial f_i}{\\partial z_i} \\right|}"}
-          annotations={[
-            { color: '#2ecc71', label: 'Sum of Log Volume Changes', side: 'above', align: 'left' },
-          ]}
-        />
-      </div>
-      <div class="figure-container" style="margin-top: 10px; height: 520px; overflow: hidden;">
-        <NormalizingFlowStages bind:this={composeFigure} width={1720} numStages={4} showLabels={true} static={true} />
-      </div>
-    </Slide>
 
     <!-- Slide: Computing the Likelihood of Data -->
     <Slide figure={encodeFigure}>
@@ -715,7 +866,7 @@
           scale={1.8}
           verticalGap={85}
           labelFontSize={42}
-          tex={"\\log p(x) = \\log p(z_0) + \\sum_{i=1}^{K} \\log \\left| {\\color{#e74c3c} \\det \\dfrac{\\partial f_i}{\\partial z_{i-1}}} \\right|"}
+          tex={"\\log p(x) = \\log p(z_0) - \\sum_{i=1}^{K} \\log \\left| {\\color{#e74c3c} \\det \\dfrac{\\partial f_i}{\\partial z_{i-1}}} \\right|"}
           annotations={[
             { color: '#e74c3c', label: 'O(d³) in general', side: 'below', align: 'left' },
           ]}
@@ -730,6 +881,22 @@
           Real NVP <span style="font-style: italic;">(Dinh et al., 2017)</span>,
           Glow <span style="font-style: italic;">(Kingma &amp; Dhariwal, 2018)</span>
         </p>
+      </div>
+    </section>
+
+    <!-- Slide: Computational Efficiency is Important -->
+    <section use:ceImageReveal>
+      <h2 class="slide-title">GPUs are Expensive</h2>
+      <div style="position: relative; width: 100%; height: 900px; overflow: visible;">
+        {#each computeExpensiveImages as img, i}
+          {#if i < ceRevealCount}
+            <img
+              src="{base}/compute_expensive/{img.file}"
+              alt=""
+              style="position: absolute; left: {img.x}px; top: {img.y}px; width: {img.w}px; height: auto; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); transform: rotate({img.rotation}deg); animation: sotaFadeIn 0.35s ease forwards;"
+            />
+          {/if}
+        {/each}
       </div>
     </section>
 
@@ -918,7 +1085,7 @@
 
     <!-- Slide: Likelihood Based Training is Expensive -->
     <section>
-      <h2 class="slide-title">Training is Still Expensive</h2>
+      <h2 class="slide-title">Simulating ODEs is Still Expensive</h2>
       <p style="margin-top: 0.5em;">
         Requires solving an ODE at <em style="color: #e74c3c;">every training step</em>.
       </p>
@@ -983,50 +1150,89 @@
       </ol>
     </section>
 
-    <!-- Slide: Flow Matching -->
-    <section>
-      <h2 class="slide-title">Flow Matching</h2>
+    <!-- Slide: Flow Matching Enables Faster Training -->
+    <section use:fmTrainingClickHandler>
+      <h2 class="slide-title">Flow Matching Enables Faster Training</h2>
       <p style="margin-top: 0.5em;">
-        Flow matching enables <strong>simulation-free training</strong> — training CNFs without running expensive ODE solvers at each step.
+        Flow matching enables <strong>simulation-free training</strong> — no expensive ODE solvers at each step.
       </p>
-      <div style="margin-top: 0.3em;">
-        <AnnotatedEquation
-          scale={1.2}
-          verticalGap={50}
-          labelFontSize={36}
-          tex={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| {\\color{#22c55e} v_t^\\theta(x_t)} - {\\color{#f17720} v_t(x_t|x_1)} \\right\\|^2"}
-          annotations={[
-            { color: '#22c55e', label: 'Our Model', side: 'above', align: 'left' },
-            { color: '#f17720', label: 'Target Velocity', side: 'above', align: 'right' },
-          ]}
-        />
-      </div>
-      <div class="figure-container" style="margin-top: 0.3em; max-height: 550px; overflow: hidden;">
-        {#if dataLoaded}
-          <ConditionalFlowMatching
-            width={1800}
-            height={550}
-            sourceDistributionSamples={$sourceDistributionSamples}
-            targetDistributionSamples={$targetDistributionSamples}
-            backgroundVisible={false}
-            distributionScaleFactor={0.75}
-            yShiftFactor={-0.8}
-            x1Pixel={{ x: 1600, y: 350 }}
-            vectorScale={350}
-            vectorWidth={4}
-            lineWidth={4}
-            dashedLineWidth={3}
-            latexFontSize={36}
-            distributionLabelOffsetY={40}
-            vtLabelOffsetY={65}
-            arrowHeadSize={12}
+      <div style="position: relative; margin-top: 1em;">
+        <div style="opacity: {fmTrainingPhase >= 1 ? 0.3 : 1}; transition: opacity 0.5s;">
+          <p style="font-size: 1.25em; color: #e74c3c; margin-bottom: 0.5em; text-align: center;">Maximum Likelihood</p>
+          <AnnotatedEquation
+            scale={1.1}
+            verticalGap={50}
+            labelFontSize={36}
+            tex={"\\mathcal{L}_{ML}(\\theta) = \\log p_0(x_0) - {\\color{#e74c3c} \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_\\theta}{\\partial x}\\right) dt}"}
+            annotations={[
+              { color: '#e74c3c', label: 'Expensive simulation', side: 'below', align: 'left' },
+            ]}
           />
+        </div>
+        {#if fmTrainingPhase >= 1}
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 8em; color: #e74c3c; opacity: 0.7; font-weight: bold; pointer-events: none;">✗</div>
         {/if}
       </div>
+      {#if fmTrainingPhase >= 1}
+        <div style="margin-top: 0.8em;">
+          <p style="font-size: 1.25em; color: #22c55e; margin-bottom: 0.5em; text-align: center; font-weight: bold;">Flow Matching</p>
+          <AnnotatedEquation
+            scale={1.1}
+            verticalGap={50}
+            labelFontSize={36}
+            tex={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| v_t^\\theta(x_t) - v_t(x_t|x_1) \\right\\|^2"}
+            annotations={[
+              { color: '#22c55e', label: 'Simulation free', side: 'below', align: 'left' },
+            ]}
+          />
+        </div>
+      {/if}
       <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
         <p style="font-size: 0.7em; color: #888; margin: 0;">
           Lipman et al., <span style="font-style: italic;">Flow Matching for Generative Modeling</span>, 2023
         </p>
+      </div>
+    </section>
+
+    <!-- Slide: Flow Matching Directly Learns Velocity -->
+    <section>
+      <h2 class="slide-title">Flow Matching Directly Learns Velocity</h2>
+      <p style="margin-top: 0.5em;">
+        Directly learns <span style="color: #3b82f6; font-weight: bold;">velocity</span> <Katex math={"\\color{#3b82f6}{v_\\theta}"} /> instead of maximizing likelihood.
+      </p>
+      <div class="figure-container" style="margin-top: 1em;">
+        {#if dataLoaded}
+          <HighlightTrajectory
+            width={1800}
+            height={700}
+            {flowMatchingClient}
+            sourceDistributionSamples={$sourceDistributionSamples}
+            targetDistributionSamples={$targetDistributionSamples}
+            allTimeSamples={$allTimeSamples}
+            isTraining={$isTraining}
+            numTrajectoriesToShow={1}
+            reverse={false}
+            showTimeSlider={true}
+            useRawSlider={true}
+            sliderMaxWidth="1100px"
+            sliderLabelSize="30px"
+            distributionScaleFactor={0.8}
+            endpointRadius={12}
+            trajectoryStrokeWidth={5}
+            latexFontSize={43}
+            animationDuration={8000}
+            pauseBeforeRestart={3000}
+            sourceLabelText={"p_0"}
+            targetLabelText={"p_1"}
+            labelFontSize={50}
+            scatterPlotColor={'#999'}
+            showVelocityArrow={true}
+            velocityArrowScale={100}
+            velocityArrowColor={'#3b82f6'}
+            velocityArrowWidth={5}
+            velocityArrowHeadSize={12}
+          />
+        {/if}
       </div>
     </section>
 
@@ -1170,50 +1376,98 @@
       </div>
     </section>
 
-    <!-- Slide: Stochastic Interpolants -->
+    <!-- Slide: Flow Matching Successfully Learns a Flow -->
     <section>
-      <h2 class="slide-title">Stochastic Interpolants</h2>
+      <h2 class="slide-title">Flow Matching Successfully Learns a Flow</h2>
       <p style="margin-top: 0.5em;">
-        We take a deterministic path like the <span style="color: #3b82f6; font-weight: bold;">linear path</span> and <span style="color: #f17720; font-weight: bold;">stochastic interpolants</span> add stochasticity.
+        This objective preserves exact likelihood evaluation, enables generation, and learns a transformation of the distribution.
       </p>
-      <div style="margin-top: 0.3em;">
-        <AnnotatedEquation
-          scale={1.3}
-          verticalGap={50}
-          labelFontSize={42}
-          tex={"X_t = (1-t)X_0 + tX_1 + {\\color{#f17720} \\sigma_t \\cdot \\varepsilon}, \\quad \\varepsilon \\sim \\mathcal{N}(0, I)"}
-          annotations={[
-            { color: '#f17720', label: 'Noise', side: 'below' },
-          ]}
-        />
-      </div>
-      <div class="figure-container" style="margin-top: -3em;">
+      <div class="figure-container" style="margin-top: 0.5em;">
         {#if dataLoaded}
-          <StochasticInterpolation
+          <ProbabilityPath
             width={1800}
             height={600}
-            sourcePointColor={"#999"}
-            targetPointColor={"#999"}
             sourceDistributionSamples={$sourceDistributionSamples}
             targetDistributionSamples={$targetDistributionSamples}
-            sourcePointIndex={5}
-            targetPointIndex={230}
-            sigma={300}
-            maxEpsilonNorm={1.5}
+            {allTimeSamples}
+            {isTraining}
             playingByDefault={true}
             backgroundVisible={false}
-            showEquation={false}
-            sourceLabelText=""
-            targetLabelText=""
+            showContours={true}
+            distributionScaleFactor={0.7}
+            showTimeSlider={true}
+            useRawSlider={true}
+            sliderMaxWidth="1100px"
+            sliderLabelSize="30px"
             labelFontSize={50}
+            labelFontFamily="Libre Baskerville, Georgia, serif"
             latexFontSize={43}
           />
         {/if}
       </div>
-      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
-        <p style="font-size: 0.7em; color: #888; margin: 0;">
-          Albergo et al., <span style="font-style: italic;">Stochastic Interpolants: A Unifying Framework for Flows and Diffusions</span>, 2023
+    </section>
+
+    <!-- Slide: Stochastic Interpolants -->
+    <section use:stochIntClickHandler>
+      <div style="position: relative; width: 1920px; height: 1200px; margin: -40px auto 0;">
+        <h2 class="slide-title">Stochastic Interpolants</h2>
+        <p style="margin-top: 0.5em;">
+          We take a deterministic path like the <span style="color: #3b82f6; font-weight: bold;">linear path</span> and <span style="color: #f17720; font-weight: bold;">stochastic interpolants</span> add stochasticity.
         </p>
+        <div style="margin-top: 0.3em;">
+          <AnnotatedEquation
+            scale={1.3}
+            verticalGap={50}
+            labelFontSize={42}
+            tex={"X_t = (1-t)X_0 + tX_1 + {\\color{#f17720} \\sigma_t \\cdot \\varepsilon}, \\quad \\varepsilon \\sim \\mathcal{N}(0, I)"}
+            annotations={[
+              { color: '#f17720', label: 'Noise', side: 'below' },
+            ]}
+          />
+        </div>
+        <div class="figure-container" style="margin-top: -3em;">
+          {#if dataLoaded}
+            <StochasticInterpolation
+              width={1800}
+              height={600}
+              sourcePointColor={"#999"}
+              targetPointColor={"#999"}
+              sourceDistributionSamples={$sourceDistributionSamples}
+              targetDistributionSamples={$targetDistributionSamples}
+              sourcePointIndex={5}
+              targetPointIndex={230}
+              sigma={300}
+              maxEpsilonNorm={1.5}
+              playingByDefault={true}
+              backgroundVisible={false}
+              showEquation={false}
+              sourceLabelText=""
+              targetLabelText=""
+              labelFontSize={50}
+              latexFontSize={43}
+            />
+          {/if}
+        </div>
+        <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
+          <p style="font-size: 0.7em; color: #888; margin: 0;">
+            Albergo et al., <span style="font-style: italic;">Stochastic Interpolants: A Unifying Framework for Flows and Diffusions</span>, 2023
+          </p>
+        </div>
+        {#if stochIntPhase >= 1}
+          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100;">
+            <h2 style="font-size: 2em; margin-bottom: 1em;">Same Training Objective</h2>
+            <AnnotatedEquation
+              scale={1.4}
+              verticalGap={50}
+              labelFontSize={36}
+              tex={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| {\\color{#22c55e} v_t^\\theta(x_t)} - {\\color{#f17720} v_t(x_t|x_1)} \\right\\|^2"}
+              annotations={[
+                { color: '#22c55e', label: 'Our Model', side: 'above', align: 'left' },
+                { color: '#f17720', label: 'Target Velocity', side: 'above', align: 'right' },
+              ]}
+            />
+          </div>
+        {/if}
       </div>
     </section>
 
@@ -1307,6 +1561,29 @@
             playingByDefault={true}
           />
         {/if}
+      </div>
+    </section>
+
+    <!-- Slide: Low Latency Is Important -->
+    <section>
+      <h2 class="slide-title">Low Latency Is Important</h2>
+      <div style="display: flex; justify-content: center; align-items: center; gap: 4em; margin-top: 2em;">
+        <div style="text-align: center;">
+          <img
+            src="{base}/latency_slide/fast.gif"
+            alt="1-second generation"
+            style="height: 600px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);"
+          />
+          <p style="margin-top: 0.8em; font-size: 1.2em; font-weight: bold; color: #22c55e;">~3 seconds</p>
+        </div>
+        <div style="text-align: center;">
+          <img
+            src="{base}/latency_slide/slow.gif"
+            alt="60-second generation"
+            style="height: 600px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);"
+          />
+          <p style="margin-top: 0.8em; font-size: 1.2em; font-weight: bold; color: #e74c3c;">~30 seconds</p>
+        </div>
       </div>
     </section>
 
@@ -1579,12 +1856,12 @@
             targetDistribution={$targetDistributionSamples}
             playingByDefault={true}
             backgroundVisible={false}
-            labelFontSize={50}
-            subtitleFontSize={36}
+            labelFontSize={54}
+            subtitleFontSize={42}
             trajectoryStrokeWidth={4}
             interactive={false}
             showPlayButton={false}
-            durationLabelFontSize={28}
+            durationLabelFontSize={32}
             durationLabelSpacing={10}
           />
         {/if}
@@ -1790,9 +2067,9 @@
     font-size: 1.2em !important;
     font-family: Georgia, serif !important;
     font-weight: 100 !important;
-    opacity: 0.65 !important;
-    color: #888 !important;
-    font-style: normal !important;
+    opacity: 1 !important;
+    color: inherit !important;
+    font-style: italic !important;
     margin: 0.2em 0 0 0 !important;
   }
 
@@ -1800,5 +2077,9 @@
     font-size: 1.06em;
     color: #888;
     margin: 0.15em 0 0 0;
+  }
+  @keyframes sotaFadeIn {
+    from { opacity: 0; transform: rotate(var(--rot, 0deg)) scale(0.7); }
+    to { opacity: 1; transform: rotate(var(--rot, 0deg)) scale(1); }
   }
 </style>

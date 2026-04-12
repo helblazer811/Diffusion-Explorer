@@ -35,15 +35,13 @@
     dotContourOpacity: number;  // Phase 1: z dot + Gaussian contours
     dashProgress: number;       // Phase 2: dashed line mean → z
     easyCalloutOpacity: number; // Phase 3: z label + "Easy to evaluate" callout
-    dimOpacity: number;         // Phase 4: white overlay on left side
-    xCalloutOpacity: number;    // Phase 5: x dot + x label + right callout
+    xCalloutOpacity: number;    // Phase 4: x dot + x label + right callout
   };
 
   const initialState: AnimationState = {
     dotContourOpacity: 0,
     dashProgress: 0,
     easyCalloutOpacity: 0,
-    dimOpacity: 0,
     xCalloutOpacity: 0,
   };
 
@@ -144,11 +142,9 @@
     builder.add({ name: 'Dash', reduce(t) { return { dashProgress: t }; } }, { durationMs: 1200 });
     // Phase 3: easy callout
     builder.add({ name: 'EasyCallout', reduce(t) { return { easyCalloutOpacity: t }; } }, { durationMs: 800 });
-    // Pause before dimming
+    // Pause before right side
     builder.add({ name: 'Pause', reduce() { return null; } }, { durationMs: 1500 });
-    // Phase 4: dim left side
-    builder.add({ name: 'Dim', reduce(t) { return { dimOpacity: t }; } }, { durationMs: 800 });
-    // Phase 5: x dot + x label + right callout
+    // Phase 4: x dot + x label + right callout (no dim)
     builder.add({ name: 'XCallout', reduce(t) { return { xCalloutOpacity: t }; } }, { durationMs: 800 });
 
     timeline = builder.build();
@@ -170,7 +166,7 @@
     // Left scatter plot (always visible)
     drawScatterPlot(ctx, sourcePixelCoords, pointRadius, sourceColor, 0.45);
 
-    // Right scatter plot — only after dim phase
+    // Right scatter plot — appears with x callout
     if (state.xCalloutOpacity > 0) {
       ctx.save();
       ctx.globalAlpha = state.xCalloutOpacity;
@@ -282,16 +278,7 @@
       ctx.restore();
     }
 
-    // ---- Phase 4: white overlay on left half ----
-    if (state.dimOpacity > 0) {
-      ctx.save();
-      ctx.globalAlpha = state.dimOpacity * 0.6;
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, width / 2, height);
-      ctx.restore();
-    }
-
-    // ---- Phase 5: x dot + x label + right callout ----
+    // ---- Phase 4: x dot + x label + right callout ----
     if (state.xCalloutOpacity > 0) {
       const op = state.xCalloutOpacity;
       const hx = highlightTargetPixel[0];

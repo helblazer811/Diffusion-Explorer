@@ -8,6 +8,7 @@
     Slider,
     drawScatterPlot,
     drawMathjax,
+    drawArrow,
     createSourceTargetScales,
     Timeline,
     useCanvas2D,
@@ -47,12 +48,20 @@
   export let samplingSteps = 400;
   export let endpointRadius = settings.stylingSettings.trajectory.endpointRadius;
   export let scatterPlotRadius = settings.stylingSettings.scatterPlot.radius;
+  export let scatterPlotColor = settings.stylingSettings.scatterPlot.color;
   export let trajectoryStrokeWidth = settings.stylingSettings.trajectory.strokeWidth;
 
   // LaTeX label styling
   export let latexLabelOffsetY =
     settings.stylingSettings.figureLatex.latexLabelOffsetY;
   export let latexFontSize = settings.stylingSettings.figureLatex.fontSize;
+
+  // Show velocity arrow at the moving point
+  export let showVelocityArrow = false;
+  export let velocityArrowScale = 40;
+  export let velocityArrowColor = '#3b82f6';
+  export let velocityArrowWidth = 4;
+  export let velocityArrowHeadSize = 10;
 
   // Reverse mode (animate trajectory from target → source)
   export let reverse = false;
@@ -341,7 +350,7 @@
       ctx,
       sourcePixelCoords,
       scatterPlotRadius,
-      settings.stylingSettings.scatterPlot.color,
+      scatterPlotColor,
       settings.stylingSettings.scatterPlot.opacity
     );
 
@@ -358,7 +367,7 @@
       ctx,
       targetPixelCoords,
       scatterPlotRadius,
-      settings.stylingSettings.scatterPlot.color,
+      scatterPlotColor,
       settings.stylingSettings.scatterPlot.opacity
     );
 
@@ -499,6 +508,26 @@
           latexLabelOffsetY,
           { color: latexColor }
         );
+      }
+
+      // Draw velocity arrow at current point
+      if (showVelocityArrow && t > 0.02 && t < 0.98) {
+        const prevIdx = Math.max(0, baseIdx - 1);
+        const dx = currentPoint[0] - traj[prevIdx][0];
+        const dy = currentPoint[1] - traj[prevIdx][1];
+        const len = Math.hypot(dx, dy);
+        if (len > 0.1) {
+          const nx = dx / len;
+          const ny = dy / len;
+          const tipX = currentPoint[0] + nx * velocityArrowScale;
+          const tipY = currentPoint[1] + ny * velocityArrowScale;
+          ctx.save();
+          ctx.strokeStyle = velocityArrowColor;
+          ctx.fillStyle = velocityArrowColor;
+          ctx.lineWidth = velocityArrowWidth;
+          drawArrow(ctx, currentPoint[0], currentPoint[1], tipX, tipY, velocityArrowHeadSize);
+          ctx.restore();
+        }
       }
     }
   }
