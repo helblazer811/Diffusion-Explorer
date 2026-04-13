@@ -1160,9 +1160,9 @@
         <div style="opacity: {fmTrainingPhase >= 1 ? 0.3 : 1}; transition: opacity 0.5s;">
           <p style="font-size: 1.25em; color: #e74c3c; margin-bottom: 0.5em; text-align: center;">Maximum Likelihood</p>
           <AnnotatedEquation
-            scale={1.1}
+            scale={1.5}
             verticalGap={50}
-            labelFontSize={36}
+            labelFontSize={44}
             tex={"\\mathcal{L}_{ML}(\\theta) = \\log p_0(x_0) - {\\color{#e74c3c} \\int_0^1 \\operatorname{tr}\\!\\left(\\frac{\\partial v_\\theta}{\\partial x}\\right) dt}"}
             annotations={[
               { color: '#e74c3c', label: 'Expensive simulation', side: 'below', align: 'left' },
@@ -1177,9 +1177,9 @@
         <div style="margin-top: 0.8em;">
           <p style="font-size: 1.25em; color: #22c55e; margin-bottom: 0.5em; text-align: center; font-weight: bold;">Flow Matching</p>
           <AnnotatedEquation
-            scale={1.1}
+            scale={1.5}
             verticalGap={50}
-            labelFontSize={36}
+            labelFontSize={44}
             tex={"\\mathcal{L}_{FM}(\\theta) = \\mathbb{E}_{t, x_0, x_1} \\left\\| v_t^\\theta(x_t) - v_t(x_t|x_1) \\right\\|^2"}
             annotations={[
               { color: '#22c55e', label: 'Simulation free', side: 'below', align: 'left' },
@@ -1564,6 +1564,26 @@
       </div>
     </section>
 
+    <!-- Slide: Curvature is the Enemy of Speed -->
+    <section>
+      <h2 class="slide-title">Curvature is the Enemy of Speed</h2>
+      <p style="margin-top: 0.5em;">Accurately integrating curved functions requires taking smaller steps, which leads to higher sampling latency.</p>
+      <div class="figure-container" style="margin-top: 1em;">
+        <EulerODECurvature
+          width={800}
+          height={500}
+          gap={10}
+          backgroundVisible={false}
+          labelFontSize={56}
+          showPlayButton={false}
+          perStepDuration={200}
+          perStepDelay={125}
+          fullAnimationDelay={250}
+          repeatDelay={750}
+        />
+      </div>
+    </section>
+
     <!-- Slide: Low Latency Is Important -->
     <section>
       <h2 class="slide-title">Low Latency Is Important</h2>
@@ -1584,26 +1604,6 @@
           />
           <p style="margin-top: 0.8em; font-size: 1.2em; font-weight: bold; color: #e74c3c;">~30 seconds</p>
         </div>
-      </div>
-    </section>
-
-    <!-- Slide: Curvature is the Enemy of Speed -->
-    <section>
-      <h2 class="slide-title">Curvature is the Enemy of Speed</h2>
-      <p style="margin-top: 0.5em;">Accurately integrating curved functions requires taking smaller steps, which leads to higher sampling latency.</p>
-      <div class="figure-container" style="margin-top: 1em;">
-        <EulerODECurvature
-          width={800}
-          height={500}
-          gap={10}
-          backgroundVisible={false}
-          labelFontSize={56}
-          showPlayButton={false}
-          perStepDuration={200}
-          perStepDelay={125}
-          fullAnimationDelay={250}
-          repeatDelay={750}
-        />
       </div>
     </section>
 
