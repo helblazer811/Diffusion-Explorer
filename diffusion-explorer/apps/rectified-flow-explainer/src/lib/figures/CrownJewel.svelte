@@ -69,6 +69,7 @@
   // Animation
   export let animationDuration = 10000; // Total cycle duration (ms)
   export let playingByDefault = true;
+  export let looping = true;
 
   // Interactive sampling
   export let highlightedTrajectoryOpacity = 1.0;
@@ -289,7 +290,7 @@
     // Set timeline duration (animation only) and end pause
     timeline.duration = (animationDuration - endPauseDurationMs) / 1000;
     timeline.setEndPause(endPauseDurationMs / 1000);
-    timeline.looping = true;
+    timeline.looping = looping;
 
     // Register tick callback
     timeline.onTick((_t, state) => {
