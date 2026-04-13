@@ -2039,7 +2039,7 @@
 
   :global(.roadmap-active) :global(.roadmap-ref) {
     color: #f17720 !important;
-    opacity: 0.45 !important;
+    opacity: 1 !important;
   }
 
   :global(.roadmap-inactive) {
@@ -2067,7 +2067,7 @@
     font-size: 1.2em !important;
     font-family: Georgia, serif !important;
     font-weight: 100 !important;
-    opacity: 1 !important;
+    opacity: 0.6 !important;
     color: inherit !important;
     font-style: italic !important;
     margin: 0.2em 0 0 0 !important;
