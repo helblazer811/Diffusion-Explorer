@@ -27,6 +27,10 @@
     highlightColor = '#3b82f6',
     highlightPointIndices = [15, 42, 78, 120, 160] as number[],
     reversed = false,
+    animateForward = false,
+    showInverseLabel = true,
+    showTheta = true,
+    showTopLabels = true,
     showDatasetLabel = false,
     showImages = false,
     flowerPointIndex = 30,
@@ -54,6 +58,10 @@
     highlightColor?: string;
     highlightPointIndices?: number[];
     reversed?: boolean;
+    animateForward?: boolean;
+    showInverseLabel?: boolean;
+    showTheta?: boolean;
+    showTopLabels?: boolean;
     showDatasetLabel?: boolean;
     showImages?: boolean;
     flowerPointIndex?: number;
@@ -319,12 +327,23 @@
 
       // Labels
       const labelY = height - 30;
+      let topLabel: string | null = null;
       if (reversed) {
-        if (s === 0) drawMathjax(ctx, `p(x)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
-        else if (s === stages.length - 1) drawMathjax(ctx, `p(z)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
+        if (s === 0) { drawMathjax(ctx, `p(x)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw); topLabel = 'Data Distribution'; }
+        else if (s === stages.length - 1) { drawMathjax(ctx, `p(z)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw); topLabel = 'Source Distribution'; }
       } else {
-        if (s === 0) drawMathjax(ctx, `p(z)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
-        else if (s === stages.length - 1) drawMathjax(ctx, `p(x)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw);
+        if (s === 0) { drawMathjax(ctx, `p(z)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw); topLabel = 'Source Distribution'; }
+        else if (s === stages.length - 1) { drawMathjax(ctx, `p(x)`, stage.centerX, labelY, _labelFontSize, 0, 0, { color: '#333' }, requestRedraw); topLabel = 'Data Distribution'; }
+      }
+      if (topLabel && showTopLabels) {
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = '#333';
+        ctx.font = `${_labelFontSize}px 'Libre Baskerville', Georgia, serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(topLabel, stage.centerX, 30 * (width / 1720));
+        ctx.restore();
       }
 
       ctx.restore();
@@ -339,18 +358,26 @@
         ctx.strokeStyle = '#555';
         ctx.lineWidth = _arrowLineWidth;
 
+        const sub = showTheta ? `${s},\\theta` : `${s}`;
+        const arrowLabel = showInverseLabel ? `f_{${sub}}^{-1}` : `f_{${sub}}`;
         if (reversed) {
           const arrowFromX = stage.centerX + _arrowOffset;
           const arrowToX = nextStage.centerX - _arrowOffset;
           drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, _arrowHeadRadius);
           const arrowMidX = (arrowFromX + arrowToX) / 2;
-          drawMathjax(ctx, `f_{${s},\\theta}^{-1}`, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
+          drawMathjax(ctx, arrowLabel, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
+        } else if (animateForward) {
+          const arrowFromX = stage.centerX + _arrowOffset;
+          const arrowToX = nextStage.centerX - _arrowOffset;
+          drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, _arrowHeadRadius);
+          const arrowMidX = (arrowFromX + arrowToX) / 2;
+          drawMathjax(ctx, arrowLabel, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
         } else {
           const arrowFromX = nextStage.centerX - _arrowOffset;
           const arrowToX = stage.centerX + _arrowOffset;
           drawArrow(ctx, arrowFromX, arrowY, arrowToX, arrowY, _arrowHeadRadius);
           const arrowMidX = (arrowFromX + arrowToX) / 2;
-          drawMathjax(ctx, `f_{${s},\\theta}^{-1}`, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
+          drawMathjax(ctx, arrowLabel, arrowMidX, arrowY - 20, _labelFontSize, 0, 0, { color: '#555' }, requestRedraw);
         }
 
         ctx.restore();
@@ -373,6 +400,9 @@
 
         let fromStageIdx: number, toStageIdx: number;
         if (reversed) {
+          fromStageIdx = segIdx;
+          toStageIdx = segIdx + 1;
+        } else if (animateForward) {
           fromStageIdx = segIdx;
           toStageIdx = segIdx + 1;
         } else {
@@ -454,10 +484,10 @@
     {@const ptIdx = highlightPointIndices[0] % stages[dataStageIdx].pixelCoords.length}
     {@const dataPt = stages[dataStageIdx].pixelCoords[ptIdx]}
     {@const noisePt = stages[noiseStageIdx].pixelCoords[ptIdx]}
-    {@const flowerImgX = dataPt[0] - imageSize - 80}
+    {@const flowerImgX = reversed ? dataPt[0] - imageSize - 80 : dataPt[0] + 160}
     {@const flowerImgY = dataPt[1] - imageSize - 40}
-    {@const noiseImgX = noisePt[0] + 60}
-    {@const noiseImgY = noisePt[1] - imageSize - 30}
+    {@const noiseImgX = reversed ? noisePt[0] + 60 : noisePt[0] - imageSize - 220}
+    {@const noiseImgY = reversed ? noisePt[1] - imageSize - 30 : noisePt[1] + 30}
 
     <!-- Connecting lines -->
     <svg

@@ -26,6 +26,7 @@
     contourThresholds = 5 as number | number[],
     contourFillColor = '#f17720',
     showLabels = false,
+    showTopLabels = true,
     looping = true,
     static: isStatic = false,
   }: {
@@ -37,6 +38,7 @@
     contourThresholds?: number | number[];
     contourFillColor?: string;
     showLabels?: boolean;
+    showTopLabels?: boolean;
     looping?: boolean;
     static?: boolean;
   } = $props();
@@ -261,6 +263,20 @@
           drawMathjax(ctx, `p(x)`, stage.centerX, labelY, fontSize, 0, 0, { color: '#333' });
         } else {
           drawMathjax(ctx, `p(z_{${s}})`, stage.centerX, labelY, fontSize, 0, 0, { color: '#333' });
+        }
+
+        // Top annotations above first and last stages
+        if (showTopLabels && (s === 0 || s === stages.length - 1)) {
+          const topLabel = s === 0 ? 'Source Distribution' : 'Data Distribution';
+          const topLabelY = 30 * k;
+          ctx.save();
+          ctx.globalAlpha = opacity;
+          ctx.fillStyle = '#333';
+          ctx.font = `${fontSize}px 'Libre Baskerville', Georgia, serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(topLabel, stage.centerX, topLabelY);
+          ctx.restore();
         }
       }
 
