@@ -321,6 +321,12 @@
     rightCurrentSegmentIndex = 0;
   }
 
+  export function restart() {
+    resetAnimation();
+    if (timeline) timeline.play();
+    isPlaying = true;
+  }
+
   // ----------------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------------
@@ -624,7 +630,7 @@
         </div>
         <div
           class="panel-subtitle"
-          style="font-size: {subtitleFontSize}px; color: {subtitleColor};"
+          style="font-size: {subtitleFontSize}px; color: {subtitleColor}; opacity: {labelOpacity};"
         >
           {leftSubtitle}
         </div>
@@ -665,7 +671,7 @@
         </div>
         <div
           class="panel-subtitle"
-          style="font-size: {subtitleFontSize}px; color: {subtitleColor};"
+          style="font-size: {subtitleFontSize}px; color: {subtitleColor}; opacity: {labelOpacity};"
         >
           {rightSubtitle}
         </div>

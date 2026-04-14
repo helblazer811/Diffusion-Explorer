@@ -70,11 +70,13 @@
   let composeFigure: NormalizingFlowStages;
   let mlFigure: MaxLikelihoodTraining;
   let encodeFigure: MaxLikelihoodTraining;
+  let genSamplesFigure: MaxLikelihoodTraining;
   let invertibilityFigure: FlowInvertibilitySimple;
   let massFigure: FlowInvertibilitySimple;
   let gridJacobianFigure: CNFGridJacobian;
   let trajFigure: HighlightTrajectory;
   let rectifiedFlowFigure: InducedCouplingAnimated;
+  let reflowFigure: CrownJewel;
   let dataLikelihoodFigure: any;
 
   // Provide reveal instance to Slide components via context
@@ -654,6 +656,17 @@
       </div>
     </Slide>
 
+    <!-- Slide: Generating New Samples -->
+    <Slide figure={genSamplesFigure}>
+      <h2 class="slide-title">Generating New Samples</h2>
+      <p style="margin-top: 0.3em;">
+        Sample <Katex math={"z \\sim p(z)"} /> and push forward through <Katex math={"f_1, f_2, \\ldots, f_K"} /> to generate a new data sample <Katex math={"x"} />.
+      </p>
+      <div class="figure-container" style="margin-top: 80px; height: 580px; overflow: visible;">
+        <MaxLikelihoodTraining bind:this={genSamplesFigure} width={1720} height={580} numStages={4} reversed={false} animateForward={true} showInverseLabel={false} showTheta={false} highlightPointIndices={[15]} highlightColor="#f17720" showImages={true} looping={true} endPause={1} />
+      </div>
+    </Slide>
+
     <!-- Slide: Normalizing Flows are Invertible (figure) -->
     <Slide figure={invertibilityFigure}>
       <h2 class="slide-title">Flows Preserve Probability Mass</h2>
@@ -753,7 +766,7 @@
         />
       </div>
       <div class="figure-container" style="margin-top: 10px; height: 520px; overflow: hidden;">
-        <NormalizingFlowStages bind:this={composeFigure} width={1720} numStages={4} showLabels={true} static={true} />
+        <NormalizingFlowStages bind:this={composeFigure} width={1720} numStages={4} showLabels={true} showTopLabels={false} static={true} />
       </div>
     </Slide>
 
@@ -826,7 +839,7 @@
         />
       </div>
       <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: visible;">
-        <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={520} numStages={4} reversed={true} showImages={true} looping={true} endPause={1} />
+        <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={520} numStages={4} reversed={true} showTopLabels={false} showImages={true} looping={true} endPause={1} />
       </div>
     </Slide>
 
@@ -839,19 +852,36 @@
         <li><strong>Anomaly detection</strong> — flag low-likelihood inputs</li>
       </ol>
       <div class="figure-container" style="margin-top: 0.5em; height: 520px; overflow: visible;">
-        <MaxLikelihoodTraining width={1720} height={520} numStages={4} reversed={true} highlightPointIndices={[15]} highlightColor="#3b82f6" showImages={true} looping={true} endPause={1} />
+        <MaxLikelihoodTraining width={1720} height={520} numStages={4} reversed={true} showTopLabels={false} highlightPointIndices={[15]} highlightColor="#3b82f6" showImages={true} looping={true} endPause={1} />
       </div>
     </section>
 
     <!-- Slide: Normalizing Flow Recap -->
     <section>
       <h2 class="slide-title">Normalizing Flow Recap</h2>
-      <p style="margin-top: 0.5em; line-height: 1.7;">
-        Normalizing flows <strong>(a)</strong> transform simple probability distributions into more complex ones,
-        and <strong>(b)</strong> allow for evaluation of exact likelihoods.
-      </p>
-      <div class="figure-container" style="margin-top: -30px;">
-        <NormalizingFlowStages width={1720} numStages={4} showLabels={true} looping={true} animationDuration={5000} />
+      <ol style="font-size: 1.05em; line-height: 1.8; padding-left: 1.2em; margin-top: 0.5em;">
+        <li style="margin-bottom: 0.3em;">Transform simple source distribution to complex target</li>
+        <li style="margin-bottom: 0.3em;">Exact likelihood evaluation</li>
+        <li>Novel sample generation</li>
+      </ol>
+      <div class="figure-container" style="margin-top: 80px; height: 580px; overflow: visible;">
+        <MaxLikelihoodTraining width={1720} height={580} numStages={4} reversed={false} animateForward={true} showInverseLabel={false} showTheta={false} highlightPointIndices={[15]} highlightColor="#f17720" showImages={true} looping={true} endPause={1} />
+      </div>
+    </section>
+
+    <!-- Slide: Computational Efficiency is Important -->
+    <section use:ceImageReveal>
+      <h2 class="slide-title">GPUs are Expensive</h2>
+      <div style="position: relative; width: 100%; height: 900px; overflow: visible;">
+        {#each computeExpensiveImages as img, i}
+          {#if i < ceRevealCount}
+            <img
+              src="{base}/compute_expensive/{img.file}"
+              alt=""
+              style="position: absolute; left: {img.x}px; top: {img.y}px; width: {img.w}px; height: auto; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); transform: rotate({img.rotation}deg); animation: sotaFadeIn 0.35s ease forwards;"
+            />
+          {/if}
+        {/each}
       </div>
     </section>
 
@@ -881,22 +911,6 @@
           Real NVP <span style="font-style: italic;">(Dinh et al., 2017)</span>,
           Glow <span style="font-style: italic;">(Kingma &amp; Dhariwal, 2018)</span>
         </p>
-      </div>
-    </section>
-
-    <!-- Slide: Computational Efficiency is Important -->
-    <section use:ceImageReveal>
-      <h2 class="slide-title">GPUs are Expensive</h2>
-      <div style="position: relative; width: 100%; height: 900px; overflow: visible;">
-        {#each computeExpensiveImages as img, i}
-          {#if i < ceRevealCount}
-            <img
-              src="{base}/compute_expensive/{img.file}"
-              alt=""
-              style="position: absolute; left: {img.x}px; top: {img.y}px; width: {img.w}px; height: auto; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); transform: rotate({img.rotation}deg); animation: sotaFadeIn 0.35s ease forwards;"
-            />
-          {/if}
-        {/each}
       </div>
     </section>
 
@@ -1836,11 +1850,12 @@
     -->
 
     <!-- Slide: Reflow Produces Straighter Trajectories -->
-    <section>
+    <Slide figure={reflowFigure}>
       <h2 class="slide-title">Reflow Produces Straighter Trajectories</h2>
       <div class="figure-container" style="margin-top: 2.5em;">
         {#if dataLoaded}
           <CrownJewel
+            bind:this={reflowFigure}
             canvasWidth={750}
             canvasHeight={650}
             gap={40}
@@ -1866,7 +1881,7 @@
           />
         {/if}
       </div>
-    </section>
+    </Slide>
 
     <!-- Slide: Key References -->
     <section>
