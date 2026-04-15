@@ -590,12 +590,12 @@
             style="height: 640px; border-radius: 12px;"
           ></video>
         </div>
-        <div style="display: flex; flex-direction: column; align-items: center;">
-          <p style="margin: 0 0 0.6em; font-size: 1.1em; font-weight: bold; color: #333;">Robotics</p>
+        <div style="display: flex; flex-direction: column; align-items: center; margin-left: -120px;">
+          <p style="margin: 0 0 0.6em; font-size: 1.1em; font-weight: bold; color: #333;">Language</p>
           <img
-            src="{base}/flow_q_learning/flow_q_learning.png"
-            alt="Flow Q-Learning"
-            style="height: 640px; border-radius: 12px;"
+            src="{base}/flm/image.png"
+            alt="Flow Language Model"
+            style="height: 560px; border-radius: 12px;"
           />
         </div>
       </div>
@@ -604,7 +604,7 @@
           [1] Geffner, T., Didi, K., Zhang, Z., Reidenbach, D., Cao, Z., Yim, J., Geiger, M., Dallago, C., Kucukbenli, E., Vahdat, A. &amp; Kreis, K. (2025). <em>Proteina: Scaling Flow-based Protein Structure Generative Models</em>. arXiv:2503.00710.
         </p>
         <p style="font-size: 0.7em; color: #888; margin: 0.3em 0 0;">
-          [2] Park, S., Li, Q. &amp; Levine, S. (2025). <em>Flow Q-Learning</em>. arXiv:2502.02538.
+          [2] Lee, C., Yoo, J., Agarwal, M., Shah, S., Huang, J., Raghunathan, A., Hong, S., Boffi, N. M. &amp; Kim, J. (2026). <em>Flow Map Language Models: One-step Language Modeling via Continuous Denoising</em>. arXiv:2602.16813.
         </p>
       </div>
     </section>
