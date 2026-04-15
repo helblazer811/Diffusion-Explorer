@@ -575,6 +575,40 @@
       </div>
     </section>
 
+    <!-- Slide: Flow Models Apply to Many Modalities -->
+    <section use:playVideoOnSlide>
+      <h2 class="slide-title">Flow Models Apply to Many Modalities</h2>
+      <div style="display: flex; align-items: flex-start; justify-content: center; gap: 6em; margin-top: 1.5em;">
+        <div style="display: flex; flex-direction: column; align-items: center;">
+          <p style="margin: 0 0 0.6em; font-size: 1.1em; font-weight: bold; color: #333;">Biology</p>
+          <video
+            src="{base}/protein_animation/ProteinVideo.mp4"
+            loop
+            muted
+            playsinline
+            autoplay
+            style="height: 640px; border-radius: 12px;"
+          ></video>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+          <p style="margin: 0 0 0.6em; font-size: 1.1em; font-weight: bold; color: #333;">Robotics</p>
+          <img
+            src="{base}/flow_q_learning/flow_q_learning.png"
+            alt="Flow Q-Learning"
+            style="height: 640px; border-radius: 12px;"
+          />
+        </div>
+      </div>
+      <div style="position: absolute; bottom: 1em; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 0.8em; padding-left: 1em; padding-right: 1em;">
+        <p style="font-size: 0.7em; color: #888; margin: 0;">
+          [1] Geffner, T., Didi, K., Zhang, Z., Reidenbach, D., Cao, Z., Yim, J., Geiger, M., Dallago, C., Kucukbenli, E., Vahdat, A. &amp; Kreis, K. (2025). <em>Proteina: Scaling Flow-based Protein Structure Generative Models</em>. arXiv:2503.00710.
+        </p>
+        <p style="font-size: 0.7em; color: #888; margin: 0.3em 0 0;">
+          [2] Park, S., Li, Q. &amp; Levine, S. (2025). <em>Flow Q-Learning</em>. arXiv:2502.02538.
+        </p>
+      </div>
+    </section>
+
     <!-- Slide 4: Diffusion vs Flow (hidden for now) -->
     <!--
     <Slide figure={diffFlowFigure}>
