@@ -508,7 +508,9 @@
         <p style="font-size: 1.2em; color: #999; margin-top: 0.4em;"><a href="https://alechelbling.com" style="color: #999;">alechelbling.com</a></p>
       </div>
       <aside class="notes">
-        Qualifier presentation. Focus on building intuition through interactive visualizations.
+        <ul>
+          <li>Hi, my name is Alec, and today I'll be giving a presentation on flow based generative models. The format is really more of a tutorial on the topic where I'll discuss some of the important works in the field, and share some animated visualizations explaining some of the underlying geometric concepts.</li>
+        </ul>
       </aside>
     </section>
 
@@ -528,7 +530,9 @@
         </div>
       </div>
       <aside class="notes">
-        Brief introduction before diving into the technical content.
+        <ul>
+          <li>Just a little bit about me, I'm a 3rd year PhD student advised by Polo here in the CSE department. I have broad interests, but a lot of my research has focused on the intersection of generative models for visual modalities like images and video and machine learning interpretability, and I have in interest in applying data visualization to understand an explain these models.</li>
+        </ul>
       </aside>
     </section>
 
@@ -546,6 +550,13 @@
           <FlowerImageDistribution bind:this={flowerFigure} width={1495} height={750} />
         </div>
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Starting out very broadly.</li>
+          <li>Two of the core goals of generative modeling are to learn to represent a distribution p(x) of data — here the distribution is images of flowers.</li>
+          <li>And our goal is model this distribution of data in a way that also allows us to efficiently generate new samples.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide 3: Flow-based Generative Models -->
@@ -557,6 +568,14 @@
       <div class="figure-container" style="margin-top: 30px;">
         <TransformingNoiseIntoData bind:this={noiseFigure} width={1720} height={780} />
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Flow based generative models are one of the most popular recent approaches to doing generative modeling.</li>
+          <li>They learn to transform a simple distribution, like Gaussian noise, to arbitrarily complex distributions.</li>
+          <li>Here I show a simple 2D Gaussian on the left connected to a funny smiley face distribution.</li>
+          <li>Each of these points shown here don't need to represent 2D objects, but can represent high-dimensional data like images.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide: Flows Underpin State of the Art Image Generation -->
@@ -573,6 +592,12 @@
           {/if}
         {/each}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Flows underpin many of the state of the art generative models for both image and video generation.</li>
+          <li>This is one of their most powerful applications.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Flow Models Apply to Many Modalities -->
@@ -607,6 +632,11 @@
           [2] Lee, C., Yoo, J., Agarwal, M., Shah, S., Huang, J., Raghunathan, A., Hong, S., Boffi, N. M. &amp; Kim, J. (2026). <em>Flow Map Language Models: One-step Language Modeling via Continuous Denoising</em>. arXiv:2602.16813.
         </p>
       </div>
+      <aside class="notes">
+        <ul>
+          <li>In the past few years though there has been an explosion in interest in flows, and they have been applied to a variety of application settings like Biology for tasks like protein structure generation, and also even language generation.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide 4: Diffusion vs Flow (hidden for now) -->
@@ -647,6 +677,13 @@
           <p class="roadmap-ref">Rectified Flows — Liu et al., 2023</p>
         </li>
       </ol>
+      <aside class="notes">
+        <ul>
+          <li>The talk is structured somewhat chronologically.</li>
+          <li>I'm going to go through some of the seminal works in the space, starting with the paper that initially popularized the idea of a normalizing flow in 2015.</li>
+          <li>Then we are going to talk about ways in which this method was generalized to more flexible, ways to make training more efficient, and practical concerns like the latency of sampling from the model.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Roadmap: Normalizing Flows -->
@@ -670,6 +707,11 @@
           <p class="roadmap-ref">Rectified Flows — Liu et al., 2023</p>
         </li>
       </ol>
+      <aside class="notes">
+        <ul>
+          <li>So starting out we ask the question, what is a normalizing flow?</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide 7: What is a Normalizing Flow? -->
@@ -688,6 +730,14 @@
           Rezende, D. &amp; Mohamed, S. (2015). Variational Inference with Normalizing Flows. <em>Proceedings of the 32nd International Conference on Machine Learning</em>, in <em>Proceedings of Machine Learning Research</em> 37:1530-1538.
         </p>
       </div>
+      <aside class="notes">
+        <ul>
+          <li>A normalizing flow learns to transform a simple distribution to a more complex one.</li>
+          <li>It does this by applying a sequence of mappings represented by these functions f.</li>
+          <li>Here on the left we have a simple 2D Gaussian source distribution and it is transformed by our flow to a Gaussian mixture model.</li>
+          <li>This general structure applies not just to our simple 2D setting but to much more complex high dimensional settings.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide: Generating New Samples -->
@@ -699,6 +749,11 @@
       <div class="figure-container" style="margin-top: 80px; height: 580px; overflow: visible;">
         <MaxLikelihoodTraining bind:this={genSamplesFigure} width={1720} height={580} numStages={4} reversed={false} animateForward={true} showInverseLabel={false} showTheta={false} highlightPointIndices={[15]} highlightColor="#f17720" showImages={true} looping={true} endPause={1} />
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Once we learn a flow, we can generate new samples by drawing a sample from our simple source distribution, and then apply a sequence of these mappings.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide: Normalizing Flows are Invertible (figure) -->
@@ -723,6 +778,13 @@
         <Katex math={"\\int p(z)\\, dz = 1"} />
         <Katex math={"\\int p(x)\\, dx = 1"} />
       </div>
+      <aside class="notes">
+        <ul>
+          <li>One of the defining properties of flows is that they conserve probability mass.</li>
+          <li>Each of the functions in our flow is invertible, which ensures that no two points are mapped to the exact same location.</li>
+          <li>This guarantees that if we start out with a normalized probability distribution on the left, that we still end up with one on the right.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide: How Likely is My Data? -->
@@ -739,9 +801,18 @@
             height={780}
             {allTimeSamples}
             distributionScaleFactor={1.0}
+            looping={false}
           />
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>A common question in machine learning is "how likely am I to observe a particular sample"?</li>
+          <li>Answering a question like this is quite straightforward for a Gaussian distribution. We have a closed form equation that tells us this.</li>
+          <li>But for more complex distributions like the smiley face example on the right, this is much less straightforward.</li>
+          <li>We don't necessarily have direct access to a likelihood.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide: Change of Variables Formula (click to toggle log form) -->
@@ -782,6 +853,14 @@
           <ChangeOfVariablesFigure width={1800} height={800} {allTimeSamples} distributionScaleFactor={0.8} showLog={covShowLog} />
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Flows allow us to solve this problem of evaluating exact likelihoods.</li>
+          <li>They do this by allowing us to represent the likelihood of observing our data in our complex distribution, in terms of the likelihood in our source distribution which is easy to compute.</li>
+          <li>This change of variable formula tells us how to do this.</li>
+          <li>Often, we will represent this equation in log form which is quite common in optimization and machine learning.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Composing Multiple Transformations -->
@@ -802,6 +881,11 @@
       <div class="figure-container" style="margin-top: 10px; height: 520px; overflow: hidden;">
         <NormalizingFlowStages bind:this={composeFigure} width={1720} numStages={4} showLabels={true} showTopLabels={false} static={true} />
       </div>
+      <aside class="notes">
+        <ul>
+          <li>We can chain together multiple of these transformations, and accumulate information over them to get this extended change of variables formula for the likelihood.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide: Jacobian Measures Local Volume Change -->
@@ -827,6 +911,12 @@
           />
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>This Jacobian term in the equation tells us how much our flow is stretching and compressing space locally.</li>
+          <li>We need to correct for how our transformation changes volume, which is exactly what the determinant of this Jacobian tells us.</li>
+        </ul>
+      </aside>
     </Slide>
 
 
@@ -851,6 +941,12 @@
       <div class="figure-container" style="margin-top: -20px; height: 580px; overflow: visible;">
         <MaxLikelihoodTraining bind:this={encodeFigure} width={1720} height={580} numStages={4} reversed={true} highlightPointIndices={[15]} highlightColor="#3b82f6" showImages={true} looping={true} endPause={1} />
       </div>
+      <aside class="notes">
+        <ul>
+          <li>So, we can use this formula to compute the likelihood of observing data like images.</li>
+          <li>We go in the reverse direction of our flow, starting out with data we have and mapping it through these inverses until we arrive at our source distribution.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide: Maximum Likelihood Training -->
@@ -875,6 +971,14 @@
       <div class="figure-container" style="margin-top: -20px; height: 520px; overflow: visible;">
         <MaxLikelihoodTraining bind:this={mlFigure} width={1720} height={520} numStages={4} reversed={true} showTopLabels={false} showImages={true} looping={true} endPause={1} />
       </div>
+      <aside class="notes">
+        <ul>
+          <li>This lends itself to a very natural training approach.</li>
+          <li>Given a set of data we aim to find a set of parameters theta for our flow that maximize the likelihood of observing our dataset, represented by the blue points here.</li>
+          <li>Here this log probability here corresponds to this change of variable formula we mentioned.</li>
+          <li>Once, we can evaluate likelihoods, training becomes simply finding parameters that maximize the likelihood.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide: Why Do We Care About Likelihoods? -->
@@ -888,6 +992,14 @@
       <div class="figure-container" style="margin-top: 0.5em; height: 520px; overflow: visible;">
         <MaxLikelihoodTraining width={1720} height={520} numStages={4} reversed={true} showTopLabels={false} highlightPointIndices={[15]} highlightColor="#3b82f6" showImages={true} looping={true} endPause={1} />
       </div>
+      <aside class="notes">
+        <ul>
+          <li>To summarize, why do we care about likelihoods.</li>
+          <li>They allow for a natural training objective.</li>
+          <li>They allow you to compare the density of two observations.</li>
+          <li>They allow other tasks like anomaly detection, where we can identify if a sample is potentially out of distribution.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Normalizing Flow Recap -->
@@ -901,6 +1013,14 @@
       <div class="figure-container" style="margin-top: 80px; height: 580px; overflow: visible;">
         <MaxLikelihoodTraining width={1720} height={580} numStages={4} reversed={false} animateForward={true} showInverseLabel={false} showTheta={false} highlightPointIndices={[15]} highlightColor="#f17720" showImages={true} looping={true} endPause={1} />
       </div>
+      <aside class="notes">
+        <ul>
+          <li>To summarize this entire first section,</li>
+          <li>Normalizing flows transform simple distributions into more complex ones.</li>
+          <li>They allow you to evaluate exact likelihoods.</li>
+          <li>And they allow you to generate novel samples.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Computational Efficiency is Important -->
@@ -917,6 +1037,12 @@
           {/if}
         {/each}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>But there is a problem.</li>
+          <li>Something that many people in this room probably know too well, which is that GPUs are expensive.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Jacobian Determinants Are Expensive -->
@@ -946,6 +1072,13 @@
           Glow <span style="font-style: italic;">(Kingma &amp; Dhariwal, 2018)</span>
         </p>
       </div>
+      <aside class="notes">
+        <ul>
+          <li>These determinants used when computing likelihoods for flows are expensive.</li>
+          <li>They scale cubically with the dimensionality of data.</li>
+          <li>A whole body of work has gone into restricting the architecture of flows so these determinants are cheaper, but this comes at the cost of model flexibility.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Roadmap: Continuous Normalizing Flows -->
@@ -969,6 +1102,11 @@
           <p class="roadmap-ref">Rectified Flows — Liu et al., 2023</p>
         </li>
       </ol>
+      <aside class="notes">
+        <ul>
+          <li>This leads us into our next topic, which is continuous normalizing flows.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Continuous Normalizing Flows (CNF) -->
@@ -1005,6 +1143,12 @@
           Chen et al., <span style="font-style: italic;">Neural Ordinary Differential Equations</span>, 2019
         </p>
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Continuous normalizing flows are a generalization of normalizing flows that replaces this finite sequence of transformations with a continuous transformation.</li>
+          <li>Here our flow transforms our source distribution at time zero into our target distribution through a set of continuous transformations until matches the target distribution at time 1.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Sampling Trajectories From a CNF -->
@@ -1042,6 +1186,12 @@
           />
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>At the individual sample level, our aim is to infer a trajectory x(t) shown in orange.</li>
+          <li>We want to identify a trajectory that moves a sample from the source distribution to our target over time.</li>
+        </ul>
+      </aside>
     </Slide>
 
     <!-- Slide: CNFs Learn to Represent Velocity Fields -->
@@ -1093,6 +1243,16 @@
           {/if}
         </div>
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Instead of directly learning these trajectories x(t), a flow instead indirectly represents a velocity field.</li>
+          <li>On the right, shown in blue we have a velocity field that tells us if we have a sample at a location at a particular time, what direction should we move that sample.</li>
+          <li>The problem of inferring a trajectory becomes one of solving an ordinary differential equation.</li>
+          <li>We can simulate our flow by doing numerical integration.</li>
+          <li>The simplest approach is to do Euler's method. We can make small movements in the direction that our velocity field points.</li>
+          <li>This gives us trajectories like the orange on on the right.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: CNFs Allow More Efficient Likelihood Based Training -->
@@ -1129,6 +1289,12 @@
           />
         </div>
       {/if}
+      <aside class="notes">
+        <ul>
+          <li>Continuous normalizing flows fix one of the key computational bottlenecks when training flows with maximum likelihood.</li>
+          <li>This expensive determinant which in general takes O(d^3) instead becomes an O(d) trace computation, which is much more favorable.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Likelihood Based Training is Expensive -->
@@ -1171,7 +1337,12 @@
         {/if}
       </div>
       <aside class="notes">
-        Key motivation for flow matching: CNFs are expressive but training via maximum likelihood is expensive because of the trace computation and ODE simulation at every step. Flow matching avoids both.
+        <ul>
+          <li>However, the bottleneck has now moved.</li>
+          <li>Simulating flows requires doing numerical integration, or simulation.</li>
+          <li>This can be expensive, particularly if our trajectories are highly curved.</li>
+          <li>With maximum likelihood training, we need to do this simulation during every training step.</li>
+        </ul>
       </aside>
     </section>
 
@@ -1196,6 +1367,11 @@
           <p class="roadmap-ref">Rectified Flows — Liu et al., 2023</p>
         </li>
       </ol>
+      <aside class="notes">
+        <ul>
+          <li>This leads us into some of the more modern literature, namely flow matching and stochastic interpolants.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Flow Matching Enables Faster Training -->
@@ -1240,6 +1416,12 @@
           Lipman et al., <span style="font-style: italic;">Flow Matching for Generative Modeling</span>, 2023
         </p>
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Flow matching takes this expensive maximum likelihood training objective, and replaces it with a much simpler regression objective.</li>
+          <li>This objective does not require doing simulation during each training step.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Flow Matching Directly Learns Velocity -->
@@ -1282,6 +1464,11 @@
           />
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Instead of doing maximum likelihood, flow matching aims to directly learn the velocity of our trajectories shown in blue here.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: The Probability Path (hidden) -->
@@ -1348,6 +1535,14 @@
           />
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>A design decision we when doing flow matching is how we define the ideal trajectories that we want to learn.</li>
+          <li>This decision is informed by something called the probability path.</li>
+          <li>The simplest, and most common choice is to draw straight lines between pairs of points in source and target distributions respectively.</li>
+          <li>These correspond to the ideal trajectories that we want to learn.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: The Conditional Velocity Field -->
@@ -1380,6 +1575,11 @@
           />
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>We can then create something called our conditional velocity field, which tells us what velocities we should have along these paths that samples move.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Regressing the Velocity Field -->
@@ -1422,6 +1622,12 @@
           />
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Our goal in flow matching is then to learn a velocity field shown in green, which we represent with a neural network, to match these target conditional velocities shown in orange.</li>
+          <li>That is exactly what we aim to minimize with this equation.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Flow Matching Successfully Learns a Flow -->
@@ -1453,6 +1659,12 @@
           />
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Despite being structurally very different from the maximum likelihood training approach we mentioned earlier, this approach still learns a valid flow.</li>
+          <li>And it does this without requiring expensive numerical integration at each point in time.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Stochastic Interpolants -->
@@ -1517,6 +1729,14 @@
           </div>
         {/if}
       </div>
+      <aside class="notes">
+        <ul>
+          <li>Something quite interesting that is worth mentioning.</li>
+          <li>A different group proposed a framework called Stochastic interpolants at around the same time that flow matching was introduced.</li>
+          <li>They aimed to create a unifying framework for flows and diffusion that also incorporated stochasticity.</li>
+          <li>However, they arrived at the same training objective.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Slide: Developed Independently in Parallel -->
@@ -1559,6 +1779,12 @@
           z-index: 1;
         "
       />
+      <aside class="notes">
+        <ul>
+          <li>I think they may have even presented this work at the same conference.</li>
+          <li>This shows that sometimes certain ideas are almost meant to happen at a certain time.</li>
+        </ul>
+      </aside>
     </section>
 
     <!-- Roadmap: Rectified Flows -->
