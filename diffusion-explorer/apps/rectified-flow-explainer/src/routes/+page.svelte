@@ -1065,6 +1065,8 @@
         targetDistributionSamples={$targetDistributionSamples}
         backgroundVisible={false}
         {flowMatchingClient}
+        showCouplingAnimation={true}
+        autoPlay={true}
       >
         <div class="caption">
           <span class="figure-number">Figure 13:</span>
