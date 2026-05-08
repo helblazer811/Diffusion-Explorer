@@ -336,6 +336,14 @@
   <h1 id="introduction" class="section-heading">Introduction</h1>
   <p>
     Flow-based generative models <HoverableReference
+      id="tabak2010density"
+      {bibEntries}
+      {citations}
+    /><HoverableReference
+      id="tabak2010family"
+      {bibEntries}
+      {citations}
+    /><HoverableReference
       id="rezende2016variationalinferencenormalizingflows"
       {bibEntries}
       {citations}
@@ -350,9 +358,11 @@
     iteratively refining it into a realistic sample, guided by patterns learned
     from training data.  -->
     The success of flow models is in part due to the introduction of flow matching
-    <HoverableReference id="lipman2022" {bibEntries} {citations} />, which
-    enables training without computationally expensive
-    simulation and allows the use of arbitrary noise distributions. 
+    <HoverableReference id="lipman2022" {bibEntries} {citations} /> and the
+    concurrent stochastic interpolant framework
+    <HoverableReference id="albergo2023" {bibEntries} {citations} />, which
+    enable training without computationally expensive
+    simulation and allow the use of arbitrary noise distributions. 
     However, a practical barrier to deploying flow models at scale
     is the need to run large neural networks—often with billions of
     parameters—many times to generate high-quality samples. This incurs not just
