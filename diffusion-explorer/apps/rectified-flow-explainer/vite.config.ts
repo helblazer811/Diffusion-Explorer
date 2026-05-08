@@ -4,6 +4,9 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [sveltekit()],
+  ssr: {
+    noExternal: ['tempus']
+  },
   server: {
     fs: {
       // Allow Vite to serve files from your diffusion package dist folder
