@@ -1,7 +1,7 @@
 <!-- Visualizes intersecting linear paths between source and target distributions with velocity vectors at intersection. -->
 
 <script lang="ts">
-  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjax, createSourceTargetScales, dataToPixelX, useCanvas2D, mathjaxInitialized, Timeline, TimelineBuilder, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjax, createSourceTargetScales, dataToPixelX, useCanvas2D, mathjaxInitialized, Timeline, TimelineBuilder, createPauseClip, useVisibilityHandler } from "@diffusion-explorer/ui";
   import type { Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import { onDestroy } from "svelte";
@@ -65,6 +65,8 @@
 
   // Coupling animation mode
   export let showCouplingAnimation = false;
+  export let autoPlay = false;
+  export let autoPlayPauseMs = 600;
   export let playingByDefault = true;
   export let looping = true;
   export let numCouplingPaths = 60;
@@ -265,26 +267,54 @@
   function setupCouplingTimeline() {
     if (timeline) timeline.pause();
 
-    timeline = new TimelineBuilder<AnimationState>()
+    const builder = new TimelineBuilder<AnimationState>()
       .setInitialState({ ...initialState })
-      .setLooping(false)
-      // Stage 0 (auto): coupling lines grow
-      .add({ name: 'DrawPaths', reduce(t) { return { bgPathsProgress: t }; } }, { durationMs: 1000 })
-      .waitForInput()
-      // Stage 1 (click): fade other paths, then show intersection x
-      .add({ name: 'FadeBg', reduce(t) { return { bgPathsOpacity: 1 - t }; } }, { durationMs: 800 })
-      .add({ name: 'Intersection', reduce(t) { return { intersectionOpacity: t }; } }, { durationMs: 600 })
-      .waitForInput()
-      // Stage 2 (click): orange arrows
-      .add({ name: 'OrangeArrows', reduce(t) { return { orangeArrowOpacity: t }; } }, { durationMs: 700 })
-      .waitForInput()
-      // Stage 3 (click): green mean arrow
-      .add({ name: 'GreenArrow', reduce(t) { return { greenArrowOpacity: t }; } }, { durationMs: 700 })
-      .waitForInput()
-      // Stage 4 (click): fade arrows + draw trajectory
-      .add({ name: 'FadeArrows', reduce(t) { return { orangeArrowOpacity: 1 - t, greenArrowOpacity: 1 - t }; } }, { durationMs: 500 })
-      .add({ name: 'Trajectory', reduce(t) { return { trajectoryProgress: t }; } }, { durationMs: trajectoryDuration })
-      .build();
+      .setLooping(autoPlay);
+
+    const wait = () => autoPlay
+      ? builder.add(createPauseClip(), { durationMs: autoPlayPauseMs })
+      : builder.waitForInput();
+
+    if (!autoPlay) {
+      // Slides mode: full staged animation with coupling paths
+      builder
+        .add({ name: 'DrawPaths', reduce(t) { return { bgPathsProgress: t }; } }, { durationMs: 1000 });
+      wait();
+      builder
+        .add({ name: 'FadeBg', reduce(t) { return { bgPathsOpacity: 1 - t }; } }, { durationMs: 800 })
+        .add({ name: 'Intersection', reduce(t) { return { intersectionOpacity: t }; } }, { durationMs: 600 });
+      wait();
+      builder
+        .add({ name: 'OrangeArrows', reduce(t) { return { orangeArrowOpacity: t }; } }, { durationMs: 700 });
+      wait();
+      builder
+        .add({ name: 'GreenArrow', reduce(t) { return { greenArrowOpacity: t }; } }, { durationMs: 700 });
+      wait();
+      builder
+        .add({ name: 'FadeArrows', reduce(t) { return { orangeArrowOpacity: 1 - t, greenArrowOpacity: 1 - t }; } }, { durationMs: 500 })
+        .add({ name: 'Trajectory', reduce(t) { return { trajectoryProgress: t }; } }, { durationMs: trajectoryDuration });
+    } else {
+      // Blog mode: skip coupling, start with two paths + intersection visible
+      const autoInitial: AnimationState = {
+        ...initialState,
+        bgPathsProgress: 1,
+        bgPathsOpacity: 0,
+        intersectionOpacity: 0,
+      };
+      builder
+        .setInitialState(autoInitial)
+        // Phase 1: reveal intersection, then accumulate arrows
+        .add({ name: 'Intersection', reduce(t) { return { intersectionOpacity: t }; } }, { durationMs: 600 })
+        .add({ name: 'OrangeArrows', reduce(t) { return { orangeArrowOpacity: t }; } }, { durationMs: 700 })
+        .add(createPauseClip(), { durationMs: autoPlayPauseMs })
+        .add({ name: 'GreenArrow', reduce(t) { return { greenArrowOpacity: t }; } }, { durationMs: 700 })
+        .add(createPauseClip(), { durationMs: autoPlayPauseMs })
+        // Phase 2: draw trajectory (arrows stay visible)
+        .add({ name: 'Trajectory', reduce(t) { return { trajectoryProgress: t }; } }, { durationMs: trajectoryDuration })
+        .add(createPauseClip(), { durationMs: 1500 });
+    }
+
+    timeline = builder.build();
 
     timeline.onTick((_t, state) => {
       draw(state);
@@ -410,7 +440,7 @@
     // Endpoint circles + labels (appear once paths are fully drawn and bg has faded)
     if (state.bgPathsOpacity < 0.5 && state.bgPathsProgress >= 1) {
       ctx.save();
-      ctx.globalAlpha = state.highlightThickness;
+      ctx.globalAlpha = 1;
       ctx.fillStyle = lineColor;
       for (const [x, y] of [[line1Coords.x1, line1Coords.y1],[line1Coords.x2, line1Coords.y2],[line2Coords.x1, line2Coords.y1],[line2Coords.x2, line2Coords.y2]]) {
         ctx.beginPath(); ctx.arc(x, y, pointRadius, 0, 2*Math.PI); ctx.fill();
