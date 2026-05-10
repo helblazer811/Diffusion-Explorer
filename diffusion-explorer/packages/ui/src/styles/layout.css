@@ -56,12 +56,12 @@
 }
 
 .article-title {
-  font-size: 2.7em;
+  font-size: 2.6em;
   margin-bottom: 0;
 }
 
 .article-subtitle {
-  font-size: 1.4em;
+  font-size: 1.7em;
   font-weight: normal;
   color: var(--muted-color);
   margin-top: 0.3em;
@@ -195,8 +195,7 @@
   }
 
   .katex-display {
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
   }
 }
 

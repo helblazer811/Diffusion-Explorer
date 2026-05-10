@@ -98,12 +98,9 @@
   export let contourStepSize = 0.005;
   export let contourAnimationDuration = 4;
 
-  // Mask outside surface
-  export let outsideMaskOpacity = 0.7;
-
   // Right canvas styling (Surface with rotating vectors)
   export let surfaceFillColor = "#fff7ed"; // Light orange tint
-  export let surfaceFillOpacity = 0.9;
+  export let surfaceFillOpacity = 0.8;
   export let surfaceStrokeColor = "#f97316"; // Orange
   export let surfaceStrokeWidth = 3;
 
@@ -258,33 +255,6 @@
     return samples;
   }
 
-  function drawOutsideMask(
-    ctx: CanvasRenderingContext2D,
-    curveFn: CurveFn,
-    toPixelFn: (p: [number, number]) => [number, number],
-    cWidth: number,
-    cHeight: number,
-    opacity: number
-  ) {
-    ctx.save();
-    ctx.beginPath();
-    // Outer rectangle (clockwise)
-    ctx.rect(0, 0, cWidth, cHeight);
-    // Inner curve (counter-clockwise for even-odd)
-    const numSamples = 200;
-    for (let i = 0; i <= numSamples; i++) {
-      const theta = (i / numSamples) * 2 * Math.PI;
-      const [px, py] = toPixelFn(curveFn(theta));
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fillStyle = "white";
-    ctx.globalAlpha = opacity;
-    ctx.fill("evenodd");
-    ctx.restore();
-  }
-
   function eulerIntegrate(
     samples: [number, number][],
     vectorField: (x: number, y: number) => [number, number],
@@ -434,7 +404,15 @@
     // Create toPixel function bound to current canvas dimensions
     const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
 
-    // 1. Draw gaussian contour plot (animated frame)
+    // 1. Fill volume interior with light orange tint (matches right side)
+    drawClosedCurve(ctx, curve, toPixelBound, {
+      fillColor: surfaceFillColor,
+      fillOpacity: surfaceFillOpacity,
+      strokeColor: "transparent",
+      strokeWidth: 0,
+    });
+
+    // 2. Draw gaussian contour plot (animated frame) on top of the tint
     plotContours(ctx, currentContours, {
       xScale: (x) => toPixelBound([x, 0])[0],
       yScale: (y) => toPixelBound([0, y])[1],
@@ -444,10 +422,7 @@
       stroke: false,
     });
 
-    // 2. Draw white mask outside surface
-    drawOutsideMask(ctx, curve, toPixelBound, cWidth, cHeight, outsideMaskOpacity);
-
-    // 3. Draw surface boundary (static, no fill)
+    // 3. Draw surface boundary (no fill, just the orange outline)
     drawClosedCurve(ctx, curve, toPixelBound, {
       fillColor: "transparent",
       fillOpacity: 0,
@@ -694,21 +669,19 @@
 </script>
 
 <div class="mass-conservation-equation">
-  <div class="equation-container">
-    <div class="equation-side">
-      <div class="equation-label">The change in probability density <Katex math={"\\color{#3b82f6}{\\rho}"}/> in a volume <Katex math={"\\color{#f97316}{V}"}/> over time.</div>
-      <div class="equation-math">
-        <Katex math={"\\frac{\\partial}{\\partial t} \\int_{\\color{#f97316}{V}} \\color{#3b82f6}{\\rho} \\, \\color{#f97316}{dV}"} displayMode={true} />
-      </div>
+  <div class="equation-grid">
+    <div class="grid-label grid-label-left">The change in probability density <Katex math={"\\color{#3b82f6}{\\rho}"}/> in a volume <Katex math={"\\color{#f97316}{V}"}/> over time.</div>
+    <div class="grid-label-spacer"></div>
+    <div class="grid-label grid-label-right">The probability flux <Katex math={"\\color{#3b82f6}{\\rho \\mathbf{v}} \\color{#374151}{\\cdot \\hat{n}}"}/> through a surface <Katex math={"\\color{#f97316}{S}"}/>.</div>
+
+    <div class="grid-math">
+      <Katex math={"\\frac{\\partial}{\\partial t} \\int_{\\color{#f97316}{V}} \\color{#3b82f6}{\\rho} \\, \\color{#f97316}{dV}"} displayMode={true} />
     </div>
-    <div class="equation-equals">
+    <div class="grid-equals">
       <Katex math={"="} displayMode={true} />
     </div>
-    <div class="equation-side">
-      <div class="equation-label">The probability flux <Katex math={"\\color{#3b82f6}{\\rho \\mathbf{v}} \\color{#374151}{\\cdot \\hat{n}}"}/> through a surface <Katex math={"\\color{#f97316}{S}"}/>.</div>
-      <div class="equation-math">
-        <Katex math={"-\\oint_{\\color{#f97316}{S}} \\color{#3b82f6}{\\rho \\mathbf{v}} \\color{#374151}{\\cdot \\hat{n}} \\, \\color{#f97316}{dS}"} displayMode={true} />
-      </div>
+    <div class="grid-math">
+      <Katex math={"-\\oint_{\\color{#f97316}{S}} \\color{#3b82f6}{\\rho \\mathbf{v}} \\color{#374151}{\\cdot \\hat{n}} \\, \\color{#f97316}{dS}"} displayMode={true} />
     </div>
   </div>
 </div>
@@ -752,41 +725,42 @@
     color: #374151;
   }
 
-  .equation-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.5rem;
+  .equation-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 0.5rem;
+    row-gap: 0.5rem;
+    justify-items: center;
   }
 
-  .equation-side {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    max-width: 350px;
-  }
-
-  .equation-label {
+  .grid-label {
     font-size: 1.5rem;
     color: #666;
-    margin-bottom: 0.5rem;
     text-align: center;
     line-height: 1.4;
+    max-width: 350px;
+    align-self: end;
   }
 
-  .equation-math {
-    min-height: 3rem;
+  .grid-label-spacer {
+    /* placeholder over the equals sign */
+  }
+
+  .grid-math {
     display: flex;
     align-items: center;
+    justify-content: center;
     font-size: 1.4rem;
+    align-self: center;
   }
 
-  .equation-equals {
+  .grid-equals {
     display: flex;
-    align-items: flex-end;
-    min-height: 3rem;
+    align-items: center;
+    justify-content: center;
     font-size: 1.4rem;
+    align-self: center;
   }
 
   /* Remove top margin from DoubleFigure */
