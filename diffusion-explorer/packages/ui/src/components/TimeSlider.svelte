@@ -21,7 +21,7 @@
   export let discreteFill = false;  // Snap fill to step boundaries
   export let showPlayButton = true;
   export let maxWidth = '644px';
-  export let labelSize = '0.85em';
+  export let labelSize = '1em';
 
   // Optional Timeline instance - when provided, TimeSlider controls the timeline directly
   // This enables seamless scrubbing while animation is playing

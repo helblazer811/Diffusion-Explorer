@@ -1,14 +1,15 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { writable } from "svelte/store";
   import { base } from "$app/paths";
   import { ArticleHeader, Katex } from "@diffusion-explorer/ui";
-  import { generateClippedGaussianSamples, clipSamplesToRadius, clipTrajectoriesToStartingRadius, loadCachedTrajectories } from "@diffusion-explorer/diffusion";
-  import { settings } from "$lib/settings";
+  import { generateClippedGaussianSamples, clipSamplesToRadius, clipTrajectoriesToStartingRadius, loadCachedTrajectories, loadCachedVectorField, FlowModelClient } from "@diffusion-explorer/diffusion";
+  import { settings, type VectorFieldData } from "$lib/settings";
 
   // Figure imports
   import { CrownJewel } from "$lib/figures/CrownJewel";
   import ProbabilityPathIntro from "$lib/figures/ProbabilityPathIntro.svelte";
+  import EulerStepDemo from "$lib/figures/EulerStepDemo.svelte";
   import FlowInvertibility from "$lib/figures/FlowInvertibility.svelte";
   import InvertibilityExplanation from "$lib/figures/InvertibilityExplanation.svelte";
   import MassConservation from "$lib/figures/MassConservation.svelte";
@@ -17,12 +18,17 @@
   import DivergenceTheorem from "$lib/figures/DivergenceTheorem/DivergenceTheorem.svelte";
   import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
   import LikelihoodIntegration from "$lib/figures/LikelihoodIntegration.svelte";
+  import Diffeomorphism from "$lib/figures/Diffeomorphism.svelte";
 
   // Data for ProbabilityPathIntro figure
   let probabilityPathSourceSamples: number[][] = [];
   let probabilityPathTargetSamples: number[][] = [];
   const allTimeSamples = writable<number[][][]>([]);
   const isTraining = writable<boolean>(false);
+
+  // Shared FlowModelClient + cached vector field for §1 figures
+  let flowMatchingClient: FlowModelClient | null = null;
+  let flowMatchingVectorField: VectorFieldData | null = null;
 
   // Data for FlowInvertibility figure
   let flowInvertibilityData: {
@@ -136,6 +142,29 @@
       console.warn("Failed to load ReverseSampling data:", e);
     }
 
+    // Initialize shared FlowModelClient (§1 figures) + cached vector field for EulerStepDemo
+    try {
+      flowMatchingClient = new FlowModelClient(
+        `${base}${settings.flowModelWorkerUrl}`,
+        `${base}${settings.flowMatchingModelPath}`,
+        "Flow Matching",
+        settings.flowMatchingModelConfig
+      );
+    } catch (e: unknown) {
+      console.warn("Failed to initialize FlowModelClient for §1 figures:", e);
+    }
+    try {
+      const vf = await loadCachedVectorField(
+        `${base}/cached_samples/flow_matching_vector_field.json`
+      );
+      if (vf) flowMatchingVectorField = vf;
+    } catch (e: unknown) {
+      console.warn("Failed to load flow matching vector field:", e);
+    }
+  });
+
+  onDestroy(() => {
+    flowMatchingClient?.dispose?.();
   });
 </script>
 
@@ -149,63 +178,51 @@
 
 <ArticleHeader
   title="A Visual Intro to the Continuity Equation"
+  subtitle="From Velocity Fields to Exact Likelihoods"
   author="Alec Helbling"
   authorLink="https://alechelbling.com"
   date="2025"
 />
 
-<CrownJewel contourBandwidth={10} numScatterSamples={300}>
-  <strong>Flow model transforming noise to data.</strong>
-  The orange contours show the evolving probability density as samples flow from a Gaussian source distribution to the two moons target distribution (blue points). Click anywhere to trace backward trajectories showing where samples originated.
-</CrownJewel>
+<MassConservation>
+  <strong>Conservation of probability mass.</strong>
+  The change in probability density <Katex math={"\\rho"} /> inside a volume <Katex math={"V"} />
+  equals the negative flux <Katex math={"\\rho \\mathbf{v}"} /> through the boundary
+  <Katex math={"S"} />.
+  <em>Left:</em> The probability density <Katex math={"\\rho"} /> evolving inside the volume.
+  <em>Right:</em> The flux vectors <Katex math={"\\rho \\mathbf{v}"} /> and surface normals
+  <Katex math={"\\hat{n}"} /> at the boundary.
+</MassConservation>
 
 <hr class="section-divider" />
 
-<!-- Introduction Section -->
-<section id="introduction">
-  <h2 id="introduction-heading" class="section-heading">Introduction</h2>
+<!-- §1 — Vector fields, flows, and the puzzle -->
+<section id="vector-fields-and-flows">
+  <h2 id="vector-fields-and-flows-heading" class="section-heading">
+    Vector Fields, Flows, and the Puzzle
+  </h2>
   <p>
-    Computer scientists have a time-honored tradition of stealing concepts from physics and rebranding
-    them with a nice computational flair, and of course this article is no different. Flow-based
-    generative models and diffusion models have become the dominant frameworks for generating
-    realistic synthetic examples of modalities like images and videos. Both of these frameworks have
-    deep roots in physics. Diffusion models are derived from Brownian motion, which was originally
-    conceived to model the random molecular motion of gases. Flow models are inspired by fluid
-    mechanics and the study of dynamical systems. It is perhaps unsurprising then that a deeper
-    understanding of the mathematical and physical underpinnings of generative models can be
-    extraordinarily valuable.
+    Flow-based generative models, like other modern generative frameworks, have deep roots in
+    physics. They draw on fluid mechanics and the study of dynamical systems, and the continuity
+    equation we will derive in this article is borrowed directly from them. The goal of this
+    section is to set up just enough machinery — a flow, a velocity field, a probability path —
+    to pose the puzzle the rest of the article answers. For a more thorough introduction to flow
+    matching itself, see the
+    <a href="https://alechelbling.com/rectified-flow/" target="_blank" rel="noopener noreferrer"
+      >rectified flow explainer</a
+    >.
   </p>
+
+  <h3 id="flows-and-paths">A flow transports a source distribution to a target</h3>
   <p>
-    Continuous normalizing flows aim to generate new samples from distributions of data (e.g. images)
-    by <em>flowing</em> samples from a simple source distribution, like a standard Gaussian, to a
-    complex data distribution by following the dynamics of a learned vector field. One of the
-    defining capabilities of flow based generative models is their ability to compute the exact
-    likelihood of samples; this is something that other generative modeling frameworks like diffusion
-    are incapable of. The <em>continuity equation</em> is a partial differential equation that flow
-    models must satisfy, and it directly leads to their ability to perform exact likelihood
-    estimation. Unsurprisingly, this is also borrowed from classical physics.
+    A <em>flow</em> <Katex math={"\\psi_t(x)"} /> is a time-indexed map that transports points from
+    a simple source distribution <Katex math={"p_0"} /> (e.g. a standard Gaussian) to a complex
+    target distribution <Katex math={"p_1 = q"} /> (e.g. natural images), tracing a continuous
+    <em>probability path</em>
+    <Katex math={"(p_t)_{0 \\le t \\le 1}"} /> in between. We can sample from
+    <Katex math={"q"} /> by drawing <Katex math={"X_0 \\sim p_0"} /> and pushing it forward:
+    <Katex math={"X_t = \\psi_t(X_0) \\sim p_t"} />.
   </p>
-  <Katex
-    math={"\\frac{\\partial p_t}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0"}
-    displayMode={true}
-  />
-  <p>
-    In this article, we give a visual overview of the theoretical underpinnings of the continuity
-    equation. We expose how the deterministic nature of flow models naturally leads to the
-    conservation of probability mass, ensuring that at all times we have a valid probability
-    distribution. By combining this mass conservation property with some surprisingly simple
-    undergraduate level physics concepts, we can derive the continuity equation and in turn derive a
-    method for exact likelihood computation.
-  </p>
-</section>
-
-<hr class="section-divider" />
-
-<!-- Background on Flow Models -->
-<section id="background">
-  <h2 id="background-heading" class="section-heading">Background on Flow Models</h2>
-
-  <h3 id="what-is-a-flow">What is a flow?</h3>
 
   <ProbabilityPathIntro
     sourceDistributionSamples={probabilityPathSourceSamples}
@@ -223,148 +240,137 @@
     trajectories to produce samples from a complex target distribution <Katex math={"p_1 = q"} />.
   </ProbabilityPathIntro>
 
+  <h3 id="flow-from-velocity">Flows are generated by velocity fields</h3>
   <p>
-    The broad goal of generative modeling is to draw samples from some complex distribution of data
-    (e.g., natural images) that we have empirical observations from, but where the true distribution
-    is unknown. More concretely, given a finite number of training samples
-    <Katex math={"X = \\{x_1, \\ldots, x_n\\}"} /> from a target distribution <Katex math={"q"} />, our goal
-    is to learn a model that can generate new samples from <Katex math={"q"} />.
-  </p>
-  <p>
-    A flow model learns to bridge a simple source probability distribution <Katex math={"p"} /> that is
-    easy to draw samples from, like a multivariate Gaussian
-    <Katex math={"\\mathcal{N}(0, \\sigma^2 I)"} />, to a complex data distribution <Katex math={"q"} /> by
-    defining a continuous transformation between the two. We define a continuous sequence of
-    probability distributions, called a <em>probability path</em>
-    <Katex math={"(p_t)_{0 \\leq t \\leq 1}"} />, that smoothly interpolates between our simple
-    source distribution <Katex math={"p_0"} /> and our data distribution <Katex math={"p_1 = q"} />. We
-    index this path by an abstract time variable <Katex math={"t \\in [0, 1]"} />, where
-    <Katex math={"t = 0"} /> corresponds to the source distribution and <Katex math={"t = 1"} />
-    corresponds to the target distribution. By drawing samples from <Katex math={"p_0"} /> and
-    transforming them along this path, we can produce samples distributed according to our data
-    distribution <Katex math={"p_1 = q"} />.
-  </p>
-  <p>
-    A <em>flow</em> <Katex math={"\\psi_t(x)"} /> is a time-indexed mapping from
-    <Katex math={"\\mathbb{R}^d"} /> to <Katex math={"\\mathbb{R}^d"} /> that specifies trajectories of
-    points over time; when applied to our samples <Katex math={"X_0 \\sim p_0"} /> it transports them
-    from the source distribution to the target distribution <Katex math={"X_1 \\sim p_1 = q"} />. The
-    intermediate samples produced by our flow <Katex math={"X_t = \\psi_t(X_0)"} /> are distributed
-    according to our probability path <Katex math={"X_t \\sim p_t"} />. If we can somehow learn to
-    model this flow, then we can draw samples from our simple source distribution
-    <Katex math={"p_0"} /> and transform them to realistic approximations of real world data with
-    distribution <Katex math={"q"} />.
-  </p>
-  <p>
-    Perhaps somewhat counterintuitively, rather than directly modeling the flow
-    <Katex math={"\\psi_t(x)"} />, flow-based generative models instead model a time-dependent velocity
-    field <Katex math={"v_t(x)"} /> that "generates" the flow. By taking this velocity field we can
-    solve a set of ordinary differential equations (ODEs) to recover the flow, in a process called
-    simulation. By starting from some initial point <Katex math={"x_0"} /> at time
-    <Katex math={"t = 0"} />, we can trace the trajectory of this point over time according to the
-    velocity field <Katex math={"v_t(x)"} /> using the following ODE:
+    Rather than parameterizing the flow <Katex math={"\\psi_t(x)"} /> directly, flow-based models
+    parameterize a time-dependent <em>velocity field</em> <Katex math={"v_t(x)"} /> that
+    <em>generates</em> the flow via an ODE:
   </p>
   <Katex
     math={"\\frac{d}{dt} \\psi_t(x_0) = v_t(\\psi_t(x_0)), \\quad \\psi_0(x_0) = x_0."}
     displayMode={true}
   />
   <p>
-    The solution to this ordinary differential equation involving <Katex math={"v_t(x)"} /> is itself
-    the flow <Katex math={"\\psi_t(x)"} />. There are a variety of numerical methods for simulating
-    these ODEs which approximate the continuous trajectory by taking a series of discrete steps.
+    Sampling reduces to integrating this ODE forward in time — typically with Euler steps that
+    repeatedly nudge the current point along the local velocity:
+    <Katex math={"x_{t + \\Delta t} = x_t + \\Delta t \\cdot v_t(x_t)"} />.
   </p>
 
-  <h3 id="exact-likelihood">Exact Likelihood Estimation with a Flow</h3>
+  {#if flowInvertibilityData}
+    <EulerStepDemo
+      {flowMatchingClient}
+      targetDistribution={flowInvertibilityData.targetDistribution}
+      {flowMatchingVectorField}
+      backgroundVisible={false}
+      maxUserTrajectories={1}
+      showGroundTruth={false}
+      showLegend={false}
+      showArrowHeads={true}
+    >
+      <strong>Euler integration through a time-dependent velocity field
+        <Katex math={"v_t(x)"} />.</strong>
+      The orange Euler approximation takes 16 discrete steps along the direction of the blue
+      velocity field. Tap anywhere to generate a new sample.
+    </EulerStepDemo>
+  {/if}
+
+  <h3 id="puzzle">The puzzle</h3>
   <p>
-    One of the most unique properties, and perhaps the defining one, of continuous normalizing flows
-    is their ability to evaluate the exact likelihood of observing data samples
-    <Katex math={"\\log p(x)"} />. This can be done by integrating along the trajectory of the vector
-    field:
+    A velocity field <Katex math={"v_t(x)"} /> describes how individual particles move. But where
+    those particles <em>end up</em> encodes an entire probability density <Katex math={"p_t(x)"} />.
+    <strong>How does a velocity field encode the evolution of a density?</strong>
+    The answer is a partial differential equation called the <em>continuity equation</em>:
   </p>
   <Katex
-    math={
-      "\\log p(x(t_1), t_1) = \\log p(x(t_0), t_0) - \\int_{t_0}^{t_1} \\nabla \\cdot v(x(t), t)\\, dt."
-    }
+    math={"\\frac{\\partial p_t}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0"}
     displayMode={true}
   />
   <p>
-    This is not a capability of many other generative modeling frameworks like diffusion. Exact
-    likelihood estimation has numerous benefits. For example, it allows for principled maximum
-    likelihood based training. It can even be applied to applications like out of distribution
-    detection. However, it may not be immediately obvious why flow models have this capability,
-    which is the focus of the rest of this article.
+    The rest of this article is dedicated to deriving this equation from first principles, showing
+    how it lets us evaluate exact likelihoods, and explaining what makes the whole story
+    rigorously well-defined.
   </p>
 </section>
 
 <hr class="section-divider" />
 
-<!-- Derivation of the Continuity Equation -->
-<section id="derivation">
-  <h2 id="derivation-heading" class="section-heading">Derivation of the Continuity Equation</h2>
+<!-- §2 — Why exact likelihoods matter -->
+<section id="why-likelihoods">
+  <h2 id="why-likelihoods-heading" class="section-heading">Why Exact Likelihoods Matter</h2>
   <p>
-    We know that the <em>continuity equation</em> is what unlocks the ability to do exact likelihood
-    evaluation with flows: but where does it come from? Answering this question requires a number of
-    steps, but thankfully none of the steps require any concepts that are out of reach to anyone who
-    has taken an undergraduate multivariable calculus class!
+    Before we dive into the machinery, it is worth pausing on <em>why</em> we care so much about
+    likelihoods in the first place. One of the most unique properties — and arguably the defining
+    one — of continuous normalizing flows is their ability to evaluate the exact likelihood
+    <Katex math={"\\log p(x)"} /> of any observed data sample. This is something that other
+    generative modeling frameworks largely cannot do.
   </p>
-  <p>At a high level the steps of this derivation are:</p>
-  <ol>
-    <li>We argue why flow models conserve probability mass.</li>
-    <li>We introduce the concept of divergence, and the divergence theorem.</li>
-    <li>We reframe mass conservation in terms of the divergence of the probability flux.</li>
-    <li>We then show how this leads to the continuity equation.</li>
+  <p>
+    Variational autoencoders only give a lower bound on the likelihood (the ELBO). GANs do not
+    expose a likelihood at all — they are sample-only generators. Diffusion models can produce
+    likelihood estimates via the probability flow ODE, but most diffusion training objectives
+    optimize a bound rather than the true log-likelihood. Continuous normalizing flows are the
+    rare framework where the model itself <em>is</em> a tractable density we can evaluate exactly.
+  </p>
+  <p>Why does that matter in practice?</p>
+  <ul>
     <li>
-      We show how the continuity equation lends itself to exact likelihood estimation with
-      continuous normalizing flows.
+      <strong>Maximum likelihood training.</strong> If we can compute
+      <Katex math={"\\log p_\\theta(x)"} /> we can train by directly maximizing it on data — the gold
+      standard objective for density estimation, with well-understood statistical properties.
     </li>
-  </ol>
+    <li>
+      <strong>Out-of-distribution detection.</strong> An exact density gives us a principled score
+      for whether a new sample looks like the training distribution. Lower
+      <Katex math={"\\log p(x)"} /> means more likely OOD.
+    </li>
+    <li>
+      <strong>Model comparison.</strong> Two models can produce visually similar samples while
+      assigning very different likelihoods to held-out data. Likelihood is the metric that
+      distinguishes them.
+    </li>
+    <li>
+      <strong>Compression and information theory.</strong> By Shannon's theorem, an exact density
+      gives an exact code length — flows can be used as principled compressors.
+    </li>
+  </ul>
+  <p>
+    In the rest of this article we'll see <em>how</em> this evaluation is actually done. The path
+    runs through a physical premise (conservation of mass), a partial differential equation (the
+    continuity equation), and a small but powerful rearrangement that turns that PDE into a 1D ODE
+    along a trajectory.
+  </p>
+</section>
 
-  <h3 id="mass-conservation">Flows Conserve Probability Mass</h3>
+<hr class="section-divider" />
+
+<!-- §3 — The continuity equation -->
+<section id="continuity-equation">
+  <h2 id="continuity-equation-heading" class="section-heading">The Continuity Equation</h2>
   <p>
-    <strong
-      >Flows are deterministic and invertible, which ensures they conserve probability mass.</strong
-    >
-  </p>
-  <p>A defining property of continuous normalizing flows is that they are deterministic. A flow is defined via the ordinary differential equation:</p>
-  <Katex
-    math={"\\frac{d}{dt}\\psi_t(x) = v_t(x), \\quad \\psi_0(x) = x."}
-    displayMode={true}
-  />
-  <p>
-    This means that every particle at point <Katex math={"x"} /> has a unique velocity
-    <Katex math={"v_t(x)"} />, there is no random component to the trajectories as in diffusion.
-  </p>
-  <p>
-    A less obvious fact about flows is that they are invertible under certain regularity conditions
-    (i.e., Lipschitz continuity). Invertibility tells us that each point <Katex math={"x"} /> is
-    mapped to a unique point <Katex math={"\\psi_t(x)"} /> at a given point in time. There are no two
-    points <Katex math={"x_a"} /> and <Katex math={"x_b"} /> such that
-    <Katex math={"\\psi_t(x_a) = \\psi_t(x_b)"} />, otherwise we would not be able to form an inverse
-    <Katex math={"\\psi_t^{-1}(x)"} /> that recovers the initial points <Katex math={"x_a"} /> and
-    <Katex math={"x_b"} /> given <Katex math={"\\psi_t(x_a)"} />. This invertibility arises due to
-    something called the Picard-Lindelöf theorem, which guarantees the existence, uniqueness, and
-    continuous dependence of our flow on initial conditions. Ok, but what does invertibility buy us?
-  </p>
-  <p>
-    <strong
-      >Invertibility guarantees that points are not created or destroyed by our flow (mapped to the
-      same destination). If points are not created or destroyed, then a flow conserves probability
-      mass!</strong
-    >
-    This allows us to apply classic properties from physics relating to the conservation of mass to flows.
+    Our derivation begins with a physical premise and ends with a partial differential equation.
+    The premise is the conservation of probability mass; the bridge from premise to PDE runs
+    through two pieces of standard vector calculus — divergence and the divergence theorem.
   </p>
 
-  <InvertibilityExplanation>
-    <strong>Non-invertible flow.</strong>
-    Two distinct starting points <Katex math={"x_a"} /> and <Katex math={"x_b"} /> converge to the same
-    location at time <Katex math={"t"} />, then follow identical paths afterward. This violates
-    invertibility because we cannot uniquely determine the origin of a particle at the merged
-    location.
-  </InvertibilityExplanation>
+  <h3 id="conservation-of-mass">Conservation of probability mass</h3>
+  <p>
+    <strong>Flows conserve probability mass.</strong> Particles are not created or destroyed by
+    the flow — they are merely transported around by the velocity field. The total probability is
+    always one, at every time <Katex math={"t"} />:
+  </p>
+  <Katex math={"\\int p_t(x) \\, dx = 1 \\quad \\text{for all } t."} displayMode={true} />
+  <p>
+    Why is this true for flows? A flow is defined via an ODE
+    <Katex math={"\\tfrac{d}{dt}\\psi_t(x) = v_t(x)"} />, so every particle at point
+    <Katex math={"x"} /> has a unique velocity. There is no random component as in diffusion. Under
+    mild regularity conditions on <Katex math={"v_t"} />, this ODE has a unique solution for each
+    initial condition, which means distinct starting points stay distinct — points are never merged
+    or split. We will prove this rigorously in §6; for now, take it as the premise.
+  </p>
 
   {#if flowInvertibilityData}
     <FlowInvertibility data={flowInvertibilityData}>
-      <strong>Invertible flow preserves probability mass.</strong>
+      <strong>An invertible flow preserves probability mass.</strong>
       An invertible flow <Katex math={"\\psi_t(x)"} /> maps distinct starting points
       <Katex math={"x_a"} /> and <Katex math={"x_b"} /> to distinct locations at all times. Because no
       samples are created or destroyed, the total probability mass is conserved:
@@ -372,16 +378,12 @@
     </FlowInvertibility>
   {/if}
 
-  <h3 id="explicit-conservation">Explicit Conservation of Mass Property</h3>
   <p>
-    We can restate this conservation of mass property more explicitly. Say we have some volume
-    <Katex math={"V"} /> in space with a boundary <Katex math={"S"} />.
-    <strong
-      >It follows from the conservation of mass that the change in probability mass inside of our
-      volume <Katex math={"V"} /> is exactly the amount of probability mass flowing through our
-      boundary <Katex math={"S"} />.</strong
-    >
-    This can be stated as
+    We can restate this conservation property more explicitly in terms of a control volume. Pick
+    any region <Katex math={"V"} /> in space with boundary <Katex math={"S"} />. Conservation of
+    mass says: <strong>the change in probability mass inside <Katex math={"V"} /> is exactly the
+    amount of probability flowing through <Katex math={"S"} /></strong> (see the hero figure at
+    the top of the article). In integral form:
   </p>
   <Katex
     math={
@@ -390,46 +392,34 @@
     displayMode={true}
   />
   <p>
-    where <Katex math={"p_t(x)"} /> corresponds to our probability density at time
-    <Katex math={"t"} />, <Katex math={"v_t"} /> is our velocity field and
-    <Katex math={"\\hat{n}(x)"} /> produces a vector normal to the surface <Katex math={"S"} /> at
-    point <Katex math={"x"} />. We now have a single equation for compactly capturing our conservation
-    of mass property.
+    where <Katex math={"p_t(x)"} /> is the probability density at time <Katex math={"t"} />,
+    <Katex math={"v_t"} /> is the velocity field, and <Katex math={"\\hat{n}(x)"} /> is the outward
+    unit normal to the surface <Katex math={"S"} /> at point <Katex math={"x"} />. The minus sign
+    is there because mass flowing <em>out</em> of <Katex math={"V"} /> (positive flux) <em>decreases</em>
+    the mass inside.
   </p>
-
-  <MassConservation>
-    <strong>Conservation of probability mass.</strong>
-    The change in probability density <Katex math={"\\rho"} /> inside a volume <Katex math={"V"} />
-    equals the negative flux <Katex math={"\\rho \\mathbf{v}"} /> through the boundary
-    <Katex math={"S"} />.
-    <em>Left:</em> The probability density <Katex math={"\\rho"} /> evolving inside the volume.
-    <em>Right:</em> The flux vectors <Katex math={"\\rho \\mathbf{v}"} /> and surface normals
-    <Katex math={"\\hat{n}"} /> at the boundary.
-  </MassConservation>
-
-  <h3 id="divergence">What is Divergence?</h3>
   <p>
-    Now that we have a formal description of the conservation of mass property of our flow, we still
-    need to demonstrate how it can be converted into the continuity equation. This requires
-    introducing the concept of divergence and the divergence theorem.
+    This integral statement is the entire physical content we need. To convert it into the local
+    PDE form, we introduce divergence and the divergence theorem.
   </p>
 
+  <h3 id="divergence">Divergence</h3>
   <p>
-    Divergence is a quantity that describes how much a vector field is outwardly flowing at a point.
-    A <em>source</em> is a location with net outward flow, and a <em>sink</em> is a location with net
-    inward flow. Divergence is a useful quantity for describing interesting properties of probability
-    flows.
+    Divergence describes how much a vector field is outwardly flowing at a point. A
+    <em>source</em> is a location with net outward flow; a <em>sink</em> is a location with net inward
+    flow. Formally, for a 2D field <Katex math={"\\mathbf{F} = (F_x, F_y)"} />,
   </p>
+  <Katex
+    math={
+      "\\nabla \\cdot \\mathbf{F} = \\frac{\\partial F_x}{\\partial x} + \\frac{\\partial F_y}{\\partial y}."
+    }
+    displayMode={true}
+  />
 
   <DivergenceIntro>
     <strong>Three types of vector field divergence.</strong>
-    The divergence of a vector field <Katex math={"\\mathbf{F} = (F_x, F_y)"} /> is defined as
-    <Katex
-      math={
-        "\\nabla \\cdot \\mathbf{F} = \\frac{\\partial F_x}{\\partial x} + \\frac{\\partial F_y}{\\partial y}"
-      }
-    />
-    and describes the rate at which "density" expands or contracts at a point.
+    The divergence of a vector field <Katex math={"\\mathbf{F} = (F_x, F_y)"} /> describes the rate
+    at which "density" expands or contracts at a point.
     <em>Left:</em> A converging field (sink) has negative divergence (<Katex
       math={"\\nabla \\cdot \\mathbf{F} < 0"}
     />).
@@ -441,162 +431,150 @@
     />).
   </DivergenceIntro>
 
-  <h3 id="divergence-theorem">Divergence Theorem</h3>
+  <h3 id="divergence-theorem">The Divergence Theorem</h3>
   <p>
-    Using something called the divergence theorem, we can directly relate divergence to the
-    probability <em>flux</em> through a boundary. This helps us convert our statement about the
-    conservation of mass to one about divergence. Gauss' Divergence Theorem states that
+    Divergence is a local quantity (defined at each point); flux is a global quantity (integrated
+    over a boundary). The <em>divergence theorem</em> connects them. Gauss' divergence theorem
+    states that
   </p>
   <Katex
-    math={"\\oint_S \\mathbf{F} \\cdot \\hat{n}(x) \\, dS = \\iint_V \\nabla \\cdot \\mathbf{F} \\, dV"}
+    math={"\\oint_S \\mathbf{F} \\cdot \\hat{n}(x) \\, dS = \\iint_V \\nabla \\cdot \\mathbf{F} \\, dV."}
     displayMode={true}
   />
   <p>
-    In English, this means that the integral of the flux
-    <Katex math={"\\mathbf{F} \\cdot \\hat{n}(x)"} /> around a boundary <Katex math={"S"} /> is
-    equal to the integral of the divergence <Katex math={"\\nabla \\cdot \\mathbf{F}"} /> across the
-    volume <Katex math={"V"} /> with boundary <Katex math={"S"} />. This allows us to convert a statement
-    about the flux of a vector field through a boundary into one about the divergence over the volume.
-  </p>
-  <p>
-    Intuitively, we can see why divergence theorem is true in the figure below. If we subdivide a
-    region into infinitesimal grids you can see that the flows of adjacent grid cells in the
-    interior counteract each other, this leaves a net component of divergence that is outward.
+    In English: the integral of the flux <Katex math={"\\mathbf{F} \\cdot \\hat{n}"} /> through a
+    closed boundary <Katex math={"S"} /> equals the integral of the divergence
+    <Katex math={"\\nabla \\cdot \\mathbf{F}"} /> over the enclosed volume <Katex math={"V"} />.
+    Intuitively, if you subdivide the region into infinitesimal cells, the flux contributions from
+    adjacent interior cells cancel, leaving only the net outward flow at the boundary.
   </p>
 
-  <!-- <DivergenceTheorem /> -->
-
-  <p>We can apply this theorem to our conservation of mass equation to arrive at</p>
-  <Katex
-    math={
-      "\\begin{align} \\frac{d}{dt} \\iint_V p_t(x) \\, dV &= - \\oint_S (p_t v_t) \\cdot \\hat{n}(x) \\, dS \\\\ \\frac{d}{dt} \\iint_V p_t(x) \\, dV &= - \\iint_V \\nabla \\cdot (p_t v_t) \\, dV \\end{align}"
-    }
-    displayMode={true}
-  />
-  <p>
-    So we now have now expressed our conservation of mass in terms of the divergence of the
-    probability flux through our volume.
+  <DivergenceTheoremSquare />
+  <p class="figure-caption">
+    <strong>Why the divergence theorem is true.</strong>
+    A region tiled by smaller squares: each square's boundary flux contribution
+    <Katex math={"\\oint \\mathbf{F} \\cdot \\hat{n} \\, dS"} /> cancels against its neighbors at every
+    shared edge. The only contributions that survive are those on the outer boundary — exactly the
+    surface integral side of the theorem. Summing the (volume) divergences inside equals the (surface)
+    flux outside.
   </p>
 
-  <h3 id="putting-together">Putting it All Together</h3>
+  <h3 id="putting-together">Deriving the PDE</h3>
   <p>
-    Finally, we can tie all of these steps together and derive the continuity equation. First we can
-    move everything to one side and combine the integrals.
+    We now have all the pieces. Apply the divergence theorem to the right-hand side of the
+    conservation-of-mass integral:
   </p>
   <Katex
     math={
-      "\\begin{align} \\frac{d}{dt} \\iint_V p_t(x) \\, dV &= - \\iint_V \\nabla \\cdot (p_t v_t) \\, dV \\\\ \\frac{d}{dt} \\iint_V p_t(x) \\, dV + \\iint_V \\nabla \\cdot (p_t v_t) \\, dV &= 0 \\end{align}"
+      "\\begin{align} \\frac{d}{dt} \\iint_V p_t(x) \\, dV &= - \\oint_S (p_t v_t) \\cdot \\hat{n}(x) \\, dS \\\\ &= - \\iint_V \\nabla \\cdot (p_t v_t) \\, dV. \\end{align}"
     }
     displayMode={true}
   />
   <p>
-    Now we can use the Leibniz integral rule to move our derivative to the inside of our integrals
-    to get
+    Move everything to one side, use the Leibniz integral rule to push the time derivative inside
+    the integral, and merge the two integrals:
   </p>
   <Katex
     math={
-      "\\iint_V \\frac{\\partial p_t(x)}{\\partial t} \\, dV + \\iint_V \\nabla \\cdot (p_t v_t) \\, dV = 0"
-    }
-    displayMode={true}
-  />
-  <p>And we can merge the integrals</p>
-  <Katex
-    math={
-      "\\iint_V \\left( \\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t) \\right) dV = 0"
+      "\\iint_V \\left( \\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t) \\right) dV = 0."
     }
     displayMode={true}
   />
   <p>
-    Now, we can use a standard argument that this statement is true for arbitrary volumes
-    <Katex math={"V"} />, rather than a particular volume. The only way for an integral of some
-    quantity
-    <Katex math={"\\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t)"} /> to be zero
-    for arbitrary volumes is if the integrand is zero. So
+    Now apply the standard <em>arbitrary-volume</em> argument. The volume <Katex math={"V"} /> was
+    chosen arbitrarily — the equation holds for <em>any</em> region we pick. The only way for an
+    integrand to integrate to zero over every possible region is if the integrand itself is zero
+    everywhere. Therefore:
   </p>
   <Katex
-    math={"\\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0"}
+    math={"\\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0."}
     displayMode={true}
   />
   <p>
-    This is the final partial differential equation form that the continuity equation is typically
-    presented in! This is an equation that all valid continuous normalizing flows are guaranteed to
-    satisfy, and as we mentioned previously it is what allows CNFs to perform exact likelihood
-    evaluation.
+    This is the <strong>continuity equation</strong>, the local PDE form that all valid continuous
+    normalizing flows must satisfy. It says: the rate of change of density at a point is exactly
+    the negative divergence of the probability flux <Katex math={"p_t v_t"} /> at that point.
   </p>
 </section>
 
 <hr class="section-divider" />
 
-<!-- Evaluating Exact Likelihoods -->
-<section id="exact-likelihoods">
-  <h2 id="exact-likelihoods-heading" class="section-heading">Evaluating Exact Likelihoods</h2>
+<!-- §4 — From PDE to log-densities: the instantaneous change of variables -->
+<section id="instantaneous-change-of-variables">
+  <h2 id="instantaneous-change-of-variables-heading" class="section-heading">
+    From PDE to Log-Densities: The Instantaneous Change of Variables
+  </h2>
   <p>
-    Now that we are equipped with the continuity equation, we want to finally derive the capability
-    of flows to evaluate exact likelihoods.
+    The continuity equation is a partial differential equation about <Katex math={"p_t(x)"} /> at
+    fixed points in space. That is the <em>Eulerian</em> view. To evaluate the likelihood of an
+    observed sample, it turns out to be far more useful to switch to the <em>Lagrangian</em> view:
+    follow a single particle along its trajectory <Katex math={"\\psi_t(x_0)"} /> and ask how its
+    log-density changes over time. This rearrangement is the bridge from the PDE to a practical
+    likelihood evaluation method, and it is what makes continuous normalizing flows work.
   </p>
   <p>
-    First, instead of thinking about how the density changes at fixed points in space, we can follow
-    the trajectories of our samples as they flow. Going back to the ODE which defines our flow we
-    have that
+    Recall the flow ODE,
+    <Katex
+      math={"\\frac{d\\psi_t(x_0)}{dt} = v_t(\\psi_t(x_0)), \\quad \\psi_0(x_0) = x_0,"}
+      displayMode={true}
+    />
+    and the continuity equation,
   </p>
   <Katex
-    math={"\\frac{d\\psi_t(x_0)}{dt} = v_t(\\psi_t(x_0)), \\quad \\psi_0(x_0) = x_0"}
-    displayMode={true}
-  />
-  <p>We can express the continuity equation in this form as</p>
-  <Katex
-    math={"\\frac{\\partial p_t(\\psi_t(x_0))}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0"}
-    displayMode={true}
-  />
-  <p>We can then expand the divergence term:</p>
-  <Katex
-    math={
-      "\\begin{align} \\frac{\\partial p_t(\\psi_t(x_0))}{\\partial t} + v_t \\cdot \\nabla p_t + p_t(\\nabla \\cdot v_t) &= 0 \\\\ \\frac{\\partial p_t(\\psi_t(x_0))}{\\partial t} + v_t \\cdot \\nabla p_t &= -p_t(\\nabla \\cdot v_t) \\end{align}"
-    }
-    displayMode={true}
-  />
-  <p>The term on the left is called the <em>material derivative</em></p>
-  <Katex
-    math={
-      "\\frac{Dp_t}{Dt} = \\frac{\\partial p_t(\\psi_t(x_0))}{\\partial t} + v_t \\cdot \\nabla p_t"
-    }
-    displayMode={true}
-  />
-  <p>Substituting this into our expanded continuity equation gives us</p>
-  <Katex math={"\\frac{Dp_t}{Dt} = - p_t (\\nabla \\cdot v_t)"} displayMode={true} />
-  <p>The final piece of our transformation comes from the definition of the derivative of a logarithm</p>
-  <Katex
-    math={"\\frac{d}{dt} \\log p_t(\\psi_t(x_0)) = \\frac{1}{p_t} \\frac{dp_t}{dt}"}
-    displayMode={true}
-  />
-  <p>If we multiply both sides of our material derivative expression we get:</p>
-  <Katex
-    math={"\\frac{1}{p_t} \\frac{D p_t(\\psi_t(x_0))}{Dt} = - \\nabla \\cdot v_t"}
-    displayMode={true}
-  />
-  <p>And we can use our log identity to get</p>
-  <Katex
-    math={"\\frac{d}{dt} \\log p_t(\\psi_t(x_0)) = - \\nabla \\cdot v_t"}
-    displayMode={true}
-  />
-  <p>Finally, by the fundamental theorem of calculus we get</p>
-  <Katex
-    math={
-      "\\log p_t(\\psi_t(x_0)) - \\log p_0(x_0) = - \\int_0^t \\nabla \\cdot v_s(\\psi_s(x_0)) \\, ds"
-    }
+    math={"\\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0."}
     displayMode={true}
   />
   <p>
-    In order to compute the exact likelihood <Katex math={"\\log p_T(x)"} /> we must run the flow
-    backwards given a sample <Katex math={"x"} /> at time <Katex math={"T"} />. Thankfully, we can do
-    this in quite a straightforward way by simply moving in the negative direction predicted by our
-    velocity field <Katex math={"-v_t(x)"} />:
+    Expand the divergence of the product
+    <Katex math={"\\nabla \\cdot (p_t v_t) = v_t \\cdot \\nabla p_t + p_t (\\nabla \\cdot v_t)"} />
+    and rearrange:
   </p>
   <Katex
-    math={"\\frac{d}{dt} \\psi_t^{-1}(x) = -v_t(\\psi_t^{-1}(x)), \\quad \\psi_T^{-1}(x) = x"}
+    math={
+      "\\frac{\\partial p_t(x)}{\\partial t} + v_t \\cdot \\nabla p_t = -p_t (\\nabla \\cdot v_t)."
+    }
     displayMode={true}
   />
-  <p>This is another situation where we are benefiting from the invertibility of our flow!</p>
+  <p>The left-hand side is the <em>material derivative</em> — the rate of change of <Katex math={"p_t"} /> as seen by an observer riding along with the flow:</p>
+  <Katex
+    math={
+      "\\frac{D p_t}{D t} \\;=\\; \\frac{\\partial p_t}{\\partial t} + v_t \\cdot \\nabla p_t."
+    }
+    displayMode={true}
+  />
+  <p>So the continuity equation becomes</p>
+  <Katex math={"\\frac{D p_t}{D t} = - p_t \\, (\\nabla \\cdot v_t)."} displayMode={true} />
+  <p>
+    Dividing by <Katex math={"p_t"} /> and recognizing the chain-rule identity
+    <Katex math={"\\frac{d}{dt} \\log p_t = \\frac{1}{p_t} \\frac{D p_t}{D t}"} /> along the
+    trajectory gives the central result of this article:
+  </p>
+  <Katex
+    math={"\\boxed{\\;\\frac{d}{dt} \\log p_t(\\psi_t(x_0)) = - \\nabla \\cdot v_t(\\psi_t(x_0)).\\;}"}
+    displayMode={true}
+  />
+  <p>
+    This is the <strong>instantaneous change of variables formula</strong>. It is the key
+    workhorse of continuous normalizing flows: a partial differential equation in space has been
+    reduced to a one-dimensional ODE along each trajectory. Integrating from
+    <Katex math={"0"} /> to <Katex math={"t"} /> yields
+  </p>
+  <Katex
+    math={
+      "\\log p_t(\\psi_t(x_0)) - \\log p_0(x_0) = - \\int_0^t \\nabla \\cdot v_s(\\psi_s(x_0)) \\, ds."
+    }
+    displayMode={true}
+  />
+  <p>
+    To evaluate <Katex math={"\\log p_T(x)"} /> for an observed sample <Katex math={"x"} />, we
+    run the flow <em>backwards</em> from <Katex math={"x"} /> at time <Katex math={"T"} /> to find
+    the corresponding source point <Katex math={"x_0"} />, then accumulate the divergence integral
+    along the way. Reversing a flow is straightforward: just integrate the negated velocity field,
+  </p>
+  <Katex
+    math={"\\frac{d}{dt} \\psi_t^{-1}(x) = -v_t(\\psi_t^{-1}(x)), \\quad \\psi_T^{-1}(x) = x."}
+    displayMode={true}
+  />
 
   {#if reverseSamplingData}
     <ReverseSampling data={reverseSamplingData}>
@@ -616,23 +594,203 @@
     </LikelihoodIntegration>
   {/if}
 
-  <h3 id="computational-concerns">Computational Concerns</h3>
   <p>
-    In practice, it is challenging to compute the exact divergence
-    <Katex math={"\\nabla \\cdot v_t = \\sum_{i = 1}^d \\frac{\\partial v_t^{(i)}}{\\partial x_i}"} />
-    which requires <Katex math={"\\mathcal{O}(d)"} /> separate backpropagations through our network.
-    For high dimensional <Katex math={"d"} /> this is not feasible. This is why many approaches settle
-    for approximate methods like Hutchinson's trace estimator which says that
+    With this formula in hand, we know <em>how</em> to evaluate likelihoods. The next two sections
+    address the natural follow-up questions: how do we actually parameterize and train such a
+    model (§5), and why is the whole construction rigorously well-defined (§6)?
+  </p>
+</section>
+
+<hr class="section-divider" />
+
+<!-- §5 — Continuous normalizing flows -->
+<section id="continuous-normalizing-flows">
+  <h2 id="continuous-normalizing-flows-heading" class="section-heading">
+    Continuous Normalizing Flows
+  </h2>
+  <p>
+    Now we have everything we need to define a continuous normalizing flow (CNF) as a
+    <em>practical</em> generative model. The recipe is short:
+  </p>
+  <ol>
+    <li>
+      Parameterize the velocity field as a neural network
+      <Katex math={"v_\\theta(x, t)"} /> — typically a simple MLP that takes the current point
+      <Katex math={"x"} /> and time <Katex math={"t"} /> as inputs and outputs a velocity vector in
+      <Katex math={"\\mathbb{R}^d"} />.
+    </li>
+    <li>
+      Define the flow implicitly through the ODE
+      <Katex math={"\\tfrac{d}{dt}\\psi_t(x_0) = v_\\theta(\\psi_t(x_0), t)"} />. Sampling means
+      starting from <Katex math={"x_0 \\sim p_0"} /> and integrating forward to <Katex math={"t = 1"} />.
+    </li>
+    <li>
+      Evaluate likelihoods using the instantaneous change of variables formula from §4: integrate
+      <Katex math={"-\\nabla \\cdot v_\\theta"} /> along the reverse trajectory.
+    </li>
+    <li>
+      Train by maximum likelihood: take gradient steps on
+      <Katex math={"-\\mathbb{E}_{x \\sim q}[\\log p_\\theta(x)]"} />.
+    </li>
+  </ol>
+  <p>
+    What is striking is how little structure we need to impose on <Katex math={"v_\\theta"} />.
+    Traditional discrete normalizing flows (RealNVP, Glow) had to use carefully restricted
+    architectures so that their Jacobian determinants would be tractable. Here, <Katex math={"v_\\theta"} />
+    can be an essentially arbitrary smooth neural network — the work of constraining the model into
+    a valid density evolution is done by the continuity equation, not by hand-designed
+    architectural restrictions.
+  </p>
+  <p>
+    The price we pay for this freedom is that sampling and likelihood evaluation both require
+    solving an ODE, which is more expensive per-sample than a single forward pass. But conceptually,
+    the model is just an MLP plus an ODE solver.
+  </p>
+
+  <CrownJewel contourBandwidth={10} numScatterSamples={300}>
+    <strong>A trained CNF in action.</strong>
+    The orange contours show the evolving probability density as samples flow from a Gaussian
+    source distribution to the two-moons target distribution (blue points). Click anywhere to
+    trace backward trajectories showing where samples originated.
+  </CrownJewel>
+</section>
+
+<hr class="section-divider" />
+
+<!-- §6 — Why the flow is well-defined -->
+<section id="well-posedness">
+  <h2 id="well-posedness-heading" class="section-heading">Why the Flow Is Well-Defined</h2>
+  <p>
+    We have so far been waving our hands at a delicate point: when does the flow ODE
+    <Katex math={"\\tfrac{d}{dt}\\psi_t(x_0) = v_\\theta(\\psi_t(x_0), t)"} /> actually have a unique
+    solution? And why does the resulting <Katex math={"\\psi_t"} /> give a valid density at every
+    time <Katex math={"t"} />? This section closes those gaps. None of the answers are deep; they
+    are all consequences of one regularity condition on <Katex math={"v_\\theta"} />.
+  </p>
+
+  <h3 id="picard-lindelof">Lipschitz continuity and Picard–Lindelöf</h3>
+  <p>
+    The crucial property we need from <Katex math={"v_\\theta"} /> is <em>Lipschitz continuity</em>
+    in the spatial argument: there exists a constant <Katex math={"L"} /> such that
+    <Katex math={"\\|v_\\theta(x, t) - v_\\theta(y, t)\\| \\le L \\|x - y\\|"} /> for all
+    <Katex math={"x, y, t"} />. For standard neural networks (MLPs with ReLU/tanh/etc.) this holds
+    on any bounded region — the network is locally Lipschitz, which is enough.
+  </p>
+  <p>
+    The <em>Picard–Lindelöf theorem</em> states that if <Katex math={"v_\\theta"} /> is Lipschitz in
+    <Katex math={"x"} /> and continuous in <Katex math={"t"} />, then for every initial condition
+    <Katex math={"x_0"} /> the ODE has a <em>unique</em> solution defined on some time interval
+    around <Katex math={"t = 0"} />. This is the foundational result that says "the flow exists and
+    is uniquely determined by the initial condition."
+  </p>
+
+  <h3 id="diffeomorphism">From uniqueness to a diffeomorphism</h3>
+  <p>
+    Picard–Lindelöf gives us more than just existence — it gives us <em>distinctness preservation</em>.
+    If <Katex math={"x_a \\ne x_b"} />, then <Katex math={"\\psi_t(x_a) \\ne \\psi_t(x_b)"} /> for all
+    <Katex math={"t"} />. Why? If two trajectories ever met at some time <Katex math={"t^*"} />,
+    they would form two solutions to the same ODE backward in time from that meeting point,
+    contradicting uniqueness.
+  </p>
+
+  <InvertibilityExplanation>
+    <strong>What Picard–Lindelöf rules out.</strong>
+    Two distinct starting points <Katex math={"x_a"} /> and <Katex math={"x_b"} /> are shown
+    converging to the same location at time <Katex math={"t"} />, then following identical paths
+    afterward. Picard–Lindelöf forbids this: under a Lipschitz velocity field, distinct trajectories
+    can never merge.
+  </InvertibilityExplanation>
+
+  <p>
+    Combined with smoothness of <Katex math={"v_\\theta"} />, this means each
+    <Katex math={"\\psi_t"} /> is a <em>diffeomorphism</em>: a smooth, invertible map with a smooth
+    inverse. A diffeomorphism is exactly the right kind of transformation to push a probability
+    density through. Concretely:
+  </p>
+  <ul>
+    <li><strong>Bijective:</strong> the inverse <Katex math={"\\psi_t^{-1}"} /> exists pointwise.</li>
+    <li>
+      <strong>No mass collapse:</strong> probability is neither created nor destroyed, justifying the
+      mass-conservation premise of §3.
+    </li>
+    <li>
+      <strong>Smooth Jacobian:</strong> the change-of-variables formula is well-defined, justifying
+      the differentiation we did in §4.
+    </li>
+    <li>
+      <strong>Reverse sampling works:</strong> integrating <Katex math={"-v_\\theta"} /> from
+      <Katex math={"t = 1"} /> back to <Katex math={"t = 0"} /> exactly inverts the forward flow.
+    </li>
+  </ul>
+
+  {#if flowInvertibilityData}
+    <Diffeomorphism data={flowInvertibilityData}>
+      <strong>A diffeomorphism in action.</strong>
+      A uniform grid at <Katex math={"t = 0"} /> is pushed forward by the same flow that maps the
+      Gaussian source distribution to the smiley target. The grid deforms continuously but never
+      folds, never tears, and no two cells overlap — exactly the properties Picard–Lindelöf
+      guarantees for any Lipschitz <Katex math={"v_\\theta"} />.
+    </Diffeomorphism>
+  {/if}
+
+  <p>
+    The chain is:
+    <Katex math={"v_\\theta"} /> Lipschitz <Katex math={"\\Rightarrow"} /> Picard–Lindelöf gives
+    unique trajectories <Katex math={"\\Rightarrow"} /> <Katex math={"\\psi_t"} /> is a diffeomorphism
+    <Katex math={"\\Rightarrow"} /> <Katex math={"p_t"} /> is a valid density at every <Katex math={"t"} />.
+    Crucially, this holds <em>at every gradient step</em> during training: as long as
+    <Katex math={"v_\\theta"} /> stays smooth, we are guaranteed that the model represents a
+    bona fide density.
+  </p>
+</section>
+
+<hr class="section-divider" />
+
+<!-- §7 — Making it tractable: the Hutchinson trace estimator -->
+<section id="hutchinson">
+  <h2 id="hutchinson-heading" class="section-heading">
+    Making It Tractable: The Hutchinson Trace Estimator
+  </h2>
+  <p>
+    There is one practical obstacle left. The instantaneous change of variables formula requires
+    evaluating <Katex math={"\\nabla \\cdot v_\\theta"} /> at every point along the trajectory.
+    Recall the definition:
   </p>
   <Katex
     math={
-      "\\nabla \\cdot v_t \\approx \\epsilon^T \\nabla_x(v_t^T \\epsilon), \\quad \\epsilon \\sim \\mathcal{N}(0, I)"
+      "\\nabla \\cdot v_\\theta = \\sum_{i = 1}^d \\frac{\\partial v_\\theta^{(i)}}{\\partial x_i} = \\operatorname{tr}\\!\\left( \\frac{\\partial v_\\theta}{\\partial x} \\right)."
     }
     displayMode={true}
   />
   <p>
-    This can be computed in a single backpropagation using a Jacobian vector product, something
-    automatic differentiation systems excel at.
+    Divergence is the trace of the Jacobian. Computing it exactly requires
+    <Katex math={"\\mathcal{O}(d)"} /> separate backpropagations — one per diagonal entry — which
+    becomes infeasible for the high-dimensional state spaces (images, latent codes) where we
+    actually want to use CNFs.
+  </p>
+  <p>
+    The fix is the <em>Hutchinson trace estimator</em>: an unbiased stochastic estimate of the
+    trace of any matrix using a single Jacobian-vector product. For
+    <Katex math={"\\epsilon \\sim \\mathcal{N}(0, I)"} /> (or any zero-mean unit-covariance
+    distribution),
+  </p>
+  <Katex
+    math={
+      "\\nabla \\cdot v_\\theta \\;\\approx\\; \\epsilon^\\top \\nabla_x (v_\\theta^\\top \\epsilon), \\quad \\epsilon \\sim \\mathcal{N}(0, I)."
+    }
+    displayMode={true}
+  />
+  <p>
+    This is a single backpropagation — exactly the kind of Jacobian-vector product that automatic
+    differentiation systems are optimized for. The estimator is unbiased: in expectation it equals
+    the true divergence. Variance can be reduced by averaging across multiple <Katex math={"\\epsilon"} />
+    samples, but in practice a single sample per step works well.
+  </p>
+  <p>
+    Hutchinson is what takes CNFs from a beautiful mathematical idea to a method that is
+    actually used at scale. With it, exact-likelihood training of a CNF on high-dimensional
+    data costs roughly the same as a single forward+backward pass per ODE step — a tractable price
+    for what we get in return.
   </p>
 </section>
 
