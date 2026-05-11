@@ -1,6 +1,25 @@
+// ========== INTERFACES ==========
+
+export interface VectorFieldData {
+  gridResolution: number;
+  timeSteps: number[];
+  domainRange: { xMin: number; xMax: number; yMin: number; yMax: number };
+  velocities: number[][][];
+  gridPoints: number[][];
+}
+
 // ========== SETTINGS OBJECT ==========
 
 export const settings = {
+  // Worker / model paths (relative; the page prefixes with `base` when creating the client)
+  flowModelWorkerUrl: '/workers/flow_model.worker.js',
+  flowMatchingModelPath: '/models/flow_model.json' as string | null,
+  flowMatchingModelConfig: { dim: 2, hidden: 64 },
+
+  // Interactive settings
+  interactiveSettings: {
+    maxUserTrajectories: 5, // max concurrent user-drawn trajectories
+  },
   // ========== STYLING SETTINGS ==========
   stylingSettings: {
     // Global styling
