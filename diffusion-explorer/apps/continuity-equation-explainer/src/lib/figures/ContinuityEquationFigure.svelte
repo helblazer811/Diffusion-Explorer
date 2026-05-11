@@ -115,6 +115,7 @@
   export let barCalloutWidth = 1;
   export let barCalloutGap = 4; // gap between dot edge and start of callout in px
   export let barLabelGap = 6; // gap between baseline and label in px
+  export let barArrowLength = 36; // length of the ∂p/∂t axis arrow in px
   export let barGridColor = "#d1d5db";
   export let barGridWidth = 1;
   export let barBaselineColor = "#9ca3af";
@@ -668,26 +669,28 @@
           fill={barColor}
           rx="2"
         />
-        <!-- Axis arrow above the top of the column -->
+        <!-- Axis arrow that starts at the top of the CURRENT bar and points
+             up. Length is fixed so the arrow stays a recognizable size at
+             every bar value. -->
         <line
           x1={barCenterX}
-          y1={barBottomY - barMaxHeight}
+          y1={barTopY}
           x2={barCenterX}
-          y2={barBottomY - barMaxHeight - 22}
+          y2={barTopY - barArrowLength}
           stroke={barColor}
-          stroke-width="2"
+          stroke-width="2.5"
           marker-end="url(#ce-axis-arrowhead)"
         />
       </svg>
-      <!-- ∂p/∂t label to the left of the axis arrow, centered on its midpoint -->
+      <!-- ∂p_t(x)/∂t label, vertically centered on the axis arrow -->
       <div
         class="dpdt-label"
         style="
-          left: {((barCenterX - 8) / canvasWidth) * 100}%;
-          top: {((barBottomY - barMaxHeight - 11) / canvasHeight) * 100}%;
+          left: {((barCenterX - 10) / canvasWidth) * 100}%;
+          top: {((barTopY - barArrowLength / 2) / canvasHeight) * 100}%;
         "
       >
-        <Katex math={`\\textcolor{${barColor}}{\\frac{\\partial p}{\\partial t}}`} />
+        <Katex math={`\\textcolor{${barColor}}{\\frac{\\partial p_t(x)}{\\partial t}}`} />
       </div>
       <div
         class="bar-label"
@@ -814,7 +817,7 @@
     position: absolute;
     transform: translate(-50%, 0);
     color: #374151;
-    font-size: 0.95rem;
+    font-size: 1.2rem;
     line-height: 1;
     pointer-events: none;
     white-space: nowrap;
@@ -825,7 +828,7 @@
     /* Anchor to the right edge of the label so it sits to the LEFT of the
        reference x position, and vertically centered on the reference y. */
     transform: translate(-100%, -50%);
-    font-size: 1rem;
+    font-size: 1.25rem;
     line-height: 1;
     pointer-events: none;
     white-space: nowrap;
