@@ -110,7 +110,6 @@
   export let barThickness = 14; // bar width in px
   export let barMaxHeight = 200; // bar height in px at p(x) = max
   export let barRightMargin = 36; // distance from canvas right edge to bar in px
-  export let barBottomMargin = 36; // distance from canvas bottom to bar baseline in px
   export let barCalloutColor = "#9ca3af";
   export let barCalloutWidth = 1;
   export let barCalloutGap = 4; // gap between dot edge and start of callout in px
@@ -472,7 +471,10 @@
   $: barCurrentHeight = Math.max(0, barHeightScale(currentBarValue));
   $: barX = canvasWidth ? canvasWidth - barRightMargin - barThickness : 0;
   $: barCenterX = barX + barThickness / 2;
-  $: barBottomY = canvasHeight - barBottomMargin;
+  // Anchor the bar's y-axis so its midpoint is on the canvas vertical center.
+  $: barBottomY = canvasHeight && barMaxHeight
+    ? (canvasHeight + barMaxHeight) / 2
+    : canvasHeight;
   $: barTopY = barBottomY - barCurrentHeight;
   // Fixed midpoint of the bar's column area — the straight callout from the
   // dot terminates here regardless of the bar's current height.
@@ -582,17 +584,17 @@
     </div>
     <div class="grid-label-spacer"></div>
     <div class="grid-label grid-label-right">
-      The negative divergence of probability flux at <Katex math={"\\color{#f97316}{x}"} />.
+      The divergence of the probability flux at <Katex math={"\\color{#f97316}{x}"} />.
     </div>
 
     <div class="grid-math">
       <Katex math={"\\frac{\\partial \\color{#3b82f6}{p_t(\\color{#f97316}{x})}}{\\partial t}"} displayMode={true} />
     </div>
     <div class="grid-equals">
-      <Katex math={"="} displayMode={true} />
+      <Katex math={"+"} displayMode={true} />
     </div>
     <div class="grid-math">
-      <Katex math={"-\\nabla \\cdot \\color{#3b82f6}{(p_t v_t)}"} displayMode={true} />
+      <Katex math={"\\nabla \\cdot \\color{#3b82f6}{(p_t v_t)} \\;=\\; 0"} displayMode={true} />
     </div>
   </div>
 </div>
@@ -716,11 +718,11 @@
   }
 
   .grid-label {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     color: #666;
     text-align: center;
     line-height: 1.4;
-    max-width: 360px;
+    max-width: 350px;
     align-self: end;
   }
 
