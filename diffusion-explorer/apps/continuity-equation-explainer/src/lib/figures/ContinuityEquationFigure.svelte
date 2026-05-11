@@ -135,11 +135,10 @@
   // Bar chart styling (overlaid vertical bar on the right side of the left canvas)
   // Blue to match the p_t(x) density color scheme on the LHS pane.
   export let barColor = "#3b82f6";
-  export let barThickness = 14; // bar width in px
+  export let barThickness = 18; // bar width in px
   export let barMaxHeight = 200; // bar height in px at p(x) = max
   export let barRightMargin = 36; // distance from canvas right edge to bar in px
   export let barCalloutColor = "#9ca3af";
-  export let barCalloutWidth = 1;
   export let barCalloutGap = 4; // gap between dot edge and start of callout in px
   export let barLabelGap = 6; // gap between baseline and label in px
   export let barArrowLength = 36; // length of the ∂p/∂t axis arrow in px
@@ -147,6 +146,9 @@
   export let barGridWidth = 1;
   export let barBaselineColor = "#9ca3af";
   export let barBaselineWidth = 1.5;
+  // Callout matches the baseline thickness so the two read as one connected
+  // elbow shape.
+  export let barCalloutWidth = barBaselineWidth;
 
   export let playingByDefault = true;
 
@@ -615,10 +617,10 @@
   $: barColumnMidY = barBottomY - barMaxHeight / 2;
   $: gridFractions = [0.25, 0.5, 0.75, 1.0];
 
-  // Angled (diagonal) callout from the dot to a point just LEFT of the bar
-  // chart's baseline. Start just past the dot's halo so the line reads as
-  // "coming out of" the dot.
-  $: barCalloutTargetX = barX - 16;
+  // Angled (diagonal) callout from the dot to the LEFT end of the bar's
+  // baseline. The shared endpoint with the baseline makes the two lines
+  // read as a single connected elbow.
+  $: barCalloutTargetX = barX - 12;
   $: barCalloutTargetY = barBottomY;
   $: barCalloutStart = canvasWidth && canvasHeight
     ? (() => {
