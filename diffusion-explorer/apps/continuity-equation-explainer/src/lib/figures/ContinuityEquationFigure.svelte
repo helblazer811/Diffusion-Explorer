@@ -702,13 +702,11 @@
 <div class="continuity-equation-equation">
   <div class="equation-grid">
     <div class="grid-label grid-label-left">
-      The rate of change of <span style="color: #3b82f6;">probability density</span> at the
-      point <Katex math={"x"} />.
+      Rate of change of <span style="color: #3b82f6;">density</span> at <Katex math={"x"} />.
     </div>
     <div class="grid-label-spacer"></div>
     <div class="grid-label grid-label-right">
-      The divergence of the <span style="color: #f97316;">probability flux</span> at
-      <Katex math={"x"} />.
+      Divergence of <span style="color: #f97316;">flux</span> at <Katex math={"x"} />.
     </div>
 
     <div class="grid-math">
