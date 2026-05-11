@@ -3,15 +3,20 @@
 
   Pointwise visualization of ∂p/∂t + ∇·(p v) = 0 at a single fixed point x.
 
+  Both panes share a convergent vector field v = -k(x - p), so the density
+  evolution and the local flow picture are internally consistent.
+
   LEFT pane (∂p/∂t at x):
-    - A broad Gaussian density contracts onto the fixed point under a linear
-      sink field v = -k(x - p). Below the canvas, an SVG bar shows p_t(x)
-      growing as density piles up at the point.
+    - A multi-modal Gaussian density contracts onto the fixed point. An SVG
+      overlay shows a thin callout from the dot to a vertical bar on the
+      right side of the canvas; the bar grows as p(x) grows.
 
   RIGHT pane (-∇·(p v) at x):
-    - Same density (muted by a translucent white overlay) with GPU streamlines
-      of the same convergent field flowing into the fixed point. The orange
-      dot marks x on both panes.
+    - Same density (muted by a translucent white overlay) with pulsing
+      pathlines integrated from seed points within a small radius of x —
+      propagated BOTH forward (where they're going, into x) and backward
+      (where they came from, away from x). Pulses sweep inward along each
+      path, illustrating the local flux into the point.
 -->
 
 <script lang="ts">
@@ -22,13 +27,13 @@
     useCanvas2D,
     useVisibilityHandler,
     Timeline,
-    StreamlineAnimation,
+    PulsingPathlineAnimation,
     computeContours,
     plotContours,
     drawMathjax,
     Katex,
     type VectorFieldFn,
-    type StreamlineAnimationState,
+    type PulsingPathlineAnimationState,
     type ComputedContours,
   } from "@diffusion-explorer/ui";
   import * as d3 from "d3";
@@ -45,15 +50,12 @@
   export let gap = 20;
   export let backgroundVisible = false;
 
-  // Fixed point + streamline field (independent of density evolution)
+  // Fixed point + convergent field. The same field drives both the density
+  // evolution (samples contract onto the point) and the streamline animation
+  // on the right pane — so the visualization is internally consistent.
   export let fixedPoint: [number, number] = [0, 0];
   export let fieldStrength = 1.0;
   export let domainHalfWidth = 1.5;
-  // Density is animated by pure translation (not contraction) — samples drift
-  // rightward across the canvas. Streamlines, on the other hand, still come
-  // from the convergent field so the right pane illustrates the local
-  // "flux into the point" picture.
-  export let densityTranslationVelocity: [number, number] = [0.9, 0];
 
   // Density samples — Gaussian mixture starting LEFT of the fixed point so
   // the density visibly drifts left→right while contracting onto it.
@@ -78,16 +80,19 @@
   export let contourStepSize = 0.03;
   export let animationDuration = 6;
 
-  // Streamlines (right pane)
-  export let streamlineColor = "#f97316"; // orange
-  export let streamlineDensity: number | [number, number] = 1.0;
-  export let streamlineMinPathLength = 1.0;
-  export let streamlineWidth = 3;
-  export let pulseWidthPixels = 22;
-  export let pulsePauseWidthPixels = 6;
-  // Show converging streamlines only within this circular radius (px) around
-  // the fixed point, so the visual emphasizes the local convergence.
-  export let streamlineClipRadius = 90;
+  // Pulsing pathlines (right pane) — seed points sampled within a small
+  // radius around the fixed point; each seed is propagated forward and
+  // backward through the convergent field to build a pathline.
+  export let pathlineColor = "#f97316"; // orange
+  export let pathlineThickness = 3;
+  export let pathSeedCount = 16;
+  export let pathSeedRadius = 0.5; // domain units around the fixed point
+  export let pathForwardSteps = 30;
+  export let pathBackwardSteps = 25;
+  export let pathStepSize = 0.04; // dt for integration
+  export let pulseWidth = 60; // pixels
+  export let pulseGap = 140; // pixels — long wavelength
+  export let pulseFrequency = 1 / 3; // 2 pulses per loop with duration = 6s
 
   // Right-pane density mute
   export let densityMuteColor = "#ffffff";
@@ -119,9 +124,9 @@
   let figureIsActive: Writable<boolean>;
 
   let leftCanvas: HTMLCanvasElement | null = null;
-  let densityCanvas: HTMLCanvasElement | null = null; // 2D, behind streamlines
-  let gpuCanvas: HTMLCanvasElement | null = null; // GPU, in front, for orange streamlines
-  let dotCanvas: HTMLCanvasElement | null = null; // 2D, in front of streamlines (orange dot)
+  let densityCanvas: HTMLCanvasElement | null = null; // 2D, behind pathlines
+  let gpuCanvas: HTMLCanvasElement | null = null; // WebGPU, pulsing pathlines
+  let dotCanvas: HTMLCanvasElement | null = null; // 2D, in front of pathlines (orange dot)
 
   const leftCanvas2d = useCanvas2D(width, height);
   const densityCanvas2d = useCanvas2D(width, height);
@@ -129,12 +134,12 @@
 
   let isInitialized = false;
 
-  type AnimationState = StreamlineAnimationState & {
+  type AnimationState = PulsingPathlineAnimationState & {
     contourFrame: number;
   };
 
   let timeline: Timeline<AnimationState> | null = null;
-  let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
+  let pathlineAnim: PulsingPathlineAnimation<AnimationState> | null = null;
   let contourFrames: ComputedContours[] = [];
   let densitySeries: number[] = []; // per-frame, normalized to [0, 1]
   let currentBarValue = 0; // reactive, drives the SVG bar width
@@ -211,10 +216,6 @@
     return (x, y) => [-k * (x - p[0]), -k * (y - p[1])];
   }
 
-  function createTranslationField(v: [number, number]): VectorFieldFn {
-    return () => [v[0], v[1]];
-  }
-
   function densityAtPoint(
     samples: [number, number][],
     p: [number, number],
@@ -234,28 +235,90 @@
   // Setup
   // ----------------------------------------------------------------
 
+  function buildPathlines(
+    field: VectorFieldFn,
+    seedCenter: [number, number],
+    seedRadius: number,
+    seedCount: number,
+    fwdSteps: number,
+    bkwSteps: number,
+    dt: number,
+    cW: number,
+    cH: number
+  ): number[][][] {
+    const paths: number[][][] = [];
+    for (let i = 0; i < seedCount; i++) {
+      // Uniform sample in disc around the seed center.
+      const r = seedRadius * Math.sqrt(Math.random());
+      const theta = 2 * Math.PI * Math.random();
+      const sx = seedCenter[0] + r * Math.cos(theta);
+      const sy = seedCenter[1] + r * Math.sin(theta);
+
+      // Backward integration: step against the field, starting from the seed.
+      // Collect points moving outward from the seed.
+      const bkw: [number, number][] = [];
+      let bx = sx;
+      let by = sy;
+      for (let s = 0; s < bkwSteps; s++) {
+        const [vx, vy] = field(bx, by);
+        bx -= vx * dt;
+        by -= vy * dt;
+        bkw.push([bx, by]);
+      }
+
+      // Forward integration: step with the field, starting from the seed.
+      const fwd: [number, number][] = [];
+      let fx = sx;
+      let fy = sy;
+      for (let s = 0; s < fwdSteps; s++) {
+        const [vx, vy] = field(fx, fy);
+        fx += vx * dt;
+        fy += vy * dt;
+        fwd.push([fx, fy]);
+      }
+
+      // Full pathline: outer end of backward → seed → forward.
+      const pathDomain: [number, number][] = [
+        ...bkw.reverse(),
+        [sx, sy],
+        ...fwd,
+      ];
+      // Convert to pixel coords.
+      const pathPx = pathDomain.map((p) => toPixel(p, cW, cH));
+      paths.push(pathPx as number[][]);
+    }
+    return paths;
+  }
+
   function runInitialComputation(cW: number, cH: number) {
-    const streamlineField = createConvergentField(fixedPoint, fieldStrength);
-    const densityField = createTranslationField(densityTranslationVelocity);
-    const toPixelBound = (p: [number, number]) => toPixel(p, cW, cH);
+    const field = createConvergentField(fixedPoint, fieldStrength);
     const domain = getDomain();
 
-    streamlineAnim = StreamlineAnimation.create<AnimationState>({
-      backend: "gpu",
-      vectorFieldFn: streamlineField,
-      domain,
-      toPixel: toPixelBound,
-      density: streamlineDensity,
-      minPathLength: streamlineMinPathLength,
-      color: streamlineColor,
-      strokeWidth: streamlineWidth,
-      pulseWidthPixels,
-      pulsePauseWidthPixels,
+    // Build pulsing pathlines from seed points sampled near the fixed point.
+    const paths = buildPathlines(
+      field,
+      fixedPoint,
+      pathSeedRadius,
+      pathSeedCount,
+      pathForwardSteps,
+      pathBackwardSteps,
+      pathStepSize,
+      cW,
+      cH
+    );
+
+    pathlineAnim = PulsingPathlineAnimation.create<AnimationState>({
+      paths,
+      color: pathlineColor,
+      thickness: pathlineThickness,
+      pulseWidth,
+      pulseGap,
       offsets: "synchronized",
       duration: animationDuration,
-      pulseFrequency: 0.5,
+      pulseFrequency,
     });
 
+    // Density: same convergent field driving the contours.
     let samples = sampleGaussianMixture(numSamples, densityModes);
     const contourDomain: [number, number, number, number] = [
       domain.xMin,
@@ -263,8 +326,6 @@
       domain.yMin,
       domain.yMax,
     ];
-    // Radius for the point-density estimator — small enough to be local,
-    // large enough that the count is stable across frames.
     const densityRadius = domainHalfWidth * 0.08;
 
     contourFrames = [];
@@ -279,21 +340,21 @@
         })
       );
       rawDensity.push(densityAtPoint(samples, fixedPoint, densityRadius));
-      samples = eulerIntegrate(samples, densityField, contourStepSize);
+      samples = eulerIntegrate(samples, field, contourStepSize);
     }
     const maxDensity = Math.max(...rawDensity, 1e-12);
     densitySeries = rawDensity.map((d) => d / maxDensity);
   }
 
   function setupTimeline(cW: number, cH: number) {
-    if (!streamlineAnim) return;
+    if (!pathlineAnim) return;
 
     timeline = new Timeline<AnimationState>();
-    timeline.initialState = { streamlinePhase: 0, contourFrame: 0 };
+    timeline.initialState = { pulsingPathlinePhase: 0, contourFrame: 0 };
     timeline.duration = animationDuration;
     timeline.looping = true;
 
-    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
+    timeline.add(pathlineAnim.clip, { start: 0, end: 1 });
 
     timeline.add(
       {
@@ -375,9 +436,9 @@
   }
 
   function drawRight(state: AnimationState, cW: number, cH: number) {
-    // GPU streamlines (front canvas, middle z-layer)
-    if (streamlineAnim?.initialized) {
-      streamlineAnim.draw(state, [0, 0, 0, 0]);
+    // GPU pulsing pathlines (middle z-layer)
+    if (pathlineAnim?.initialized) {
+      pathlineAnim.draw(state, [0, 0, 0, 0]);
     }
 
     // Density + mute on the back canvas
@@ -388,7 +449,7 @@
       drawDensityAndDot(dctx, cf, cW, cH, /* mute */ true);
     }
 
-    // Orange dot on the topmost canvas so it sits above the streamlines
+    // Orange dot on the topmost canvas so it sits above the pathlines
     const tctx = dotCanvas2d.ctx;
     if (tctx) {
       tctx.clearRect(0, 0, cW, cH);
@@ -414,23 +475,13 @@
   $: calloutX1 = dotPixel[0] + pointRadius + barCalloutGap;
   $: calloutX2 = barX;
 
-  // Center of the streamline clip circle, in percentages of the GPU canvas.
-  // Domain is centered on fixedPoint, so this is always (50, 50) — but compute
-  // it from toPixel so the clip stays correct if the domain logic changes.
-  $: streamlineClipCenterPct = canvasWidth && canvasHeight
-    ? (() => {
-        const [px, py] = toPixel(fixedPoint, canvasWidth, canvasHeight);
-        return [(px / canvasWidth) * 100, (py / canvasHeight) * 100];
-      })()
-    : [50, 50];
-
   // ----------------------------------------------------------------
   // Lifecycle
   // ----------------------------------------------------------------
 
   onDestroy(() => {
     if (timeline) timeline.pause();
-    if (streamlineAnim) streamlineAnim.destroy();
+    if (pathlineAnim) pathlineAnim.destroy();
   });
 
   // ----------------------------------------------------------------
@@ -455,11 +506,11 @@
       densityCanvas2d.resize(canvasWidth, canvasHeight);
       dotCanvas2d.resize(canvasWidth, canvasHeight);
 
-      if (streamlineAnim && gpuCanvas) {
+      if (pathlineAnim && gpuCanvas) {
         const dpr = window.devicePixelRatio || 1;
         gpuCanvas.width = canvasWidth * dpr;
         gpuCanvas.height = canvasHeight * dpr;
-        await streamlineAnim.init(gpuCanvas);
+        await pathlineAnim.init(gpuCanvas);
       }
 
       if (timeline) {
@@ -534,13 +585,9 @@
         use:densityCanvas2d.bindCanvas
         class="back-canvas"
       ></canvas>
-      <!-- Middle: GPU streamlines, clipped to a circular region around the
-           fixed point so the visual emphasizes the local convergence. -->
-      <canvas
-        bind:this={gpuCanvas}
-        class="gpu-canvas"
-        style="clip-path: circle({streamlineClipRadius}px at {streamlineClipCenterPct[0]}% {streamlineClipCenterPct[1]}%);"
-      ></canvas>
+      <!-- Middle: pulsing pathlines (WebGPU). The pathlines are bounded by
+           the path seed radius, so no clip-path is needed. -->
+      <canvas bind:this={gpuCanvas} class="gpu-canvas"></canvas>
       <!-- Front: orange dot label -->
       <canvas
         bind:this={dotCanvas}

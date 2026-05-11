@@ -255,7 +255,7 @@
   density at <Katex math={"x"} /> — visualized by the orange bar, which grows as the density
   moves onto <Katex math={"x"} /> and shrinks as it moves off.
   <em>Right:</em> <Katex math={"-\\nabla \\cdot (p_t v_t)"} /> at <Katex math={"x"} /> is the rate
-  at which probability flux flows INTO the point — the converging orange streamlines.
+  at which probability flux flows INTO the point — the pulsing pathlines sweeping inward from nearby seed points.
 </ContinuityEquationFigure>
 
 <hr class="section-divider" />
@@ -643,13 +643,13 @@
 
   <ContinuityEquationFigure>
     <strong>The continuity equation, pointwise.</strong>
-    Both panes show the same probability density drifting through a fixed point <Katex math={"x"} />
-    (orange dot).
+    Both panes show the same probability density contracting onto a fixed point <Katex math={"x"} />
+    (orange dot) under a convergent flow.
     <em>Left:</em> <Katex math={"\\partial p_t(x) / \\partial t"} /> is the rate of change of
-    density at <Katex math={"x"} /> — visualized by the orange bar, which grows as the density
-    moves onto <Katex math={"x"} /> and shrinks as it moves off.
+    density at <Katex math={"x"} /> — visualized by the orange bar growing as density piles up
+    at the point.
     <em>Right:</em> <Katex math={"-\\nabla \\cdot (p_t v_t)"} /> at <Katex math={"x"} /> is the rate
-    at which probability flux flows INTO the point — the converging orange streamlines. The PDE
+    at which probability flux flows INTO the point — the pulsing pathlines sweeping inward from nearby seed points. The PDE
     above says these two quantities are equal at every point and every time.
   </ContinuityEquationFigure>
 
