@@ -56,7 +56,7 @@
   // on the right pane — so the visualization is internally consistent.
   export let fixedPoint: [number, number] = [0, 0];
   export let fieldStrength = 1.0;
-  export let domainHalfWidth = 1.5;
+  export let domainHalfWidth = 1.1;
 
   // Density samples — Gaussian mixture positioned so the fixed point sits
   // inside the initial support (non-zero p(x) at t=0). Density then
