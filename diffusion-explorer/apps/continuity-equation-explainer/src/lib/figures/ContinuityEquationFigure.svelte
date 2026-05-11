@@ -1057,6 +1057,11 @@
     line-height: 1;
     pointer-events: none;
     white-space: nowrap;
+    /* White halo so the derivative term remains legible against any
+       contour density or streamlines that might appear behind it. */
+    text-shadow:
+      -2px 0 white, 2px 0 white, 0 -2px white, 0 2px white,
+      -2px -2px white, 2px -2px white, -2px 2px white, 2px 2px white;
   }
 
   /* Rotate labels 90° counter-clockwise so they read bottom-to-top —
