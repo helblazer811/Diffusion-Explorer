@@ -473,8 +473,7 @@
     We can restate this conservation property more explicitly in terms of a control volume. Pick
     any region <Katex math={"V"} /> in space with boundary <Katex math={"S"} />. Conservation of
     mass says: <strong>the change in probability mass inside <Katex math={"V"} /> is exactly the
-    amount of probability flowing through <Katex math={"S"} /></strong> (see the hero figure at
-    the top of the article). In integral form:
+    amount of probability flowing through <Katex math={"S"} /></strong>. In integral form:
   </p>
   <Katex
     math={
@@ -489,6 +488,16 @@
     is there because mass flowing <em>out</em> of <Katex math={"V"} /> (positive flux) <em>decreases</em>
     the mass inside.
   </p>
+
+  <MassConservation>
+    <strong>Conservation of probability mass.</strong>
+    The change in probability density <Katex math={"\\rho"} /> inside a volume <Katex math={"V"} />
+    equals the negative flux <Katex math={"\\rho \\mathbf{v}"} /> through the boundary
+    <Katex math={"S"} />.
+    <em>Left:</em> The probability density <Katex math={"\\rho"} /> evolving inside the volume.
+    <em>Right:</em> The flux vectors <Katex math={"\\rho \\mathbf{v}"} /> and surface normals
+    <Katex math={"\\hat{n}"} /> at the boundary.
+  </MassConservation>
   <p>
     This integral statement is the entire physical content we need. To convert it into the local
     PDE form, we need two pieces of standard vector calculus.
@@ -497,12 +506,11 @@
 
 <hr class="section-divider" />
 
-<!-- §5 — Divergence and the divergence theorem -->
-<section id="divergence-and-theorem">
-  <h2 id="divergence-and-theorem-heading" class="section-heading">
-    Divergence and the Divergence Theorem
-  </h2>
+<!-- §5 — The divergence theorem -->
+<section id="divergence-theorem">
+  <h2 id="divergence-theorem-heading" class="section-heading">The Divergence Theorem</h2>
   <p>
+    <strong>Divergence.</strong>
     Divergence describes how much a vector field is outwardly flowing at a point. A
     <em>source</em> is a location with net outward flow; a <em>sink</em> is a location with net inward
     flow. Formally, for a 2D field <Katex math={"\\mathbf{F} = (F_x, F_y)"} />,
@@ -530,6 +538,7 @@
   </DivergenceIntro>
 
   <p>
+    <strong>The theorem.</strong>
     Divergence is a local quantity (defined at each point); flux is a global quantity (integrated
     over a boundary). The <em>divergence theorem</em> connects them. Gauss' divergence theorem
     states that
@@ -638,10 +647,10 @@
 
 <hr class="section-divider" />
 
-<!-- §7 — From PDE to log-densities: the instantaneous change of variables -->
+<!-- §7 — The instantaneous change of variables -->
 <section id="instantaneous-change-of-variables">
   <h2 id="instantaneous-change-of-variables-heading" class="section-heading">
-    From PDE to Log-Densities: The Instantaneous Change of Variables
+    Instantaneous Change of Variables
   </h2>
   <p>
     The continuity equation is a partial differential equation about <Katex math={"p_t(x)"} /> at
