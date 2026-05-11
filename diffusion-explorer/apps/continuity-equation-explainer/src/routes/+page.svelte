@@ -642,10 +642,11 @@
 
   <ContinuityEquationFigure>
     <strong>The continuity equation, pointwise.</strong>
-    Both panes show a probability density contracting onto a fixed point <Katex math={"x"} />
+    Both panes show the same probability density drifting through a fixed point <Katex math={"x"} />
     (orange dot).
-    <em>Left:</em> <Katex math={"\\partial p_t(x) / \\partial t"} /> is the rate at which density
-    piles up at <Katex math={"x"} /> — visualized by the growing orange bar below the canvas.
+    <em>Left:</em> <Katex math={"\\partial p_t(x) / \\partial t"} /> is the rate of change of
+    density at <Katex math={"x"} /> — visualized by the orange bar, which grows as the density
+    moves onto <Katex math={"x"} /> and shrinks as it moves off.
     <em>Right:</em> <Katex math={"-\\nabla \\cdot (p_t v_t)"} /> at <Katex math={"x"} /> is the rate
     at which probability flux flows INTO the point — the converging orange streamlines. The PDE
     above says these two quantities are equal at every point and every time.

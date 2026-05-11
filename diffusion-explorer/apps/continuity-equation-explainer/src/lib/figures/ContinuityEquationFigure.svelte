@@ -45,10 +45,15 @@
   export let gap = 20;
   export let backgroundVisible = false;
 
-  // Fixed point + field
+  // Fixed point + streamline field (independent of density evolution)
   export let fixedPoint: [number, number] = [0, 0];
   export let fieldStrength = 1.0;
   export let domainHalfWidth = 1.5;
+  // Density is animated by pure translation (not contraction) — samples drift
+  // rightward across the canvas. Streamlines, on the other hand, still come
+  // from the convergent field so the right pane illustrates the local
+  // "flux into the point" picture.
+  export let densityTranslationVelocity: [number, number] = [0.9, 0];
 
   // Density samples — Gaussian mixture starting LEFT of the fixed point so
   // the density visibly drifts left→right while contracting onto it.
@@ -206,6 +211,10 @@
     return (x, y) => [-k * (x - p[0]), -k * (y - p[1])];
   }
 
+  function createTranslationField(v: [number, number]): VectorFieldFn {
+    return () => [v[0], v[1]];
+  }
+
   function densityAtPoint(
     samples: [number, number][],
     p: [number, number],
@@ -226,13 +235,14 @@
   // ----------------------------------------------------------------
 
   function runInitialComputation(cW: number, cH: number) {
-    const vectorField = createConvergentField(fixedPoint, fieldStrength);
+    const streamlineField = createConvergentField(fixedPoint, fieldStrength);
+    const densityField = createTranslationField(densityTranslationVelocity);
     const toPixelBound = (p: [number, number]) => toPixel(p, cW, cH);
     const domain = getDomain();
 
     streamlineAnim = StreamlineAnimation.create<AnimationState>({
       backend: "gpu",
-      vectorFieldFn: vectorField,
+      vectorFieldFn: streamlineField,
       domain,
       toPixel: toPixelBound,
       density: streamlineDensity,
@@ -269,7 +279,7 @@
         })
       );
       rawDensity.push(densityAtPoint(samples, fixedPoint, densityRadius));
-      samples = eulerIntegrate(samples, vectorField, contourStepSize);
+      samples = eulerIntegrate(samples, densityField, contourStepSize);
     }
     const maxDensity = Math.max(...rawDensity, 1e-12);
     densitySeries = rawDensity.map((d) => d / maxDensity);
