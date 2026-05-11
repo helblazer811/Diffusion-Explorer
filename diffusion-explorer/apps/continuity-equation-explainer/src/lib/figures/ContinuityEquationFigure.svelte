@@ -612,14 +612,25 @@
         use:leftCanvas2d.bindCanvas
         class="density-canvas"
       ></canvas>
-      <!-- Bar-chart overlay: solid gridlines + baseline, a straight callout
-           from the dot to the vertical center of the bar's column, and the
-           bar itself. -->
+      <!-- Bar-chart overlay: solid gridlines + baseline, the bar itself, and
+           an orange "dp/dt" axis arrow at the top of the column. -->
       <svg
         class="bar-overlay"
         viewBox="0 0 {canvasWidth} {canvasHeight}"
         preserveAspectRatio="none"
       >
+        <defs>
+          <marker
+            id="ce-axis-arrowhead"
+            markerWidth="8"
+            markerHeight="8"
+            refX="4"
+            refY="4"
+            orient="auto"
+          >
+            <polygon points="0 0, 8 4, 0 8" fill={barColor} />
+          </marker>
+        </defs>
         {#each gridFractions as frac}
           <line
             x1={barX - 8}
@@ -646,7 +657,27 @@
           fill={barColor}
           rx="2"
         />
+        <!-- Axis arrow above the top of the column -->
+        <line
+          x1={barCenterX}
+          y1={barBottomY - barMaxHeight}
+          x2={barCenterX}
+          y2={barBottomY - barMaxHeight - 22}
+          stroke={barColor}
+          stroke-width="2"
+          marker-end="url(#ce-axis-arrowhead)"
+        />
       </svg>
+      <!-- ∂p/∂t label to the left of the axis arrow, centered on its midpoint -->
+      <div
+        class="dpdt-label"
+        style="
+          left: {((barCenterX - 8) / canvasWidth) * 100}%;
+          top: {((barBottomY - barMaxHeight - 11) / canvasHeight) * 100}%;
+        "
+      >
+        <Katex math={`\\textcolor{${barColor}}{\\frac{\\partial p}{\\partial t}}`} />
+      </div>
       <div
         class="bar-label"
         style="
@@ -769,6 +800,17 @@
     transform: translate(-50%, 0);
     color: #374151;
     font-size: 0.95rem;
+    line-height: 1;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .dpdt-label {
+    position: absolute;
+    /* Anchor to the right edge of the label so it sits to the LEFT of the
+       reference x position, and vertically centered on the reference y. */
+    transform: translate(-100%, -50%);
+    font-size: 1rem;
     line-height: 1;
     pointer-events: none;
     white-space: nowrap;
