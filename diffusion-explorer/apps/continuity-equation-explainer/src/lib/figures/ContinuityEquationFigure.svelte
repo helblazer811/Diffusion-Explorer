@@ -198,6 +198,11 @@
   let globalMaxDensity = 1;
   let currentContourFrame = 0;
 
+  // Derivative tracking: an EMA of the change in currentBarValue per tick,
+  // used to flip the ∂p_t(x)/∂t axis arrow up or down.
+  let previousBarValue = 0;
+  let barDerivativeEma = 0;
+
   // Cursor interactivity. When non-null, both panes hide the fixed x/dot and
   // a cursor dot is shown instead; the bar tracks density at this point.
   let cursorDomain: [number, number] | null = null;
@@ -506,7 +511,13 @@
       }
       // Exponential moving average: each tick blends current value toward the
       // new sample by `barEmaAlpha`. Lower alpha → smoother but laggier.
-      currentBarValue = currentBarValue + barEmaAlpha * (target - currentBarValue);
+      const newBarValue = currentBarValue + barEmaAlpha * (target - currentBarValue);
+      // Track the derivative (smoothed) so the axis arrow can flip up/down
+      // based on whether p_t(x) is currently growing or shrinking.
+      const rawDerivative = newBarValue - previousBarValue;
+      barDerivativeEma = barDerivativeEma + barEmaAlpha * (rawDerivative - barDerivativeEma);
+      previousBarValue = newBarValue;
+      currentBarValue = newBarValue;
     });
   }
 
@@ -629,6 +640,12 @@
   // dot terminates here regardless of the bar's current height.
   $: barColumnMidY = barBottomY - barMaxHeight / 2;
   $: gridFractions = [0.25, 0.5, 0.75, 1.0];
+
+  // Derivative arrow direction: +1 = up (p_t(x) growing), -1 = down (shrinking).
+  // Small dead-zone around zero so the arrow doesn't flicker on noise.
+  $: barArrowSign = barDerivativeEma > 0.0008 ? -1 : barDerivativeEma < -0.0008 ? 1 : -1;
+  // y of the arrow's tip (negative = up, positive = down from the base).
+  $: barArrowTipY = barTopY + barArrowSign * barArrowLength;
 
   // Angled (diagonal) callout from the dot to the LEFT end of the bar's
   // baseline. The shared endpoint with the baseline makes the two lines
@@ -885,25 +902,25 @@
           fill={barColor}
           rx="2"
         />
-        <!-- Axis arrow that starts at the top of the CURRENT bar and points
-             up. Length is fixed so the arrow stays a recognizable size at
-             every bar value. -->
+        <!-- Axis arrow aligned with the LEFT edge of the bar, starting at
+             the top of the current bar. Points up when p_t(x) is growing,
+             down when it is shrinking; constant length either way. -->
         <line
-          x1={barCenterX}
+          x1={barX}
           y1={barTopY}
-          x2={barCenterX}
-          y2={barTopY - barArrowLength}
+          x2={barX}
+          y2={barArrowTipY}
           stroke={barColor}
           stroke-width="2.5"
           marker-end="url(#ce-axis-arrowhead)"
         />
       </svg>
-      <!-- ∂p_t(x)/∂t label, vertically centered on the axis arrow -->
+      <!-- ∂p_t(x)/∂t label, vertically centered with the TOP of the bar -->
       <div
         class="dpdt-label"
         style="
-          left: {((barCenterX - 10) / canvasWidth) * 100}%;
-          top: {((barTopY - barArrowLength / 2) / canvasHeight) * 100}%;
+          left: {((barX - 10) / canvasWidth) * 100}%;
+          top: {(barTopY / canvasHeight) * 100}%;
         "
       >
         <Katex math={`\\textcolor{${barColor}}{\\frac{\\partial p_t(x)}{\\partial t}}`} />
