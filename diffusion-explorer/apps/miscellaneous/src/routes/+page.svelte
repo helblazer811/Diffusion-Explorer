@@ -26,6 +26,7 @@
 		<li><a href="/streamline_generation">Streamline Generation</a></li>
 		<li><a href="/marching_squares">Marching Squares</a></li>
 		<li><a href="/discrete_to_continuous_flow">Discrete to Continuous Flow</a></li>
+		<li><a href="/topographic_contours">Topographic Contours</a></li>
 	</ul>
 </section>
 
