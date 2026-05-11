@@ -104,7 +104,7 @@
   export let pointRadius = 6;
   export let pointLabel = "x";
   export let pointLabelFontSize = 28;
-  export let pointLabelOffset: [number, number] = [18, -14];
+  export let pointLabelOffset: [number, number] = [26, -16];
 
   // Bar chart styling (overlaid vertical bar on the right side of the left canvas)
   export let barColor = "#f97316";
@@ -397,8 +397,7 @@
     ctx: CanvasRenderingContext2D,
     cW: number,
     cH: number,
-    pos: [number, number] = fixedPoint,
-    showLabel: boolean = true
+    pos: [number, number] = fixedPoint
   ) {
     const [px, py] = toPixel(pos, cW, cH);
     // White halo
@@ -406,23 +405,21 @@
     ctx.beginPath();
     ctx.arc(px, py, pointRadius + 2.5, 0, 2 * Math.PI);
     ctx.fill();
-    // Orange dot
+    // Dot
     ctx.fillStyle = pointColor;
     ctx.beginPath();
     ctx.arc(px, py, pointRadius, 0, 2 * Math.PI);
     ctx.fill();
-    if (showLabel) {
-      drawMathjax(
-        ctx,
-        pointLabel,
-        px + pointLabelOffset[0],
-        py + pointLabelOffset[1] + pointLabelFontSize / 2,
-        pointLabelFontSize,
-        0,
-        0,
-        { color: pointColor, stroke: "white", strokeWidth: 8, strokeOpacity: 0.95 }
-      );
-    }
+    drawMathjax(
+      ctx,
+      pointLabel,
+      px + pointLabelOffset[0],
+      py + pointLabelOffset[1] + pointLabelFontSize / 2,
+      pointLabelFontSize,
+      0,
+      0,
+      { color: pointColor, stroke: "white", strokeWidth: 8, strokeOpacity: 0.95 }
+    );
   }
 
   function drawLeft(state: AnimationState, cW: number, cH: number) {
@@ -432,7 +429,7 @@
     ctx.clearRect(0, 0, cW, cH);
     drawDensityAndDot(ctx, cf, cW, cH, /* mute */ true);
     const pos = cursorDomain ?? fixedPoint;
-    drawDot(ctx, cW, cH, pos, /* showLabel */ !cursorDomain);
+    drawDot(ctx, cW, cH, pos);
   }
 
   function drawRight(state: AnimationState, cW: number, cH: number) {
@@ -454,7 +451,7 @@
     if (tctx) {
       tctx.clearRect(0, 0, cW, cH);
       const pos = cursorDomain ?? fixedPoint;
-      drawDot(tctx, cW, cH, pos, /* showLabel */ !cursorDomain);
+      drawDot(tctx, cW, cH, pos);
     }
   }
 
