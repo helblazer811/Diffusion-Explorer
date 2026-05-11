@@ -149,6 +149,17 @@
   let densitySeries: number[] = []; // per-frame, normalized to [0, 1]
   let currentBarValue = 0; // reactive, drives the SVG bar width
 
+  // Per-frame samples (so we can query density at an arbitrary point on hover)
+  // and a global max density used for normalization so the bar scale is
+  // consistent regardless of cursor position.
+  let frameSamples: [number, number][][] = [];
+  let globalMaxDensity = 1;
+  let currentContourFrame = 0;
+
+  // Cursor interactivity. When non-null, both panes hide the fixed x/dot and
+  // a cursor dot is shown instead; the bar tracks density at this point.
+  let cursorDomain: [number, number] | null = null;
+
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
   // ----------------------------------------------------------------
@@ -271,8 +282,23 @@
     ];
     const densityRadius = domainHalfWidth * 0.08;
 
+    // Probe grid for the global density max (used to normalize the bar so
+    // its scale stays consistent as the cursor moves around).
+    const probePoints: [number, number][] = [];
+    const probeSide = 16;
+    for (let i = 0; i < probeSide; i++) {
+      for (let j = 0; j < probeSide; j++) {
+        probePoints.push([
+          domain.xMin + ((i + 0.5) / probeSide) * (domain.xMax - domain.xMin),
+          domain.yMin + ((j + 0.5) / probeSide) * (domain.yMax - domain.yMin),
+        ]);
+      }
+    }
+
     contourFrames = [];
+    frameSamples = [];
     const rawDensity: number[] = [];
+    let runningMax = 0;
     for (let i = 0; i < contourAnimationSteps; i++) {
       contourFrames.push(
         computeContours(samples, {
@@ -282,11 +308,17 @@
           domain: contourDomain,
         })
       );
+      // Stash a copy of samples so we can query density at the cursor later.
+      frameSamples.push(samples.map(([x, y]) => [x, y]));
       rawDensity.push(densityAtPoint(samples, fixedPoint, densityRadius));
+      for (const p of probePoints) {
+        const d = densityAtPoint(samples, p, densityRadius);
+        if (d > runningMax) runningMax = d;
+      }
       samples = eulerIntegrate(samples, field, contourStepSize);
     }
-    const maxDensity = Math.max(...rawDensity, 1e-12);
-    densitySeries = rawDensity.map((d) => d / maxDensity);
+    globalMaxDensity = Math.max(runningMax, 1e-12);
+    densitySeries = rawDensity.map((d) => d / globalMaxDensity);
   }
 
   function setupTimeline(cW: number, cH: number) {
@@ -314,9 +346,19 @@
     );
 
     timeline.onTick((_t, state) => {
+      currentContourFrame = state.contourFrame;
       drawLeft(state, cW, cH);
       drawRight(state, cW, cH);
-      currentBarValue = densitySeries[state.contourFrame] ?? 0;
+      if (cursorDomain) {
+        const d = densityAtPoint(
+          frameSamples[state.contourFrame] ?? [],
+          cursorDomain,
+          domainHalfWidth * 0.08
+        );
+        currentBarValue = Math.min(1.5, d / globalMaxDensity);
+      } else {
+        currentBarValue = densitySeries[state.contourFrame] ?? 0;
+      }
     });
   }
 
@@ -351,22 +393,36 @@
     }
   }
 
-  function drawDot(ctx: CanvasRenderingContext2D, cW: number, cH: number) {
-    const [px, py] = toPixel(fixedPoint, cW, cH);
+  function drawDot(
+    ctx: CanvasRenderingContext2D,
+    cW: number,
+    cH: number,
+    pos: [number, number] = fixedPoint,
+    showLabel: boolean = true
+  ) {
+    const [px, py] = toPixel(pos, cW, cH);
+    // White halo
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.arc(px, py, pointRadius + 2.5, 0, 2 * Math.PI);
+    ctx.fill();
+    // Orange dot
     ctx.fillStyle = pointColor;
     ctx.beginPath();
     ctx.arc(px, py, pointRadius, 0, 2 * Math.PI);
     ctx.fill();
-    drawMathjax(
-      ctx,
-      pointLabel,
-      px + pointLabelOffset[0],
-      py + pointLabelOffset[1] + pointLabelFontSize / 2,
-      pointLabelFontSize,
-      0,
-      0,
-      { color: pointColor, stroke: "white", strokeWidth: 6, strokeOpacity: 0.9 }
-    );
+    if (showLabel) {
+      drawMathjax(
+        ctx,
+        pointLabel,
+        px + pointLabelOffset[0],
+        py + pointLabelOffset[1] + pointLabelFontSize / 2,
+        pointLabelFontSize,
+        0,
+        0,
+        { color: pointColor, stroke: "white", strokeWidth: 8, strokeOpacity: 0.95 }
+      );
+    }
   }
 
   function drawLeft(state: AnimationState, cW: number, cH: number) {
@@ -375,7 +431,8 @@
     if (!ctx || !cf) return;
     ctx.clearRect(0, 0, cW, cH);
     drawDensityAndDot(ctx, cf, cW, cH, /* mute */ true);
-    drawDot(ctx, cW, cH);
+    const pos = cursorDomain ?? fixedPoint;
+    drawDot(ctx, cW, cH, pos, /* showLabel */ !cursorDomain);
   }
 
   function drawRight(state: AnimationState, cW: number, cH: number) {
@@ -396,7 +453,8 @@
     const tctx = dotCanvas2d.ctx;
     if (tctx) {
       tctx.clearRect(0, 0, cW, cH);
-      drawDot(tctx, cW, cH);
+      const pos = cursorDomain ?? fixedPoint;
+      drawDot(tctx, cW, cH, pos, /* showLabel */ !cursorDomain);
     }
   }
 
@@ -408,7 +466,7 @@
   // Bar's bottom sits at the bottom of the canvas. A thin L-shaped callout
   // connects the orange dot to the top of the bar.
   $: dotPixel = canvasWidth && canvasHeight
-    ? toPixel(fixedPoint, canvasWidth, canvasHeight)
+    ? toPixel(cursorDomain ?? fixedPoint, canvasWidth, canvasHeight)
     : [0, 0];
   $: barHeightScale = d3.scaleLinear().domain([0, 1]).range([0, barMaxHeight]);
   $: barCurrentHeight = Math.max(0, barHeightScale(currentBarValue));
@@ -437,6 +495,42 @@
     if (timeline) timeline.pause();
     if (streamlineAnim) streamlineAnim.destroy();
   });
+
+  // ----------------------------------------------------------------
+  // Cursor interactivity
+  // ----------------------------------------------------------------
+
+  function eventToDomain(e: PointerEvent): [number, number] {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const xPx = ((e.clientX - rect.left) / rect.width) * canvasWidth;
+    const yPx = ((e.clientY - rect.top) / rect.height) * canvasHeight;
+    const { xMin, xMax, yMin, yMax } = getDomain();
+    return [
+      xMin + (xPx / canvasWidth) * (xMax - xMin),
+      yMax - (yPx / canvasHeight) * (yMax - yMin),
+    ];
+  }
+
+  function handlePointerMove(e: PointerEvent) {
+    if (!isInitialized) return;
+    cursorDomain = eventToDomain(e);
+  }
+
+  function handlePointerLeave() {
+    cursorDomain = null;
+  }
+
+  // Recompute the bar value whenever the cursor moves between ticks, so the
+  // bar updates smoothly even when the cursor is held still and only the
+  // contour frame is advancing.
+  $: if (cursorDomain && frameSamples.length > 0) {
+    const d = densityAtPoint(
+      frameSamples[currentContourFrame] ?? [],
+      cursorDomain,
+      domainHalfWidth * 0.08
+    );
+    currentBarValue = Math.min(1.5, d / globalMaxDensity);
+  }
 
   // ----------------------------------------------------------------
   // Reactive blocks
@@ -508,6 +602,8 @@
     <div
       class="left-canvas-container"
       style="width: 100%; aspect-ratio: {canvasWidth}/{canvasHeight};"
+      onpointermove={handlePointerMove}
+      onpointerleave={handlePointerLeave}
     >
       <canvas
         bind:this={leftCanvas}
@@ -573,6 +669,8 @@
     <div
       class="right-canvas-container"
       style="width: 100%; aspect-ratio: {canvasWidth}/{canvasHeight};"
+      onpointermove={handlePointerMove}
+      onpointerleave={handlePointerLeave}
     >
       <!-- Back: density + mute -->
       <canvas
@@ -646,6 +744,7 @@
   .left-canvas-container,
   .right-canvas-container {
     position: relative;
+    cursor: crosshair;
   }
 
   .density-canvas {

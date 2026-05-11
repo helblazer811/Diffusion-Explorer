@@ -256,6 +256,12 @@
   at the point.
   <em>Right:</em> <Katex math={"-\\nabla \\cdot (p_t v_t)"} /> at <Katex math={"x"} /> is the rate
   at which probability flux flows INTO the point — the converging orange streamlines.
+  Hover
+  <img
+    src="{base}/icons/tap.svg"
+    alt="hover"
+    style="width: 22px; height: 22px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+  /> over either pane to query <Katex math={"p(\\cdot)"} /> at any other point.
 </ContinuityEquationFigure>
 
 <hr class="section-divider" />
@@ -651,6 +657,12 @@
     <em>Right:</em> <Katex math={"-\\nabla \\cdot (p_t v_t)"} /> at <Katex math={"x"} /> is the rate
     at which probability flux flows INTO the point — the converging orange streamlines. The PDE
     above says these two quantities are equal at every point and every time.
+    Hover
+    <img
+      src="{base}/icons/tap.svg"
+      alt="hover"
+      style="width: 22px; height: 22px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+    /> over either pane to query <Katex math={"p(\\cdot)"} /> at any other point.
   </ContinuityEquationFigure>
 
   <p>
