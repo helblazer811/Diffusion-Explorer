@@ -125,7 +125,7 @@
   export let pointRadius = 6;
   export let pointLabel = "x";
   export let pointLabelFontSize = 28;
-  export let pointLabelOffset: [number, number] = [26, -16];
+  export let pointLabelOffset: [number, number] = [0, -28];
 
   // Bar chart styling (overlaid vertical bar on the right side of the left canvas)
   export let barColor = "#f97316";
@@ -590,6 +590,20 @@
   $: barColumnMidY = barBottomY - barMaxHeight / 2;
   $: gridFractions = [0.25, 0.5, 0.75, 1.0];
 
+  // Callout from the dot to the bar's baseline ("the p(x) base of the bar").
+  // Start the line just past the dot's halo so it reads as "coming out of"
+  // the dot rather than overlapping it.
+  $: barCalloutStart = canvasWidth && canvasHeight
+    ? (() => {
+        const [dx, dy] = dotPixel;
+        const vx = barCenterX - dx;
+        const vy = barBottomY - dy;
+        const len = Math.hypot(vx, vy) || 1;
+        const off = pointRadius + barCalloutGap;
+        return [dx + (vx / len) * off, dy + (vy / len) * off];
+      })()
+    : [0, 0];
+
   // Center of the streamline clip circle, in percentages of the GPU canvas.
   $: streamlineClipCenterPct = canvasWidth && canvasHeight
     ? (() => {
@@ -770,6 +784,15 @@
           y2={barBottomY}
           stroke={barBaselineColor}
           stroke-width={barBaselineWidth}
+        />
+        <!-- Callout from the dot to the base of the bar (p(x) baseline). -->
+        <line
+          x1={barCalloutStart[0]}
+          y1={barCalloutStart[1]}
+          x2={barCenterX}
+          y2={barBottomY}
+          stroke={barCalloutColor}
+          stroke-width={barCalloutWidth}
         />
         <rect
           x={barX}
