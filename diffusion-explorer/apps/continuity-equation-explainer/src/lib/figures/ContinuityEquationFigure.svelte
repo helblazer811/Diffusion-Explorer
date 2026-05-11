@@ -903,20 +903,20 @@
           marker-end="url(#ce-axis-arrowhead)"
         />
       </svg>
-      <!-- ∂p_t(x)/∂t label, rotated, just past the axis arrow tip -->
+      <!-- ∂p_t(x)/∂t label, horizontal, above the arrow tip -->
       <div
-        class="dpdt-label rotated-label"
+        class="dpdt-label"
         style="
-          left: {((barRightX + barArrowLength + 8) / canvasWidth) * 100}%;
-          top: {(barCenterY / canvasHeight) * 100}%;
+          left: {((barRightX + barArrowLength / 2) / canvasWidth) * 100}%;
+          top: {((barCenterY - 26) / canvasHeight) * 100}%;
         "
       >
         <Katex math={`\\textcolor{${barColor}}{\\frac{\\partial p_t(x)}{\\partial t}}`} />
       </div>
       <div
-        class="bar-label rotated-label"
+        class="bar-label"
         style="
-          left: {((barLeftX - 14) / canvasWidth) * 100}%;
+          left: {((barLeftX - 26) / canvasWidth) * 100}%;
           top: {(barCenterY / canvasHeight) * 100}%;
         "
       >
@@ -1038,6 +1038,9 @@
 
   .bar-label {
     position: absolute;
+    /* Anchor the label's RIGHT edge at `left` (so it sits to the LEFT of
+       the reference x) and vertical center at `top`. */
+    transform: translate(-100%, -50%);
     color: #374151;
     font-size: 1.5rem;
     line-height: 1;
@@ -1047,6 +1050,9 @@
 
   .dpdt-label {
     position: absolute;
+    /* Center horizontally at `left`, bottom at `top` — sits ABOVE the
+       reference y. */
+    transform: translate(-50%, -100%);
     font-size: 1.5rem;
     line-height: 1;
     pointer-events: none;
