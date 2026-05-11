@@ -61,9 +61,9 @@
   // Visibility state from TripleFigure
   let isActive: ReturnType<typeof import('svelte/store').writable<boolean>> | undefined;
 
-  // Compute canvas dimensions
+  // Compute canvas dimensions (square panels)
   $: canvasWidth = 230;
-  $: canvasHeight = height;
+  $: canvasHeight = canvasWidth;
 
   // Three canvases
   let canvas1: HTMLCanvasElement | null = null;
