@@ -373,6 +373,8 @@
         offsets: "synchronized",
         duration: animationDuration,
         pulseFrequency: pathPulseFrequency,
+        showPreview: true,
+        previewOpacity: 0.3,
       });
     }
 
