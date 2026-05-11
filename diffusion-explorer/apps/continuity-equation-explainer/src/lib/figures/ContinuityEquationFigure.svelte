@@ -22,6 +22,7 @@
   import type { Writable } from "svelte/store";
   import {
     DoubleFigure,
+    TimeSlider,
     useCanvas2D,
     useVisibilityHandler,
     Timeline,
@@ -585,7 +586,8 @@
     </div>
     <div class="grid-label-spacer"></div>
     <div class="grid-label grid-label-right">
-      The divergence of the probability flux at <Katex math={"\\color{#f97316}{x}"} />.
+      The divergence of the <span style="color: #3b82f6;">probability flux</span> at
+      <Katex math={"\\color{#f97316}{x}"} />.
     </div>
 
     <div class="grid-math">
@@ -687,6 +689,13 @@
         class="front-canvas"
       ></canvas>
     </div>
+  {/snippet}
+
+  {#snippet footer()}
+    <TimeSlider
+      timeline={timeline as import("@diffusion-explorer/ui").Timeline<unknown> | null}
+      color={pointColor}
+    />
   {/snippet}
 
   {#snippet caption()}
