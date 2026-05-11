@@ -125,11 +125,12 @@
   export let pathPulseGap = 140;
   export let pathPulseFrequency = 0.25;
 
-  // Translucent white mute between the density and the dot/streamlines.
-  // Applied on BOTH panes so the foreground markers (dot, label, streamlines,
-  // bar chart) remain legible against the density.
+  // Translucent white mute between the density and the foreground layers.
+  // The right pane uses a stronger mute so the orange streamlines/pathlines
+  // really pop against the muted density.
   export let densityMuteColor = "#ffffff";
   export let densityMuteOpacity = 0.4;
+  export let rightDensityMuteOpacity = 0.7;
 
   // Fixed point styling
   export let pointColor = "#374151";
@@ -519,7 +520,8 @@
     cf: ComputedContours,
     cW: number,
     cH: number,
-    mute: boolean
+    mute: boolean,
+    muteOpacity: number = densityMuteOpacity
   ) {
     const toPixelBound = (p: [number, number]) => toPixel(p, cW, cH);
 
@@ -534,7 +536,7 @@
 
     if (mute) {
       ctx.save();
-      ctx.globalAlpha = densityMuteOpacity;
+      ctx.globalAlpha = muteOpacity;
       ctx.fillStyle = densityMuteColor;
       ctx.fillRect(0, 0, cW, cH);
       ctx.restore();
@@ -591,12 +593,13 @@
       pathlineAnim.draw(state, [0, 0, 0, 0]);
     }
 
-    // Density + mute on the back canvas
+    // Density + (stronger) mute on the back canvas so the orange streamlines
+    // / pathlines on the GPU canvas above stand out against the density.
     const dctx = densityCanvas2d.ctx;
     const cf = contourFrames[state.contourFrame];
     if (dctx && cf) {
       dctx.clearRect(0, 0, cW, cH);
-      drawDensityAndDot(dctx, cf, cW, cH, /* mute */ true);
+      drawDensityAndDot(dctx, cf, cW, cH, /* mute */ true, rightDensityMuteOpacity);
     }
 
     // Orange dot on the topmost canvas so it sits above the streamlines
