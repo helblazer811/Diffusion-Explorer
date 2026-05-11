@@ -100,7 +100,7 @@
   export let densityMuteOpacity = 0.4;
 
   // Fixed point styling
-  export let pointColor = "#f97316";
+  export let pointColor = "#374151";
   export let pointRadius = 6;
   export let pointLabel = "x";
   export let pointLabelFontSize = 28;
@@ -582,22 +582,22 @@
   <div class="equation-grid">
     <div class="grid-label grid-label-left">
       The rate of change of <span style="color: #3b82f6;">probability density</span> at the
-      point <Katex math={"\\color{#f97316}{x}"} />.
+      point <Katex math={"x"} />.
     </div>
     <div class="grid-label-spacer"></div>
     <div class="grid-label grid-label-right">
-      The divergence of the <span style="color: #3b82f6;">probability flux</span> at
-      <Katex math={"\\color{#f97316}{x}"} />.
+      The divergence of the <span style="color: #f97316;">probability flux</span> at
+      <Katex math={"x"} />.
     </div>
 
     <div class="grid-math">
-      <Katex math={"\\frac{\\partial \\textcolor{#3b82f6}{p_t(\\textcolor{#f97316}{x})}}{\\partial t}"} displayMode={true} />
+      <Katex math={"\\frac{\\partial \\textcolor{#3b82f6}{p_t(x)}}{\\partial t}"} displayMode={true} />
     </div>
     <div class="grid-equals">
       <Katex math={"+"} displayMode={true} />
     </div>
     <div class="grid-math">
-      <Katex math={"\\nabla \\cdot \\textcolor{#3b82f6}{p_t v_t} \\;=\\; 0"} displayMode={true} />
+      <Katex math={"\\nabla \\cdot \\textcolor{#f97316}{p_t v_t} \\;=\\; 0"} displayMode={true} />
     </div>
   </div>
 </div>
@@ -694,7 +694,7 @@
   {#snippet footer()}
     <TimeSlider
       timeline={timeline as import("@diffusion-explorer/ui").Timeline<unknown> | null}
-      color={pointColor}
+      color={barColor}
     />
   {/snippet}
 
