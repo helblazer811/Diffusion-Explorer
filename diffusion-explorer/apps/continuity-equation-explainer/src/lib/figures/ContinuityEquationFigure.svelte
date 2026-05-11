@@ -634,13 +634,13 @@
         <defs>
           <marker
             id="ce-axis-arrowhead"
-            markerWidth="8"
-            markerHeight="8"
-            refX="4"
-            refY="4"
+            markerWidth="5"
+            markerHeight="5"
+            refX="2.5"
+            refY="2.5"
             orient="auto"
           >
-            <polygon points="0 0, 8 4, 0 8" fill={barColor} />
+            <polygon points="0 0, 5 2.5, 0 5" fill={barColor} />
           </marker>
         </defs>
         {#each gridFractions as frac}
