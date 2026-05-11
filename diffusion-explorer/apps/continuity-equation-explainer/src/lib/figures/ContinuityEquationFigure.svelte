@@ -27,12 +27,14 @@
     useVisibilityHandler,
     Timeline,
     StreamlineAnimation,
+    PulsingPathlineAnimation,
     computeContours,
     plotContours,
     drawMathjax,
     Katex,
     type VectorFieldFn,
     type StreamlineAnimationState,
+    type PulsingPathlineAnimationState,
     type ComputedContours,
   } from "@diffusion-explorer/ui";
   import * as d3 from "d3";
@@ -81,6 +83,11 @@
   export let contourStepSize = 0.004;
   export let animationDuration = 6;
 
+  // Right-pane visualization mode. Pathlines: integrate forward/backward
+  // from seed points around x to show the local convergent flow. Streamlines:
+  // GPU-rendered field streamlines clipped to a circle around x.
+  export let rhsMode: "pathlines" | "streamlines" = "pathlines";
+
   // Streamlines (right pane) — fewer pulses per second with longer pulses.
   export let streamlineColor = "#f97316"; // orange
   export let streamlineDensity: number | [number, number] = 1.0;
@@ -92,6 +99,20 @@
   // Show converging streamlines only within this circular radius (px) around
   // the fixed point, so the visual emphasizes the local convergence.
   export let streamlineClipRadius = 90;
+
+  // Pulsing pathlines (right pane) — seed points sampled within a small
+  // radius around the fixed point; each seed is propagated forward and
+  // backward through the convergent field to build a pathline.
+  export let pathlineColor = "#f97316"; // orange
+  export let pathlineThickness = 3;
+  export let pathSeedCount = 20;
+  export let pathSeedRadius = 0.45; // domain units around the fixed point
+  export let pathForwardSteps = 30;
+  export let pathBackwardSteps = 25;
+  export let pathStepSize = 0.04;
+  export let pathPulseWidth = 60;
+  export let pathPulseGap = 140;
+  export let pathPulseFrequency = 0.25;
 
   // Translucent white mute between the density and the dot/streamlines.
   // Applied on BOTH panes so the foreground markers (dot, label, streamlines,
@@ -140,12 +161,14 @@
 
   let isInitialized = false;
 
-  type AnimationState = StreamlineAnimationState & {
-    contourFrame: number;
-  };
+  type AnimationState = StreamlineAnimationState &
+    PulsingPathlineAnimationState & {
+      contourFrame: number;
+    };
 
   let timeline: Timeline<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
+  let pathlineAnim: PulsingPathlineAnimation<AnimationState> | null = null;
   let contourFrames: ComputedContours[] = [];
   let densitySeries: number[] = []; // per-frame, normalized to [0, 1]
   let currentBarValue = 0; // reactive, drives the SVG bar width
@@ -233,6 +256,59 @@
     return (x, y) => [-k * (x - p[0]), -k * (y - p[1])];
   }
 
+  /**
+   * Sample seeds in a disc around `center` and integrate the field both
+   * forward and backward from each one. Returns the resulting paths in
+   * PIXEL coords ready to feed to PulsingPathlineAnimation.
+   */
+  function buildPathlines(
+    field: VectorFieldFn,
+    center: [number, number],
+    seedRadius: number,
+    seedCount: number,
+    fwdSteps: number,
+    bkwSteps: number,
+    dt: number,
+    cW: number,
+    cH: number
+  ): number[][][] {
+    const paths: number[][][] = [];
+    for (let i = 0; i < seedCount; i++) {
+      const r = seedRadius * Math.sqrt(Math.random());
+      const theta = 2 * Math.PI * Math.random();
+      const sx = center[0] + r * Math.cos(theta);
+      const sy = center[1] + r * Math.sin(theta);
+
+      const bkw: [number, number][] = [];
+      let bx = sx;
+      let by = sy;
+      for (let s = 0; s < bkwSteps; s++) {
+        const [vx, vy] = field(bx, by);
+        bx -= vx * dt;
+        by -= vy * dt;
+        bkw.push([bx, by]);
+      }
+
+      const fwd: [number, number][] = [];
+      let fx = sx;
+      let fy = sy;
+      for (let s = 0; s < fwdSteps; s++) {
+        const [vx, vy] = field(fx, fy);
+        fx += vx * dt;
+        fy += vy * dt;
+        fwd.push([fx, fy]);
+      }
+
+      const pathDomain: [number, number][] = [
+        ...bkw.reverse(),
+        [sx, sy],
+        ...fwd,
+      ];
+      paths.push(pathDomain.map((p) => toPixel(p, cW, cH)) as number[][]);
+    }
+    return paths;
+  }
+
   function densityAtPoint(
     samples: [number, number][],
     p: [number, number],
@@ -257,21 +333,47 @@
     const toPixelBound = (p: [number, number]) => toPixel(p, cW, cH);
     const domain = getDomain();
 
-    streamlineAnim = StreamlineAnimation.create<AnimationState>({
-      backend: "gpu",
-      vectorFieldFn: field,
-      domain,
-      toPixel: toPixelBound,
-      density: streamlineDensity,
-      minPathLength: streamlineMinPathLength,
-      color: streamlineColor,
-      strokeWidth: streamlineWidth,
-      pulseWidthPixels,
-      pulsePauseWidthPixels,
-      offsets: "synchronized",
-      duration: animationDuration,
-      pulseFrequency: streamlinePulseFrequency,
-    });
+    if (rhsMode === "streamlines") {
+      streamlineAnim = StreamlineAnimation.create<AnimationState>({
+        backend: "gpu",
+        vectorFieldFn: field,
+        domain,
+        toPixel: toPixelBound,
+        density: streamlineDensity,
+        minPathLength: streamlineMinPathLength,
+        color: streamlineColor,
+        strokeWidth: streamlineWidth,
+        pulseWidthPixels,
+        pulsePauseWidthPixels,
+        offsets: "synchronized",
+        duration: animationDuration,
+        pulseFrequency: streamlinePulseFrequency,
+      });
+    } else {
+      // Pre-cache pathlines around the original fixed point; we translate
+      // the GPU canvas at runtime so they follow the cursor.
+      const paths = buildPathlines(
+        field,
+        fixedPoint,
+        pathSeedRadius,
+        pathSeedCount,
+        pathForwardSteps,
+        pathBackwardSteps,
+        pathStepSize,
+        cW,
+        cH
+      );
+      pathlineAnim = PulsingPathlineAnimation.create<AnimationState>({
+        paths,
+        color: pathlineColor,
+        thickness: pathlineThickness,
+        pulseWidth: pathPulseWidth,
+        pulseGap: pathPulseGap,
+        offsets: "synchronized",
+        duration: animationDuration,
+        pulseFrequency: pathPulseFrequency,
+      });
+    }
 
     // Density: same convergent field driving the contours.
     let samples = sampleGaussianMixture(numSamples, densityModes);
@@ -323,14 +425,19 @@
   }
 
   function setupTimeline(cW: number, cH: number) {
-    if (!streamlineAnim) return;
+    const rhsAnim = streamlineAnim ?? pathlineAnim;
+    if (!rhsAnim) return;
 
     timeline = new Timeline<AnimationState>();
-    timeline.initialState = { streamlinePhase: 0, contourFrame: 0 };
+    timeline.initialState = {
+      streamlinePhase: 0,
+      pulsingPathlinePhase: 0,
+      contourFrame: 0,
+    };
     timeline.duration = animationDuration;
     timeline.looping = true;
 
-    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
+    timeline.add(rhsAnim.clip, { start: 0, end: 1 });
 
     timeline.add(
       {
@@ -434,9 +541,12 @@
   }
 
   function drawRight(state: AnimationState, cW: number, cH: number) {
-    // GPU streamlines (middle z-layer)
+    // GPU streamlines / pathlines (middle z-layer)
     if (streamlineAnim?.initialized) {
       streamlineAnim.draw(state, [0, 0, 0, 0]);
+    }
+    if (pathlineAnim?.initialized) {
+      pathlineAnim.draw(state, [0, 0, 0, 0]);
     }
 
     // Density + mute on the back canvas
@@ -506,6 +616,7 @@
   onDestroy(() => {
     if (timeline) timeline.pause();
     if (streamlineAnim) streamlineAnim.destroy();
+    if (pathlineAnim) pathlineAnim.destroy();
   });
 
   // ----------------------------------------------------------------
@@ -566,11 +677,12 @@
       densityCanvas2d.resize(canvasWidth, canvasHeight);
       dotCanvas2d.resize(canvasWidth, canvasHeight);
 
-      if (streamlineAnim && gpuCanvas) {
+      if (gpuCanvas) {
         const dpr = window.devicePixelRatio || 1;
         gpuCanvas.width = canvasWidth * dpr;
         gpuCanvas.height = canvasHeight * dpr;
-        await streamlineAnim.init(gpuCanvas);
+        if (streamlineAnim) await streamlineAnim.init(gpuCanvas);
+        else if (pathlineAnim) await pathlineAnim.init(gpuCanvas);
       }
 
       if (timeline) {
@@ -723,7 +835,9 @@
         bind:this={gpuCanvas}
         class="gpu-canvas"
         style="
-          clip-path: circle({streamlineClipRadius}px at {streamlineClipCenterPct[0]}% {streamlineClipCenterPct[1]}%);
+          {rhsMode === 'streamlines'
+            ? `clip-path: circle(${streamlineClipRadius}px at ${streamlineClipCenterPct[0]}% ${streamlineClipCenterPct[1]}%);`
+            : ''}
           transform: translate({gpuTranslate[0]}px, {gpuTranslate[1]}px);
           transition: transform 0.05s linear;
         "
