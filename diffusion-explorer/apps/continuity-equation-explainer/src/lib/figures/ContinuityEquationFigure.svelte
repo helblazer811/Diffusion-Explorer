@@ -487,6 +487,17 @@
       })()
     : [50, 50];
 
+  // Translate the GPU canvas so the convergent pattern follows the cursor.
+  // The streamlines are baked at init time around fixedPoint; this CSS
+  // transform shifts the rendered output (and its circular clip) as a unit.
+  $: gpuTranslate = cursorDomain && canvasWidth && canvasHeight
+    ? (() => {
+        const [cx, cy] = toPixel(cursorDomain, canvasWidth, canvasHeight);
+        const [fx, fy] = toPixel(fixedPoint, canvasWidth, canvasHeight);
+        return [cx - fx, cy - fy];
+      })()
+    : [0, 0];
+
   // ----------------------------------------------------------------
   // Lifecycle
   // ----------------------------------------------------------------
@@ -708,7 +719,11 @@
       <canvas
         bind:this={gpuCanvas}
         class="gpu-canvas"
-        style="clip-path: circle({streamlineClipRadius}px at {streamlineClipCenterPct[0]}% {streamlineClipCenterPct[1]}%);"
+        style="
+          clip-path: circle({streamlineClipRadius}px at {streamlineClipCenterPct[0]}% {streamlineClipCenterPct[1]}%);
+          transform: translate({gpuTranslate[0]}px, {gpuTranslate[1]}px);
+          transition: transform 0.05s linear;
+        "
       ></canvas>
       <!-- Front: orange dot label -->
       <canvas
