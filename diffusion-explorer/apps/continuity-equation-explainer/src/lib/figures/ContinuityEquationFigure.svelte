@@ -72,7 +72,7 @@
   // Animation discretization — shorter contraction span.
   export let contourAnimationSteps = 60;
   export let contourStepSize = 0.03;
-  export let animationDuration = 3;
+  export let animationDuration = 6;
 
   // Streamlines (right pane)
   export let streamlineColor = "#f97316"; // orange
