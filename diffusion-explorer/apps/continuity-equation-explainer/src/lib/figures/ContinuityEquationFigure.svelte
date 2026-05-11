@@ -43,7 +43,6 @@
   export let width = 800;
   export let height = 380;
   export let gap = 20;
-  export let barPanelHeight = 56;
   export let backgroundVisible = false;
 
   // Fixed point + field
@@ -96,9 +95,15 @@
   export let pointLabelFontSize = 18;
   export let pointLabelOffset: [number, number] = [14, -10];
 
-  // Bar chart styling
+  // Bar chart styling (overlaid vertical bar on the right side of the left canvas)
   export let barColor = "#f97316";
-  export let barHeight = 16;
+  export let barThickness = 14; // bar width in px
+  export let barMaxHeight = 120; // bar height in px at p(x) = max
+  export let barRightMargin = 36; // distance from canvas right edge to bar in px
+  export let barCalloutColor = "#9ca3af";
+  export let barCalloutWidth = 1;
+  export let barCalloutGap = 4; // gap between dot edge and start of callout in px
+  export let barLabelGap = 8; // gap between bottom of callout and label in px
 
   export let playingByDefault = true;
 
@@ -385,9 +390,19 @@
   // Bar chart (d3 scale, Svelte template)
   // ----------------------------------------------------------------
 
-  $: barColumnWidth = Math.max(0, canvasWidth);
-  $: barScale = d3.scaleLinear().domain([0, 1]).range([0, barColumnWidth]);
-  $: barWidth = Math.max(0, barScale(currentBarValue));
+  // Bar geometry — vertical bar overlaid on the right side of the left canvas.
+  // Bar's bottom sits at the same y as the orange dot, so a horizontal callout
+  // connects the dot to the bar. Bar grows upward as p(x) grows.
+  $: dotPixel = canvasWidth && canvasHeight
+    ? toPixel(fixedPoint, canvasWidth, canvasHeight)
+    : [0, 0];
+  $: barHeightScale = d3.scaleLinear().domain([0, 1]).range([0, barMaxHeight]);
+  $: barCurrentHeight = Math.max(0, barHeightScale(currentBarValue));
+  $: barX = canvasWidth ? canvasWidth - barRightMargin - barThickness : 0;
+  $: barBottomY = dotPixel[1];
+  $: barTopY = barBottomY - barCurrentHeight;
+  $: calloutX1 = dotPixel[0] + pointRadius + barCalloutGap;
+  $: calloutX2 = barX;
 
   // Center of the streamline clip circle, in percentages of the GPU canvas.
   // Domain is centered on fixedPoint, so this is always (50, 50) — but compute
@@ -413,7 +428,7 @@
   // ----------------------------------------------------------------
 
   $: canvasWidth = Math.floor((width - gap) / 2);
-  $: canvasHeight = height - barPanelHeight;
+  $: canvasHeight = height;
 
   $: if (
     !isInitialized &&
@@ -453,63 +468,75 @@
 
 <DoubleFigure {gap} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet left()}
-    <div class="left-stack" style="width: 100%;">
+    <div
+      class="left-canvas-container"
+      style="width: 100%; aspect-ratio: {canvasWidth}/{canvasHeight};"
+    >
       <canvas
         bind:this={leftCanvas}
         use:leftCanvas2d.bindCanvas
-        style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
+        class="density-canvas"
       ></canvas>
-      <div class="bar-column" style="height: {barPanelHeight}px;">
-        <span class="bar-label-above">
-          <Katex math={"p(x)"} />
-        </span>
-        <svg
-          class="bar-svg"
-          viewBox="0 0 {barColumnWidth} {barHeight}"
-          width={barColumnWidth}
-          height={barHeight}
-          preserveAspectRatio="none"
-        >
-          <rect
-            x="0"
-            y="0"
-            width={barWidth}
-            height={barHeight}
-            fill={barColor}
-            rx="2"
-          />
-        </svg>
+      <!-- Bar-chart overlay: thin callout from the dot to a vertical bar on
+           the right edge of the canvas, with "p(x)" labeled below the bar. -->
+      <svg
+        class="bar-overlay"
+        viewBox="0 0 {canvasWidth} {canvasHeight}"
+        preserveAspectRatio="none"
+      >
+        <line
+          x1={calloutX1}
+          y1={barBottomY}
+          x2={calloutX2}
+          y2={barBottomY}
+          stroke={barCalloutColor}
+          stroke-width={barCalloutWidth}
+        />
+        <rect
+          x={barX}
+          y={barTopY}
+          width={barThickness}
+          height={barCurrentHeight}
+          fill={barColor}
+          rx="2"
+        />
+      </svg>
+      <div
+        class="bar-label"
+        style="
+          left: {((barX + barThickness / 2) / canvasWidth) * 100}%;
+          top: {((barBottomY + barLabelGap) / canvasHeight) * 100}%;
+        "
+      >
+        <Katex math={"p(x)"} />
       </div>
     </div>
   {/snippet}
 
   {#snippet right()}
-    <div class="right-stack" style="width: 100%;">
-      <div
-        class="right-canvas-container"
-        style="width: 100%; aspect-ratio: {canvasWidth}/{canvasHeight};"
-      >
-        <!-- Back: density + mute -->
-        <canvas
-          bind:this={densityCanvas}
-          use:densityCanvas2d.bindCanvas
-          class="back-canvas"
-        ></canvas>
-        <!-- Middle: GPU streamlines, clipped to a circular region around the
-             fixed point so the visual emphasizes the local convergence. -->
-        <canvas
-          bind:this={gpuCanvas}
-          class="gpu-canvas"
-          style="clip-path: circle({streamlineClipRadius}px at {streamlineClipCenterPct[0]}% {streamlineClipCenterPct[1]}%);"
-        ></canvas>
-        <!-- Front: orange dot label -->
-        <canvas
-          bind:this={dotCanvas}
-          use:dotCanvas2d.bindCanvas
-          class="front-canvas"
-        ></canvas>
-      </div>
-      <div class="bar-row-spacer" style="height: {barPanelHeight}px;"></div>
+    <div
+      class="right-canvas-container"
+      style="width: 100%; aspect-ratio: {canvasWidth}/{canvasHeight};"
+    >
+      <!-- Back: density + mute -->
+      <canvas
+        bind:this={densityCanvas}
+        use:densityCanvas2d.bindCanvas
+        class="back-canvas"
+      ></canvas>
+      <!-- Middle: GPU streamlines, clipped to a circular region around the
+           fixed point so the visual emphasizes the local convergence. -->
+      <canvas
+        bind:this={gpuCanvas}
+        class="gpu-canvas"
+        style="clip-path: circle({streamlineClipRadius}px at {streamlineClipCenterPct[0]}% {streamlineClipCenterPct[1]}%);"
+      ></canvas>
+      <!-- Front: orange dot label -->
+      <canvas
+        bind:this={dotCanvas}
+        use:dotCanvas2d.bindCanvas
+        class="front-canvas"
+      ></canvas>
     </div>
   {/snippet}
 
@@ -519,39 +546,35 @@
 </DoubleFigure>
 
 <style>
-  .left-stack,
-  .right-stack {
-    display: flex;
-    flex-direction: column;
+  .left-canvas-container,
+  .right-canvas-container {
+    position: relative;
   }
 
-  .bar-column {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-    padding-top: 8px;
-  }
-
-  .bar-label-above {
-    text-align: center;
-    color: #374151;
-    font-size: 1rem;
-    line-height: 1;
-  }
-
-  .bar-svg {
+  .density-canvas {
     width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .bar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
     overflow: visible;
   }
 
-  .bar-row-spacer {
-    /* keeps the right column the same vertical extent as the left so captions
-       sit at the same baseline below both panes. */
-  }
-
-  .right-canvas-container {
-    position: relative;
+  .bar-label {
+    position: absolute;
+    transform: translate(-50%, 0);
+    color: #374151;
+    font-size: 0.95rem;
+    line-height: 1;
+    pointer-events: none;
+    white-space: nowrap;
   }
 
   .back-canvas,
