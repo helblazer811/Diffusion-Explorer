@@ -1,8 +1,17 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { writable } from "svelte/store";
   import { base } from "$app/paths";
-  import { ArticleHeader, Katex } from "@diffusion-explorer/ui";
+  import {
+    ArticleHeader,
+    Bibliography,
+    HoverableReference,
+    Katex,
+    loadBibliography,
+    collectCitations,
+    type BibEntry,
+    type CitationInfo,
+  } from "@diffusion-explorer/ui";
   import { generateClippedGaussianSamples, clipSamplesToRadius, clipTrajectoriesToStartingRadius, loadCachedTrajectories, FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings, type VectorFieldData } from "$lib/settings";
 
@@ -35,6 +44,10 @@
 
   // 1D flow trajectories for the likelihood section figure
   let oneDimensionalFlowTrajectories: number[][][] = [];
+
+  // Bibliography state
+  let bibEntries: Map<string, BibEntry> | null = null;
+  let citations: CitationInfo[] = [];
 
   // Data for FlowInvertibility figure
   let flowInvertibilityData: {
@@ -197,6 +210,19 @@
     } catch (e: unknown) {
       console.warn("Failed to load 1D flow trajectories:", e);
     }
+
+    // Load bibliography and collect HoverableReference citations.
+    try {
+      bibEntries = await loadBibliography(`${base}/bibliography.bib`);
+      if (!bibEntries) {
+        console.error("Failed to load bibliography from bibliography.bib");
+      } else {
+        await tick();
+        citations = collectCitations();
+      }
+    } catch (e: unknown) {
+      console.error("Error loading bibliography:", e);
+    }
   });
 
   onDestroy(() => {
@@ -243,7 +269,7 @@
     the evolution of a probability density:
   </p>
   <Katex
-    math={"\\frac{\\partial p_t}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0."}
+    math={"\\underbrace{\\frac{\\partial p_t}{\\partial t}}_{\\text{Change in density}} + \\underbrace{\\nabla \\cdot (p_t v_t)}_{\\text{Divergence of probability flux}} = 0."}
     displayMode={true}
   />
   <p>
@@ -255,11 +281,14 @@
   </p>
   <p>
     We assume only the most basic familiarity with flow models. For a more thorough introduction
-    to flow matching itself — including the training objective, the role of the velocity field,
-    and how trajectories are generated — see the
+    to flow matching <HoverableReference id="lipman2022" {bibEntries} {citations} /> and the
+    concurrent stochastic interpolant framework
+    <HoverableReference id="albergo2023" {bibEntries} {citations} /> — including the training
+    objective, the role of the velocity field, and how trajectories are generated — see the
     <a href="https://alechelbling.com/rectified-flow/" target="_blank" rel="noopener noreferrer"
       >rectified flow explainer</a
-    >. The next section gives a compressed recap to fix the vocabulary we will use throughout.
+    > <HoverableReference id="liu2022" {bibEntries} {citations} />. The next section gives a
+    compressed recap to fix the vocabulary we will use throughout.
   </p>
 </section>
 
@@ -719,7 +748,10 @@
     Continuous Normalizing Flows
   </h2>
   <p>
-    Now we have everything we need to define a continuous normalizing flow (CNF) as a
+    Now we have everything we need to define a continuous normalizing flow
+    <HoverableReference id="chen2018neural" {bibEntries} {citations} /> (CNF) — the
+    continuous-time generalization of normalizing flows
+    <HoverableReference id="rezende2015" {bibEntries} {citations} /> — as a
     <em>practical</em> generative model. The recipe is short:
   </p>
   <ol>
@@ -867,24 +899,7 @@
   <!-- References Section -->
   <section id="references">
     <h2 id="references-heading" class="section-heading">References</h2>
-    <ol>
-      <li>
-        Lipman, Y., Chen, R. T., Ben-Hamu, H., Nickel, M., & Le, M. (2022). Flow matching for
-        generative modeling. <em>arXiv preprint arXiv:2210.02747</em>.
-      </li>
-      <li>
-        Chen, R. T., Rubanova, Y., Bettencourt, J., & Duvenaud, D. K. (2018). Neural ordinary
-        differential equations. <em>Advances in neural information processing systems</em>, 31.
-      </li>
-      <li>
-        Rezende, D., & Mohamed, S. (2015). Variational inference with normalizing flows.
-        <em>International conference on machine learning</em>.
-      </li>
-      <li>
-        Liu, X., Gong, C., & Liu, Q. (2022). Flow straight and fast: Learning to generate and transfer
-        data with rectified flow. <em>arXiv preprint arXiv:2209.03003</em>.
-      </li>
-    </ol>
+    <Bibliography {citations} {bibEntries} />
   </section>
 
   <!-- How to Cite Section -->
