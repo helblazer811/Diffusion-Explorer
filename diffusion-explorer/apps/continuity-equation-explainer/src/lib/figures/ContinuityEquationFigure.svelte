@@ -345,6 +345,30 @@
 
   function drawDot(ctx: CanvasRenderingContext2D, cW: number, cH: number) {
     const [px, py] = toPixel(fixedPoint, cW, cH);
+
+    // Translucent white rounded rectangle behind the dot and label so they
+    // stay legible against the contour density and streamlines.
+    const padX = 6;
+    const padY = 4;
+    const labelW = pointLabelFontSize * 0.7; // approx width of "x" glyph
+    const rectLeft = px - pointRadius - padX;
+    const rectRight =
+      px + pointLabelOffset[0] + labelW + padX;
+    const labelMidY = py + pointLabelOffset[1];
+    const rectTop =
+      Math.min(py - pointRadius, labelMidY - pointLabelFontSize / 2) - padY;
+    const rectBottom =
+      Math.max(py + pointRadius, labelMidY + pointLabelFontSize / 2) + padY;
+    const rectW = rectRight - rectLeft;
+    const rectH = rectBottom - rectTop;
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.roundRect(rectLeft, rectTop, rectW, rectH, 6);
+    ctx.fill();
+    ctx.restore();
+
     ctx.fillStyle = pointColor;
     ctx.beginPath();
     ctx.arc(px, py, pointRadius, 0, 2 * Math.PI);
@@ -357,7 +381,7 @@
       pointLabelFontSize,
       0,
       0,
-      { color: pointColor, stroke: "white", strokeWidth: 6, strokeOpacity: 0.9 }
+      { color: pointColor }
     );
   }
 
