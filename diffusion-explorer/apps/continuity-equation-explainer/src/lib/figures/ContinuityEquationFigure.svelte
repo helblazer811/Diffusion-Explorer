@@ -591,17 +591,17 @@
   $: barColumnMidY = barBottomY - barMaxHeight / 2;
   $: gridFractions = [0.25, 0.5, 0.75, 1.0];
 
-  // Callout from the dot to the bar's baseline ("the p(x) base of the bar").
-  // Start the line just past the dot's halo so it reads as "coming out of"
-  // the dot rather than overlapping it.
+  // Angled-elbow callout: start near the dot, run horizontally toward the
+  // bar's column, then drop vertically to a point just to the LEFT of the
+  // bar at the baseline. The vertical segment "points" to that target.
+  $: barCalloutTargetX = barX - 16;
   $: barCalloutStart = canvasWidth && canvasHeight
     ? (() => {
         const [dx, dy] = dotPixel;
-        const vx = barCenterX - dx;
-        const vy = barBottomY - dy;
-        const len = Math.hypot(vx, vy) || 1;
+        const vx = barCalloutTargetX - dx;
+        const len = Math.abs(vx) || 1;
         const off = pointRadius + barCalloutGap;
-        return [dx + (vx / len) * off, dy + (vy / len) * off];
+        return [dx + (vx / len) * off, dy];
       })()
     : [0, 0];
 
@@ -786,12 +786,12 @@
           stroke={barBaselineColor}
           stroke-width={barBaselineWidth}
         />
-        <!-- Callout from the dot to the base of the bar (p(x) baseline). -->
-        <line
-          x1={barCalloutStart[0]}
-          y1={barCalloutStart[1]}
-          x2={barCenterX}
-          y2={barBottomY}
+        <!-- Angled-elbow callout from the dot to a point just LEFT of the
+             bar's baseline: horizontal segment from the dot, then a vertical
+             drop down to the baseline. -->
+        <polyline
+          points="{barCalloutStart[0]},{barCalloutStart[1]} {barCalloutTargetX},{barCalloutStart[1]} {barCalloutTargetX},{barBottomY}"
+          fill="none"
           stroke={barCalloutColor}
           stroke-width={barCalloutWidth}
         />
