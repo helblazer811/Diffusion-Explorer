@@ -890,23 +890,24 @@
           fill={barColor}
           rx="2"
         />
-        <!-- Axis arrow pointing RIGHT from the end of the bar's max-extent
-             column. Constant length regardless of bar value. -->
+        <!-- Axis arrow that sits at the RIGHT edge of the current bar and
+             points further right. Tracks the bar's current value. Length
+             is fixed so the arrow stays a recognizable size at every value. -->
         <line
-          x1={barLeftX + barMaxHeight}
+          x1={barRightX}
           y1={barCenterY}
-          x2={barLeftX + barMaxHeight + barArrowLength}
+          x2={barRightX + barArrowLength}
           y2={barCenterY}
           stroke={barColor}
           stroke-width="2.5"
           marker-end="url(#ce-axis-arrowhead)"
         />
       </svg>
-      <!-- ∂p_t(x)/∂t label, rotated, after the axis arrow tip -->
+      <!-- ∂p_t(x)/∂t label, rotated, just past the axis arrow tip -->
       <div
         class="dpdt-label rotated-label"
         style="
-          left: {((barLeftX + barMaxHeight + barArrowLength + 8) / canvasWidth) * 100}%;
+          left: {((barRightX + barArrowLength + 8) / canvasWidth) * 100}%;
           top: {(barCenterY / canvasHeight) * 100}%;
         "
       >
