@@ -53,9 +53,14 @@
 
   // Fixed point + convergent field. The same field drives both the density
   // evolution (samples contract onto the point) and the streamline animation
-  // on the right pane — so the visualization is internally consistent.
+  // on the right pane — so the visualization is internally consistent. A
+  // small wavy component is added so pathlines curve and vary with position
+  // (a pure linear sink is translation-invariant — pathlines would look
+  // identical at every cursor location).
   export let fixedPoint: [number, number] = [0, 0];
   export let fieldStrength = 1.0;
+  export let fieldWavyAmplitude = 0.7;
+  export let fieldWavyFrequency = 3.0;
   export let domainHalfWidth = 1.1;
 
   // Density samples — Gaussian mixture positioned so the fixed point sits
@@ -170,6 +175,7 @@
   let timeline: Timeline<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let pathlineAnim: PulsingPathlineAnimation<AnimationState> | null = null;
+  let activeField: VectorFieldFn | null = null;
   let contourFrames: ComputedContours[] = [];
   let densitySeries: number[] = []; // per-frame, normalized to [0, 1]
   let currentBarValue = 0; // reactive, drives the SVG bar width
@@ -253,8 +259,16 @@
     });
   }
 
-  function createConvergentField(p: [number, number], k: number): VectorFieldFn {
-    return (x, y) => [-k * (x - p[0]), -k * (y - p[1])];
+  function createConvergentField(
+    p: [number, number],
+    k: number,
+    wavyAmp: number = 0,
+    wavyFreq: number = 0
+  ): VectorFieldFn {
+    return (x, y) => [
+      -k * (x - p[0]) + wavyAmp * Math.sin(wavyFreq * y),
+      -k * (y - p[1]) - wavyAmp * Math.sin(wavyFreq * x),
+    ];
   }
 
   /**
@@ -275,10 +289,12 @@
   ): number[][][] {
     const paths: number[][][] = [];
     for (let i = 0; i < seedCount; i++) {
-      const r = seedRadius * Math.sqrt(Math.random());
-      const theta = 2 * Math.PI * Math.random();
-      const sx = center[0] + r * Math.cos(theta);
-      const sy = center[1] + r * Math.sin(theta);
+      // Evenly spaced points on the circle of radius `seedRadius` around
+      // `center` — gives a regular starburst pattern rather than random
+      // clustering.
+      const theta = (2 * Math.PI * i) / seedCount;
+      const sx = center[0] + seedRadius * Math.cos(theta);
+      const sy = center[1] + seedRadius * Math.sin(theta);
 
       const bkw: [number, number][] = [];
       let bx = sx;
@@ -330,7 +346,13 @@
   // ----------------------------------------------------------------
 
   function runInitialComputation(cW: number, cH: number) {
-    const field = createConvergentField(fixedPoint, fieldStrength);
+    const field = createConvergentField(
+      fixedPoint,
+      fieldStrength,
+      fieldWavyAmplitude,
+      fieldWavyFrequency
+    );
+    activeField = field;
     const toPixelBound = (p: [number, number]) => toPixel(p, cW, cH);
     const domain = getDomain();
 
@@ -618,9 +640,9 @@
     : [50, 50];
 
   // Translate the GPU canvas so the convergent pattern follows the cursor.
-  // The streamlines are baked at init time around fixedPoint; this CSS
-  // transform shifts the rendered output (and its circular clip) as a unit.
-  $: gpuTranslate = cursorDomain && canvasWidth && canvasHeight
+  // Only used in streamline mode — pathline mode recomputes paths at the
+  // cursor position instead, so no translation is needed.
+  $: gpuTranslate = cursorDomain && canvasWidth && canvasHeight && rhsMode === "streamlines"
     ? (() => {
         const [cx, cy] = toPixel(cursorDomain, canvasWidth, canvasHeight);
         const [fx, fy] = toPixel(fixedPoint, canvasWidth, canvasHeight);
@@ -665,6 +687,31 @@
 
   function handlePointerLeave() {
     cursorDomain = null;
+  }
+
+  // Recompute pathlines whenever the active center (cursor or fixedPoint)
+  // moves, so the wavy-field paths actually vary with location instead of
+  // just being CSS-translated. Cheap (~1000 ODE steps + a GPU upload).
+  $: if (
+    rhsMode === "pathlines" &&
+    pathlineAnim?.initialized &&
+    activeField &&
+    canvasWidth &&
+    canvasHeight
+  ) {
+    const center = cursorDomain ?? fixedPoint;
+    const newPaths = buildPathlines(
+      activeField,
+      center,
+      pathSeedRadius,
+      pathSeedCount,
+      pathForwardSteps,
+      pathBackwardSteps,
+      pathStepSize,
+      canvasWidth,
+      canvasHeight
+    );
+    pathlineAnim.updatePaths(newPaths);
   }
 
   // Recompute the bar value whenever the cursor moves between ticks, so the
