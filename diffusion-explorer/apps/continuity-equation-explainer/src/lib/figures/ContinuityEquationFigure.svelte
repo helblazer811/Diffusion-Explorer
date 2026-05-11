@@ -580,7 +580,8 @@
 <div class="continuity-equation-equation">
   <div class="equation-grid">
     <div class="grid-label grid-label-left">
-      The rate of change of probability density at the point <Katex math={"\\color{#f97316}{x}"} />.
+      The rate of change of <span style="color: #3b82f6;">probability density</span> at the
+      point <Katex math={"\\color{#f97316}{x}"} />.
     </div>
     <div class="grid-label-spacer"></div>
     <div class="grid-label grid-label-right">
@@ -594,7 +595,7 @@
       <Katex math={"+"} displayMode={true} />
     </div>
     <div class="grid-math">
-      <Katex math={"\\nabla \\cdot \\textcolor{#3b82f6}{(p_t v_t)} \\;=\\; 0"} displayMode={true} />
+      <Katex math={"\\nabla \\cdot \\textcolor{#3b82f6}{p_t v_t} \\;=\\; 0"} displayMode={true} />
     </div>
   </div>
 </div>
@@ -637,14 +638,6 @@
           y2={barBottomY}
           stroke={barBaselineColor}
           stroke-width={barBaselineWidth}
-        />
-        <line
-          x1={dotPixel[0] + pointRadius + barCalloutGap}
-          y1={dotPixel[1]}
-          x2={barCenterX}
-          y2={barColumnMidY}
-          stroke={barCalloutColor}
-          stroke-width={barCalloutWidth}
         />
         <rect
           x={barX}
