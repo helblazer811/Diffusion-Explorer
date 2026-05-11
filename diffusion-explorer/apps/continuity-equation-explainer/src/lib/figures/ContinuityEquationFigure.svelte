@@ -91,9 +91,11 @@
   // the fixed point, so the visual emphasizes the local convergence.
   export let streamlineClipRadius = 90;
 
-  // Right-pane density mute
+  // Translucent white mute between the density and the dot/streamlines.
+  // Applied on BOTH panes so the foreground markers (dot, label, streamlines,
+  // bar chart) remain legible against the density.
   export let densityMuteColor = "#ffffff";
-  export let densityMuteOpacity = 0.6;
+  export let densityMuteOpacity = 0.4;
 
   // Fixed point styling
   export let pointColor = "#f97316";
@@ -345,30 +347,6 @@
 
   function drawDot(ctx: CanvasRenderingContext2D, cW: number, cH: number) {
     const [px, py] = toPixel(fixedPoint, cW, cH);
-
-    // Translucent white rounded rectangle behind the dot and label so they
-    // stay legible against the contour density and streamlines.
-    const padX = 6;
-    const padY = 4;
-    const labelW = pointLabelFontSize * 0.7; // approx width of "x" glyph
-    const rectLeft = px - pointRadius - padX;
-    const rectRight =
-      px + pointLabelOffset[0] + labelW + padX;
-    const labelMidY = py + pointLabelOffset[1];
-    const rectTop =
-      Math.min(py - pointRadius, labelMidY - pointLabelFontSize / 2) - padY;
-    const rectBottom =
-      Math.max(py + pointRadius, labelMidY + pointLabelFontSize / 2) + padY;
-    const rectW = rectRight - rectLeft;
-    const rectH = rectBottom - rectTop;
-    ctx.save();
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.roundRect(rectLeft, rectTop, rectW, rectH, 6);
-    ctx.fill();
-    ctx.restore();
-
     ctx.fillStyle = pointColor;
     ctx.beginPath();
     ctx.arc(px, py, pointRadius, 0, 2 * Math.PI);
@@ -381,7 +359,7 @@
       pointLabelFontSize,
       0,
       0,
-      { color: pointColor }
+      { color: pointColor, stroke: "white", strokeWidth: 6, strokeOpacity: 0.9 }
     );
   }
 
@@ -390,7 +368,7 @@
     const cf = contourFrames[state.contourFrame];
     if (!ctx || !cf) return;
     ctx.clearRect(0, 0, cW, cH);
-    drawDensityAndDot(ctx, cf, cW, cH, /* mute */ false);
+    drawDensityAndDot(ctx, cf, cW, cH, /* mute */ true);
     drawDot(ctx, cW, cH);
   }
 
@@ -421,18 +399,19 @@
   // ----------------------------------------------------------------
 
   // Bar geometry — vertical bar overlaid on the right side of the left canvas.
-  // Bar's bottom sits at the same y as the orange dot, so a horizontal callout
-  // connects the dot to the bar. Bar grows upward as p(x) grows.
+  // Bar's bottom sits at the bottom of the canvas. A thin L-shaped callout
+  // connects the orange dot to the top of the bar.
   $: dotPixel = canvasWidth && canvasHeight
     ? toPixel(fixedPoint, canvasWidth, canvasHeight)
     : [0, 0];
   $: barHeightScale = d3.scaleLinear().domain([0, 1]).range([0, barMaxHeight]);
   $: barCurrentHeight = Math.max(0, barHeightScale(currentBarValue));
   $: barX = canvasWidth ? canvasWidth - barRightMargin - barThickness : 0;
-  $: barBottomY = dotPixel[1];
+  $: barCenterX = barX + barThickness / 2;
+  $: barBottomY = canvasHeight;
   $: barTopY = barBottomY - barCurrentHeight;
   $: calloutX1 = dotPixel[0] + pointRadius + barCalloutGap;
-  $: calloutX2 = barX;
+  $: gridFractions = [0.25, 0.5, 0.75, 1.0];
 
   // Center of the streamline clip circle, in percentages of the GPU canvas.
   $: streamlineClipCenterPct = canvasWidth && canvasHeight
@@ -505,18 +484,45 @@
         use:leftCanvas2d.bindCanvas
         class="density-canvas"
       ></canvas>
-      <!-- Bar-chart overlay: thin callout from the dot to a vertical bar on
-           the right edge of the canvas, with "p(x)" labeled below the bar. -->
+      <!-- Bar-chart overlay: subtle gridlines + baseline, an L-shaped callout
+           from the dot to the top of the bar, and the bar itself. -->
       <svg
         class="bar-overlay"
         viewBox="0 0 {canvasWidth} {canvasHeight}"
         preserveAspectRatio="none"
       >
+        {#each gridFractions as frac}
+          <line
+            x1={barX - 8}
+            y1={barBottomY - frac * barMaxHeight}
+            x2={barX + barThickness + 8}
+            y2={barBottomY - frac * barMaxHeight}
+            stroke="#d1d5db"
+            stroke-width="1"
+            stroke-dasharray="2 3"
+          />
+        {/each}
+        <line
+          x1={barX - 12}
+          y1={barBottomY - 0.5}
+          x2={barX + barThickness + 12}
+          y2={barBottomY - 0.5}
+          stroke="#9ca3af"
+          stroke-width="1.25"
+        />
         <line
           x1={calloutX1}
-          y1={barBottomY}
-          x2={calloutX2}
-          y2={barBottomY}
+          y1={dotPixel[1]}
+          x2={barCenterX}
+          y2={dotPixel[1]}
+          stroke={barCalloutColor}
+          stroke-width={barCalloutWidth}
+        />
+        <line
+          x1={barCenterX}
+          y1={dotPixel[1]}
+          x2={barCenterX}
+          y2={barTopY}
           stroke={barCalloutColor}
           stroke-width={barCalloutWidth}
         />
@@ -532,7 +538,7 @@
       <div
         class="bar-label"
         style="
-          left: {((barX + barThickness / 2) / canvasWidth) * 100}%;
+          left: {(barCenterX / canvasWidth) * 100}%;
           top: {((barBottomY + barLabelGap) / canvasHeight) * 100}%;
         "
       >
