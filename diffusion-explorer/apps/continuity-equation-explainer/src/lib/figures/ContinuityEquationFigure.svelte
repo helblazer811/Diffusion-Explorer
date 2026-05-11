@@ -624,22 +624,21 @@
   $: barHeightScale = d3.scaleLinear().domain([0, 1]).range([0, barMaxHeight]);
   $: barCurrentHeight = Math.max(0, barHeightScale(currentBarValue));
   $: barX = canvasWidth ? canvasWidth - barRightMargin - barThickness : 0;
-  $: barCenterX = barX + barThickness / 2;
-  // Anchor the bar's y-axis so its midpoint is on the canvas vertical center.
-  $: barBottomY = canvasHeight && barMaxHeight
-    ? (canvasHeight + barMaxHeight) / 2
-    : canvasHeight;
-  $: barTopY = barBottomY - barCurrentHeight;
-  // Fixed midpoint of the bar's column area — the straight callout from the
-  // dot terminates here regardless of the bar's current height.
-  $: barColumnMidY = barBottomY - barMaxHeight / 2;
+  // Horizontal bar chart, overlaid on the bottom of the LHS canvas and
+  // horizontally centered. `barMaxHeight` is reused as the bar's max LENGTH
+  // (horizontal extent), `barThickness` as its vertical thickness.
+  $: barLeftX = canvasWidth ? (canvasWidth - barMaxHeight) / 2 : 0;
+  $: barCenterY = canvasHeight ? canvasHeight - barRightMargin - barThickness / 2 : 0;
+  $: barTopRowY = barCenterY - barThickness / 2;
+  $: barBottomRowY = barCenterY + barThickness / 2;
+  // Right-edge of the current bar (it grows rightward from barLeftX).
+  $: barRightX = barLeftX + barCurrentHeight;
   $: gridFractions = [0.25, 0.5, 0.75, 1.0];
 
-  // Angled (diagonal) callout from the dot to the LEFT end of the bar's
-  // baseline. The shared endpoint with the baseline makes the two lines
-  // read as a single connected elbow.
-  $: barCalloutTargetX = barX - 12;
-  $: barCalloutTargetY = barBottomY;
+  // Angled (diagonal) callout from the dot to the LEFT end of the
+  // horizontal bar's baseline (top-left corner of the bar's tick area).
+  $: barCalloutTargetX = barLeftX;
+  $: barCalloutTargetY = barTopRowY - 6;
   $: barCalloutStart = canvasWidth && canvasHeight
     ? (() => {
         const [dx, dy] = dotPixel;
@@ -835,8 +834,9 @@
         use:leftCanvas2d.bindCanvas
         class="density-canvas"
       ></canvas>
-      <!-- Bar-chart overlay: solid gridlines + baseline, the bar itself, and
-           an orange "dp/dt" axis arrow at the top of the column. -->
+      <!-- Horizontal bar-chart overlay at the bottom of the canvas:
+           gridlines, baseline tick, callout from the dot, the bar itself,
+           and a ∂p_t(x)/∂t axis arrow extending to the right. -->
       <svg
         class="bar-overlay"
         viewBox="0 0 {canvasWidth} {canvasHeight}"
@@ -856,24 +856,24 @@
         </defs>
         {#each gridFractions as frac}
           <line
-            x1={barX - 8}
-            y1={barBottomY - frac * barMaxHeight}
-            x2={barX + barThickness + 8}
-            y2={barBottomY - frac * barMaxHeight}
+            x1={barLeftX + frac * barMaxHeight}
+            y1={barTopRowY - 8}
+            x2={barLeftX + frac * barMaxHeight}
+            y2={barBottomRowY + 8}
             stroke={barGridColor}
             stroke-width={barGridWidth}
           />
         {/each}
         <line
-          x1={barX - 12}
-          y1={barBottomY}
-          x2={barX + barThickness + 12}
-          y2={barBottomY}
+          x1={barLeftX}
+          y1={barTopRowY - 12}
+          x2={barLeftX}
+          y2={barBottomRowY + 12}
           stroke={barBaselineColor}
           stroke-width={barBaselineWidth}
         />
-        <!-- Angled (diagonal) callout from the dot to a point left of the
-             bar's baseline. -->
+        <!-- Angled (diagonal) callout from the dot to the top-left of the
+             horizontal bar's baseline tick. -->
         <line
           x1={barCalloutStart[0]}
           y1={barCalloutStart[1]}
@@ -883,41 +883,40 @@
           stroke-width={barCalloutWidth}
         />
         <rect
-          x={barX}
-          y={barTopY}
-          width={barThickness}
-          height={barCurrentHeight}
+          x={barLeftX}
+          y={barTopRowY}
+          width={barCurrentHeight}
+          height={barThickness}
           fill={barColor}
           rx="2"
         />
-        <!-- Axis arrow centered on the bar, always pointing up. Length is
-             fixed so the arrow stays a recognizable size at every bar
-             value. -->
+        <!-- Axis arrow pointing RIGHT from the end of the bar's max-extent
+             column. Constant length regardless of bar value. -->
         <line
-          x1={barCenterX}
-          y1={barTopY}
-          x2={barCenterX}
-          y2={barTopY - barArrowLength}
+          x1={barLeftX + barMaxHeight}
+          y1={barCenterY}
+          x2={barLeftX + barMaxHeight + barArrowLength}
+          y2={barCenterY}
           stroke={barColor}
           stroke-width="2.5"
           marker-end="url(#ce-axis-arrowhead)"
         />
       </svg>
-      <!-- ∂p_t(x)/∂t label, vertically centered on the axis arrow -->
+      <!-- ∂p_t(x)/∂t label, rotated, after the axis arrow tip -->
       <div
-        class="dpdt-label"
+        class="dpdt-label rotated-label"
         style="
-          left: {((barCenterX - 10) / canvasWidth) * 100}%;
-          top: {((barTopY - barArrowLength / 2) / canvasHeight) * 100}%;
+          left: {((barLeftX + barMaxHeight + barArrowLength + 8) / canvasWidth) * 100}%;
+          top: {(barCenterY / canvasHeight) * 100}%;
         "
       >
         <Katex math={`\\textcolor{${barColor}}{\\frac{\\partial p_t(x)}{\\partial t}}`} />
       </div>
       <div
-        class="bar-label"
+        class="bar-label rotated-label"
         style="
-          left: {(barCenterX / canvasWidth) * 100}%;
-          top: {((barBottomY + barLabelGap) / canvasHeight) * 100}%;
+          left: {((barLeftX - 14) / canvasWidth) * 100}%;
+          top: {(barCenterY / canvasHeight) * 100}%;
         "
       >
         <Katex math={`\\color{${barColor}} p_t(x)`} />
@@ -1038,7 +1037,6 @@
 
   .bar-label {
     position: absolute;
-    transform: translate(-50%, 0);
     color: #374151;
     font-size: 1.5rem;
     line-height: 1;
@@ -1048,13 +1046,17 @@
 
   .dpdt-label {
     position: absolute;
-    /* Anchor to the right edge of the label so it sits to the LEFT of the
-       reference x position, and vertically centered on the reference y. */
-    transform: translate(-100%, -50%);
     font-size: 1.5rem;
     line-height: 1;
     pointer-events: none;
     white-space: nowrap;
+  }
+
+  /* Rotate labels 90° counter-clockwise so they read bottom-up alongside
+     the horizontal bar chart. The label's center stays at (left, top). */
+  .rotated-label {
+    transform: translate(-50%, -50%) rotate(-90deg);
+    transform-origin: center;
   }
 
   .back-canvas,
