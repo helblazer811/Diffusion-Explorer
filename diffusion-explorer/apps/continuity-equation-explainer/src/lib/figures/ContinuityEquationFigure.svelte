@@ -566,7 +566,9 @@
       pointLabelFontSize,
       0,
       0,
-      { color: pointColor, stroke: "white", strokeWidth: 8, strokeOpacity: 0.95 }
+      // strokeWidth is in MathJax internal SVG units (≈ 1000 / em), so the
+      // value needs to be large to read as a visible halo at fontSize.
+      { color: pointColor, stroke: "white", strokeWidth: 110, strokeOpacity: 1 }
     );
   }
 
