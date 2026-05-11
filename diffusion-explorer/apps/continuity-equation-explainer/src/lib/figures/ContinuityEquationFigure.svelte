@@ -80,13 +80,14 @@
   export let contourStepSize = 0.004;
   export let animationDuration = 6;
 
-  // Streamlines (right pane)
+  // Streamlines (right pane) — fewer pulses per second with longer pulses.
   export let streamlineColor = "#f97316"; // orange
   export let streamlineDensity: number | [number, number] = 1.0;
   export let streamlineMinPathLength = 1.0;
   export let streamlineWidth = 3;
-  export let pulseWidthPixels = 22;
-  export let pulsePauseWidthPixels = 6;
+  export let pulseWidthPixels = 48;
+  export let pulsePauseWidthPixels = 16;
+  export let streamlinePulseFrequency = 0.25;
   // Show converging streamlines only within this circular radius (px) around
   // the fixed point, so the visual emphasizes the local convergence.
   export let streamlineClipRadius = 90;
@@ -101,18 +102,23 @@
   export let pointColor = "#f97316";
   export let pointRadius = 6;
   export let pointLabel = "x";
-  export let pointLabelFontSize = 18;
-  export let pointLabelOffset: [number, number] = [14, -10];
+  export let pointLabelFontSize = 28;
+  export let pointLabelOffset: [number, number] = [18, -14];
 
   // Bar chart styling (overlaid vertical bar on the right side of the left canvas)
   export let barColor = "#f97316";
   export let barThickness = 14; // bar width in px
-  export let barMaxHeight = 120; // bar height in px at p(x) = max
+  export let barMaxHeight = 200; // bar height in px at p(x) = max
   export let barRightMargin = 36; // distance from canvas right edge to bar in px
+  export let barBottomMargin = 36; // distance from canvas bottom to bar baseline in px
   export let barCalloutColor = "#9ca3af";
   export let barCalloutWidth = 1;
   export let barCalloutGap = 4; // gap between dot edge and start of callout in px
-  export let barLabelGap = 8; // gap between bottom of callout and label in px
+  export let barLabelGap = 6; // gap between baseline and label in px
+  export let barGridColor = "#d1d5db";
+  export let barGridWidth = 1;
+  export let barBaselineColor = "#9ca3af";
+  export let barBaselineWidth = 1.5;
 
   export let playingByDefault = true;
 
@@ -252,7 +258,7 @@
       pulsePauseWidthPixels,
       offsets: "synchronized",
       duration: animationDuration,
-      pulseFrequency: 0.5,
+      pulseFrequency: streamlinePulseFrequency,
     });
 
     // Density: same convergent field driving the contours.
@@ -408,9 +414,11 @@
   $: barCurrentHeight = Math.max(0, barHeightScale(currentBarValue));
   $: barX = canvasWidth ? canvasWidth - barRightMargin - barThickness : 0;
   $: barCenterX = barX + barThickness / 2;
-  $: barBottomY = canvasHeight;
+  $: barBottomY = canvasHeight - barBottomMargin;
   $: barTopY = barBottomY - barCurrentHeight;
-  $: calloutX1 = dotPixel[0] + pointRadius + barCalloutGap;
+  // Fixed midpoint of the bar's column area — the straight callout from the
+  // dot terminates here regardless of the bar's current height.
+  $: barColumnMidY = barBottomY - barMaxHeight / 2;
   $: gridFractions = [0.25, 0.5, 0.75, 1.0];
 
   // Center of the streamline clip circle, in percentages of the GPU canvas.
@@ -473,6 +481,28 @@
   }
 </script>
 
+<div class="continuity-equation-equation">
+  <div class="equation-grid">
+    <div class="grid-label grid-label-left">
+      The rate of change of probability density at the point <Katex math={"\\color{#f97316}{x}"} />.
+    </div>
+    <div class="grid-label-spacer"></div>
+    <div class="grid-label grid-label-right">
+      The negative divergence of probability flux at <Katex math={"\\color{#f97316}{x}"} />.
+    </div>
+
+    <div class="grid-math">
+      <Katex math={"\\frac{\\partial \\color{#3b82f6}{p_t(\\color{#f97316}{x})}}{\\partial t}"} displayMode={true} />
+    </div>
+    <div class="grid-equals">
+      <Katex math={"="} displayMode={true} />
+    </div>
+    <div class="grid-math">
+      <Katex math={"-\\nabla \\cdot \\color{#3b82f6}{(p_t v_t)}"} displayMode={true} />
+    </div>
+  </div>
+</div>
+
 <DoubleFigure {gap} {backgroundVisible} bind:isActive={figureIsActive}>
   {#snippet left()}
     <div
@@ -484,8 +514,9 @@
         use:leftCanvas2d.bindCanvas
         class="density-canvas"
       ></canvas>
-      <!-- Bar-chart overlay: subtle gridlines + baseline, an L-shaped callout
-           from the dot to the top of the bar, and the bar itself. -->
+      <!-- Bar-chart overlay: solid gridlines + baseline, a straight callout
+           from the dot to the vertical center of the bar's column, and the
+           bar itself. -->
       <svg
         class="bar-overlay"
         viewBox="0 0 {canvasWidth} {canvasHeight}"
@@ -497,32 +528,23 @@
             y1={barBottomY - frac * barMaxHeight}
             x2={barX + barThickness + 8}
             y2={barBottomY - frac * barMaxHeight}
-            stroke="#d1d5db"
-            stroke-width="1"
-            stroke-dasharray="2 3"
+            stroke={barGridColor}
+            stroke-width={barGridWidth}
           />
         {/each}
         <line
           x1={barX - 12}
-          y1={barBottomY - 0.5}
+          y1={barBottomY}
           x2={barX + barThickness + 12}
-          y2={barBottomY - 0.5}
-          stroke="#9ca3af"
-          stroke-width="1.25"
+          y2={barBottomY}
+          stroke={barBaselineColor}
+          stroke-width={barBaselineWidth}
         />
         <line
-          x1={calloutX1}
+          x1={dotPixel[0] + pointRadius + barCalloutGap}
           y1={dotPixel[1]}
           x2={barCenterX}
-          y2={dotPixel[1]}
-          stroke={barCalloutColor}
-          stroke-width={barCalloutWidth}
-        />
-        <line
-          x1={barCenterX}
-          y1={dotPixel[1]}
-          x2={barCenterX}
-          y2={barTopY}
+          y2={barColumnMidY}
           stroke={barCalloutColor}
           stroke-width={barCalloutWidth}
         />
@@ -580,6 +602,47 @@
 </DoubleFigure>
 
 <style>
+  .continuity-equation-equation {
+    text-align: center;
+    margin-bottom: 0;
+    color: #374151;
+  }
+
+  .equation-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 0.5rem;
+    row-gap: 0.5rem;
+    justify-items: center;
+  }
+
+  .grid-label {
+    font-size: 1.25rem;
+    color: #666;
+    text-align: center;
+    line-height: 1.4;
+    max-width: 360px;
+    align-self: end;
+  }
+
+  .grid-label-spacer {
+    /* placeholder over the equals sign */
+  }
+
+  .grid-math,
+  .grid-equals {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    align-self: center;
+  }
+
+  .continuity-equation-equation + :global(.double-figure) {
+    margin-top: 0;
+  }
+
   .left-canvas-container,
   .right-canvas-container {
     position: relative;
