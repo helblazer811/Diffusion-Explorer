@@ -51,8 +51,17 @@
   export let fieldStrength = 1.0;
   export let domainHalfWidth = 1.5;
 
-  // Density samples
-  export let initialSampleStd = 0.9;
+  // Density samples — Gaussian mixture starting LEFT of the fixed point so
+  // the density visibly drifts left→right while contracting onto it.
+  export let densityModes: Array<{
+    mean: [number, number];
+    cov: [[number, number], [number, number]];
+    weight: number;
+  }> = [
+    { mean: [-0.8, 0.4], cov: [[0.06, 0.01], [0.01, 0.04]], weight: 0.4 },
+    { mean: [-0.6, -0.35], cov: [[0.05, 0], [0, 0.06]], weight: 0.35 },
+    { mean: [-1.0, 0.05], cov: [[0.04, -0.01], [-0.01, 0.05]], weight: 0.25 },
+  ];
   export let numSamples = 3000;
   export let contourBandwidth = 12;
   export let contourGridSize = 400;
@@ -60,10 +69,10 @@
   export let contourOpacity = 0.4;
   export let contourColor = "#3b82f6"; // blue
 
-  // Animation discretization
+  // Animation discretization — shorter contraction span.
   export let contourAnimationSteps = 60;
-  export let contourStepSize = 0.04;
-  export let animationDuration = 6;
+  export let contourStepSize = 0.03;
+  export let animationDuration = 3;
 
   // Streamlines (right pane)
   export let streamlineColor = "#f97316"; // orange
@@ -72,6 +81,9 @@
   export let streamlineWidth = 3;
   export let pulseWidthPixels = 22;
   export let pulsePauseWidthPixels = 6;
+  // Show converging streamlines only within this circular radius (px) around
+  // the fixed point, so the visual emphasizes the local convergence.
+  export let streamlineClipRadius = 90;
 
   // Right-pane density mute
   export let densityMuteColor = "#ffffff";
@@ -87,7 +99,6 @@
   // Bar chart styling
   export let barColor = "#f97316";
   export let barHeight = 16;
-  export let barLabelWidth = 64; // px reserved for "p_t(x) =" on the left
 
   export let playingByDefault = true;
 
@@ -148,15 +159,29 @@
     return [r * Math.cos(theta), r * Math.sin(theta)];
   }
 
-  function sampleBroadGaussian(
+  function sampleGaussianMixture(
     n: number,
-    center: [number, number],
-    std: number
+    modes: typeof densityModes
   ): [number, number][] {
     const samples: [number, number][] = [];
     for (let i = 0; i < n; i++) {
+      const r = Math.random();
+      let cumWeight = 0;
+      let selected = modes[0];
+      for (const g of modes) {
+        cumWeight += g.weight;
+        if (r <= cumWeight) {
+          selected = g;
+          break;
+        }
+      }
+      const { mean, cov } = selected;
       const [z1, z2] = boxMullerTransform();
-      samples.push([center[0] + std * z1, center[1] + std * z2]);
+      // Cholesky decomposition of 2x2 covariance.
+      const a = Math.sqrt(cov[0][0]);
+      const b = cov[1][0] / a;
+      const c = Math.sqrt(Math.max(0, cov[1][1] - b * b));
+      samples.push([mean[0] + a * z1, mean[1] + b * z1 + c * z2]);
     }
     return samples;
   }
@@ -216,7 +241,7 @@
       pulseFrequency: 0.5,
     });
 
-    let samples = sampleBroadGaussian(numSamples, fixedPoint, initialSampleStd);
+    let samples = sampleGaussianMixture(numSamples, densityModes);
     const contourDomain: [number, number, number, number] = [
       domain.xMin,
       domain.xMax,
@@ -360,9 +385,19 @@
   // Bar chart (d3 scale, Svelte template)
   // ----------------------------------------------------------------
 
-  $: barAreaWidth = Math.max(0, canvasWidth - barLabelWidth - 8);
-  $: barScale = d3.scaleLinear().domain([0, 1]).range([0, barAreaWidth]);
+  $: barColumnWidth = Math.max(0, canvasWidth);
+  $: barScale = d3.scaleLinear().domain([0, 1]).range([0, barColumnWidth]);
   $: barWidth = Math.max(0, barScale(currentBarValue));
+
+  // Center of the streamline clip circle, in percentages of the GPU canvas.
+  // Domain is centered on fixedPoint, so this is always (50, 50) — but compute
+  // it from toPixel so the clip stays correct if the domain logic changes.
+  $: streamlineClipCenterPct = canvasWidth && canvasHeight
+    ? (() => {
+        const [px, py] = toPixel(fixedPoint, canvasWidth, canvasHeight);
+        return [(px / canvasWidth) * 100, (py / canvasHeight) * 100];
+      })()
+    : [50, 50];
 
   // ----------------------------------------------------------------
   // Lifecycle
@@ -424,25 +459,17 @@
         use:leftCanvas2d.bindCanvas
         style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
       ></canvas>
-      <div class="bar-row" style="height: {barPanelHeight}px;">
-        <span class="bar-label" style="width: {barLabelWidth}px;">
-          <Katex math={"p_t(x) ="} />
+      <div class="bar-column" style="height: {barPanelHeight}px;">
+        <span class="bar-label-above">
+          <Katex math={"p(x)"} />
         </span>
         <svg
           class="bar-svg"
-          viewBox="0 0 {barAreaWidth} {barHeight}"
-          width={barAreaWidth}
+          viewBox="0 0 {barColumnWidth} {barHeight}"
+          width={barColumnWidth}
           height={barHeight}
           preserveAspectRatio="none"
         >
-          <rect
-            x="0"
-            y="0"
-            width={barAreaWidth}
-            height={barHeight}
-            fill="#e5e7eb"
-            rx="2"
-          />
           <rect
             x="0"
             y="0"
@@ -468,8 +495,13 @@
           use:densityCanvas2d.bindCanvas
           class="back-canvas"
         ></canvas>
-        <!-- Middle: GPU streamlines -->
-        <canvas bind:this={gpuCanvas} class="gpu-canvas"></canvas>
+        <!-- Middle: GPU streamlines, clipped to a circular region around the
+             fixed point so the visual emphasizes the local convergence. -->
+        <canvas
+          bind:this={gpuCanvas}
+          class="gpu-canvas"
+          style="clip-path: circle({streamlineClipRadius}px at {streamlineClipCenterPct[0]}% {streamlineClipCenterPct[1]}%);"
+        ></canvas>
         <!-- Front: orange dot label -->
         <canvas
           bind:this={dotCanvas}
@@ -493,22 +525,23 @@
     flex-direction: column;
   }
 
-  .bar-row {
+  .bar-column {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-top: 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding-top: 8px;
   }
 
-  .bar-label {
-    flex: 0 0 auto;
-    text-align: right;
+  .bar-label-above {
+    text-align: center;
     color: #374151;
     font-size: 1rem;
+    line-height: 1;
   }
 
   .bar-svg {
-    flex: 1 1 auto;
+    width: 100%;
     overflow: visible;
   }
 
