@@ -205,7 +205,7 @@
 </script>
 
 <svelte:head>
-  <title>A Visual Intro to the Continuity Equation</title>
+  <title>From Velocity Fields to Exact Likelihoods — A Visual Introduction to the Continuity Equation</title>
   <meta
     name="description"
     content="A visual introduction to the continuity equation and exact likelihood evaluation in flow-based generative models"
@@ -213,8 +213,8 @@
 </svelte:head>
 
 <ArticleHeader
-  title="A Visual Intro to the Continuity Equation"
-  subtitle="From Velocity Fields to Exact Likelihoods"
+  title="From Velocity Fields to Exact Likelihoods"
+  subtitle="A Visual Introduction to the Continuity Equation"
   author="Alec Helbling"
   authorLink="https://alechelbling.com"
   date="2025"
@@ -945,4 +945,7 @@
 {"}"}</code></pre>
     </div>
   </section>
+
+  <!-- Comments (giscus) — populated at runtime by /comments.js -->
+  <h2 id="comments" class="section-heading">Comments</h2>
 </div>
