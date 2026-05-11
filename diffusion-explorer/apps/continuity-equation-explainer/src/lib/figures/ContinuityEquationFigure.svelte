@@ -642,12 +642,17 @@
 
   function eventToDomain(e: PointerEvent): [number, number] {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const xPx = ((e.clientX - rect.left) / rect.width) * canvasWidth;
-    const yPx = ((e.clientY - rect.top) / rect.height) * canvasHeight;
+    // Clamp the event coords to the canvas bounds so the cursor dot never
+    // ends up outside the visible area (e.g., when the pointer is moving
+    // between panes and the event fires with edge-of-rect coordinates).
+    const xPx = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const yPx = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+    const xCanvas = (xPx / rect.width) * canvasWidth;
+    const yCanvas = (yPx / rect.height) * canvasHeight;
     const { xMin, xMax, yMin, yMax } = getDomain();
     return [
-      xMin + (xPx / canvasWidth) * (xMax - xMin),
-      yMax - (yPx / canvasHeight) * (yMax - yMin),
+      xMin + (xCanvas / canvasWidth) * (xMax - xMin),
+      yMax - (yCanvas / canvasHeight) * (yMax - yMin),
     ];
   }
 
@@ -723,7 +728,8 @@
     </div>
     <div class="grid-label-spacer"></div>
     <div class="grid-label grid-label-right">
-      Divergence of <span style="color: #f97316;">flux</span> at <Katex math={"x"} />.
+      Divergence of <span style="color: #f97316;">probability flux</span> at
+      <Katex math={"x"} />.
     </div>
 
     <div class="grid-math">
@@ -956,7 +962,7 @@
     position: absolute;
     transform: translate(-50%, 0);
     color: #374151;
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     line-height: 1;
     pointer-events: none;
     white-space: nowrap;
