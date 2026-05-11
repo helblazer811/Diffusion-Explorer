@@ -1,54 +1,45 @@
 <!--
-  Divergence Theorem Square Grid Visualization
+  DivergenceTheoremSquare
 
-  Shows a grid of pulsing squares with a larger outer square,
-  demonstrating how interior flux contributions cancel at shared edges,
-  leaving only the flux through the outer boundary.
+  Visualizes why the divergence theorem holds: a region tiled by smaller squares.
+  Each inner square has pulses traveling around its perimeter (blue), and a larger
+  outer square also has pulses (orange). Adjacent inner-square pulses move in
+  opposite directions on the shared edge, "cancelling" — only the outer-boundary
+  pulse contribution survives.
 
-  Uses GPU-accelerated WebGPU rendering with arrowheads on pulses.
+  Implementation: pure Canvas2D (no WebGPU). Simple and reliable across browsers.
 -->
 
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
-    Figure,
-    Katex,
-    PulsingPathsRenderer,
-  } from "@diffusion-explorer/ui";
-
-  // ----------------------------------------------------------------
-  // Props
-  // ----------------------------------------------------------------
+  import { Figure, Katex } from "@diffusion-explorer/ui";
 
   interface Props {
-    // Layout
     width?: number;
     height?: number;
 
-    // Grid configuration
     gridResolution?: number;
     squareWidth?: number;
     gap?: number;
 
-    // Animation
     clockwise?: boolean;
     animationDuration?: number;
     pulseFrequency?: number;
 
-    // Pulse styling - inner squares
+    // Inner pulses
     pulseWidth?: number;
     pulsePauseWidth?: number;
     pulseColor?: string;
     strokeWidth?: number;
     baseOpacity?: number;
 
-    // Outer square styling
+    // Outer square
     outerPadding?: number;
     outerStrokeWidth?: number;
     outerColor?: string;
 
-    // Display options
+    // Arrowheads
     showArrowhead?: boolean;
     arrowheadSize?: number;
 
@@ -56,35 +47,29 @@
   }
 
   let {
-    // Layout
     width = 400,
     height = 400,
 
-    // Grid configuration
     gridResolution = 4,
     squareWidth = 55,
     gap = 20,
 
-    // Animation
     clockwise = true,
     animationDuration = 4000,
     pulseFrequency = 0.5,
 
-    // Pulse styling - inner squares
     pulseWidth = 35,
     pulsePauseWidth = 15,
     pulseColor = "#3b82f6",
     strokeWidth = 4,
-    baseOpacity = 0.8,
+    baseOpacity = 0.25,
 
-    // Outer square styling
     outerPadding = 10,
     outerStrokeWidth = 4,
     outerColor = "#f97316",
 
-    // Display options
     showArrowhead = true,
-    arrowheadSize = 2.0,
+    arrowheadSize = 7,
 
     playingByDefault = true,
   }: Props = $props();
@@ -94,206 +79,241 @@
   // ----------------------------------------------------------------
 
   let canvas: HTMLCanvasElement | null = $state(null);
-  let isInitialized = $state(false);
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
 
-  // WebGPU renderers
-  let innerRenderer: PulsingPathsRenderer | null = $state(null);
-  let outerRenderer: PulsingPathsRenderer | null = $state(null);
-  let sharedDevice: GPUDevice | null = $state(null);
+  let rafId: number | null = null;
+  let startTime: number | null = null;
+  let isPlaying = false;
+  let wasPlayingBeforeHidden = false;
+  let dpr = 1;
 
-  // Animation state
-  let isPlaying = $state(false);
-  let wasPlayingBeforeHidden = $state(false);
-  let animationFrameId: number | null = $state(null);
-  let startTime: number | null = $state(null);
-
-  // WebGPU availability
-  let webgpuAvailable = $state(false);
-  let initError: string | null = $state(null);
-
-  // Grid layout computed values
-  let gridPositions: { x: number; y: number }[] = $state([]);
-  let gridTotalWidth: number = $state(0);
-  let gridTotalHeight: number = $state(0);
+  // Grid layout (CSS pixels)
+  type Square = { cx: number; cy: number; size: number; cw: boolean };
+  let innerSquares: Square[] = [];
+  let outerSquare: Square | null = null;
 
   // ----------------------------------------------------------------
   // Helpers
   // ----------------------------------------------------------------
 
   /**
-   * Generate a square perimeter path as an array of [x, y] points.
-   * Points are ordered for traversal in the specified direction.
+   * Map a 0..1 fraction of the perimeter to an (x, y) on the square's edge.
+   * Direction is determined by `cw` (clockwise vs counter-clockwise).
+   * Also returns the local tangent (unit direction along the path) so callers
+   * can orient an arrowhead.
    */
-  function generateSquarePath(
-    centerX: number,
-    centerY: number,
-    size: number,
-    cw: boolean
-  ): number[][] {
-    const hw = size / 2;
-    if (cw) {
-      return [
-        [centerX - hw, centerY - hw], // TL
-        [centerX + hw, centerY - hw], // TR
-        [centerX + hw, centerY + hw], // BR
-        [centerX - hw, centerY + hw], // BL
-        [centerX - hw, centerY - hw], // Close
-      ];
-    } else {
-      return [
-        [centerX - hw, centerY - hw], // TL
-        [centerX - hw, centerY + hw], // BL
-        [centerX + hw, centerY + hw], // BR
-        [centerX + hw, centerY - hw], // TR
-        [centerX - hw, centerY - hw], // Close
-      ];
+  function pointAtFraction(
+    sq: Square,
+    f: number
+  ): { x: number; y: number; tx: number; ty: number } {
+    const hw = sq.size / 2;
+    // Normalize fraction to [0, 1)
+    let t = f - Math.floor(f);
+    // Each side is 1/4 of the perimeter
+    // Order (clockwise from TL): TL→TR (top), TR→BR (right), BR→BL (bottom), BL→TL (left)
+    // For counter-clockwise, reverse the path direction.
+    if (!sq.cw) {
+      t = 1 - t;
+      if (t === 1) t = 0;
     }
+    const seg = Math.min(3, Math.floor(t * 4));
+    const local = t * 4 - seg;
+    let x = 0,
+      y = 0,
+      tx = 0,
+      ty = 0;
+    switch (seg) {
+      case 0: // top edge L→R
+        x = sq.cx - hw + local * sq.size;
+        y = sq.cy - hw;
+        tx = 1;
+        ty = 0;
+        break;
+      case 1: // right edge T→B
+        x = sq.cx + hw;
+        y = sq.cy - hw + local * sq.size;
+        tx = 0;
+        ty = 1;
+        break;
+      case 2: // bottom edge R→L
+        x = sq.cx + hw - local * sq.size;
+        y = sq.cy + hw;
+        tx = -1;
+        ty = 0;
+        break;
+      case 3: // left edge B→T
+        x = sq.cx - hw;
+        y = sq.cy + hw - local * sq.size;
+        tx = 0;
+        ty = -1;
+        break;
+    }
+    if (!sq.cw) {
+      tx = -tx;
+      ty = -ty;
+    }
+    return { x, y, tx, ty };
   }
 
-  /**
-   * Calculate center positions for all squares in the grid.
-   * Grid is centered in the canvas.
-   */
-  function computeGridPositions(
-    resolution: number,
-    squareW: number,
-    gapSize: number,
-    canvasWidth: number,
-    canvasHeight: number
-  ): {
-    positions: { x: number; y: number }[];
-    totalWidth: number;
-    totalHeight: number;
-  } {
-    const totalWidth = resolution * squareW + (resolution - 1) * gapSize;
-    const totalHeight = resolution * squareW + (resolution - 1) * gapSize;
+  /** Polyline along the perimeter from fraction `start` to `end` (mod 1). */
+  function arcPoints(sq: Square, start: number, end: number, samples = 12): { x: number; y: number }[] {
+    const pts: { x: number; y: number }[] = [];
+    for (let i = 0; i <= samples; i++) {
+      const f = start + ((end - start) * i) / samples;
+      const p = pointAtFraction(sq, f);
+      pts.push({ x: p.x, y: p.y });
+    }
+    return pts;
+  }
 
-    const startX = (canvasWidth - totalWidth) / 2 + squareW / 2;
-    const startY = (canvasHeight - totalHeight) / 2 + squareW / 2;
+  function computeGridLayout() {
+    const totalGridWidth = gridResolution * squareWidth + (gridResolution - 1) * gap;
+    const totalGridHeight = totalGridWidth;
+    const startX = (width - totalGridWidth) / 2 + squareWidth / 2;
+    const startY = (height - totalGridHeight) / 2 + squareWidth / 2;
 
-    const positions: { x: number; y: number }[] = [];
-    for (let row = 0; row < resolution; row++) {
-      for (let col = 0; col < resolution; col++) {
-        positions.push({
-          x: startX + col * (squareW + gapSize),
-          y: startY + row * (squareW + gapSize),
+    innerSquares = [];
+    for (let row = 0; row < gridResolution; row++) {
+      for (let col = 0; col < gridResolution; col++) {
+        innerSquares.push({
+          cx: startX + col * (squareWidth + gap),
+          cy: startY + row * (squareWidth + gap),
+          size: squareWidth,
+          cw: clockwise,
         });
       }
     }
 
-    return { positions, totalWidth, totalHeight };
+    outerSquare = {
+      cx: width / 2,
+      cy: height / 2,
+      size: totalGridWidth + outerPadding * 2,
+      cw: clockwise,
+    };
   }
 
   // ----------------------------------------------------------------
-  // Setup
+  // Drawing
   // ----------------------------------------------------------------
 
-  async function initializeRenderers() {
-    if (!canvas) return;
+  function drawSquareOutline(
+    ctx: CanvasRenderingContext2D,
+    sq: Square,
+    color: string,
+    lineWidth: number,
+    opacity: number
+  ) {
+    const hw = sq.size / 2;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.globalAlpha = opacity;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.strokeRect(sq.cx - hw, sq.cy - hw, sq.size, sq.size);
+    ctx.restore();
+  }
 
-    // Check WebGPU availability
-    if (!navigator.gpu) {
-      initError = "WebGPU is not supported in this browser";
-      return;
+  function drawPulses(
+    ctx: CanvasRenderingContext2D,
+    sq: Square,
+    phase: number,
+    pulseLengthPx: number,
+    gapPx: number,
+    color: string,
+    lineWidth: number,
+    arrowhead: boolean,
+    arrowheadRadius: number
+  ) {
+    const perimeter = sq.size * 4;
+    const cycle = pulseLengthPx + gapPx;
+    if (perimeter <= 0 || cycle <= 0) return;
+
+    const numPulses = Math.max(1, Math.round(perimeter / cycle));
+    const pulseLengthFrac = pulseLengthPx / perimeter;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    for (let k = 0; k < numPulses; k++) {
+      const baseFrac = (k / numPulses + phase) % 1;
+      const tailFrac = baseFrac;
+      const headFrac = baseFrac + pulseLengthFrac;
+
+      const pts = arcPoints(sq, tailFrac, headFrac, 12);
+      if (pts.length < 2) continue;
+
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+
+      if (arrowhead) {
+        const tip = pointAtFraction(sq, headFrac);
+        const angle = Math.atan2(tip.ty, tip.tx);
+        const r = arrowheadRadius;
+        ctx.beginPath();
+        ctx.moveTo(tip.x + r * Math.cos(angle), tip.y + r * Math.sin(angle));
+        ctx.lineTo(
+          tip.x + r * Math.cos(angle + (2 * Math.PI) / 3),
+          tip.y + r * Math.sin(angle + (2 * Math.PI) / 3)
+        );
+        ctx.lineTo(
+          tip.x + r * Math.cos(angle + (4 * Math.PI) / 3),
+          tip.y + r * Math.sin(angle + (4 * Math.PI) / 3)
+        );
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  function draw(phase: number) {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // DPR transform — set once per frame so all coordinates are in CSS pixels.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    // Inner squares: faint base outlines, then bright pulses
+    for (const sq of innerSquares) {
+      drawSquareOutline(ctx, sq, pulseColor, strokeWidth, baseOpacity);
+    }
+    for (const sq of innerSquares) {
+      drawPulses(
+        ctx,
+        sq,
+        phase,
+        pulseWidth,
+        pulsePauseWidth,
+        pulseColor,
+        strokeWidth,
+        showArrowhead,
+        arrowheadSize
+      );
     }
 
-    try {
-      const dpr = window.devicePixelRatio || 1;
-
-      // Set canvas size (physical pixels)
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-
-      // Create shared WebGPU device
-      const adapter = await navigator.gpu.requestAdapter();
-      if (!adapter) {
-        throw new Error("Failed to get WebGPU adapter");
-      }
-      sharedDevice = await adapter.requestDevice();
-
-      const gpuContext = {
-        adapter,
-        device: sharedDevice,
-        destroy: () => sharedDevice?.destroy(),
-      };
-
-      // Compute grid positions (in CSS pixels)
-      const result = computeGridPositions(
-        gridResolution,
-        squareWidth,
-        gap,
-        width,
-        height
+    // Outer square: faint base + bright pulses (slightly fatter / spaced wider)
+    if (outerSquare) {
+      drawSquareOutline(ctx, outerSquare, outerColor, outerStrokeWidth, baseOpacity);
+      drawPulses(
+        ctx,
+        outerSquare,
+        phase,
+        pulseWidth * 1.5,
+        pulsePauseWidth * 1.5,
+        outerColor,
+        outerStrokeWidth,
+        showArrowhead,
+        arrowheadSize * 1.2
       );
-      gridPositions = result.positions;
-      gridTotalWidth = result.totalWidth;
-      gridTotalHeight = result.totalHeight;
-
-      // Generate inner square paths (in CSS pixels)
-      const innerPaths: number[][][] = gridPositions.map((pos) =>
-        generateSquarePath(pos.x, pos.y, squareWidth, clockwise)
-      );
-
-      // Generate outer square path
-      const outerWidth = gridTotalWidth + outerPadding * 2;
-      const outerPath = generateSquarePath(
-        width / 2,
-        height / 2,
-        outerWidth,
-        clockwise
-      );
-
-      // Create inner squares renderer
-      innerRenderer = await PulsingPathsRenderer.create(
-        canvas,
-        {
-          dpr,
-          thickness: strokeWidth,
-          pulseWidth,
-          pulseGap: pulsePauseWidth,
-          color: pulseColor,
-          baseOpacity,
-          showArrowhead,
-          arrowheadSize,
-          showPreview: true,
-          previewOpacity: 0.15,
-        },
-        gpuContext
-      );
-      innerRenderer.setPaths(innerPaths, "synchronized");
-
-      // Create outer square renderer (shares same device and canvas)
-      outerRenderer = await PulsingPathsRenderer.create(
-        canvas,
-        {
-          dpr,
-          thickness: outerStrokeWidth,
-          pulseWidth: pulseWidth * 1.5,
-          pulseGap: pulsePauseWidth * 1.5,
-          color: outerColor,
-          baseOpacity,
-          showArrowhead,
-          arrowheadSize: arrowheadSize * 1.2,
-          showPreview: true,
-          previewOpacity: 0.15,
-        },
-        gpuContext
-      );
-      outerRenderer.setPaths([outerPath], "synchronized");
-
-      webgpuAvailable = true;
-      isInitialized = true;
-
-      // Initial draw
-      draw(0);
-
-      if (playingByDefault) {
-        startAnimation();
-      }
-    } catch (e) {
-      initError = e instanceof Error ? e.message : "Failed to initialize WebGPU";
-      console.error("WebGPU initialization error:", e);
     }
   }
 
@@ -301,57 +321,48 @@
   // Animation
   // ----------------------------------------------------------------
 
-  /**
-   * Main draw function - depends on animation phase.
-   */
-  function draw(phase: number): void {
-    if (!innerRenderer || !outerRenderer) return;
-
-    // Clear with transparent background and render inner squares
-    innerRenderer.render({ phase }, [0, 0, 0, 0]);
-
-    // Render outer square on top (no clear)
-    outerRenderer.render({ phase });
-  }
-
   function animate(timestamp: number) {
     if (!isPlaying) return;
-
-    if (startTime === null) {
-      startTime = timestamp;
-    }
-
-    const elapsed = (timestamp - startTime) / 1000; // seconds
+    if (startTime === null) startTime = timestamp;
+    const elapsedSec = (timestamp - startTime) / 1000;
     const durationSec = animationDuration / 1000;
-    const phase = ((elapsed * pulseFrequency) / durationSec) % 1;
-
+    const phase = ((elapsedSec * pulseFrequency) / durationSec) % 1;
     draw(phase);
-
-    animationFrameId = requestAnimationFrame(animate);
+    rafId = requestAnimationFrame(animate);
   }
 
   function startAnimation() {
-    if (isPlaying || !isInitialized) return;
+    if (isPlaying) return;
     isPlaying = true;
     startTime = null;
-    animationFrameId = requestAnimationFrame(animate);
+    rafId = requestAnimationFrame(animate);
   }
 
   function stopAnimation() {
-    if (!isPlaying) return;
     isPlaying = false;
-    if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
   }
 
   // ----------------------------------------------------------------
-  // Event Handlers
+  // Init / lifecycle
   // ----------------------------------------------------------------
 
+  function initCanvas() {
+    if (!canvas) return;
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    computeGridLayout();
+    draw(0);
+    if (playingByDefault) startAnimation();
+  }
+
   function handleVisibilityChange(active: boolean) {
-    if (!isInitialized) return;
     if (!active && isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
@@ -361,30 +372,18 @@
     }
   }
 
-  // ----------------------------------------------------------------
-  // Lifecycle
-  // ----------------------------------------------------------------
+  $effect(() => {
+    if (canvas) initCanvas();
+  });
+
+  $effect(() => {
+    if (figureIsActive !== undefined) {
+      handleVisibilityChange($figureIsActive);
+    }
+  });
 
   onDestroy(() => {
     stopAnimation();
-    if (innerRenderer) innerRenderer.destroy();
-    if (outerRenderer) outerRenderer.destroy();
-  });
-
-  // ----------------------------------------------------------------
-  // Reactive Blocks
-  // ----------------------------------------------------------------
-
-  $effect(() => {
-    if (!isInitialized && canvas) {
-      initializeRenderers();
-    }
-  });
-
-  $effect(() => {
-    if (figureIsActive !== undefined && isInitialized) {
-      handleVisibilityChange($figureIsActive);
-    }
   });
 </script>
 
@@ -396,21 +395,9 @@
     />
   </div>
 
-  {#if initError}
-    <div class="error-message">
-      <p>WebGPU Error: {initError}</p>
-      <p class="error-hint">
-        WebGPU requires a modern browser with GPU support enabled.
-      </p>
-    </div>
-  {:else}
-    <Figure bind:isActive={figureIsActive} backgroundVisible={false}>
-      <canvas
-        bind:this={canvas}
-        style="width: {width}px; height: {height}px;"
-      ></canvas>
-    </Figure>
-  {/if}
+  <Figure bind:isActive={figureIsActive} backgroundVisible={false}>
+    <canvas bind:this={canvas}></canvas>
+  </Figure>
 </div>
 
 <style>
@@ -425,16 +412,5 @@
     margin-bottom: 1rem;
     color: #4b5563;
     font-size: 1.3rem;
-  }
-
-  .error-message {
-    padding: 20px;
-    text-align: center;
-    color: #e63946;
-  }
-
-  .error-hint {
-    font-size: 0.9em;
-    color: #666;
   }
 </style>
