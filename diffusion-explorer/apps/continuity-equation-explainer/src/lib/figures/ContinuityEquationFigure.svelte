@@ -588,13 +588,13 @@
     </div>
 
     <div class="grid-math">
-      <Katex math={"\\frac{\\partial \\color{#3b82f6}{p_t(\\color{#f97316}{x})}}{\\partial t}"} displayMode={true} />
+      <Katex math={"\\frac{\\partial \\textcolor{#3b82f6}{p_t(\\textcolor{#f97316}{x})}}{\\partial t}"} displayMode={true} />
     </div>
     <div class="grid-equals">
       <Katex math={"+"} displayMode={true} />
     </div>
     <div class="grid-math">
-      <Katex math={"\\nabla \\cdot \\color{#3b82f6}{(p_t v_t)} \\;=\\; 0"} displayMode={true} />
+      <Katex math={"\\nabla \\cdot \\textcolor{#3b82f6}{(p_t v_t)} \\;=\\; 0"} displayMode={true} />
     </div>
   </div>
 </div>
