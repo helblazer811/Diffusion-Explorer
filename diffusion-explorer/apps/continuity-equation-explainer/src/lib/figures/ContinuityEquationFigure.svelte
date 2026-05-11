@@ -148,6 +148,9 @@
   export let barCalloutGap = 4; // gap between dot edge and start of callout in px
   export let barLabelGap = 6; // gap between baseline and label in px
   export let barArrowLength = 36; // length of the ∂p/∂t axis arrow in px
+  // EMA smoothing for the bar value — each tick blends toward the new
+  // measurement by this fraction. Lower = smoother but laggier.
+  export let barEmaAlpha = 0.18;
   export let barGridColor = "#d1d5db";
   export let barGridWidth = 1;
   export let barBaselineColor = "#9ca3af";
@@ -490,16 +493,20 @@
       currentContourFrame = state.contourFrame;
       drawLeft(state, cW, cH);
       drawRight(state, cW, cH);
+      let target: number;
       if (cursorDomain) {
         const d = densityAtPoint(
           frameSamples[state.contourFrame] ?? [],
           cursorDomain,
           domainHalfWidth * 0.08
         );
-        currentBarValue = Math.min(1.5, d / globalMaxDensity);
+        target = Math.min(1.5, d / globalMaxDensity);
       } else {
-        currentBarValue = densitySeries[state.contourFrame] ?? 0;
+        target = densitySeries[state.contourFrame] ?? 0;
       }
+      // Exponential moving average: each tick blends current value toward the
+      // new sample by `barEmaAlpha`. Lower alpha → smoother but laggier.
+      currentBarValue = currentBarValue + barEmaAlpha * (target - currentBarValue);
     });
   }
 
@@ -724,14 +731,15 @@
 
   // Recompute the bar value whenever the cursor moves between ticks, so the
   // bar updates smoothly even when the cursor is held still and only the
-  // contour frame is advancing.
+  // contour frame is advancing. Same EMA smoothing as the tick path.
   $: if (cursorDomain && frameSamples.length > 0) {
     const d = densityAtPoint(
       frameSamples[currentContourFrame] ?? [],
       cursorDomain,
       domainHalfWidth * 0.08
     );
-    currentBarValue = Math.min(1.5, d / globalMaxDensity);
+    const target = Math.min(1.5, d / globalMaxDensity);
+    currentBarValue = currentBarValue + barEmaAlpha * (target - currentBarValue);
   }
 
   // ----------------------------------------------------------------
@@ -786,13 +794,13 @@
 <div class="continuity-equation-equation">
   <div class="equation-grid">
     <div class="grid-label grid-label-left">
-      Rate of change of <span style="color: #3b82f6;">density</span> at <Katex math={"x"} />
+      Rate of change of <span style="color: #3b82f6;">density</span>
     </div>
     <div class="grid-label-spacer"></div>
     <div class="grid-label grid-label-right">
-      Divergence of <span style="color: #f97316;">probability flux</span> at
-      <Katex math={"x"} />
+      Divergence of <span style="color: #f97316;">probability flux</span>
     </div>
+    <div class="grid-label-spacer"></div>
 
     <div class="grid-math">
       <Katex math={"\\frac{\\partial \\textcolor{#3b82f6}{p_t(x)}}{\\partial t}"} displayMode={true} />
@@ -801,7 +809,10 @@
       <Katex math={"+"} displayMode={true} />
     </div>
     <div class="grid-math">
-      <Katex math={"\\nabla \\cdot \\textcolor{#f97316}{p_t v_t} \\qquad = \\; 0"} displayMode={true} />
+      <Katex math={"\\nabla \\cdot \\textcolor{#f97316}{p_t v_t}"} displayMode={true} />
+    </div>
+    <div class="grid-equals">
+      <Katex math={"= \\; 0"} displayMode={true} />
     </div>
   </div>
 </div>
@@ -965,7 +976,7 @@
 
   .equation-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
     grid-template-rows: auto auto;
     column-gap: 0.5rem;
     row-gap: 0.5rem;
