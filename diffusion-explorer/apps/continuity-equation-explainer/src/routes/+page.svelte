@@ -22,6 +22,7 @@
   import FlowInvertibility from "$lib/figures/FlowInvertibility.svelte";
   import InvertibilityExplanation from "$lib/figures/InvertibilityExplanation.svelte";
   import MassConservation from "$lib/figures/MassConservation.svelte";
+  import ContinuityEquationFigure from "$lib/figures/ContinuityEquationFigure.svelte";
   import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
   import DivergenceTheoremFigure from "$lib/figures/DivergenceTheoremFigure.svelte";
   import { createClosedCurve, createWavyVectorField } from "$lib/figures/DivergenceTheorem/divergence_theorem";
@@ -638,6 +639,18 @@
     math={"\\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0."}
     displayMode={true}
   />
+
+  <ContinuityEquationFigure>
+    <strong>The continuity equation, pointwise.</strong>
+    Both panes show a probability density contracting onto a fixed point <Katex math={"x"} />
+    (orange dot).
+    <em>Left:</em> <Katex math={"\\partial p_t(x) / \\partial t"} /> is the rate at which density
+    piles up at <Katex math={"x"} /> — visualized by the growing orange bar below the canvas.
+    <em>Right:</em> <Katex math={"-\\nabla \\cdot (p_t v_t)"} /> at <Katex math={"x"} /> is the rate
+    at which probability flux flows INTO the point — the converging orange streamlines. The PDE
+    above says these two quantities are equal at every point and every time.
+  </ContinuityEquationFigure>
+
   <p>
     This is the <strong>continuity equation</strong>, the local PDE form that all valid continuous
     normalizing flows must satisfy. It says: the rate of change of density at a point is exactly
