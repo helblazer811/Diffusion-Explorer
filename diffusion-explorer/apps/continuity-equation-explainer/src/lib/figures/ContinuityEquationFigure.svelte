@@ -47,7 +47,7 @@
 
   // Layout
   export let width = 800;
-  export let height = 380;
+  export let height = 340;
   export let gap = 20;
   export let backgroundVisible = false;
 
@@ -724,12 +724,12 @@
 <div class="continuity-equation-equation">
   <div class="equation-grid">
     <div class="grid-label grid-label-left">
-      Rate of change of <span style="color: #3b82f6;">density</span> at <Katex math={"x"} />.
+      Rate of change of <span style="color: #3b82f6;">density</span> at <Katex math={"x"} />
     </div>
     <div class="grid-label-spacer"></div>
     <div class="grid-label grid-label-right">
       Divergence of <span style="color: #f97316;">probability flux</span> at
-      <Katex math={"x"} />.
+      <Katex math={"x"} />
     </div>
 
     <div class="grid-math">
@@ -739,7 +739,7 @@
       <Katex math={"+"} displayMode={true} />
     </div>
     <div class="grid-math">
-      <Katex math={"\\nabla \\cdot \\textcolor{#f97316}{p_t v_t} \\;=\\; 0"} displayMode={true} />
+      <Katex math={"\\nabla \\cdot \\textcolor{#f97316}{p_t v_t} \\qquad = \\; 0"} displayMode={true} />
     </div>
   </div>
 </div>
