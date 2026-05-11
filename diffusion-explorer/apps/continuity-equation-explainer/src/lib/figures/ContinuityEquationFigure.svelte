@@ -95,7 +95,7 @@
 
   // Streamlines (right pane) — fewer pulses per second with longer pulses.
   export let streamlineColor = "#f97316"; // orange
-  export let streamlineDensity: number | [number, number] = 1.0;
+  export let streamlineDensity: number | [number, number] = 0.6;
   export let streamlineMinPathLength = 1.0;
   export let streamlineWidth = 3;
   export let pulseWidthPixels = 48;
@@ -110,7 +110,7 @@
   // backward through the convergent field to build a pathline.
   export let pathlineColor = "#f97316"; // orange
   export let pathlineThickness = 3;
-  export let pathSeedCount = 20;
+  export let pathSeedCount = 12;
   // Multiplier on the dot's pixel radius — seeds sit on a circle slightly
   // larger than the dot itself by default, so pathlines visibly emerge from
   // just outside x. Set to 1.0 to exactly match the dot.
