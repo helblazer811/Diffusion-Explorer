@@ -5,8 +5,13 @@ let mathjaxLoading: Promise<void> | null = null;
 const REFERENCE_CHAR = 'M';
 let referenceViewBoxHeight: number | null = null;
 
-// Cache for rendered MathJax images: key -> { img, aspectRatio, vbHeight }
-const mathjaxCache = new Map<string, { img: HTMLImageElement; aspectRatio: number; vbHeight: number }>();
+// Cache for rendered MathJax images. paddingFraction is the fraction of the
+// image's height that is stroke padding above the glyph's geometric top
+// (and below its bottom) — non-zero only when a stroke is being applied.
+const mathjaxCache = new Map<
+  string,
+  { img: HTMLImageElement; aspectRatio: number; vbHeight: number; paddingFraction: number }
+>();
 
 // Track formulas currently being rendered
 const pendingRenders = new Set<string>();
@@ -140,8 +145,27 @@ async function renderToCache(latex: string, options: MathjaxStyleOptions): Promi
     return;
   }
 
-  const [, , vbWidth, vbHeight] = viewBox;
-  const aspectRatio = vbWidth / vbHeight;
+  const [vbX, vbY, vbWidth, vbHeight] = viewBox;
+
+  // When a stroke is applied, paths render strokeWidth/2 beyond their
+  // geometric edges. Pad the viewBox so the halo isn't clipped at the top
+  // or sides of the cached image. Track the padding ratio so the draw code
+  // can offset the baseline correctly.
+  const strokePad = options.stroke ? (options.strokeWidth ?? 0) / 2 : 0;
+  const paddedVbWidth = vbWidth + 2 * strokePad;
+  const paddedVbHeight = vbHeight + 2 * strokePad;
+  if (strokePad > 0) {
+    svg.setAttribute(
+      'viewBox',
+      `${vbX - strokePad} ${vbY - strokePad} ${paddedVbWidth} ${paddedVbHeight}`
+    );
+  }
+
+  const aspectRatio = paddedVbWidth / paddedVbHeight;
+  // Fraction of the image height that is padding ABOVE the glyph baseline
+  // box. drawMathjax uses this to shift the draw point so the baseline
+  // still lands at the caller's (x, y).
+  const paddingFraction = strokePad / paddedVbHeight;
 
   // Render at a base size for caching (we'll scale when drawing)
   const baseHeight = 100;
@@ -161,7 +185,7 @@ async function renderToCache(latex: string, options: MathjaxStyleOptions): Promi
     img.src = dataUrl;
   });
 
-  mathjaxCache.set(cacheKey, { img, aspectRatio, vbHeight });
+  mathjaxCache.set(cacheKey, { img, aspectRatio, vbHeight, paddingFraction });
 }
 
 /**
@@ -310,11 +334,21 @@ export function drawMathjax(
     return;
   }
 
-  // Synchronous drawing
+  // Synchronous drawing.
+  // `glyphHeight` is the height the glyph would occupy WITHOUT any stroke
+  // padding — this preserves the caller's intended size regardless of
+  // stroke width. The cached image may include padding above and below the
+  // glyph (paddingFraction); expand the draw rect to include that padding
+  // and shift the draw point up so the baseline still lands at y.
   const scale = cached.vbHeight / referenceViewBoxHeight;
-  const height = fontSize * scale;
-  const width = height * cached.aspectRatio;
-  const drawX = x - width / 2 + offsetX;
-  const drawY = y - height + offsetY;
-  ctx.drawImage(cached.img, drawX, drawY, width, height);
+  const glyphHeight = fontSize * scale;
+  const pad = cached.paddingFraction ?? 0;
+  // height = glyphHeight + 2 * paddingPx. paddingPx / fullHeight = pad,
+  // so glyphHeight / fullHeight = 1 - 2*pad ⇒ fullHeight = glyphHeight / (1 - 2*pad).
+  const fullHeight = pad > 0 ? glyphHeight / (1 - 2 * pad) : glyphHeight;
+  const fullWidth = fullHeight * cached.aspectRatio;
+  const paddingPx = pad * fullHeight;
+  const drawX = x - fullWidth / 2 + offsetX;
+  const drawY = y - glyphHeight - paddingPx + offsetY;
+  ctx.drawImage(cached.img, drawX, drawY, fullWidth, fullHeight);
 }
