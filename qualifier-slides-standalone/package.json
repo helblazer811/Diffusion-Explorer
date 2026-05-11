@@ -1,0 +1,14 @@
+{
+  "name": "qualifier-slides-standalone",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w qualifier-slides",
+    "build": "npm run build -w qualifier-slides",
+    "preview": "npm run preview -w qualifier-slides"
+  }
+}
