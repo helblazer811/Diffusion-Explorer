@@ -128,7 +128,8 @@
   export let pointLabelOffset: [number, number] = [0, -28];
 
   // Bar chart styling (overlaid vertical bar on the right side of the left canvas)
-  export let barColor = "#f97316";
+  // Blue to match the p_t(x) density color scheme on the LHS pane.
+  export let barColor = "#3b82f6";
   export let barThickness = 14; // bar width in px
   export let barMaxHeight = 200; // bar height in px at p(x) = max
   export let barRightMargin = 36; // distance from canvas right edge to bar in px
@@ -832,7 +833,7 @@
           top: {((barBottomY + barLabelGap) / canvasHeight) * 100}%;
         "
       >
-        <Katex math={`\\color{${barColor}} p(x)`} />
+        <Katex math={`\\color{${barColor}} p_t(x)`} />
       </div>
     </div>
   {/snippet}
