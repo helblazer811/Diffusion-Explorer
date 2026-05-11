@@ -1052,8 +1052,9 @@
     white-space: nowrap;
   }
 
-  /* Rotate labels 90° counter-clockwise so they read bottom-up alongside
-     the horizontal bar chart. The label's center stays at (left, top). */
+  /* Rotate labels 90° counter-clockwise so they read bottom-to-top —
+     standard "y-axis label" orientation. The label's center stays at
+     (left, top). */
   .rotated-label {
     transform: translate(-50%, -50%) rotate(-90deg);
     transform-origin: center;
