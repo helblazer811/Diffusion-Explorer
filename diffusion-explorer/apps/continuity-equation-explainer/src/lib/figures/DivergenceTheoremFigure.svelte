@@ -76,6 +76,10 @@
   export let streamlineMinPathLength = 0.4;
   export let pulseWidthPixels = 24;
   export let pulsePauseWidthPixels = 6;
+  // Semi-transparent overlay drawn between streamlines and the surface/grid layers
+  // — mutes the streamlines visually so the foreground stands out.
+  export let streamlineOverlayColor = "#ffffff";
+  export let streamlineOverlayOpacity = 0.3;
 
   // Grid-cell arrows (right pane)
   export let cellArrowColor = "#1f2937";
@@ -86,7 +90,7 @@
   // Rotating normal / field vector (left pane)
   export let normalColor = "#f97316";
   export let fieldColor = "#3b82f6";
-  export let vectorDomainLength = 0.35;
+  export let vectorDomainLength = 0.22;
   export let vectorWidth = 3;
   export let vectorHeadSize = 6;
   export let dotColor = "#f97316";
@@ -241,6 +245,8 @@
       };
 
       // One streamline animation per canvas (each owns its own canvas + RAF state).
+      // CPU backend so streamlines share the Canvas2D context with the surface + grid
+      // — pulses are computed via alpha LUTs and look fine, no second canvas needed.
       const totalDuration = animationDuration;
       const streamlineCommon = {
         backend: "cpu" as const,
@@ -268,13 +274,21 @@
   function setupTimeline() {
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
-      segmentIndex: 0,
+      streamlinePhase: 0,
       theta: 0,
       arrowPhase: 0,
     };
     timeline.duration = animationDuration;
     timeline.looping = true;
 
+    // Streamline clip: sets `streamlinePhase` on the state (drives pulse position).
+    // We add one — both panes' animations read the same `streamlinePhase` and render
+    // in sync.
+    if (leftStreamlineAnim) {
+      timeline.add(leftStreamlineAnim.clip, { start: 0, end: 1 });
+    }
+
+    // Our own clip: surface rotation + propagating arrow wave.
     timeline.add(
       {
         name: "DivergenceTheoremCycle",
@@ -311,21 +325,39 @@
     });
   }
 
+  /**
+   * Paint a semi-transparent rectangle over the streamlines so the surface,
+   * grid, and arrows on top read more clearly.
+   */
+  function drawStreamlineOverlay(ctx: CanvasRenderingContext2D) {
+    if (streamlineOverlayOpacity <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = streamlineOverlayOpacity;
+    ctx.fillStyle = streamlineOverlayColor;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.restore();
+  }
+
   function drawLeft(state: AnimationState) {
     const ctx = leftCanvas2d.ctx;
     if (!ctx || !boundingBox) return;
 
+    // Always clear first — the CPU StreamlineAnimation doesn't clear for us, so
+    // skipping this leaves trails of every previous frame on the canvas.
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
     // 1. Streamlines behind (drawn to leftCanvas via leftStreamlineAnim)
     if (showStreamlines && leftStreamlineAnim?.initialized) {
       leftStreamlineAnim.draw(state, [0, 0, 0, 0]);
-    } else {
-      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     }
 
-    // 2. Surface fill + outline
+    // 2. Muting overlay between streamlines and foreground
+    drawStreamlineOverlay(ctx);
+
+    // 3. Surface fill + outline
     drawSurface(ctx);
 
-    // 3. Rotating boundary point with outward normal `n̂` and field vector `F`
+    // 4. Rotating boundary point with outward normal `n̂` and field vector `F`
     const { theta, position, normal } = getTangentAndNormalSafe(state.theta);
     const [px, py] = toPixel(position);
 
@@ -389,17 +421,21 @@
     const ctx = rightCanvas2d.ctx;
     if (!ctx || !boundingBox) return;
 
+    // Always clear first (see drawLeft note).
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
     // 1. Streamlines behind
     if (showStreamlines && rightStreamlineAnim?.initialized) {
       rightStreamlineAnim.draw(state, [0, 0, 0, 0]);
-    } else {
-      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     }
 
-    // 2. Surface fill + outline
+    // 2. Muting overlay between streamlines and foreground
+    drawStreamlineOverlay(ctx);
+
+    // 3. Surface fill + outline
     drawSurface(ctx);
 
-    // 3. Grid cells with outward-propagating arrows
+    // 4. Grid cells with outward-propagating arrows
     ctx.save();
     ctx.strokeStyle = cellArrowColor;
     ctx.fillStyle = cellArrowColor;
