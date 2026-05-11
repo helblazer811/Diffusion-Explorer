@@ -694,7 +694,7 @@
   {#snippet footer()}
     <TimeSlider
       timeline={timeline as import("@diffusion-explorer/ui").Timeline<unknown> | null}
-      color={barColor}
+      color="#9ca3af"
     />
   {/snippet}
 
