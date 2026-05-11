@@ -247,15 +247,16 @@
   date="2025"
 />
 
-<MassConservation>
-  <strong>Conservation of probability mass.</strong>
-  The change in probability density <Katex math={"\\rho"} /> inside a volume <Katex math={"V"} />
-  equals the negative flux <Katex math={"\\rho \\mathbf{v}"} /> through the boundary
-  <Katex math={"S"} />.
-  <em>Left:</em> The probability density <Katex math={"\\rho"} /> evolving inside the volume.
-  <em>Right:</em> The flux vectors <Katex math={"\\rho \\mathbf{v}"} /> and surface normals
-  <Katex math={"\\hat{n}"} /> at the boundary.
-</MassConservation>
+<ContinuityEquationFigure>
+  <strong>The continuity equation, pointwise.</strong>
+  Both panes show the same probability density drifting through a fixed point <Katex math={"x"} />
+  (orange dot).
+  <em>Left:</em> <Katex math={"\\partial p_t(x) / \\partial t"} /> is the rate of change of
+  density at <Katex math={"x"} /> — visualized by the orange bar, which grows as the density
+  moves onto <Katex math={"x"} /> and shrinks as it moves off.
+  <em>Right:</em> <Katex math={"-\\nabla \\cdot (p_t v_t)"} /> at <Katex math={"x"} /> is the rate
+  at which probability flux flows INTO the point — the converging orange streamlines.
+</ContinuityEquationFigure>
 
 <hr class="section-divider" />
 

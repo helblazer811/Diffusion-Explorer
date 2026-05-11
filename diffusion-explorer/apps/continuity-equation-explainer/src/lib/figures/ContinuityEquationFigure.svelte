@@ -67,9 +67,9 @@
     { mean: [-1.0, 0.05], cov: [[0.04, -0.01], [-0.01, 0.05]], weight: 0.25 },
   ];
   export let numSamples = 3000;
-  export let contourBandwidth = 12;
+  export let contourBandwidth = 10;
   export let contourGridSize = 400;
-  export let contourThresholds = 8;
+  export let contourThresholds = 5;
   export let contourOpacity = 0.4;
   export let contourColor = "#3b82f6"; // blue
 
