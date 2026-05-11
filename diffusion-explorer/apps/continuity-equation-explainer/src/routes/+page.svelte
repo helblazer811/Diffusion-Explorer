@@ -520,7 +520,7 @@
 
   <DivergenceTheoremFigure
     curveFn={(theta) => {
-      const half = 0.95;
+      const half = 0.6;
       const t = ((theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       const seg = Math.min(3, Math.floor(t / (Math.PI / 2)));
       const local = (t - seg * (Math.PI / 2)) / (Math.PI / 2);
@@ -533,6 +533,7 @@
     }}
     vectorFieldFn={createWavyVectorField({ amplitude: 0.35, frequency: 1.6 })}
     gridResolution={3}
+    domainMargin={0.45}
   >
     <strong>The divergence theorem on a square region.</strong>
     Right: the region is tiled by a 3×3 grid of sub-cells. Each cell carries outward arrows — a
