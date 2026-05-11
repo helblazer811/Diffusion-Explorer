@@ -512,7 +512,7 @@
           top: {((barBottomY + barLabelGap) / canvasHeight) * 100}%;
         "
       >
-        <Katex math={"p(x)"} />
+        <Katex math={`\\color{${barColor}} p(x)`} />
       </div>
     </div>
   {/snippet}
