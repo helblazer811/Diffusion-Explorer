@@ -3,7 +3,7 @@
   import { writable } from "svelte/store";
   import { base } from "$app/paths";
   import { ArticleHeader, Katex } from "@diffusion-explorer/ui";
-  import { generateClippedGaussianSamples, clipSamplesToRadius, clipTrajectoriesToStartingRadius, loadCachedTrajectories, loadCachedVectorField, FlowModelClient } from "@diffusion-explorer/diffusion";
+  import { generateClippedGaussianSamples, clipSamplesToRadius, clipTrajectoriesToStartingRadius, loadCachedTrajectories, FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings, type VectorFieldData } from "$lib/settings";
 
   // Figure imports
@@ -14,7 +14,8 @@
   import InvertibilityExplanation from "$lib/figures/InvertibilityExplanation.svelte";
   import MassConservation from "$lib/figures/MassConservation.svelte";
   import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
-  import DivergenceTheoremSquare from "$lib/figures/DivergenceTheoremSquare/DivergenceTheoremSquare.svelte";
+  import DivergenceTheoremFigure from "$lib/figures/DivergenceTheoremFigure.svelte";
+  import { createClosedCurve, createWavyVectorField } from "$lib/figures/DivergenceTheorem/divergence_theorem";
   import DivergenceTheorem from "$lib/figures/DivergenceTheorem/DivergenceTheorem.svelte";
   import ReverseSampling from "$lib/figures/ReverseSampling.svelte";
   import LikelihoodIntegration from "$lib/figures/LikelihoodIntegration.svelte";
@@ -27,7 +28,8 @@
   const allTimeSamples = writable<number[][][]>([]);
   const isTraining = writable<boolean>(false);
 
-  // Shared FlowModelClient + cached vector field for §1 figures
+  // Shared FlowModelClient for §1 figures + a vector field computed live from the same model
+  // (so the field arrows align exactly with the trajectory motion).
   let flowMatchingClient: FlowModelClient | null = null;
   let flowMatchingVectorField: VectorFieldData | null = null;
 
@@ -146,7 +148,7 @@
       console.warn("Failed to load ReverseSampling data:", e);
     }
 
-    // Initialize shared FlowModelClient (§1 figures) + cached vector field for EulerStepDemo
+    // Initialize FlowModelClient using this app's existing flow_model
     try {
       flowMatchingClient = new FlowModelClient(
         `${base}${settings.flowModelWorkerUrl}`,
@@ -157,13 +159,33 @@
     } catch (e: unknown) {
       console.warn("Failed to initialize FlowModelClient for §1 figures:", e);
     }
-    try {
-      const vf = await loadCachedVectorField(
-        `${base}/cached_samples/flow_matching_vector_field.json`
-      );
-      if (vf) flowMatchingVectorField = vf;
-    } catch (e: unknown) {
-      console.warn("Failed to load flow matching vector field:", e);
+    // Compute the vector field live from the same model that produces the trajectories
+    // — guarantees the arrows align with where samples actually flow. Run sequentially so
+    // we don't fan out 20 parallel model loads across the worker pool (which leaves it
+    // unable to service the EulerStepDemo's trajectory sampling for several seconds).
+    if (flowMatchingClient) {
+      try {
+        const gridResolution = 9;
+        const domainRange = { xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 };
+        const numTimeSteps = 20;
+        const timeSteps = Array.from({ length: numTimeSteps }, (_, i) => i / (numTimeSteps - 1));
+        const velocities: number[][][] = [];
+        let gridPoints: number[][] = [];
+        for (let i = 0; i < timeSteps.length; i++) {
+          const r = await flowMatchingClient.vectorFieldGrid(gridResolution, domainRange, timeSteps[i]).promise;
+          velocities.push(r.velocities);
+          if (i === 0) gridPoints = r.gridPoints;
+        }
+        flowMatchingVectorField = {
+          gridResolution,
+          timeSteps,
+          domainRange,
+          velocities,
+          gridPoints,
+        };
+      } catch (e: unknown) {
+        console.warn("Failed to compute live vector field:", e);
+      }
     }
 
     // Load cached 1D flow trajectories for §3 figure
@@ -297,7 +319,7 @@
       showGroundTruth={false}
       showLegend={false}
       showArrowHeads={true}
-      domainRange={{ xMin: -2.5, xMax: 2.35, yMin: -2.5, yMax: 2.35 }}
+      domainRange={{ xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 }}
     >
       <strong>Euler integration through a time-dependent velocity field
         <Katex math={"v_t(x)"} />.</strong>
@@ -496,15 +518,50 @@
     adjacent interior cells cancel, leaving only the net outward flow at the boundary.
   </p>
 
-  <DivergenceTheoremSquare />
-  <p class="figure-caption">
-    <strong>Why the divergence theorem is true.</strong>
-    A region tiled by smaller squares: each square's boundary flux contribution
-    <Katex math={"\\oint \\mathbf{F} \\cdot \\hat{n} \\, dS"} /> cancels against its neighbors at every
-    shared edge. The only contributions that survive are those on the outer boundary — exactly the
-    surface integral side of the theorem. Summing the (volume) divergences inside equals the (surface)
-    flux outside.
-  </p>
+  <DivergenceTheoremFigure
+    curveFn={(theta) => {
+      const half = 0.95;
+      const t = ((theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const seg = Math.min(3, Math.floor(t / (Math.PI / 2)));
+      const local = (t - seg * (Math.PI / 2)) / (Math.PI / 2);
+      switch (seg) {
+        case 0: return [half, -half + local * 2 * half];
+        case 1: return [half - local * 2 * half, half];
+        case 2: return [-half, half - local * 2 * half];
+        default: return [-half + local * 2 * half, -half];
+      }
+    }}
+    vectorFieldFn={createWavyVectorField({ amplitude: 0.35, frequency: 1.6 })}
+    gridResolution={3}
+  >
+    <strong>The divergence theorem on a square region.</strong>
+    Right: the region is tiled by a 3×3 grid of sub-cells. Each cell carries outward arrows — a
+    discrete picture of <Katex math={"\\nabla \\cdot \\mathbf{F}"} /> inside. Arrows from adjacent
+    cells point in opposite directions across every shared interior edge, so interior contributions
+    cancel pairwise; only the arrows on the outer boundary survive. Left: those surviving boundary
+    contributions are exactly the surface integral
+    <Katex math={"\\oint_{\\partial V} \\mathbf{F} \\cdot \\hat{n}\\, dS"} /> swept by the rotating
+    normal. Streamlines of <Katex math={"\\mathbf{F}"} /> shown faintly behind for context.
+  </DivergenceTheoremFigure>
+
+  <!--
+    Arbitrary-shape variant: hidden for now, kept in source for the future.
+    <DivergenceTheoremFigure
+      curveFn={createClosedCurve({
+        baseRadius: 0.85,
+        amplitudes: [0.22, 0.16, 0.1],
+        phases: [0, 0.7, 1.3],
+        frequencies: [1, 2, 3],
+      })}
+      vectorFieldFn={createWavyVectorField({ amplitude: 0.35, frequency: 1.6 })}
+      gridResolution={8}
+    >
+      <strong>The same argument works for any shape.</strong>
+      Replace the square with an arbitrary smooth closed curve, subdivide it more finely, and the
+      same pairwise cancellation occurs — interior arrows shared between neighbors annihilate;
+      only the outward-pointing arrows along the boundary remain.
+    </DivergenceTheoremFigure>
+  -->
 
   <h3 id="putting-together">Deriving the PDE</h3>
   <p>
