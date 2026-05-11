@@ -412,16 +412,9 @@
 
 <hr class="section-divider" />
 
-<!-- §4 — The continuity equation -->
-<section id="continuity-equation">
-  <h2 id="continuity-equation-heading" class="section-heading">The Continuity Equation</h2>
-  <p>
-    Our derivation begins with a physical premise and ends with a partial differential equation.
-    The premise is the conservation of probability mass; the bridge from premise to PDE runs
-    through two pieces of standard vector calculus — divergence and the divergence theorem.
-  </p>
-
-  <h3 id="conservation-of-mass">Conservation of probability mass</h3>
+<!-- §4 — Conservation of mass -->
+<section id="conservation-of-mass">
+  <h2 id="conservation-of-mass-heading" class="section-heading">Conservation of Mass</h2>
   <p>
     <strong>Flows conserve probability mass.</strong> Particles are not created or destroyed by
     the flow — they are merely transported around by the velocity field. The total probability is
@@ -434,7 +427,7 @@
     <Katex math={"x"} /> has a unique velocity. There is no random component as in diffusion. Under
     mild regularity conditions on <Katex math={"v_t"} />, this ODE has a unique solution for each
     initial condition, which means distinct starting points stay distinct — points are never merged
-    or split. We will prove this rigorously in §7; for now, take it as the premise.
+    or split. We will prove this rigorously later in the post; for now, take it as the premise.
   </p>
 
   {#if flowInvertibilityData}
@@ -469,10 +462,17 @@
   </p>
   <p>
     This integral statement is the entire physical content we need. To convert it into the local
-    PDE form, we introduce divergence and the divergence theorem.
+    PDE form, we need two pieces of standard vector calculus.
   </p>
+</section>
 
-  <h3 id="divergence">Divergence</h3>
+<hr class="section-divider" />
+
+<!-- §5 — Divergence and the divergence theorem -->
+<section id="divergence-and-theorem">
+  <h2 id="divergence-and-theorem-heading" class="section-heading">
+    Divergence and the Divergence Theorem
+  </h2>
   <p>
     Divergence describes how much a vector field is outwardly flowing at a point. A
     <em>source</em> is a location with net outward flow; a <em>sink</em> is a location with net inward
@@ -500,7 +500,6 @@
     />).
   </DivergenceIntro>
 
-  <h3 id="divergence-theorem">The Divergence Theorem</h3>
   <p>
     Divergence is a local quantity (defined at each point); flux is a global quantity (integrated
     over a boundary). The <em>divergence theorem</em> connects them. Gauss' divergence theorem
@@ -564,8 +563,13 @@
       only the outward-pointing arrows along the boundary remain.
     </DivergenceTheoremFigure>
   -->
+</section>
 
-  <h3 id="putting-together">Deriving the PDE</h3>
+<hr class="section-divider" />
+
+<!-- §6 — The continuity equation -->
+<section id="continuity-equation">
+  <h2 id="continuity-equation-heading" class="section-heading">The Continuity Equation</h2>
   <p>
     We now have all the pieces. Apply the divergence theorem to the right-hand side of the
     conservation-of-mass integral:
@@ -605,7 +609,7 @@
 
 <hr class="section-divider" />
 
-<!-- §5 — From PDE to log-densities: the instantaneous change of variables -->
+<!-- §7 — From PDE to log-densities: the instantaneous change of variables -->
 <section id="instantaneous-change-of-variables">
   <h2 id="instantaneous-change-of-variables-heading" class="section-heading">
     From PDE to Log-Densities: The Instantaneous Change of Variables
@@ -703,13 +707,13 @@
   <p>
     With this formula in hand, we know <em>how</em> to evaluate likelihoods. The next two sections
     address the natural follow-up questions: how do we actually parameterize and train such a
-    model (§6), and why is the whole construction rigorously well-defined (§7)?
+    model (§8), and why is the whole construction rigorously well-defined (§9)?
   </p>
 </section>
 
 <hr class="section-divider" />
 
-<!-- §6 — Continuous normalizing flows -->
+<!-- §8 — Continuous normalizing flows -->
 <section id="continuous-normalizing-flows">
   <h2 id="continuous-normalizing-flows-heading" class="section-heading">
     Continuous Normalizing Flows
@@ -731,7 +735,7 @@
       starting from <Katex math={"x_0 \\sim p_0"} /> and integrating forward to <Katex math={"t = 1"} />.
     </li>
     <li>
-      Evaluate likelihoods using the instantaneous change of variables formula from §5: integrate
+      Evaluate likelihoods using the instantaneous change of variables formula from §7: integrate
       <Katex math={"-\\nabla \\cdot v_\\theta"} /> along the reverse trajectory.
     </li>
     <li>
@@ -763,7 +767,7 @@
 
 <hr class="section-divider" />
 
-<!-- §7 — Why the flow is well-defined -->
+<!-- §9 — Why the flow is well-defined -->
 <section id="well-posedness">
   <h2 id="well-posedness-heading" class="section-heading">Why the Flow Is Well-Defined</h2>
   <p>
@@ -821,7 +825,7 @@
     </li>
     <li>
       <strong>Smooth Jacobian:</strong> the change-of-variables formula is well-defined, justifying
-      the differentiation we did in §5.
+      the differentiation we did in §7.
     </li>
     <li>
       <strong>Reverse sampling works:</strong> integrating <Katex math={"-v_\\theta"} /> from
