@@ -903,12 +903,12 @@
           marker-end="url(#ce-axis-arrowhead)"
         />
       </svg>
-      <!-- ∂p_t(x)/∂t label, horizontal, above the arrow tip -->
+      <!-- ∂p_t(x)/∂t label, horizontal, below the bar -->
       <div
         class="dpdt-label"
         style="
           left: {((barRightX + barArrowLength / 2) / canvasWidth) * 100}%;
-          top: {((barCenterY - 26) / canvasHeight) * 100}%;
+          top: {((barBottomRowY + 8) / canvasHeight) * 100}%;
         "
       >
         <Katex math={`\\textcolor{${barColor}}{\\frac{\\partial p_t(x)}{\\partial t}}`} />
@@ -1050,19 +1050,13 @@
 
   .dpdt-label {
     position: absolute;
-    /* Center horizontally at `left`, bottom at `top` — sits ABOVE the
+    /* Center horizontally at `left`, top at `top` — sits BELOW the
        reference y. */
-    transform: translate(-50%, -100%);
+    transform: translate(-50%, 0);
     font-size: 1.5rem;
     line-height: 1;
     pointer-events: none;
     white-space: nowrap;
-    /* Translucent white plate behind the label so it stays legible against
-       contour density. The plate moves with the label since it's the
-       element's own background. */
-    background-color: rgba(255, 255, 255, 0.7);
-    padding: 2px 6px;
-    border-radius: 4px;
   }
 
   /* Rotate labels 90° counter-clockwise so they read bottom-to-top —
