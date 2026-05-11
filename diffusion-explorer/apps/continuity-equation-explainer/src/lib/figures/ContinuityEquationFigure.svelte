@@ -111,9 +111,15 @@
   export let pathlineColor = "#f97316"; // orange
   export let pathlineThickness = 3;
   export let pathSeedCount = 20;
-  export let pathSeedRadius = 0.45; // domain units around the fixed point
-  export let pathForwardSteps = 30;
-  export let pathBackwardSteps = 25;
+  // Multiplier on the dot's pixel radius — seeds sit on a circle slightly
+  // larger than the dot itself by default, so pathlines visibly emerge from
+  // just outside x. Set to 1.0 to exactly match the dot.
+  export let pathSeedRadiusInDotRadii = 1.0;
+  // With seeds sitting on a tight circle around x, the forward leg is short
+  // (a few steps get you to x), but the backward leg needs many steps to
+  // reach far enough out that paths read as a real starburst.
+  export let pathForwardSteps = 12;
+  export let pathBackwardSteps = 90;
   export let pathStepSize = 0.04;
   export let pathPulseWidth = 60;
   export let pathPulseGap = 140;
@@ -734,6 +740,11 @@
 
   $: canvasWidth = Math.floor((width - gap) / 2);
   $: canvasHeight = height;
+  // Pathline seed radius in DOMAIN units, derived from the dot's pixel radius
+  // so the seed circle matches the visible dot.
+  $: pathSeedRadius = canvasWidth
+    ? (pointRadius * pathSeedRadiusInDotRadii * 2 * domainHalfWidth) / canvasWidth
+    : 0.04;
 
   $: if (
     !isInitialized &&
