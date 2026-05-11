@@ -1046,7 +1046,7 @@
     /* Anchor to the right edge of the label so it sits to the LEFT of the
        reference x position, and vertically centered on the reference y. */
     transform: translate(-100%, -50%);
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     line-height: 1;
     pointer-events: none;
     white-space: nowrap;
