@@ -28,12 +28,10 @@
     useVisibilityHandler,
     StreamlineAnimation,
     drawArrow,
-    drawMathjax,
     type StreamlineAnimationState,
   } from "@diffusion-explorer/ui";
   import {
     createWavyVectorField,
-    getTangentAndNormal,
     drawClosedCurve,
     type CurveFn,
     type VectorFieldFn,
@@ -43,6 +41,10 @@
     computeBoundingBox,
     isPointInside,
   } from "./DivergenceTheorem/grid-animation";
+  import {
+    WaveCancellationAnimation,
+    type GridCellSpec,
+  } from "./DivergenceTheoremSquare/wave-cancellation-animation";
 
   // ----------------------------------------------------------------
   // Props
@@ -68,12 +70,14 @@
   export let surfaceStrokeColor = "#f97316";
   export let surfaceStrokeWidth = 3;
 
-  // Streamlines (CPU backend so it works without WebGPU)
+  // Streamlines (GPU backend, rendered to its own canvas behind the 2D overlay)
   export let showStreamlines = true;
   export let streamlineColor = "#3b82f6";
   export let streamlineWidth = 3;
-  export let streamlineDensity: number | [number, number] = 0.9;
-  export let streamlineMinPathLength = 0.4;
+  // Density + min path length matched to MassConservation so streamlines look like
+  // long flowing curves rather than chunky stubs at the same visual scale.
+  export let streamlineDensity: number | [number, number] = 0.8;
+  export let streamlineMinPathLength = 1.5;
   export let pulseWidthPixels = 24;
   export let pulsePauseWidthPixels = 6;
   // Semi-transparent overlay drawn between streamlines and the surface/grid layers
@@ -87,20 +91,14 @@
   export let cellArrowHeadRadius = 4;
   export let cellArrowPadding = 0.32; // fraction of half-cell to leave as padding
 
-  // Rotating normal / field vector (left pane)
-  export let normalColor = "#f97316";
-  export let fieldColor = "#3b82f6";
-  export let vectorDomainLength = 0.22;
-  export let vectorWidth = 3;
-  export let vectorHeadSize = 6;
-  export let dotColor = "#f97316";
-  export let dotRadius = 4;
-  export let labelFontSize = 18;
-  export let labelStrokeColor = "white";
-  export let labelStrokeWidth = 8;
-
   // Animation
-  export let animationDuration = 8; // seconds for one cycle
+  export let animationDuration = 8; // seconds for one cycle (rotating point + arrow wave)
+  // Pulse frequency: number of pulse cycles per timeline loop. MUST satisfy
+  // pulseFrequency × animationDuration ∈ ℤ to avoid a phase discontinuity at the
+  // loop boundary (otherwise the pulse jumps backward each loop).
+  // 0.5 × 8 = 4 → seamless. Pulse cycle = animationDuration / 4 = 2 s, matching
+  // MassConservation's streamline pace.
+  export let streamlinePulseFrequency = 0.5;
   export let playingByDefault = true;
 
   // Caption slot
@@ -113,20 +111,26 @@
   let figureIsActive: Writable<boolean>;
   const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
 
-  // Canvases
+  // Canvases — dual-canvas pattern matching MassConservation:
+  //   - leftGpuCanvas / rightGpuCanvas: WebGPU surfaces for the streamline pulses
+  //   - leftCanvas / rightCanvas: Canvas2D overlays for the surface, grid, arrows
+  // Stacked via CSS so the streamlines sit behind everything else.
+  let leftGpuCanvas: HTMLCanvasElement | null = null;
+  let rightGpuCanvas: HTMLCanvasElement | null = null;
   let leftCanvas: HTMLCanvasElement | null = null;
   let rightCanvas: HTMLCanvasElement | null = null;
   const leftCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
   const rightCanvas2d = useCanvas2D(canvasWidth, canvasHeight);
 
   type AnimationState = StreamlineAnimationState & {
-    theta: number; // 0..2π — position of the rotating point on the boundary (left)
+    wavePhase: number; // 0..1 — drives the wave-cancellation animation (left)
     arrowPhase: number; // 0..1 — drives the propagating-arrow wave (right)
   };
 
   let timeline: Timeline<AnimationState> | null = null;
   let leftStreamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let rightStreamlineAnim: StreamlineAnimation<AnimationState> | null = null;
+  let leftWaveAnim: WaveCancellationAnimation<AnimationState> | null = null;
 
   let boundingBox: { xMin: number; xMax: number; yMin: number; yMax: number } | null = null;
   let isInitialized = false;
@@ -233,8 +237,53 @@
     return bbox;
   }
 
+  /**
+   * Build a fixed 3×3 grid for the LEFT pane's wave-cancellation animation.
+   * Unlike the right pane's grid, this one always uses all 9 cells regardless
+   * of curve shape — the wave-cancellation viz is fundamentally about the
+   * 3×3 arrow topology, not whether the cells lie inside the boundary.
+   */
+  function buildLeftGrid(): { cells: GridCellSpec[]; cellSizePx: number } {
+    if (!boundingBox) return { cells: [], cellSizePx: 0 };
+    const dimX = boundingBox.xMax - boundingBox.xMin;
+    const dimY = boundingBox.yMax - boundingBox.yMin;
+    const maxDim = Math.max(dimX, dimY);
+    const step = maxDim / 3;
+    const cx = (boundingBox.xMin + boundingBox.xMax) / 2;
+    const cy = (boundingBox.yMin + boundingBox.yMax) / 2;
+    const gridXMin = cx - (step * 3) / 2;
+    const gridYMin = cy - (step * 3) / 2;
+
+    const out: GridCellSpec[] = [];
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        const centerDomain: [number, number] = [
+          gridXMin + (col + 0.5) * step,
+          gridYMin + (row + 0.5) * step,
+        ];
+        const [pxX, pxY] = toPixel(centerDomain);
+        out.push({ cx: pxX, cy: pxY, row, col });
+      }
+    }
+    return { cells: out, cellSizePx: scaleLength(step) };
+  }
+
   async function runInitialComputation() {
     boundingBox = computeGridCells();
+
+    // Build the LEFT pane's wave-cancellation animation on a 3×3 grid.
+    const leftGrid = buildLeftGrid();
+    leftWaveAnim = WaveCancellationAnimation.create<AnimationState>({
+      cells: leftGrid.cells,
+      gridResolution: 3,
+      centerCell: { row: 1, col: 1 },
+      cellSizePx: leftGrid.cellSizePx,
+      arrowPadding: cellArrowPadding,
+      color: cellArrowColor,
+      strokeWidth: cellArrowStrokeWidth,
+      headRadius: cellArrowHeadRadius,
+    });
+    if (leftCanvas) await leftWaveAnim.init(leftCanvas);
 
     if (showStreamlines) {
       const domain = {
@@ -244,12 +293,29 @@
         yMax: boundingBox.yMax + domainMargin,
       };
 
-      // One streamline animation per canvas (each owns its own canvas + RAF state).
-      // CPU backend so streamlines share the Canvas2D context with the surface + grid
-      // — pulses are computed via alpha LUTs and look fine, no second canvas needed.
-      const totalDuration = animationDuration;
+      // GPU backend (same as MassConservation) so pulses flow smoothly with per-pixel
+      // alpha gradients. Each streamline animation gets its own dedicated GPU canvas
+      // so the Canvas2D overlay (surface + grid + vectors) doesn't fight the WebGPU
+      // context for the same canvas.
+      //
+      // Critical: size the GPU canvas's internal pixel buffer ourselves before
+      // create(). HTML canvases default to 300×150; without this the WebGPU surface
+      // renders at that scale and the streamlines look badly zoomed.
+      const dpr = window.devicePixelRatio || 1;
+      if (leftGpuCanvas) {
+        leftGpuCanvas.width = canvasWidth * dpr;
+        leftGpuCanvas.height = canvasHeight * dpr;
+      }
+      if (rightGpuCanvas) {
+        rightGpuCanvas.width = canvasWidth * dpr;
+        rightGpuCanvas.height = canvasHeight * dpr;
+      }
+
+      // Pass animationDuration as the streamline duration (matches the timeline's
+      // duration) so loopMultiplier = pulseFrequency × duration is an integer and
+      // streamlinePhase wraps from exactly N → 0 at the loop boundary — no stutter.
       const streamlineCommon = {
-        backend: "cpu" as const,
+        backend: "gpu" as const,
         vectorFieldFn,
         domain,
         toPixel: (p: [number, number]) => toPixel(p),
@@ -260,14 +326,14 @@
         pulseWidthPixels,
         pulsePauseWidthPixels,
         offsets: "synchronized" as const,
-        duration: totalDuration,
-        pulseFrequency: 0.5,
+        duration: animationDuration,
+        pulseFrequency: streamlinePulseFrequency,
       };
       leftStreamlineAnim = StreamlineAnimation.create<AnimationState>(streamlineCommon);
       rightStreamlineAnim = StreamlineAnimation.create<AnimationState>(streamlineCommon);
 
-      if (leftCanvas) await leftStreamlineAnim.init(leftCanvas);
-      if (rightCanvas) await rightStreamlineAnim.init(rightCanvas);
+      if (leftGpuCanvas) await leftStreamlineAnim.init(leftGpuCanvas);
+      if (rightGpuCanvas) await rightStreamlineAnim.init(rightGpuCanvas);
     }
   }
 
@@ -275,7 +341,7 @@
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
       streamlinePhase: 0,
-      theta: 0,
+      wavePhase: 0,
       arrowPhase: 0,
     };
     timeline.duration = animationDuration;
@@ -288,13 +354,13 @@
       timeline.add(leftStreamlineAnim.clip, { start: 0, end: 1 });
     }
 
-    // Our own clip: surface rotation + propagating arrow wave.
+    // Our own clip: wave-cancellation phase (left) + propagating arrow wave (right).
     timeline.add(
       {
         name: "DivergenceTheoremCycle",
         reduce(t: number): Partial<AnimationState> {
           return {
-            theta: t * 2 * Math.PI,
+            wavePhase: t,
             arrowPhase: t,
           };
         },
@@ -342,100 +408,44 @@
     const ctx = leftCanvas2d.ctx;
     if (!ctx || !boundingBox) return;
 
-    // Always clear first — the CPU StreamlineAnimation doesn't clear for us, so
-    // skipping this leaves trails of every previous frame on the canvas.
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    // 1. Streamlines behind (drawn to leftCanvas via leftStreamlineAnim)
+    // 1. Streamlines render to their own GPU canvas (behind, via CSS stacking).
     if (showStreamlines && leftStreamlineAnim?.initialized) {
       leftStreamlineAnim.draw(state, [0, 0, 0, 0]);
     }
 
-    // 2. Muting overlay between streamlines and foreground
+    // Overlay canvas: clear, paint a translucent white "between" layer
+    // (sits on top of GPU streamlines visually), then surface + wave arrows.
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     drawStreamlineOverlay(ctx);
 
-    // 3. Surface fill + outline
+    // 2. Surface fill + outline
     drawSurface(ctx);
 
-    // 4. Rotating boundary point with outward normal `n̂` and field vector `F`
-    const { theta, position, normal } = getTangentAndNormalSafe(state.theta);
-    const [px, py] = toPixel(position);
-
-    const v = vectorFieldFn(position[0], position[1]);
-    const vMag = Math.hypot(v[0], v[1]);
-    const vUnit: [number, number] = vMag > 0 ? [v[0] / vMag, v[1] / vMag] : [1, 0];
-    const pixelLen = scaleLength(vectorDomainLength);
-
-    // Normal (outward, orange). y is flipped because canvas y grows downward.
-    const nEnd: [number, number] = [px + normal[0] * pixelLen, py - normal[1] * pixelLen];
-    ctx.save();
-    ctx.strokeStyle = normalColor;
-    ctx.fillStyle = normalColor;
-    ctx.lineWidth = vectorWidth;
-    drawArrow(ctx, px, py, nEnd[0], nEnd[1], vectorHeadSize);
-
-    // Field vector (blue)
-    const fEnd: [number, number] = [px + vUnit[0] * pixelLen, py - vUnit[1] * pixelLen];
-    ctx.strokeStyle = fieldColor;
-    ctx.fillStyle = fieldColor;
-    drawArrow(ctx, px, py, fEnd[0], fEnd[1], vectorHeadSize);
-
-    // Point
-    ctx.fillStyle = dotColor;
-    ctx.beginPath();
-    ctx.arc(px, py, dotRadius, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.restore();
-
-    // Labels (n̂ and F)
-    drawMathjax(
-      ctx,
-      "\\hat{n}",
-      nEnd[0] + normal[0] * 14,
-      nEnd[1] - normal[1] * 14,
-      labelFontSize,
-      0,
-      labelFontSize / 2,
-      { color: normalColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: 0.9 }
-    );
-    drawMathjax(
-      ctx,
-      "\\mathbf{F}",
-      fEnd[0] + vUnit[0] * 14,
-      fEnd[1] - vUnit[1] * 14,
-      labelFontSize,
-      0,
-      labelFontSize / 2,
-      { color: fieldColor, stroke: labelStrokeColor, strokeWidth: labelStrokeWidth, strokeOpacity: 0.9 }
-    );
-
-    void theta; // (used only to convey that the rotation tracks state.theta)
-  }
-
-  function getTangentAndNormalSafe(thetaRad: number) {
-    const r = getTangentAndNormal(curveFn, thetaRad);
-    return { theta: thetaRad, position: r.position, normal: r.normal };
+    // 3. Wave-cancellation animation: 3×3 grid of outward arrows whose
+    //    interior pairs cancel center-out, leaving only boundary arrows
+    //    pulsed for emphasis at the end of the cycle.
+    if (leftWaveAnim?.initialized) {
+      leftWaveAnim.draw(state);
+    }
   }
 
   function drawRight(state: AnimationState) {
     const ctx = rightCanvas2d.ctx;
     if (!ctx || !boundingBox) return;
 
-    // Always clear first (see drawLeft note).
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    // 1. Streamlines behind
+    // 1. Streamlines render to their own GPU canvas (behind).
     if (showStreamlines && rightStreamlineAnim?.initialized) {
       rightStreamlineAnim.draw(state, [0, 0, 0, 0]);
     }
 
-    // 2. Muting overlay between streamlines and foreground
+    // Overlay canvas: clear, paint the muting layer, then surface + grid.
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     drawStreamlineOverlay(ctx);
 
-    // 3. Surface fill + outline
+    // 2. Surface fill + outline
     drawSurface(ctx);
 
-    // 4. Grid cells with outward-propagating arrows
+    // 3. Grid cells with outward-propagating arrows
     ctx.save();
     ctx.strokeStyle = cellArrowColor;
     ctx.fillStyle = cellArrowColor;
@@ -485,11 +495,38 @@
     if (timeline) timeline.pause();
   });
 
-  // Initialize once the canvases are bound
+  // Force re-init when inputs that affect *streamline geometry* change
+  // (HMR + interactive prop tweaking). Streamlines are baked at init from the
+  // current toPixel/domainMargin, so without this the cells respond to changes
+  // but streamlines stay frozen at their old scale.
+  let lastDomainMargin = domainMargin;
+  let lastCurveFn = curveFn;
+  let lastGridResolution = gridResolution;
+  $: if (
+    isInitialized &&
+    (domainMargin !== lastDomainMargin ||
+      curveFn !== lastCurveFn ||
+      gridResolution !== lastGridResolution)
+  ) {
+    lastDomainMargin = domainMargin;
+    lastCurveFn = curveFn;
+    lastGridResolution = gridResolution;
+    if (timeline) timeline.pause();
+    timeline = null;
+    leftStreamlineAnim = null;
+    rightStreamlineAnim = null;
+    leftWaveAnim?.destroy();
+    leftWaveAnim = null;
+    isInitialized = false;
+  }
+
+  // Initialize once all four canvases are bound
   $: if (
     !isInitialized &&
     leftCanvas &&
     rightCanvas &&
+    leftGpuCanvas &&
+    rightGpuCanvas &&
     leftCanvas2d.ctx &&
     rightCanvas2d.ctx
   ) {
@@ -515,18 +552,37 @@
 
 <DoubleFigure {gap} {caption} backgroundVisible={false} bind:isActive={figureIsActive}>
   {#snippet left()}
-    <canvas
-      bind:this={leftCanvas}
-      use:leftCanvas2d.bindCanvas
-      style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
-    ></canvas>
+    <div class="canvas-stack" style="aspect-ratio: {canvasWidth}/{canvasHeight};">
+      <canvas bind:this={leftGpuCanvas} class="gpu-canvas"></canvas>
+      <canvas bind:this={leftCanvas} use:leftCanvas2d.bindCanvas class="overlay-canvas"></canvas>
+    </div>
   {/snippet}
 
   {#snippet right()}
-    <canvas
-      bind:this={rightCanvas}
-      use:rightCanvas2d.bindCanvas
-      style="width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
-    ></canvas>
+    <div class="canvas-stack" style="aspect-ratio: {canvasWidth}/{canvasHeight};">
+      <canvas bind:this={rightGpuCanvas} class="gpu-canvas"></canvas>
+      <canvas bind:this={rightCanvas} use:rightCanvas2d.bindCanvas class="overlay-canvas"></canvas>
+    </div>
   {/snippet}
 </DoubleFigure>
+
+<style>
+  .canvas-stack {
+    position: relative;
+    width: 100%;
+  }
+  .canvas-stack .gpu-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .canvas-stack .overlay-canvas {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+</style>

@@ -456,7 +456,7 @@
   </p>
   <Katex
     math={
-      "\\frac{d}{dt} \\iint_V p_t(x) \\, dV = - \\oint_S (p_t v_t) \\cdot \\hat{n}(x) \\, dS"
+      "\\frac{d}{dt} \\int_V p_t(x) \\, dx = - \\int_{\\partial V} (p_t v_t) \\cdot \\hat{n}(x) \\, dS"
     }
     displayMode={true}
   />
@@ -507,7 +507,7 @@
     states that
   </p>
   <Katex
-    math={"\\oint_S \\mathbf{F} \\cdot \\hat{n}(x) \\, dS = \\iint_V \\nabla \\cdot \\mathbf{F} \\, dV."}
+    math={"\\int_{\\partial V} \\mathbf{F} \\cdot \\hat{n}(x) \\, dS = \\int_V \\nabla \\cdot \\mathbf{F} \\, dx."}
     displayMode={true}
   />
   <p>
@@ -533,16 +533,17 @@
     }}
     vectorFieldFn={createWavyVectorField({ amplitude: 0.35, frequency: 1.6 })}
     gridResolution={3}
-    domainMargin={0.45}
+    domainMargin={1.0}
   >
     <strong>The divergence theorem on a square region.</strong>
-    Right: the region is tiled by a 3×3 grid of sub-cells. Each cell carries outward arrows — a
-    discrete picture of <Katex math={"\\nabla \\cdot \\mathbf{F}"} /> inside. Arrows from adjacent
-    cells point in opposite directions across every shared interior edge, so interior contributions
-    cancel pairwise; only the arrows on the outer boundary survive. Left: those surviving boundary
-    contributions are exactly the surface integral
-    <Katex math={"\\oint_{\\partial V} \\mathbf{F} \\cdot \\hat{n}\\, dS"} /> swept by the rotating
-    normal. Streamlines of <Katex math={"\\mathbf{F}"} /> shown faintly behind for context.
+    The region is tiled by a 3×3 grid of sub-cells. Each cell carries outward arrows — a discrete
+    picture of <Katex math={"\\nabla \\cdot \\mathbf{F}"} /> inside. Left: a wave propagates from
+    the center outward; as it passes each shared interior edge, the opposing arrow pair flashes and
+    fades — interior contributions cancel pairwise. Only the arrows on the outer boundary survive,
+    and they pulse to emphasize that they are exactly the surface integral
+    <Katex math={"\\int_{\\partial V} \\mathbf{F} \\cdot \\hat{n}\\, dS"} />. Right: the same
+    discrete divergence as a propagating wave of outward arrows. Streamlines of
+    <Katex math={"\\mathbf{F}"} /> shown faintly behind for context.
   </DivergenceTheoremFigure>
 
   <!--
@@ -571,7 +572,7 @@
   </p>
   <Katex
     math={
-      "\\begin{align} \\frac{d}{dt} \\iint_V p_t(x) \\, dV &= - \\oint_S (p_t v_t) \\cdot \\hat{n}(x) \\, dS \\\\ &= - \\iint_V \\nabla \\cdot (p_t v_t) \\, dV. \\end{align}"
+      "\\begin{align} \\frac{d}{dt} \\int_V p_t(x) \\, dx &= - \\int_{\\partial V} (p_t v_t) \\cdot \\hat{n}(x) \\, dS \\\\ &= - \\int_V \\nabla \\cdot (p_t v_t) \\, dx. \\end{align}"
     }
     displayMode={true}
   />
@@ -581,7 +582,7 @@
   </p>
   <Katex
     math={
-      "\\iint_V \\left( \\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t) \\right) dV = 0."
+      "\\int_V \\left( \\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t) \\right) dx = 0."
     }
     displayMode={true}
   />
@@ -846,56 +847,6 @@
     Crucially, this holds <em>at every gradient step</em> during training: as long as
     <Katex math={"v_\\theta"} /> stays smooth, we are guaranteed that the model represents a
     bona fide density.
-  </p>
-</section>
-
-<hr class="section-divider" />
-
-<!-- §8 — Making it tractable: the Hutchinson trace estimator -->
-<section id="hutchinson">
-  <h2 id="hutchinson-heading" class="section-heading">
-    Making It Tractable: The Hutchinson Trace Estimator
-  </h2>
-  <p>
-    There is one practical obstacle left. The instantaneous change of variables formula requires
-    evaluating <Katex math={"\\nabla \\cdot v_\\theta"} /> at every point along the trajectory.
-    Recall the definition:
-  </p>
-  <Katex
-    math={
-      "\\nabla \\cdot v_\\theta = \\sum_{i = 1}^d \\frac{\\partial v_\\theta^{(i)}}{\\partial x_i} = \\operatorname{tr}\\!\\left( \\frac{\\partial v_\\theta}{\\partial x} \\right)."
-    }
-    displayMode={true}
-  />
-  <p>
-    Divergence is the trace of the Jacobian. Computing it exactly requires
-    <Katex math={"\\mathcal{O}(d)"} /> separate backpropagations — one per diagonal entry — which
-    becomes infeasible for the high-dimensional state spaces (images, latent codes) where we
-    actually want to use CNFs.
-  </p>
-  <p>
-    The fix is the <em>Hutchinson trace estimator</em>: an unbiased stochastic estimate of the
-    trace of any matrix using a single Jacobian-vector product. For
-    <Katex math={"\\epsilon \\sim \\mathcal{N}(0, I)"} /> (or any zero-mean unit-covariance
-    distribution),
-  </p>
-  <Katex
-    math={
-      "\\nabla \\cdot v_\\theta \\;\\approx\\; \\epsilon^\\top \\nabla_x (v_\\theta^\\top \\epsilon), \\quad \\epsilon \\sim \\mathcal{N}(0, I)."
-    }
-    displayMode={true}
-  />
-  <p>
-    This is a single backpropagation — exactly the kind of Jacobian-vector product that automatic
-    differentiation systems are optimized for. The estimator is unbiased: in expectation it equals
-    the true divergence. Variance can be reduced by averaging across multiple <Katex math={"\\epsilon"} />
-    samples, but in practice a single sample per step works well.
-  </p>
-  <p>
-    Hutchinson is what takes CNFs from a beautiful mathematical idea to a method that is
-    actually used at scale. With it, exact-likelihood training of a CNF on high-dimensional
-    data costs roughly the same as a single forward+backward pass per ODE step — a tractable price
-    for what we get in return.
   </p>
 </section>
 
