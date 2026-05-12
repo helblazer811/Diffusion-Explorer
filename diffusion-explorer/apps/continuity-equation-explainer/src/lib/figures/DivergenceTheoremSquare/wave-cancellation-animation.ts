@@ -400,7 +400,10 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
         const lengthScale = this.interiorLengthScale(t, a.waveArrivalTime);
         if (lengthScale <= 0.001) continue;
         ctx.globalAlpha = opacity;
-        const len = a.baseLength * lengthScale;
+        // Clamp the arrow tip (including the arrowhead) so the pulse never
+        // pushes past the subdivision line on either side.
+        const maxLen = Math.max(0, a.halfCellPx - this.headRadius);
+        const len = Math.min(a.baseLength * lengthScale, maxLen);
         drawArrow(
           ctx,
           a.startX,
