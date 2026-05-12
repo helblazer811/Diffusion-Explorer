@@ -57,6 +57,9 @@ export type WaveCancellationOptions = {
   waveHold?: number;
   waveFade?: number;
   highlightOpacityBoost?: number;
+  // Multiplier on stroke width (and arrowhead radius) at the peak of the
+  // cancellation highlight — the "blink" before the arrow fades out.
+  highlightThicknessBoost?: number;
 
   // Loop-time placement of each ring's wave arrival.
   ring1Time?: number;
@@ -91,6 +94,7 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
   private readonly waveHold: number;
   private readonly waveFade: number;
   private readonly highlightOpacityBoost: number;
+  private readonly highlightThicknessBoost: number;
 
   private readonly swapStart: number;
   private readonly swapEnd: number;
@@ -114,6 +118,7 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
       waveHold = 0.03,
       waveFade = 0.12,
       highlightOpacityBoost = 1.3,
+      highlightThicknessBoost = 1.9,
       ring1Time = 0.275,
       ring2Time = 0.525,
       swapStart = 0.68,
@@ -129,6 +134,7 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
     this.waveHold = waveHold;
     this.waveFade = waveFade;
     this.highlightOpacityBoost = highlightOpacityBoost;
+    this.highlightThicknessBoost = highlightThicknessBoost;
     this.swapStart = swapStart;
     this.swapEnd = swapEnd;
     this.outsideHoldEnd = outsideHoldEnd;
@@ -297,6 +303,22 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
   }
 
   /**
+   * Stroke-thickness multiplier for interior arrows around their cancellation
+   * moment — ramps from 1.0 up to highlightThicknessBoost over the lead window,
+   * stays at the peak through the hold, then decays back to 1.0 across the
+   * fade window. Combined with the opacity envelope, this produces a brief
+   * "blink" before the arrow disappears.
+   */
+  private interiorThickness(t: number, T: number): number {
+    const { waveLead: lead, waveHold: hold, waveFade: fade, highlightThicknessBoost: boost } = this;
+    if (t < T - lead) return 1.0;
+    if (t < T) return 1.0 + (boost - 1.0) * ((t - (T - lead)) / lead);
+    if (t < T + hold) return boost;
+    if (t < T + hold + fade) return 1.0 + (boost - 1.0) * (1 - (t - (T + hold)) / fade);
+    return 1.0;
+  }
+
+  /**
    * Visibility envelope for the inside (in-cell) boundary arrows: full opacity
    * normally, fades out during the swap, returns at end of cycle.
    * Returns a multiplier in [0, 1] applied to the base 0.9 opacity.
@@ -342,15 +364,18 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
       if (a.category === 'interior') {
         const opacity = this.interiorOpacity(t, a.waveArrivalTime);
         if (opacity <= 0.001) continue;
+        const thicknessMult = this.interiorThickness(t, a.waveArrivalTime);
         ctx.globalAlpha = opacity;
+        ctx.lineWidth = this.strokeWidth * thicknessMult;
         drawArrow(
           ctx,
           a.startX,
           a.startY,
           a.startX + a.dx * a.baseLength,
           a.startY + a.dy * a.baseLength,
-          this.headRadius
+          this.headRadius * thicknessMult
         );
+        ctx.lineWidth = this.strokeWidth;
       } else {
         // Inside boundary arrow (in-cell, pointing outward).
         const insideOpacity = 0.9 * insideMult;
