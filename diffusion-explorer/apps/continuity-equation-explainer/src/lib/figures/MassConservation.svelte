@@ -67,7 +67,7 @@
   export let volumeStrokeColor = "#f97316"; // Orange
   export let volumeStrokeWidth = 3;
   export let volumeFillColor = "#fed7aa"; // Light orange tint
-  export let volumeFillOpacity = 0.8;
+  export let volumeFillOpacity = 1.0;
   export let volumeLabelText = "V";
   export let volumeLabelFontSize = 32;
   export let volumeLabelColor = "#f97316"; // Orange to match boundary
@@ -92,7 +92,7 @@
   export let gaussianContourBandwidth = 10;
   export let gaussianGridSize = 400;
   export let gaussianContourThresholds = 8;
-  export let gaussianContourOpacity = 0.4;
+  export let gaussianContourOpacity = 0.25;
   export let gaussianContourColor = "#3b82f6"; // Blue
 
   // Contour animation
