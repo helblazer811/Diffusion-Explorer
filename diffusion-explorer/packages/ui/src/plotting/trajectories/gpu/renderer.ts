@@ -27,9 +27,11 @@ const DEFAULT_OPACITY = 0.8;
 const DEFAULT_COLOR = '#3b82f6';
 const DEFAULT_POINT_RADIUS = 4;
 
-// Uniform buffer size (must be 16-byte aligned)
-// 16 floats * 4 bytes = 64 bytes
-const UNIFORM_BUFFER_SIZE = 64;
+// Uniform buffer size (must be 16-byte aligned).
+// 20 floats * 4 bytes = 80 bytes — extra slot for pointRadius + padding to
+// reach the next 16-byte boundary, so head markers can size themselves
+// independently of stroke thickness.
+const UNIFORM_BUFFER_SIZE = 80;
 
 /**
  * Options for creating a GPU trajectory renderer.
@@ -63,6 +65,7 @@ export class GPUTrajectoryRenderer {
   private context: GPUCanvasContext;
   private format: GPUTextureFormat;
   private pipeline: GPURenderPipeline;
+  private headPipeline: GPURenderPipeline;
   private uniformBuffer: GPUBuffer;
   private segmentBuffer: GPUBuffer | null = null;
   private headBuffer: GPUBuffer | null = null;
@@ -78,6 +81,7 @@ export class GPUTrajectoryRenderer {
 
   // Cached style options
   private thickness = DEFAULT_THICKNESS;
+  private pointRadius = DEFAULT_POINT_RADIUS;
   private colorR = 0.231;
   private colorG = 0.510;
   private colorB = 0.965;
@@ -94,6 +98,7 @@ export class GPUTrajectoryRenderer {
     context: GPUCanvasContext,
     format: GPUTextureFormat,
     pipeline: GPURenderPipeline,
+    headPipeline: GPURenderPipeline,
     uniformBuffer: GPUBuffer,
     canvasWidth: number,
     canvasHeight: number,
@@ -103,6 +108,7 @@ export class GPUTrajectoryRenderer {
     this.context = context;
     this.format = format;
     this.pipeline = pipeline;
+    this.headPipeline = headPipeline;
     this.uniformBuffer = uniformBuffer;
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
@@ -162,7 +168,7 @@ export class GPUTrajectoryRenderer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // Create bind group layout (uniforms + segments)
+    // Create bind group layout for stroke pipeline (uniforms + segments)
     const bindGroupLayout = device.createBindGroupLayout({
       label: 'Trajectory Bind Group Layout',
       entries: [
@@ -179,51 +185,69 @@ export class GPUTrajectoryRenderer {
       ],
     });
 
-    // Create pipeline layout
+    // Bind group layout for the head pipeline. Heads live at binding 2 in WGSL
+    // so they don't shadow segments@1 within the shared shader module — each
+    // pipeline supplies the buffer at its own slot.
+    const headBindGroupLayout = device.createBindGroupLayout({
+      label: 'Trajectory Head Bind Group Layout',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.VERTEX,
+          buffer: { type: 'read-only-storage' },
+        },
+      ],
+    });
+
     const pipelineLayout = device.createPipelineLayout({
       label: 'Trajectory Pipeline Layout',
       bindGroupLayouts: [bindGroupLayout],
     });
+    const headPipelineLayout = device.createPipelineLayout({
+      label: 'Trajectory Head Pipeline Layout',
+      bindGroupLayouts: [headBindGroupLayout],
+    });
+
+    // Color/depth/blend config shared between the stroke and head pipelines —
+    // identical aside from entry points, so head dots blend into the same
+    // canvas the same way segments do.
+    const sharedTargets = [
+      {
+        format,
+        blend: {
+          color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
+          alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
+        },
+      },
+    ] as const;
+    const sharedDepth = {
+      format: 'depth24plus' as GPUTextureFormat,
+      depthWriteEnabled: true,
+      depthCompare: 'less' as GPUCompareFunction,
+    };
 
     // Create render pipeline with depth testing
     const pipeline = device.createRenderPipeline({
       label: 'Trajectory Render Pipeline',
       layout: pipelineLayout,
-      vertex: {
-        module: shaderModule,
-        entryPoint: 'vs_main',
-      },
-      fragment: {
-        module: shaderModule,
-        entryPoint: 'fs_main',
-        targets: [
-          {
-            format,
-            blend: {
-              // Use max blending to prevent darkening at overlapping segments
-              // This ensures constant color regardless of overlap
-              color: {
-                srcFactor: 'one',
-                dstFactor: 'one',
-                operation: 'max',
-              },
-              alpha: {
-                srcFactor: 'one',
-                dstFactor: 'one',
-                operation: 'max',
-              },
-            },
-          },
-        ],
-      },
-      depthStencil: {
-        format: 'depth24plus',
-        depthWriteEnabled: true,
-        depthCompare: 'less', // Smaller z = closer = on top
-      },
-      primitive: {
-        topology: 'triangle-list',
-      },
+      vertex: { module: shaderModule, entryPoint: 'vs_main' },
+      fragment: { module: shaderModule, entryPoint: 'fs_main', targets: [...sharedTargets] },
+      depthStencil: sharedDepth,
+      primitive: { topology: 'triangle-list' },
+    });
+
+    const headPipeline = device.createRenderPipeline({
+      label: 'Trajectory Head Render Pipeline',
+      layout: headPipelineLayout,
+      vertex: { module: shaderModule, entryPoint: 'vs_head' },
+      fragment: { module: shaderModule, entryPoint: 'fs_head', targets: [...sharedTargets] },
+      depthStencil: sharedDepth,
+      primitive: { topology: 'triangle-list' },
     });
 
     return new GPUTrajectoryRenderer(
@@ -231,6 +255,7 @@ export class GPUTrajectoryRenderer {
       context,
       format,
       pipeline,
+      headPipeline,
       uniformBuffer,
       canvas.width,
       canvas.height,
@@ -264,6 +289,7 @@ export class GPUTrajectoryRenderer {
   ): void {
     // Update cached style
     this.thickness = style.strokeWidth ?? DEFAULT_THICKNESS;
+    this.pointRadius = style.pointRadius ?? DEFAULT_POINT_RADIUS;
     const color = parseColor(style.color ?? DEFAULT_COLOR);
     this.colorR = color[0];
     this.colorG = color[1];
@@ -329,13 +355,13 @@ export class GPUTrajectoryRenderer {
       ],
     });
 
-    // Create bind group for heads (using head buffer in binding 1)
+    // Bind group for heads — layout comes from the head pipeline (binding 2).
     this.headBindGroup = this.device.createBindGroup({
       label: 'Trajectory Head Bind Group',
-      layout: this.pipeline.getBindGroupLayout(0),
+      layout: this.headPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: { buffer: this.headBuffer } },
+        { binding: 2, resource: { buffer: this.headBuffer } },
       ],
     });
   }
@@ -426,8 +452,21 @@ export class GPUTrajectoryRenderer {
     renderPass.setBindGroup(0, this.bindGroup);
     renderPass.draw(6, this.segmentCount, 0, 0);
 
-    // Note: Head markers are not implemented in this version
-    // (the existing CPU code handles head markers)
+    // Pass 3: Draw head markers (the leading dot at each trajectory's frontier).
+    // Skipped when pointRadius is zero or no heads exist.
+    if (this.headBindGroup && this.headCount > 0 && this.pointRadius > 0) {
+      // Outline pass for head dots first (drawn behind via larger radius)
+      if (this.hasOutline) {
+        this.updateUniforms(true);
+        renderPass.setPipeline(this.headPipeline);
+        renderPass.setBindGroup(0, this.headBindGroup);
+        renderPass.draw(6, this.headCount, 0, 0);
+      }
+      this.updateUniforms(false);
+      renderPass.setPipeline(this.headPipeline);
+      renderPass.setBindGroup(0, this.headBindGroup);
+      renderPass.draw(6, this.headCount, 0, 0);
+    }
 
     renderPass.end();
     this.device.queue.submit([commandEncoder.finish()]);
@@ -437,12 +476,13 @@ export class GPUTrajectoryRenderer {
    * Update uniforms buffer.
    */
   private updateUniforms(isOutlinePass: boolean): void {
-    // Uniform layout (16 floats = 64 bytes):
+    // Uniform layout (20 floats = 80 bytes):
     // [width, height, dpr, _pad0,
     //  thickness, colorR, colorG, colorB, baseOpacity,
     //  outlineThickness, outlineColorR, outlineColorG, outlineColorB, outlineOpacity,
-    //  isOutlinePass, _pad1]
-    const uniformData = new Float32Array(16);
+    //  isOutlinePass, _pad1,
+    //  pointRadius, _pad2, _pad3, _pad4]
+    const uniformData = new Float32Array(20);
     uniformData[0] = this.canvasWidth;
     uniformData[1] = this.canvasHeight;
     uniformData[2] = this.dpr;
@@ -462,6 +502,9 @@ export class GPUTrajectoryRenderer {
 
     uniformData[14] = isOutlinePass ? 1.0 : 0.0;
     uniformData[15] = 0; // padding
+
+    uniformData[16] = this.pointRadius;
+    // 17, 18, 19 padding remain 0
 
     this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
   }
