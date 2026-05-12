@@ -60,6 +60,12 @@ export type WaveCancellationOptions = {
   // The arrow then fades out over waveFade.
   flashHalfWidth?: number;
   flashGap?: number;
+  // Length pulse: during the two-flash window, each arrow extends OUTWARD at
+  // each flash peak and retracts INWARD at the midpoint between flashes,
+  // creating an "outward-inward-outward" pulsing motion that visually shows
+  // the cancellation back-and-forth before the arrow fades to zero length.
+  // Fraction of baseLength to add/subtract at the peak/trough.
+  lengthPulseAmplitude?: number;
 
   // Loop-time placement of each ring's wave arrival.
   ring1Time?: number;
@@ -94,6 +100,7 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
   private readonly highlightOpacityBoost: number;
   private readonly flashHalfWidth: number;
   private readonly flashGap: number;
+  private readonly lengthPulseAmplitude: number;
 
   private readonly swapStart: number;
   private readonly swapEnd: number;
@@ -117,6 +124,7 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
       highlightOpacityBoost = 1.5,
       flashHalfWidth = 0.025,
       flashGap = 0.06,
+      lengthPulseAmplitude = 0.45,
       ring1Time = 0.275,
       ring2Time = 0.525,
       swapStart = 0.68,
@@ -132,6 +140,7 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
     this.highlightOpacityBoost = highlightOpacityBoost;
     this.flashHalfWidth = flashHalfWidth;
     this.flashGap = flashGap;
+    this.lengthPulseAmplitude = lengthPulseAmplitude;
     this.swapStart = swapStart;
     this.swapEnd = swapEnd;
     this.outsideHoldEnd = outsideHoldEnd;
@@ -314,6 +323,35 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
   }
 
   /**
+   * Length multiplier on interior arrows during their cancellation moment.
+   * Piecewise-linear "outward-inward-outward" pulse synced to the two-flash
+   * opacity profile:
+   *   - flash 1 peak (T):                     length = base * (1 + amp)
+   *   - midpoint between flashes (T+gap/2):   length = base * (1 - amp)
+   *   - flash 2 peak (T+gap):                 length = base * (1 + amp)
+   * Outside this window the length is base. During the subsequent fade, the
+   * length shrinks linearly to zero so the arrow appears to retract while it
+   * disappears.
+   */
+  private interiorLengthScale(t: number, T: number): number {
+    const { flashHalfWidth: hw, flashGap: gap, waveFade: fade, lengthPulseAmplitude: amp } = this;
+    const t0 = T - hw;
+    const t1 = T;
+    const t2 = T + gap / 2;
+    const t3 = T + gap;
+    const t4 = T + gap + hw;
+    const fadeEnd = t4 + fade;
+
+    if (t <= t0) return 1;
+    if (t < t1) return 1 + amp * (t - t0) / hw;
+    if (t < t2) return (1 + amp) + (-2 * amp) * ((t - t1) / (gap / 2));
+    if (t < t3) return (1 - amp) + (2 * amp) * ((t - t2) / (gap / 2));
+    if (t < t4) return (1 + amp) - amp * ((t - t3) / hw);
+    if (t < fadeEnd) return 1 - (t - t4) / fade;
+    return 0;
+  }
+
+  /**
    * Visibility envelope for the inside (in-cell) boundary arrows: full opacity
    * normally, fades out during the swap, returns at end of cycle.
    * Returns a multiplier in [0, 1] applied to the base 0.9 opacity.
@@ -359,13 +397,16 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
       if (a.category === 'interior') {
         const opacity = this.interiorOpacity(t, a.waveArrivalTime);
         if (opacity <= 0.001) continue;
+        const lengthScale = this.interiorLengthScale(t, a.waveArrivalTime);
+        if (lengthScale <= 0.001) continue;
         ctx.globalAlpha = opacity;
+        const len = a.baseLength * lengthScale;
         drawArrow(
           ctx,
           a.startX,
           a.startY,
-          a.startX + a.dx * a.baseLength,
-          a.startY + a.dy * a.baseLength,
+          a.startX + a.dx * len,
+          a.startY + a.dy * len,
           this.headRadius
         );
       } else {
