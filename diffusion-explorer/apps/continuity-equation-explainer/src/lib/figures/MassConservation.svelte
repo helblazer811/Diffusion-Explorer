@@ -102,7 +102,7 @@
 
   // Right canvas styling (Surface with rotating vectors)
   export let surfaceFillColor = "#ffffff"; // White
-  export let surfaceFillOpacity = 1.0;
+  export let surfaceFillOpacity = 0.5;
   export let surfaceStrokeColor = "#f97316"; // Orange
   export let surfaceStrokeWidth = 3;
 
