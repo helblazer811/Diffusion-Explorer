@@ -56,7 +56,7 @@
   export let contourBandwidth = 14;
   export let contourThresholds = 4;
   export let intermediateContourColor = "#f17720";
-  export let intermediateContourOpacity = 0.5;
+  export let intermediateContourOpacity = 0.25;
   export let contourMinThreshold = 0.0005;
 
   // Source / target scatter styling (blue points, like FlowInvertibility)
