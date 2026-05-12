@@ -579,7 +579,7 @@
     const cf = contourFrames[state.contourFrame];
     if (!ctx || !cf) return;
     ctx.clearRect(0, 0, cW, cH);
-    drawDensityAndDot(ctx, cf, cW, cH, /* mute */ true);
+    drawDensityAndDot(ctx, cf, cW, cH, /* mute */ false);
     const pos = cursorDomain ?? fixedPoint;
     drawDot(ctx, cW, cH, pos);
   }
