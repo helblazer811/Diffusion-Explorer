@@ -66,8 +66,8 @@
   // Left canvas styling (Volume)
   export let volumeStrokeColor = "#f97316"; // Orange
   export let volumeStrokeWidth = 3;
-  export let volumeFillColor = "#fdba74"; // More pronounced orange tint
-  export let volumeFillOpacity = 0.85;
+  export let volumeFillColor = "#ffedd5"; // Very light orange tint
+  export let volumeFillOpacity = 1.0;
   export let volumeLabelText = "V";
   export let volumeLabelFontSize = 32;
   export let volumeLabelColor = "#f97316"; // Orange to match boundary
@@ -410,7 +410,7 @@
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, cWidth, cHeight);
 
-    // 1. Fill volume interior with a pronounced orange tint
+    // 1. Fill volume interior with a light orange tint
     drawClosedCurve(ctx, curve, toPixelBound, {
       fillColor: volumeFillColor,
       fillOpacity: volumeFillOpacity,
@@ -428,7 +428,16 @@
       stroke: false,
     });
 
-    // 3. Draw "V" label in center
+    // 3. Draw the volume boundary outline on top so it reads cleanly over the
+    // tint + contours.
+    drawClosedCurve(ctx, curve, toPixelBound, {
+      fillColor: "transparent",
+      fillOpacity: 0,
+      strokeColor: volumeStrokeColor,
+      strokeWidth: volumeStrokeWidth,
+    });
+
+    // 4. Draw "V" label in center
     const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
     const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
     const [px, py] = toPixelBound([centerX, centerY]);
@@ -446,7 +455,7 @@
       }
     );
 
-    // 4. Draw "ρ" label above the surface
+    // 5. Draw "ρ" label above the surface
     const bbHeight = boundingBox.yMax - boundingBox.yMin;
     const rhoLabelY = centerY - densityLabelYOffset * bbHeight;
     const [rlx, rly] = toPixelBound([centerX, rhoLabelY]);
