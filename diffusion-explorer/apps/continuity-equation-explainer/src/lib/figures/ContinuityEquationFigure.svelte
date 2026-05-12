@@ -814,7 +814,7 @@
       <Katex math={"\\nabla \\cdot \\textcolor{#f97316}{p_t v_t}"} displayMode={true} />
     </div>
     <div class="grid-equals">
-      <Katex math={"= \\; 0"} displayMode={true} />
+      <Katex math={"= 0"} displayMode={true} />
     </div>
   </div>
 </div>
@@ -981,7 +981,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
     grid-template-rows: auto auto;
-    column-gap: 0.15rem;
+    column-gap: 0.5rem;
     row-gap: 1.1rem;
     justify-items: center;
   }
