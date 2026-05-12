@@ -798,23 +798,14 @@
     <div class="grid-label grid-label-left">
       Rate of change of <span style="color: #3b82f6;">density</span>
     </div>
-    <div class="grid-label-spacer"></div>
     <div class="grid-label grid-label-right">
       Divergence of <span style="color: #f97316;">probability flux</span>
     </div>
-    <div class="grid-label-spacer"></div>
-
-    <div class="grid-math">
-      <Katex math={"\\frac{\\partial \\textcolor{#3b82f6}{p_t(x)}}{\\partial t}"} displayMode={true} />
-    </div>
-    <div class="grid-equals">
-      <Katex math={"+"} displayMode={true} />
-    </div>
-    <div class="grid-math">
-      <Katex math={"\\nabla \\cdot \\textcolor{#f97316}{p_t v_t}"} displayMode={true} />
-    </div>
-    <div class="grid-equals">
-      <Katex math={"= 0"} displayMode={true} />
+    <div class="grid-math-full">
+      <Katex
+        math={"\\frac{\\partial \\textcolor{#3b82f6}{p_t(x)}}{\\partial t} + \\nabla \\cdot \\textcolor{#f97316}{p_t v_t} = 0"}
+        displayMode={true}
+      />
     </div>
   </div>
 </div>
@@ -979,7 +970,7 @@
 
   .equation-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-rows: auto auto;
     column-gap: 0.5rem;
     row-gap: 1.1rem;
@@ -995,17 +986,12 @@
     align-self: end;
   }
 
-  .grid-label-spacer {
-    /* placeholder over the equals sign */
-  }
-
-  .grid-math,
-  .grid-equals {
+  .grid-math-full {
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.4rem;
-    align-self: center;
   }
 
   .continuity-equation-equation + :global(.double-figure) {
