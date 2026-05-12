@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
-  import { Figure, drawScatterPlot, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, Timeline, createPauseClip, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawLine, drawCircle, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, Timeline, createPauseClip, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -129,28 +129,6 @@
         (p[0] - scales.targetMeanX) * scales.xScaleFactor,
       scales.yScale(p[1]),
     ]);
-  }
-
-  function drawLine(x1: number, y1: number, x2: number, y2: number, color: string, lineW: number, opacity: number = 1) {
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineW;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function drawCircle(x: number, y: number, radius: number, color: string, opacity: number = 1) {
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
   }
 
   function selectRandomIndices() {
@@ -343,6 +321,7 @@
         (sourcePoint[0] - scales.sourceMeanX) * scales.xScaleFactor;
       const sourceY = scales.yScale(sourcePoint[1]);
       drawLine(
+        ctx,
         sourceX,
         sourceY,
         targetX,
@@ -354,7 +333,7 @@
     }
 
     // Draw selected target point
-    drawCircle(targetX, targetY, selectedTargetRadius, selectedTargetColor);
+    drawCircle(ctx, targetX, targetY, selectedTargetRadius, selectedTargetColor);
 
     // Draw intermediate point and vector
     const sourceIdx = selectedSourceIndices[selectedPathIndex];
@@ -365,6 +344,7 @@
     const interpPixel = interpDataToPixel(interpDataX, interpDataY, t, scales);
 
     drawCircle(
+      ctx,
       interpPixel.x,
       interpPixel.y,
       intermediatePointRadius,
@@ -411,7 +391,7 @@
       scales.sourceCenterPixelX +
       (sourcePoint[0] - scales.sourceMeanX) * scales.xScaleFactor;
     const sourceY = scales.yScale(sourcePoint[1]);
-    drawCircle(sourceX, sourceY, selectedTargetRadius, selectedTargetColor);
+    drawCircle(ctx, sourceX, sourceY, selectedTargetRadius, selectedTargetColor);
     drawMathjax(
       ctx, "x_0", sourceX, sourceY,
       latexFontSize, 0, latexLabelOffsetY, { color: latexColor }

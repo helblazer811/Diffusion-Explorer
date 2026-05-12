@@ -4,7 +4,7 @@
   import { onDestroy } from "svelte";
   import type { Snippet } from "svelte";
   import type { Writable } from "svelte/store";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawLine, drawCircle, drawText, drawMathjax, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -136,29 +136,6 @@
     }
   }
 
-  // Canvas drawing helpers
-  function drawLine(x1: number, y1: number, x2: number, y2: number, color: string, lineW: number, opacity: number = 1) {
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineW;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function drawCircle(x: number, y: number, radius: number, color: string, opacity: number = 1) {
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
   // ----------------------------------------------------------------
   // Setup
   // ----------------------------------------------------------------
@@ -287,6 +264,7 @@
 
     // Draw connection line
     drawLine(
+      ctx,
       sourcePointPixel[0],
       sourcePointPixel[1],
       targetPointPixel[0],
@@ -297,8 +275,8 @@
     );
 
     // Draw line endpoints
-    drawCircle(sourcePointPixel[0], sourcePointPixel[1], pointRadius, animatedDotColor);
-    drawCircle(targetPointPixel[0], targetPointPixel[1], pointRadius, animatedDotColor);
+    drawCircle(ctx, sourcePointPixel[0], sourcePointPixel[1], pointRadius, animatedDotColor);
+    drawCircle(ctx, targetPointPixel[0], targetPointPixel[1], pointRadius, animatedDotColor);
 
     // --- Dynamic Foreground ---
     const t = state.time;
@@ -306,7 +284,7 @@
     // Draw animated dot at current time position (trivial lerps use t directly)
     const currentX = sourcePointPixel[0] + t * (targetPointPixel[0] - sourcePointPixel[0]);
     const currentY = sourcePointPixel[1] + t * (targetPointPixel[1] - sourcePointPixel[1]);
-    drawCircle(currentX, currentY, animatedDotRadius, animatedDotColor);
+    drawCircle(ctx, currentX, currentY, animatedDotRadius, animatedDotColor);
 
     // Draw LaTeX labels directly on canvas
     const latexColor = settings.stylingSettings.figureLatex.color;
