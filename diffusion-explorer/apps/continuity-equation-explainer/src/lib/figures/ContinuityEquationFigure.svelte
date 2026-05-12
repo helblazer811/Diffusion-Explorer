@@ -624,21 +624,19 @@
   $: barHeightScale = d3.scaleLinear().domain([0, 1]).range([0, barMaxHeight]);
   $: barCurrentHeight = Math.max(0, barHeightScale(currentBarValue));
   $: barX = canvasWidth ? canvasWidth - barRightMargin - barThickness : 0;
-  // Horizontal bar chart, overlaid on the bottom of the LHS canvas and
-  // horizontally centered. `barMaxHeight` is reused as the bar's max LENGTH
-  // (horizontal extent), `barThickness` as its vertical thickness.
-  $: barLeftX = canvasWidth ? (canvasWidth - barMaxHeight) / 2 : 0;
-  $: barCenterY = canvasHeight ? canvasHeight - barRightMargin - barThickness / 2 : 0;
-  $: barTopRowY = barCenterY - barThickness / 2;
-  $: barBottomRowY = barCenterY + barThickness / 2;
-  // Right-edge of the current bar (it grows rightward from barLeftX).
-  $: barRightX = barLeftX + barCurrentHeight;
+  // Vertical bar chart on the LEFT side of the canvas, centered vertically.
+  $: barX = barRightMargin;
+  $: barCenterX = barX + barThickness / 2;
+  $: barBottomY = canvasHeight && barMaxHeight
+    ? (canvasHeight + barMaxHeight) / 2
+    : canvasHeight;
+  $: barTopY = barBottomY - barCurrentHeight;
   $: gridFractions = [0.25, 0.5, 0.75, 1.0];
 
-  // Angled (diagonal) callout from the dot to the LEFT end of the
-  // horizontal bar's baseline (top-left corner of the bar's tick area).
-  $: barCalloutTargetX = barLeftX;
-  $: barCalloutTargetY = barTopRowY - 6;
+  // Angled (diagonal) callout from the dot to the LEFT side of the
+  // vertical bar's BASE — the leftmost end of the baseline tick.
+  $: barCalloutTargetX = barX - 12;
+  $: barCalloutTargetY = barBottomY;
   $: barCalloutStart = canvasWidth && canvasHeight
     ? (() => {
         const [dx, dy] = dotPixel;
@@ -856,24 +854,24 @@
         </defs>
         {#each gridFractions as frac}
           <line
-            x1={barLeftX + frac * barMaxHeight}
-            y1={barTopRowY - 8}
-            x2={barLeftX + frac * barMaxHeight}
-            y2={barBottomRowY + 8}
+            x1={barX - 8}
+            y1={barBottomY - frac * barMaxHeight}
+            x2={barX + barThickness + 8}
+            y2={barBottomY - frac * barMaxHeight}
             stroke={barGridColor}
             stroke-width={barGridWidth}
           />
         {/each}
         <line
-          x1={barLeftX}
-          y1={barTopRowY - 12}
-          x2={barLeftX}
-          y2={barBottomRowY + 12}
+          x1={barX - 12}
+          y1={barBottomY}
+          x2={barX + barThickness + 12}
+          y2={barBottomY}
           stroke={barBaselineColor}
           stroke-width={barBaselineWidth}
         />
-        <!-- Angled (diagonal) callout from the dot to the top-left of the
-             horizontal bar's baseline tick. -->
+        <!-- Angled (diagonal) callout from the dot to the LEFT side of the
+             bar's baseline tick. -->
         <line
           x1={barCalloutStart[0]}
           y1={barCalloutStart[1]}
@@ -883,32 +881,31 @@
           stroke-width={barCalloutWidth}
         />
         <rect
-          x={barLeftX}
-          y={barTopRowY}
-          width={barCurrentHeight}
-          height={barThickness}
+          x={barX}
+          y={barTopY}
+          width={barThickness}
+          height={barCurrentHeight}
           fill={barColor}
           rx="2"
         />
-        <!-- Axis arrow that sits at the RIGHT edge of the current bar and
-             points further right. Tracks the bar's current value. Length
-             is fixed so the arrow stays a recognizable size at every value. -->
+        <!-- Axis arrow centered on the bar, always pointing up. Length is
+             fixed so the arrow stays a recognizable size at every value. -->
         <line
-          x1={barRightX}
-          y1={barCenterY}
-          x2={barRightX + barArrowLength}
-          y2={barCenterY}
+          x1={barCenterX}
+          y1={barTopY}
+          x2={barCenterX}
+          y2={barTopY - barArrowLength}
           stroke={barColor}
           stroke-width="2.5"
           marker-end="url(#ce-axis-arrowhead)"
         />
       </svg>
-      <!-- ∂p_t(x)/∂t label, horizontal, below the bar -->
+      <!-- ∂p_t(x)/∂t label, vertically centered on the axis arrow -->
       <div
         class="dpdt-label"
         style="
-          left: {((barRightX + barArrowLength / 2) / canvasWidth) * 100}%;
-          top: {((barBottomRowY + 8) / canvasHeight) * 100}%;
+          left: {((barCenterX + 8) / canvasWidth) * 100}%;
+          top: {((barTopY - barArrowLength / 2) / canvasHeight) * 100}%;
         "
       >
         <Katex math={`\\textcolor{${barColor}}{\\frac{\\partial p_t(x)}{\\partial t}}`} />
@@ -916,8 +913,8 @@
       <div
         class="bar-label"
         style="
-          left: {((barLeftX - 26) / canvasWidth) * 100}%;
-          top: {(barCenterY / canvasHeight) * 100}%;
+          left: {(barCenterX / canvasWidth) * 100}%;
+          top: {((barBottomY + barLabelGap) / canvasHeight) * 100}%;
         "
       >
         <Katex math={`\\color{${barColor}} p_t(x)`} />
@@ -1038,9 +1035,9 @@
 
   .bar-label {
     position: absolute;
-    /* Anchor the label's RIGHT edge at `left` (so it sits to the LEFT of
-       the reference x) and vertical center at `top`. */
-    transform: translate(-100%, -50%);
+    /* Horizontally centered at `left`, top edge at `top` — sits BELOW the
+       reference y. */
+    transform: translate(-50%, 0);
     color: #374151;
     font-size: 1.5rem;
     line-height: 1;
@@ -1050,9 +1047,9 @@
 
   .dpdt-label {
     position: absolute;
-    /* Center horizontally at `left`, top at `top` — sits BELOW the
-       reference y. */
-    transform: translate(-50%, 0);
+    /* Anchor left edge at `left` and vertical center at `top` — sits to
+       the RIGHT of the reference x, vertically centered on it. */
+    transform: translate(0, -50%);
     font-size: 1.5rem;
     line-height: 1;
     pointer-events: none;
