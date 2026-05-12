@@ -91,6 +91,11 @@
   export let cellArrowHeadRadius = 4;
   export let cellArrowPadding = 0.32; // fraction of half-cell to leave as padding
 
+  // Subdivision lines on the LHS rectangle (the 3×3 grid lines).
+  export let subdivisionColor = "#f97316";
+  export let subdivisionWidth = 1.5;
+  export let subdivisionOpacity = 0.45;
+
   // Animation
   export let animationDuration = 8; // seconds for one cycle (rotating point + arrow wave)
   // Pulse frequency: number of pulse cycles per timeline loop. MUST satisfy
@@ -392,6 +397,50 @@
   }
 
   /**
+   * Draw the 3×3 subdivision lines that match the LHS wave-cancellation grid.
+   * The grid is centered on the bounding box and uses max(width, height) / 3
+   * as the cell size, matching `buildLeftGrid`.
+   */
+  function drawLeftSubdivisions(ctx: CanvasRenderingContext2D) {
+    if (!boundingBox) return;
+    const cx = (boundingBox.xMin + boundingBox.xMax) / 2;
+    const cy = (boundingBox.yMin + boundingBox.yMax) / 2;
+    const dim = Math.max(
+      boundingBox.xMax - boundingBox.xMin,
+      boundingBox.yMax - boundingBox.yMin
+    );
+    const step = dim / 3;
+    const gridXMin = cx - step * 1.5;
+    const gridYMin = cy - step * 1.5;
+    const gridXMax = gridXMin + 3 * step;
+    const gridYMax = gridYMin + 3 * step;
+
+    ctx.save();
+    ctx.strokeStyle = subdivisionColor;
+    ctx.lineWidth = subdivisionWidth;
+    ctx.globalAlpha = subdivisionOpacity;
+
+    for (let i = 1; i < 3; i++) {
+      const xDomain = gridXMin + i * step;
+      const [x1, y1] = toPixel([xDomain, gridYMin]);
+      const [x2, y2] = toPixel([xDomain, gridYMax]);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      const yDomain = gridYMin + i * step;
+      const [hx1, hy1] = toPixel([gridXMin, yDomain]);
+      const [hx2, hy2] = toPixel([gridXMax, yDomain]);
+      ctx.beginPath();
+      ctx.moveTo(hx1, hy1);
+      ctx.lineTo(hx2, hy2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /**
    * Paint a semi-transparent rectangle over the streamlines so the surface,
    * grid, and arrows on top read more clearly.
    */
@@ -421,7 +470,10 @@
     // 2. Surface fill + outline
     drawSurface(ctx);
 
-    // 3. Wave-cancellation animation: 3×3 grid of outward arrows whose
+    // 3. 3×3 subdivision lines so the discrete cells are explicit.
+    drawLeftSubdivisions(ctx);
+
+    // 4. Wave-cancellation animation: 3×3 grid of outward arrows whose
     //    interior pairs cancel center-out, leaving only boundary arrows
     //    pulsed for emphasis at the end of the cycle.
     if (leftWaveAnim?.initialized) {
