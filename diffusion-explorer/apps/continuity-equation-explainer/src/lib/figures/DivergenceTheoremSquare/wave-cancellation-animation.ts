@@ -53,13 +53,13 @@ export type WaveCancellationOptions = {
   headRadius?: number;
 
   // Wave timing — all in normalized loop fraction [0, 1].
-  waveLead?: number;
-  waveHold?: number;
   waveFade?: number;
   highlightOpacityBoost?: number;
-  // Multiplier on stroke width (and arrowhead radius) at the peak of the
-  // cancellation highlight — the "blink" before the arrow fades out.
-  highlightThicknessBoost?: number;
+  // Two-flash blink: each flash is a triangular opacity pulse of half-width
+  // flashHalfWidth around its peak, with flashGap between the two peaks.
+  // The arrow then fades out over waveFade.
+  flashHalfWidth?: number;
+  flashGap?: number;
 
   // Loop-time placement of each ring's wave arrival.
   ring1Time?: number;
@@ -90,11 +90,10 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
   private readonly strokeWidth: number;
   private readonly headRadius: number;
 
-  private readonly waveLead: number;
-  private readonly waveHold: number;
   private readonly waveFade: number;
   private readonly highlightOpacityBoost: number;
-  private readonly highlightThicknessBoost: number;
+  private readonly flashHalfWidth: number;
+  private readonly flashGap: number;
 
   private readonly swapStart: number;
   private readonly swapEnd: number;
@@ -114,11 +113,10 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
       color = '#1f2937',
       strokeWidth = 2,
       headRadius = 4,
-      waveLead = 0.04,
-      waveHold = 0.03,
       waveFade = 0.12,
-      highlightOpacityBoost = 1.3,
-      highlightThicknessBoost = 1.9,
+      highlightOpacityBoost = 1.5,
+      flashHalfWidth = 0.025,
+      flashGap = 0.06,
       ring1Time = 0.275,
       ring2Time = 0.525,
       swapStart = 0.68,
@@ -130,11 +128,10 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
     this.color = color;
     this.strokeWidth = strokeWidth;
     this.headRadius = headRadius;
-    this.waveLead = waveLead;
-    this.waveHold = waveHold;
     this.waveFade = waveFade;
     this.highlightOpacityBoost = highlightOpacityBoost;
-    this.highlightThicknessBoost = highlightThicknessBoost;
+    this.flashHalfWidth = flashHalfWidth;
+    this.flashGap = flashGap;
     this.swapStart = swapStart;
     this.swapEnd = swapEnd;
     this.outsideHoldEnd = outsideHoldEnd;
@@ -281,41 +278,39 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
   // --------------------------------------------------------------------------
 
   /**
-   * Cancellation-aware opacity for interior arrows. Returns the highlight-then-
-   * fade profile around the arrow's wave-arrival time, and recovers back to 1
-   * during the end-of-cycle window so the loop closes seamlessly.
+   * Cancellation-aware opacity for interior arrows. Around the arrow's wave-
+   * arrival time, opacity flashes twice (two triangular pulses peaking at
+   * 1 + (boost - 1)), then the arrow fades to 0 over waveFade. Recovers to
+   * 1.0 during the end-of-cycle window so the loop closes seamlessly.
    */
   private interiorOpacity(t: number, T: number): number {
-    const { waveLead: lead, waveHold: hold, waveFade: fade, highlightOpacityBoost: boost } = this;
-    let canc: number;
-    if (t < T - lead) canc = 1.0;
-    else if (t < T) canc = 1.0 + (boost - 1.0) * ((t - (T - lead)) / lead);
-    else if (t < T + hold) canc = boost;
-    else if (t < T + hold + fade) canc = boost * (1 - (t - (T + hold)) / fade);
-    else canc = 0;
+    const { flashHalfWidth: hw, flashGap: gap, waveFade: fade, highlightOpacityBoost: boost } = this;
+    const flash1Peak = T;
+    const flash2Peak = T + gap;
+    const flashEnd = flash2Peak + hw;
+
+    // Triangular pulse: peak amplitude (boost - 1) at the peak time, linearly
+    // tapering to 0 at peak ± hw.
+    const pulse = (d: number) => {
+      const ad = Math.abs(d);
+      return ad < hw ? (boost - 1) * (1 - ad / hw) : 0;
+    };
+
+    const flashContrib = Math.max(pulse(t - flash1Peak), pulse(t - flash2Peak));
+
+    let base: number;
+    if (t < flashEnd) base = 1.0;
+    else if (t < flashEnd + fade) base = 1.0 - (t - flashEnd) / fade;
+    else base = 0;
+
+    let opacity = base + flashContrib;
 
     // End-of-cycle recovery: ramp back to 1.0 for a seamless loop.
     if (t >= this.outsideHoldEnd) {
       const u = (t - this.outsideHoldEnd) / (1.0 - this.outsideHoldEnd);
-      return Math.max(canc, u);
+      opacity = Math.max(opacity, u);
     }
-    return canc;
-  }
-
-  /**
-   * Stroke-thickness multiplier for interior arrows around their cancellation
-   * moment — ramps from 1.0 up to highlightThicknessBoost over the lead window,
-   * stays at the peak through the hold, then decays back to 1.0 across the
-   * fade window. Combined with the opacity envelope, this produces a brief
-   * "blink" before the arrow disappears.
-   */
-  private interiorThickness(t: number, T: number): number {
-    const { waveLead: lead, waveHold: hold, waveFade: fade, highlightThicknessBoost: boost } = this;
-    if (t < T - lead) return 1.0;
-    if (t < T) return 1.0 + (boost - 1.0) * ((t - (T - lead)) / lead);
-    if (t < T + hold) return boost;
-    if (t < T + hold + fade) return 1.0 + (boost - 1.0) * (1 - (t - (T + hold)) / fade);
-    return 1.0;
+    return opacity;
   }
 
   /**
@@ -364,18 +359,15 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
       if (a.category === 'interior') {
         const opacity = this.interiorOpacity(t, a.waveArrivalTime);
         if (opacity <= 0.001) continue;
-        const thicknessMult = this.interiorThickness(t, a.waveArrivalTime);
         ctx.globalAlpha = opacity;
-        ctx.lineWidth = this.strokeWidth * thicknessMult;
         drawArrow(
           ctx,
           a.startX,
           a.startY,
           a.startX + a.dx * a.baseLength,
           a.startY + a.dy * a.baseLength,
-          this.headRadius * thicknessMult
+          this.headRadius
         );
-        ctx.lineWidth = this.strokeWidth;
       } else {
         // Inside boundary arrow (in-cell, pointing outward).
         const insideOpacity = 0.9 * insideMult;

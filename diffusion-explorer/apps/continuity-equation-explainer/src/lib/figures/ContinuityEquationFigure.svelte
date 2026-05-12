@@ -700,10 +700,23 @@
   function handlePointerMove(e: PointerEvent) {
     if (!isInitialized) return;
     cursorDomain = eventToDomain(e);
+    redrawIfPaused();
   }
 
   function handlePointerLeave() {
     cursorDomain = null;
+    redrawIfPaused();
+  }
+
+  // When the timeline is paused, ticks don't fire and the canvases don't
+  // re-render. Cursor moves still need to update the orange dot, the bar
+  // chart, the pathlines/streamlines clip center, etc., so trigger a manual
+  // redraw using the timeline's current state.
+  function redrawIfPaused() {
+    if (!timeline || timeline.isPlaying || !canvasWidth || !canvasHeight) return;
+    const state = timeline.state;
+    drawLeft(state, canvasWidth, canvasHeight);
+    drawRight(state, canvasWidth, canvasHeight);
   }
 
   // Recompute pathlines whenever the active center (cursor or fixedPoint)
