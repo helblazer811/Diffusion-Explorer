@@ -905,7 +905,7 @@
       <div
         class="dpdt-label"
         style="
-          left: {((barCenterX - 8) / canvasWidth) * 100}%;
+          left: {((barCenterX - 20) / canvasWidth) * 100}%;
           top: {((barTopY - barArrowLength / 2) / canvasHeight) * 100}%;
         "
       >
