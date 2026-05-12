@@ -633,9 +633,9 @@
   $: barTopY = barBottomY - barCurrentHeight;
   $: gridFractions = [0.25, 0.5, 0.75, 1.0];
 
-  // Angled (diagonal) callout from the dot to the LEFT side of the
-  // vertical bar's BASE — the leftmost end of the baseline tick.
-  $: barCalloutTargetX = barX - 12;
+  // Angled (diagonal) callout from the dot to the RIGHT side of the
+  // vertical bar's BASE — the rightmost end of the baseline tick.
+  $: barCalloutTargetX = barX + barThickness + 12;
   $: barCalloutTargetY = barBottomY;
   $: barCalloutStart = canvasWidth && canvasHeight
     ? (() => {
@@ -900,11 +900,12 @@
           marker-end="url(#ce-axis-arrowhead)"
         />
       </svg>
-      <!-- ∂p_t(x)/∂t label, vertically centered on the axis arrow -->
+      <!-- ∂p_t(x)/∂t label, to the LEFT of the bar's axis arrow,
+           vertically centered on the arrow midpoint. -->
       <div
         class="dpdt-label"
         style="
-          left: {((barCenterX + 8) / canvasWidth) * 100}%;
+          left: {((barCenterX - 8) / canvasWidth) * 100}%;
           top: {((barTopY - barArrowLength / 2) / canvasHeight) * 100}%;
         "
       >
@@ -1047,9 +1048,9 @@
 
   .dpdt-label {
     position: absolute;
-    /* Anchor left edge at `left` and vertical center at `top` — sits to
-       the RIGHT of the reference x, vertically centered on it. */
-    transform: translate(0, -50%);
+    /* Anchor right edge at `left` and vertical center at `top` — sits to
+       the LEFT of the reference x, vertically centered on it. */
+    transform: translate(-100%, -50%);
     font-size: 1.5rem;
     line-height: 1;
     pointer-events: none;
