@@ -371,7 +371,7 @@
       showGroundTruth={false}
       showLegend={false}
       showArrowHeads={true}
-      domainRange={{ xMin: -3.25, xMax: 3.25, yMin: -3.425, yMax: 3.075 }}
+      domainRange={{ xMin: -2.825, xMax: 2.825, yMin: -3, yMax: 2.65 }}
     >
       <strong>Euler integration through a time-dependent velocity field
         <Katex math={"v_t(x)"} />.</strong>
