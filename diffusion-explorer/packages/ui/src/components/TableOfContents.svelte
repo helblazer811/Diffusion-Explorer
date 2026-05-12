@@ -175,11 +175,12 @@
     margin: 0;
   }
 
-  .toc-divider {
+  .toc-list .toc-divider,
+  .toc-modal-list .toc-divider {
     list-style: none;
     height: 1px;
     background: #e0e0e0;
-    margin: 0.6rem 0.75rem;
+    margin: 1rem 0.75rem;
   }
 
   .toc-item {
