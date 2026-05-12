@@ -930,6 +930,7 @@
       gridYMax={2.2}
       gridResolution={10}
       contourThresholds={8}
+      contourMinThreshold={0.002}
     >
       <strong>A diffeomorphism in action.</strong>
       A uniform grid at <Katex math={"t = 0"} /> is pushed forward by the same flow that maps the
