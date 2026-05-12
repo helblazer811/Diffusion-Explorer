@@ -66,7 +66,7 @@
   // Left canvas styling (Volume)
   export let volumeStrokeColor = "#f97316"; // Orange
   export let volumeStrokeWidth = 3;
-  export let volumeFillColor = "#ffedd5"; // Very light orange tint
+  export let volumeFillColor = "#fed7aa"; // Light orange tint
   export let volumeFillOpacity = 1.0;
   export let volumeLabelText = "V";
   export let volumeLabelFontSize = 32;
