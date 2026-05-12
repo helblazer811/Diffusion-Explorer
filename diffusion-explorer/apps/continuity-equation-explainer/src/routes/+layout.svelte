@@ -22,7 +22,7 @@
 	}}
 />
 
-<TableOfContents />
+<TableOfContents dividerIds={['acknowledgements-heading']} />
 
 <PageContainer>
 	{@render children()}

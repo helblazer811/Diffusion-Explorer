@@ -4,6 +4,10 @@
   // Props
   export let title = 'Contents';
   export let includeH3 = true;
+  // IDs of headings that should have a horizontal divider rendered ABOVE them
+  // in the TOC — useful for separating the main content from meta sections
+  // like Acknowledgements / References.
+  export let dividerIds = [];
 
   // State
   let headings = [];
@@ -71,6 +75,9 @@
   <h4 class="toc-title">{title}</h4>
   <ul class="toc-list">
     {#each headings as heading}
+      {#if dividerIds.includes(heading.id)}
+        <li class="toc-divider" aria-hidden="true"></li>
+      {/if}
       <li>
         <button
           class="toc-item"
@@ -111,6 +118,9 @@
     </div>
     <ul class="toc-modal-list">
       {#each headings as heading}
+        {#if dividerIds.includes(heading.id)}
+          <li class="toc-divider" aria-hidden="true"></li>
+        {/if}
         <li>
           <button
             class="toc-modal-item"
@@ -163,6 +173,13 @@
 
   .toc-list li {
     margin: 0;
+  }
+
+  .toc-divider {
+    list-style: none;
+    height: 1px;
+    background: #e0e0e0;
+    margin: 0.6rem 0.75rem;
   }
 
   .toc-item {
