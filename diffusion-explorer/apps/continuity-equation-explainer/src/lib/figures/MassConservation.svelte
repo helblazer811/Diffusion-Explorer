@@ -66,6 +66,8 @@
   // Left canvas styling (Volume)
   export let volumeStrokeColor = "#f97316"; // Orange
   export let volumeStrokeWidth = 3;
+  export let volumeFillColor = "#fdba74"; // More pronounced orange tint
+  export let volumeFillOpacity = 0.85;
   export let volumeLabelText = "V";
   export let volumeLabelFontSize = 32;
   export let volumeLabelColor = "#f97316"; // Orange to match boundary
@@ -99,8 +101,8 @@
   export let contourAnimationDuration = 4;
 
   // Right canvas styling (Surface with rotating vectors)
-  export let surfaceFillColor = "#fff7ed"; // Light orange tint
-  export let surfaceFillOpacity = 0.8;
+  export let surfaceFillColor = "#ffffff"; // White
+  export let surfaceFillOpacity = 1.0;
   export let surfaceStrokeColor = "#f97316"; // Orange
   export let surfaceStrokeWidth = 3;
 
@@ -404,10 +406,10 @@
     // Create toPixel function bound to current canvas dimensions
     const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
 
-    // 1. Fill volume interior with light orange tint (matches right side)
+    // 1. Fill volume interior with a pronounced orange tint
     drawClosedCurve(ctx, curve, toPixelBound, {
-      fillColor: surfaceFillColor,
-      fillOpacity: surfaceFillOpacity,
+      fillColor: volumeFillColor,
+      fillOpacity: volumeFillOpacity,
       strokeColor: "transparent",
       strokeWidth: 0,
     });
@@ -422,15 +424,7 @@
       stroke: false,
     });
 
-    // 3. Draw surface boundary (no fill, just the orange outline)
-    drawClosedCurve(ctx, curve, toPixelBound, {
-      fillColor: "transparent",
-      fillOpacity: 0,
-      strokeColor: volumeStrokeColor,
-      strokeWidth: volumeStrokeWidth,
-    });
-
-    // 4. Draw "V" label in center
+    // 3. Draw "V" label in center
     const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
     const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
     const [px, py] = toPixelBound([centerX, centerY]);
@@ -448,7 +442,7 @@
       }
     );
 
-    // 5. Draw "ρ" label above the surface
+    // 4. Draw "ρ" label above the surface
     const bbHeight = boundingBox.yMax - boundingBox.yMin;
     const rhoLabelY = centerY - densityLabelYOffset * bbHeight;
     const [rlx, rly] = toPixelBound([centerX, rhoLabelY]);
