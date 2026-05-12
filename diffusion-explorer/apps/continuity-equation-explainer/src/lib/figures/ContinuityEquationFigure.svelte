@@ -71,9 +71,9 @@
     cov: [[number, number], [number, number]];
     weight: number;
   }> = [
-    { mean: [-0.35, 0.4], cov: [[0.08, 0.02], [0.02, 0.05]], weight: 0.4 },
-    { mean: [-0.15, -0.4], cov: [[0.07, 0], [0, 0.06]], weight: 0.35 },
-    { mean: [0.15, 0.05], cov: [[0.05, -0.01], [-0.01, 0.06]], weight: 0.25 },
+    { mean: [-0.1, 0.4], cov: [[0.08, 0.02], [0.02, 0.05]], weight: 0.4 },
+    { mean: [0.1, -0.4], cov: [[0.07, 0], [0, 0.06]], weight: 0.35 },
+    { mean: [0.4, 0.05], cov: [[0.05, -0.01], [-0.01, 0.06]], weight: 0.25 },
   ];
   export let numSamples = 3000;
   export let contourBandwidth = 10;
