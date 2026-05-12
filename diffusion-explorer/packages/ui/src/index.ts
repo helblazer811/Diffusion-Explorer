@@ -1,3 +1,16 @@
+// Shared figures (extracted from byte-identical duplicates in apps)
+export { default as CurvedTrajectoryIntro } from './figures/CurvedTrajectoryIntro.svelte';
+export type {
+  CurvedTrajectoryIntroSettings,
+  FlowModelClientLike,
+} from './figures/CurvedTrajectoryIntro.svelte';
+export { default as EulerStepDemo } from './figures/EulerStepDemo.svelte';
+export type {
+  EulerStepDemoSettings,
+  EulerStepDemoVectorFieldData,
+  EulerStepDemoFlowModelClientLike,
+} from './figures/EulerStepDemo.svelte';
+
 // Existing components
 export { default as Katex } from './components/Katex.svelte';
 export { default as AnnotatedEquation } from './components/AnnotatedEquation.svelte';

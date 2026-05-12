@@ -1,16 +1,65 @@
+<script lang="ts" context="module">
+  export interface CurvedTrajectoryIntroSettings {
+    interactiveSettings: { maxUserTrajectories: number };
+    stylingSettings: {
+      scatterPlot: {
+        clippingRadius: number;
+        yShiftFactor: number;
+        radius: number;
+        color: string;
+        opacity: number;
+      };
+      layout: { sourceCenterX: number; targetCenterX: number };
+      trajectory: {
+        color: string;
+        strokeWidth: number;
+        endpointRadius: number;
+        opacity: number;
+      };
+      label: {
+        color: string;
+        fontSize: number;
+        fontWeight: number | string;
+        opacity: number;
+      };
+    };
+    flowModelWorkerUrl: string | null;
+    flowMatchingModelPath: string | null;
+  }
+
+  // Minimal duck-typed interface — accepts any FlowModelClient-like object.
+  // Avoids coupling @diffusion-explorer/ui to @diffusion-explorer/diffusion.
+  export interface FlowModelClientLike {
+    stopRequest(id: string): void;
+    sampleFromInitialPoints(
+      initialPoints: number[][],
+      numSteps: number,
+      options: object,
+      onStep?: (step: number, x_t: number[][]) => void
+    ): { requestId: string; promise: Promise<unknown> };
+  }
+</script>
+
 <script lang="ts">
   import { onDestroy, type Snippet } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
-  import type { FlowModelClient } from "@diffusion-explorer/diffusion";
+  import Figure from "../components/Figure.svelte";
+  import TimeSlider from "../components/TimeSlider.svelte";
+  import { drawScatterPlot, drawText } from "../plotting/plotting";
+  import { createSourceTargetScales } from "../d3_utils";
+  import { useCanvas2D } from "../plotting/canvas";
+  import { PathlineAnimation, type PathlineAnimationState } from "../animation/animations/pathline-animation";
+  import { Timeline, useVisibilityHandler } from "tempus";
   import type { Writable } from "svelte/store";
-  import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
+  // App-specific settings (styling, layout, model paths)
+  export let settings: CurvedTrajectoryIntroSettings;
+
   // FlowModelClient instance (passed from parent, created with correct base path)
-  export let flowMatchingClient: FlowModelClient | null = null;
+  export let flowMatchingClient: FlowModelClientLike | null = null;
 
   // Data props
   export let sourceDistributionSamples: number[][] = [];

@@ -24,9 +24,8 @@
   import OTCoupling from "$lib/figures/OTCoupling.svelte";
   import ProbabilityPath from "$lib/figures/ProbabilityPath.svelte";
   import HighlightTrajectory from "$lib/figures/HighlightTrajectory.svelte";
-  import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
+  import { CurvedTrajectoryIntro, EulerStepDemo } from "@diffusion-explorer/ui";
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
-  import EulerStepDemo from "$lib/figures/EulerStepDemo.svelte";
   import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
   import CrownJewel from "$lib/figures/CrownJewel.svelte";
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
@@ -395,12 +394,12 @@
   {#if showOtherFigures}
     <div id="figure-2">
       <CurvedTrajectoryIntro
+        {settings}
         width={figureWidth}
         {flowMatchingClient}
         sourceDistributionSamples={$sourceDistributionSamples}
         targetDistributionSamples={$targetDistributionSamples}
         allTimeSamples={$allTimeSamples}
-        isTraining={$isTraining}
       >
         <div class="caption">
           <span class="figure-number">Figure 2:</span>
@@ -622,6 +621,7 @@
 
   {#if showOtherFigures}
     <EulerStepDemo
+      {settings}
       {flowMatchingClient}
       targetDistribution={$targetDistributionSamples}
       flowMatchingVectorField={$vectorFieldData}
