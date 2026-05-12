@@ -85,6 +85,12 @@ export function prepareGPUTrajectoryData(
   const unsortedSegments: number[][] = [];
   const headPositions = new Float32Array(numTrajectories * 4);
 
+  // Divide by (maxTimeIndex + 1) so even the trajIdx tiebreaker for the last
+  // timestep stays strictly inside [0, 1]. With the previous denominator, head
+  // zValue could be (maxTimeIndex + numTraj*0.0001) / maxTimeIndex > 1.0,
+  // producing a negative NDC depth (1 - z) and getting clipped by WebGPU.
+  const zDenom = Math.max(maxTimeIndex, 1) + 1;
+
   for (let trajIdx = 0; trajIdx < numTrajectories; trajIdx++) {
     const traj = trajectories[trajIdx];
     const endIdx = Math.min(segmentIndex + 1, traj.length - 1);
@@ -95,7 +101,7 @@ export function prepareGPUTrajectoryData(
     for (let timeIdx = 0; timeIdx < endIdx; timeIdx++) {
       // Z-value: based on time index with trajectory tiebreaker
       // Higher values = closer to camera = drawn on top
-      const zValue = (timeIdx + trajIdx * 0.0001) / Math.max(maxTimeIndex, 1);
+      const zValue = (timeIdx + trajIdx * 0.0001) / zDenom;
 
       unsortedSegments.push([
         traj[timeIdx][0],
@@ -109,9 +115,10 @@ export function prepareGPUTrajectoryData(
       ]);
     }
 
-    // Head position
+    // Head position. Bias slightly above the last segment so dots always sit
+    // on top of the strokes they cap (depthCompare='less' fails on ties).
     const headIdx = endIdx;
-    const headZValue = (headIdx + trajIdx * 0.0001) / Math.max(maxTimeIndex, 1);
+    const headZValue = (headIdx + 0.5 + trajIdx * 0.0001) / zDenom;
     headPositions[trajIdx * 4 + 0] = traj[headIdx][0];
     headPositions[trajIdx * 4 + 1] = traj[headIdx][1];
     headPositions[trajIdx * 4 + 2] = headZValue;
