@@ -593,13 +593,13 @@
       pathlineAnim.draw(state, [0, 0, 0, 0]);
     }
 
-    // Density + (stronger) mute on the back canvas so the orange streamlines
-    // / pathlines on the GPU canvas above stand out against the density.
+    // Density on the back canvas — no mute overlay; streamlines stand out
+    // visually because they're rendered above.
     const dctx = densityCanvas2d.ctx;
     const cf = contourFrames[state.contourFrame];
     if (dctx && cf) {
       dctx.clearRect(0, 0, cW, cH);
-      drawDensityAndDot(dctx, cf, cW, cH, /* mute */ true, rightDensityMuteOpacity);
+      drawDensityAndDot(dctx, cf, cW, cH, /* mute */ false);
     }
 
     // Orange dot on the topmost canvas so it sits above the streamlines
