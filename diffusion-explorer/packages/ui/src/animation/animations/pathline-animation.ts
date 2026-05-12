@@ -18,7 +18,11 @@
  */
 
 import type { AnimationWithData, Clip } from 'tempus';
-import { drawTrajectories, type TrajectoryStyleOptions } from '../../plotting/trajectories';
+import {
+  drawTrajectories,
+  isGPUTrajectoryRendererActive,
+  type TrajectoryStyleOptions,
+} from '../../plotting/trajectories';
 
 /**
  * Base animation state for pathline animation.
@@ -43,6 +47,15 @@ export interface PathlineAnimationState {
 export interface PathlineAnimationOptions {
   /** Styling options passed to drawTrajectories */
   style?: Partial<TrajectoryStyleOptions>;
+  /**
+   * Rendering backend.
+   * - `'cpu'` (default): uses Canvas 2D. Compatible with any canvas.
+   * - `'gpu'`: uses WebGPU via the shared `GPUTrajectoryRenderer`. The canvas
+   *   passed to `init()` must be pristine (no prior `getContext('2d')` call).
+   * - `'auto'`: picks `'gpu'` when `navigator.gpu` is available, else `'cpu'`.
+   *   Runtime GPU failures fall back to CPU silently inside `drawTrajectories`.
+   */
+  backend?: 'cpu' | 'gpu' | 'auto';
 }
 
 /**
@@ -53,6 +66,27 @@ export interface PathlineData {
   pathlines: number[][][];
   /** Number of segments (points - 1) in the longest pathline */
   numSegments: number;
+}
+
+function resolveBackend(requested: 'cpu' | 'gpu' | 'auto'): 'cpu' | 'gpu' {
+  if (requested !== 'auto') return requested;
+  return typeof navigator !== 'undefined' && 'gpu' in navigator ? 'gpu' : 'cpu';
+}
+
+function buildStyle(
+  base: Partial<TrajectoryStyleOptions>,
+  override?: Partial<TrajectoryStyleOptions>,
+  perSegmentAlphas?: number[][]
+): TrajectoryStyleOptions {
+  return {
+    strokeWidth: base.strokeWidth ?? 2,
+    color: base.color ?? '#3b82f6',
+    opacity: base.opacity ?? 0.8,
+    pointRadius: base.pointRadius ?? 4,
+    ...base,
+    ...override,
+    perSegmentAlphas,
+  };
 }
 
 /**
@@ -75,9 +109,13 @@ export class PathlineAnimation<TState extends PathlineAnimationState>
   readonly clip: Clip<TState>;
   readonly data: PathlineData;
   private style: Partial<TrajectoryStyleOptions>;
+  private requestedBackend: 'cpu' | 'gpu' | 'auto';
 
-  // Context storage for init/draw pattern
+  // Backend storage for init/draw pattern.
+  // CPU mode stores the 2D context; GPU mode stores the bare canvas.
   private ctx: CanvasRenderingContext2D | null = null;
+  private canvas: HTMLCanvasElement | null = null;
+  private resolvedBackend: 'cpu' | 'gpu' = 'cpu';
   private _initialized = false;
 
   private constructor(
@@ -91,6 +129,7 @@ export class PathlineAnimation<TState extends PathlineAnimationState>
 
     this.data = { pathlines, numSegments };
     this.style = options.style ?? {};
+    this.requestedBackend = options.backend ?? 'cpu';
 
     // Create clip that maps normalized time to segmentIndex
     this.clip = {
@@ -103,17 +142,50 @@ export class PathlineAnimation<TState extends PathlineAnimationState>
 
   /**
    * Initialize the animation with a canvas element.
-   * Stores the 2D rendering context internally.
+   *
+   * - In `'cpu'` mode: acquires a 2D rendering context from the canvas.
+   * - In `'gpu'` mode: stores the bare canvas and pre-warms the shared
+   *   `GPUTrajectoryRenderer` cache by issuing an empty draw call, so that
+   *   subsequent `draw()` calls dispatch synchronously.
    *
    * @param canvas - HTML canvas element to render to
-   * @throws Error if context cannot be obtained
+   * @throws Error if the 2D context cannot be obtained (CPU mode)
    */
   async init(canvas: HTMLCanvasElement): Promise<void> {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Failed to get 2D rendering context');
+    this.resolvedBackend = resolveBackend(this.requestedBackend);
+
+    if (this.resolvedBackend === 'gpu') {
+      this.canvas = canvas;
+      // Pre-warm the GPU renderer cache so future draw() calls are sync.
+      // An empty trajectories array creates the renderer without rendering anything.
+      await drawTrajectories(
+        canvas,
+        [],
+        0,
+        buildStyle(this.style),
+        { clearCanvas: false }
+      );
+
+      // If the user explicitly requested 'gpu' but the dispatcher silently fell
+      // back to CPU (no WebGPU, adapter request failed, etc.), surface that.
+      // 'auto' callers don't get this warning — they opted in to fallback.
+      // The dispatcher's internal `gpuFailed` set continues to route subsequent
+      // draws on this canvas to CPU, so functionally everything keeps working.
+      if (this.requestedBackend === 'gpu' && !isGPUTrajectoryRendererActive(canvas)) {
+        console.warn(
+          '[PathlineAnimation] backend: "gpu" was requested but WebGPU is unavailable; ' +
+          'rendering is falling back to the CPU 2D context. Pass backend: "auto" to ' +
+          'silence this, or backend: "cpu" if you want CPU explicitly.'
+        );
+      }
+    } else {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Failed to get 2D rendering context');
+      }
+      this.ctx = ctx;
     }
-    this.ctx = ctx;
+
     this._initialized = true;
   }
 
@@ -135,7 +207,7 @@ export class PathlineAnimation<TState extends PathlineAnimationState>
     state: TState,
     styleOverride?: Partial<TrajectoryStyleOptions>
   ): void {
-    if (!this.ctx) {
+    if (!this._initialized) {
       console.warn('PathlineAnimation.draw() called before init()');
       return;
     }
@@ -144,25 +216,27 @@ export class PathlineAnimation<TState extends PathlineAnimationState>
     const pathlines = state.pathlines ?? this.data.pathlines;
     if (pathlines.length === 0) return;
 
-    // Build style: defaults -> constructor style -> override -> state.perSegmentAlphas
-    const fullStyle: TrajectoryStyleOptions = {
-      strokeWidth: this.style.strokeWidth ?? 2,
-      color: this.style.color ?? '#3b82f6',
-      opacity: this.style.opacity ?? 0.8,
-      pointRadius: this.style.pointRadius ?? 4,
-      ...this.style,
-      ...styleOverride,
-      perSegmentAlphas: state.perSegmentAlphas,
-    };
+    const fullStyle = buildStyle(this.style, styleOverride, state.perSegmentAlphas);
 
-    drawTrajectories(this.ctx, pathlines, state.segmentIndex, fullStyle);
+    if (this.resolvedBackend === 'gpu') {
+      // GPU renderer was pre-warmed in init(); this call dispatches synchronously
+      // via the cached renderer (the returned Promise is already resolved).
+      void drawTrajectories(this.canvas!, pathlines, state.segmentIndex, fullStyle);
+    } else {
+      drawTrajectories(this.ctx!, pathlines, state.segmentIndex, fullStyle);
+    }
   }
 
   /**
    * Clean up resources.
+   *
+   * Note: the shared `GPUTrajectoryRenderer` is keyed on the canvas via WeakMap
+   * inside the trajectories module and is cleaned up when the canvas is GC'd,
+   * so we don't need to explicitly destroy it here.
    */
   destroy(): void {
     this.ctx = null;
+    this.canvas = null;
     this._initialized = false;
   }
 
