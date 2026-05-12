@@ -121,18 +121,29 @@
 
       if (targetRes.ok && trajRes.ok) {
         const targetData: { points: number[][] } = await targetRes.json();
-        const trajData: {
-          allTrajectories: number[][][];
-          highlightedIndices?: number[];
-          config: { numSteps: number; gaussianStd: number; clipRadius: number };
-        } = await trajRes.json();
+        // trajectories.json is step-major: { "0": [[x,y], ...], "1": [...], ... }.
+        // Transpose to trajectory-major so each entry is one full path.
+        const stepMajor: Record<string, number[][]> = await trajRes.json();
+        const stepKeys = Object.keys(stepMajor)
+          .map((k) => parseInt(k, 10))
+          .filter((k) => !isNaN(k))
+          .sort((a, b) => a - b);
+        const numTraj = stepMajor[String(stepKeys[0])].length;
+        const allTrajectories: number[][][] = [];
+        for (let i = 0; i < numTraj; i++) {
+          const traj: number[][] = [];
+          for (const step of stepKeys) {
+            traj.push(stepMajor[String(step)][i]);
+          }
+          allTrajectories.push(traj);
+        }
 
         flowInvertibilityData = {
-          allTrajectories: trajData.allTrajectories,
-          highlightedIndices: trajData.highlightedIndices || [0, 1],
+          allTrajectories,
+          highlightedIndices: [0, 1],
           sourceDistribution,
           targetDistribution: targetData.points,
-          config: trajData.config,
+          config: { numSteps: stepKeys.length - 1, gaussianStd: 1, clipRadius: 4 },
         };
       }
     } catch (e: unknown) {
@@ -360,7 +371,7 @@
       showGroundTruth={false}
       showLegend={false}
       showArrowHeads={true}
-      domainRange={{ xMin: -3, xMax: 3, yMin: -3, yMax: 3 }}
+      domainRange={{ xMin: -3.25, xMax: 3.25, yMin: -3.425, yMax: 3.075 }}
     >
       <strong>Euler integration through a time-dependent velocity field
         <Katex math={"v_t(x)"} />.</strong>
