@@ -129,7 +129,9 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
       ring2Time = 0.525,
       swapStart = 0.68,
       swapEnd = 0.80,
-      outsideHoldEnd = 0.90,
+      // Hold the outside arrows until the very end of the cycle, then the
+      // timeline loops and everything snaps back — no "reverse" recovery.
+      outsideHoldEnd = 1.0,
       outsideArrowLengthScale = 1.0,
     } = options;
 
@@ -289,8 +291,8 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
   /**
    * Cancellation-aware opacity for interior arrows. Around the arrow's wave-
    * arrival time, opacity flashes twice (two triangular pulses peaking at
-   * 1 + (boost - 1)), then the arrow fades to 0 over waveFade. Recovers to
-   * 1.0 during the end-of-cycle window so the loop closes seamlessly.
+   * 1 + (boost - 1)), then the arrow fades to 0 over waveFade. After the
+   * fade the arrow stays gone until the timeline loops.
    */
   private interiorOpacity(t: number, T: number): number {
     const { flashHalfWidth: hw, flashGap: gap, waveFade: fade, highlightOpacityBoost: boost } = this;
@@ -312,14 +314,7 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
     else if (t < flashEnd + fade) base = 1.0 - (t - flashEnd) / fade;
     else base = 0;
 
-    let opacity = base + flashContrib;
-
-    // End-of-cycle recovery: ramp back to 1.0 for a seamless loop.
-    if (t >= this.outsideHoldEnd) {
-      const u = (t - this.outsideHoldEnd) / (1.0 - this.outsideHoldEnd);
-      opacity = Math.max(opacity, u);
-    }
-    return opacity;
+    return base + flashContrib;
   }
 
   /**
@@ -353,27 +348,24 @@ export class WaveCancellationAnimation<TState extends WaveCancellationState>
 
   /**
    * Visibility envelope for the inside (in-cell) boundary arrows: full opacity
-   * normally, fades out during the swap, returns at end of cycle.
+   * normally, fades out during the swap, then stays at 0 until the loop wraps.
    * Returns a multiplier in [0, 1] applied to the base 0.9 opacity.
    */
   private insideBoundaryAlpha(t: number): number {
     if (t < this.swapStart) return 1;
     if (t < this.swapEnd) return 1 - (t - this.swapStart) / (this.swapEnd - this.swapStart);
-    if (t < this.outsideHoldEnd) return 0;
-    // Recover at end of cycle.
-    return (t - this.outsideHoldEnd) / (1.0 - this.outsideHoldEnd);
+    return 0;
   }
 
   /**
    * Progress of the outside arrows: 0 before swap, ramps to 1 during swap,
-   * holds at 1, then ramps back to 0 in the recovery window. Used for both
-   * opacity and length scaling so the arrows "grow out of" the boundary.
+   * then holds at 1 for the rest of the cycle. Used for both opacity and
+   * length scaling so the arrows "grow out of" the boundary.
    */
   private outsideArrowProgress(t: number): number {
     if (t < this.swapStart) return 0;
     if (t < this.swapEnd) return (t - this.swapStart) / (this.swapEnd - this.swapStart);
-    if (t < this.outsideHoldEnd) return 1;
-    return 1 - (t - this.outsideHoldEnd) / (1.0 - this.outsideHoldEnd);
+    return 1;
   }
 
   // --------------------------------------------------------------------------
