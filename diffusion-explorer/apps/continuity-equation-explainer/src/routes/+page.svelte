@@ -180,11 +180,11 @@
     if (flowMatchingClient) {
       try {
         const gridResolution = 9;
-        // Tighter than the canvas display range so grid points sit on round
-        // coordinates that line up with smiley-face features, and the outer
-        // arrows have room to render inside the canvas instead of being
-        // clipped at the edge.
-        const domainRange = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
+        // 9 points over [-2.4, 2.4] gives spacing 0.6, which lands grid
+        // columns at x = ±1.2 — right on the smiley's eye centroids
+        // (x ≈ ±1.21). The EulerStepDemo display domain is wider so the
+        // outer arrows render inside the canvas with breathing room.
+        const domainRange = { xMin: -2.4, xMax: 2.4, yMin: -2.4, yMax: 2.4 };
         const numTimeSteps = 20;
         const timeSteps = Array.from({ length: numTimeSteps }, (_, i) => i / (numTimeSteps - 1));
         const velocities: number[][][] = [];
@@ -360,7 +360,7 @@
       showGroundTruth={false}
       showLegend={false}
       showArrowHeads={true}
-      domainRange={{ xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 }}
+      domainRange={{ xMin: -3, xMax: 3, yMin: -3, yMax: 3 }}
     >
       <strong>Euler integration through a time-dependent velocity field
         <Katex math={"v_t(x)"} />.</strong>
@@ -644,12 +644,8 @@
     Now apply the standard <em>arbitrary-volume</em> argument. The volume <Katex math={"V"} /> was
     chosen arbitrarily — the equation holds for <em>any</em> region we pick. The only way for an
     integrand to integrate to zero over every possible region is if the integrand itself is zero
-    everywhere. Therefore:
+    everywhere:
   </p>
-  <Katex
-    math={"\\frac{\\partial p_t(x)}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0."}
-    displayMode={true}
-  />
 
   <ContinuityEquationFigure>
     <strong>The continuity equation, pointwise.</strong>
