@@ -171,8 +171,12 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     sd = perpDist - halfThickness;
   }
 
-  // Anti-aliased alpha from signed distance
-  let aaWidth = 0.75 * dpr;
+  // Anti-aliased alpha from signed distance.
+  // aaWidth is half the smoothstep band, in physical pixels. Keep it small
+  // (~0.5 physical px each side) so the soft edge doesn't dominate the
+  // visual weight of thin strokes — Canvas2D's native AA spans roughly
+  // 1 physical pixel total transition, and we want to match that.
+  let aaWidth = 0.5;
   let shapeAlpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
 
   // Interpolate segment alpha based on position along segment
@@ -187,7 +191,12 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     discard;
   }
 
-  return vec4<f32>(colorR, colorG, colorB, finalAlpha);
+  // Output premultiplied alpha — the canvas context is configured with
+  // `alphaMode: 'premultiplied'`, so straight RGBA would be interpreted as
+  // already-multiplied and the compositor would divide RGB by alpha when
+  // displaying, brightening the color (e.g. orange #f17720 at 0.85 alpha
+  // would display as #ff8c26 instead of staying #f17720).
+  return vec4<f32>(colorR * finalAlpha, colorG * finalAlpha, colorB * finalAlpha, finalAlpha);
 }
 
 // ============================================================================
@@ -260,8 +269,9 @@ fn fs_head(input: HeadVertexOutput) -> @location(0) vec4<f32> {
   let dist = length(input.localPos);
   let sd = dist - radius;
 
-  // Anti-aliased alpha
-  let aaWidth = 0.75 * dpr;
+  // Anti-aliased alpha. Match the stroke shader's aaWidth so head dots and
+  // strokes share the same edge softness instead of looking smudged.
+  let aaWidth = 0.5;
   let shapeAlpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
 
   let finalAlpha = shapeAlpha * input.alpha * baseOpacity;
@@ -270,5 +280,6 @@ fn fs_head(input: HeadVertexOutput) -> @location(0) vec4<f32> {
     discard;
   }
 
-  return vec4<f32>(colorR, colorG, colorB, finalAlpha);
+  // Premultiplied output — see the stroke fragment shader for why.
+  return vec4<f32>(colorR * finalAlpha, colorG * finalAlpha, colorB * finalAlpha, finalAlpha);
 }
