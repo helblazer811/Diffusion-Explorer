@@ -406,6 +406,10 @@
     // Create toPixel function bound to current canvas dimensions
     const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
 
+    // 0. Opaque white background behind everything on the LHS canvas.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, cWidth, cHeight);
+
     // 1. Fill volume interior with a pronounced orange tint
     drawClosedCurve(ctx, curve, toPixelBound, {
       fillColor: volumeFillColor,
