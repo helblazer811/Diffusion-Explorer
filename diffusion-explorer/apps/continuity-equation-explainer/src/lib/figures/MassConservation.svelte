@@ -111,7 +111,7 @@
   export let surfaceLabelFontSize = 28;
   export let surfaceLabelColor = "#f97316"; // Orange
   export let surfaceLabelStrokeColor = "white";
-  export let surfaceLabelStrokeWidth = 15;
+  export let surfaceLabelStrokeWidth = 110;
   export let surfaceLabelYOffset = -0.7; // Fraction of bounding box height from center
 
   // Rotation animation
@@ -608,7 +608,7 @@
         color: surfaceLabelColor,
         stroke: surfaceLabelStrokeColor,
         strokeWidth: surfaceLabelStrokeWidth,
-        strokeOpacity: 0.8,
+        strokeOpacity: 1.0,
       }
     );
   }
