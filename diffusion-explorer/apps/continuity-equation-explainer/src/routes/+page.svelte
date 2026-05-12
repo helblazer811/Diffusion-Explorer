@@ -180,7 +180,11 @@
     if (flowMatchingClient) {
       try {
         const gridResolution = 9;
-        const domainRange = { xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 2.5 };
+        // Tighter than the canvas display range so grid points sit on round
+        // coordinates that line up with smiley-face features, and the outer
+        // arrows have room to render inside the canvas instead of being
+        // clipped at the edge.
+        const domainRange = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
         const numTimeSteps = 20;
         const timeSteps = Array.from({ length: numTimeSteps }, (_, i) => i / (numTimeSteps - 1));
         const velocities: number[][][] = [];
