@@ -44,6 +44,13 @@ struct Uniforms {
   isOutlinePass: f32,
   // Padding
   _pad1: f32,
+
+  // Head-marker radius in logical pixels (drawn as a filled circle at the
+  // current frontier of each trajectory). Same value used by the CPU path.
+  pointRadius: f32,
+  _pad2: f32,
+  _pad3: f32,
+  _pad4: f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -203,7 +210,9 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 // Head Marker Vertex Shader
 // ============================================================================
 
-// Head data: [x, y, zValue, alpha] per marker
+// Head data: [x, y, zValue, alpha] per marker. The head pipeline uses its own
+// bind group layout (binding 2), keeping segments@1 and heads@2 from
+// colliding within this single shader module.
 @group(0) @binding(2) var<storage, read> heads: array<f32>;
 
 struct HeadVertexOutput {
@@ -232,9 +241,12 @@ fn vs_head(
   // Get quad position
   let quadPos = QUAD_POSITIONS[vertexIndex % 6u];
 
-  // Select radius based on pass (use thickness as radius for head markers)
-  let thickness = select(uniforms.thickness, uniforms.outlineThickness, uniforms.isOutlinePass > 0.5);
-  let radius = thickness * dpr * 0.5; // Half thickness = radius
+  // Head dot radius is independent of stroke thickness (matches the CPU path,
+  // which uses style.pointRadius for the marker and style.strokeWidth for the
+  // line). On the outline pass, expand the radius by the outline thickness so
+  // the dot gets a matching halo.
+  let outlineExpand = select(0.0, uniforms.outlineThickness * 0.5, uniforms.isOutlinePass > 0.5);
+  let radius = (uniforms.pointRadius + outlineExpand) * dpr;
   let margin = radius + 2.0 * dpr; // Extra for AA
 
   // Expand quad around center
@@ -256,9 +268,10 @@ fn vs_head(
 fn fs_head(input: HeadVertexOutput) -> @location(0) vec4<f32> {
   let dpr = uniforms.dpr;
 
-  // Select style based on pass
-  let thickness = select(uniforms.thickness, uniforms.outlineThickness, uniforms.isOutlinePass > 0.5);
-  let radius = thickness * dpr * 0.5;
+  // Mirror the radius expansion done in vs_head so the SDF threshold is
+  // consistent across the two stages.
+  let outlineExpand = select(0.0, uniforms.outlineThickness * 0.5, uniforms.isOutlinePass > 0.5);
+  let radius = (uniforms.pointRadius + outlineExpand) * dpr;
 
   let colorR = select(uniforms.colorR, uniforms.outlineColorR, uniforms.isOutlinePass > 0.5);
   let colorG = select(uniforms.colorG, uniforms.outlineColorG, uniforms.isOutlinePass > 0.5);
