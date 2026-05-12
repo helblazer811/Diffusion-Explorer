@@ -70,6 +70,7 @@ export * from './plotting/plotting';
 export * from './plotting/trajectories';
 export * from './plotting/contours';
 export * from './plotting/vector_field';
+export * from './plotting/velocity_grid';
 export * from './plotting/mathjax';
 export * from './plotting/pathlines';
 export * from './plotting/streamlines/index';  // New unified module with CPU/GPU support
