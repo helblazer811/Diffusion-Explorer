@@ -67,7 +67,7 @@
   export let volumeStrokeColor = "#f97316"; // Orange
   export let volumeStrokeWidth = 3;
   export let volumeFillColor = "#fed7aa"; // Light orange tint
-  export let volumeFillOpacity = 1.0;
+  export let volumeFillOpacity = 0.7;
   export let volumeLabelText = "V";
   export let volumeLabelFontSize = 32;
   export let volumeLabelColor = "#f97316"; // Orange to match boundary
@@ -92,7 +92,7 @@
   export let gaussianContourBandwidth = 10;
   export let gaussianGridSize = 400;
   export let gaussianContourThresholds = 8;
-  export let gaussianContourOpacity = 0.25;
+  export let gaussianContourOpacity = 0.4;
   export let gaussianContourColor = "#3b82f6"; // Blue
 
   // Contour animation
@@ -410,15 +410,8 @@
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, cWidth, cHeight);
 
-    // 1. Fill volume interior with a light orange tint
-    drawClosedCurve(ctx, curve, toPixelBound, {
-      fillColor: volumeFillColor,
-      fillOpacity: volumeFillOpacity,
-      strokeColor: "transparent",
-      strokeWidth: 0,
-    });
-
-    // 2. Draw gaussian contour plot (animated frame) on top of the tint
+    // 1. Draw the gaussian contour plot (animated frame) directly on the
+    // white background — the volume tint will overlay it next.
     plotContours(ctx, currentContours, {
       xScale: (x) => toPixelBound([x, 0])[0],
       yScale: (y) => toPixelBound([0, y])[1],
@@ -428,8 +421,17 @@
       stroke: false,
     });
 
-    // 3. Draw the volume boundary outline on top so it reads cleanly over the
-    // tint + contours.
+    // 2. Overlay the volume interior with a light orange tint on top of the
+    // density. With <1 opacity, the contours still show through inside V but
+    // are muted by the orange wash — making V read as a distinct region.
+    drawClosedCurve(ctx, curve, toPixelBound, {
+      fillColor: volumeFillColor,
+      fillOpacity: volumeFillOpacity,
+      strokeColor: "transparent",
+      strokeWidth: 0,
+    });
+
+    // 3. Draw the volume boundary outline last so it reads cleanly.
     drawClosedCurve(ctx, curve, toPixelBound, {
       fillColor: "transparent",
       fillOpacity: 0,
