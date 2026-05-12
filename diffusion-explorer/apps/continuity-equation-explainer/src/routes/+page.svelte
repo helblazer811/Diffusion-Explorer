@@ -922,7 +922,15 @@
   </ul>
 
   {#if flowInvertibilityData}
-    <Diffeomorphism data={flowInvertibilityData}>
+    <Diffeomorphism
+      data={flowInvertibilityData}
+      gridXMin={-2.2}
+      gridXMax={2.2}
+      gridYMin={-2.2}
+      gridYMax={2.2}
+      gridResolution={10}
+      contourThresholds={8}
+    >
       <strong>A diffeomorphism in action.</strong>
       A uniform grid at <Katex math={"t = 0"} /> is pushed forward by the same flow that maps the
       Gaussian source distribution to the smiley target. The grid deforms continuously but never
