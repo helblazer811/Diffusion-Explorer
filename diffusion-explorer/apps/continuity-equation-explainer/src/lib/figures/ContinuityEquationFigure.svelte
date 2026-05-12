@@ -981,7 +981,7 @@
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
     grid-template-rows: auto auto;
     column-gap: 0.15rem;
-    row-gap: 0.5rem;
+    row-gap: 1.1rem;
     justify-items: center;
   }
 

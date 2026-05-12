@@ -277,7 +277,7 @@
     the evolution of a probability density:
   </p>
   <Katex
-    math={"\\underbrace{\\frac{\\partial p_t}{\\partial t}}_{\\text{Change in density}} + \\underbrace{\\nabla \\cdot (p_t v_t)}_{\\text{Divergence of probability flux}} = 0."}
+    math={"\\frac{\\partial p_t}{\\partial t} + \\nabla \\cdot (p_t v_t) = 0."}
     displayMode={true}
   />
   <p>
