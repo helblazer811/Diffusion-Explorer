@@ -56,6 +56,18 @@ const gpuRendererInitializing = new WeakMap<HTMLCanvasElement, Promise<GPUTrajec
 const gpuFailed = new WeakSet<HTMLCanvasElement>();
 
 /**
+ * Returns whether a GPU trajectory renderer is currently active for the given
+ * canvas. False means either GPU was never attempted, or GPU init failed and
+ * the canvas has fallen back to CPU rendering.
+ *
+ * Use this after an initial `drawTrajectories(canvas, ...)` call to detect
+ * whether the request was actually served by GPU.
+ */
+export function isGPUTrajectoryRendererActive(canvas: HTMLCanvasElement): boolean {
+  return !gpuFailed.has(canvas) && gpuRendererCache.has(canvas);
+}
+
+/**
  * Get or create a cached GPU renderer for a canvas.
  */
 async function getGPURenderer(canvas: HTMLCanvasElement): Promise<GPUTrajectoryRenderer | null> {
@@ -88,6 +100,33 @@ async function getGPURenderer(canvas: HTMLCanvasElement): Promise<GPUTrajectoryR
 
   gpuRendererInitializing.set(canvas, initPromise);
   return initPromise;
+}
+
+/**
+ * Acquire a 2D context on a canvas that was originally sized for WebGPU and
+ * draw the CPU implementation onto it. The canvas's internal pixel dimensions
+ * are typically `clientWidth * dpr`, so we apply a matching transform — without
+ * it, drawing in logical-pixel coordinates ends up squished into the upper-left
+ * quadrant on hi-DPI displays. Idempotent across repeated calls.
+ */
+function drawCpuFallback(
+  canvas: HTMLCanvasElement,
+  trajectories: number[][][],
+  segmentIndex: number,
+  style: TrajectoryStyleOptions,
+  shouldClear: boolean
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const cssWidth = canvas.clientWidth;
+  const cssHeight = canvas.clientHeight;
+  const dprX = cssWidth > 0 ? canvas.width / cssWidth : 1;
+  const dprY = cssHeight > 0 ? canvas.height / cssHeight : 1;
+  ctx.setTransform(dprX, 0, 0, dprY, 0, 0);
+  if (shouldClear) {
+    ctx.clearRect(0, 0, cssWidth || canvas.width, cssHeight || canvas.height);
+  }
+  cpuDrawTrajectories(ctx, trajectories, segmentIndex, style);
 }
 
 /**
@@ -166,11 +205,7 @@ export async function drawTrajectories(
 
     // If GPU already failed for this canvas, go straight to CPU
     if (gpuFailed.has(canvas)) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        if (shouldClear) ctx.clearRect(0, 0, canvas.width, canvas.height);
-        cpuDrawTrajectories(ctx, trajectories, segmentIndex, normalizedStyle);
-      }
+      drawCpuFallback(canvas, trajectories, segmentIndex, normalizedStyle, shouldClear);
       return;
     }
 
@@ -186,11 +221,7 @@ export async function drawTrajectories(
     if (!renderer) {
       // GPU unavailable - mark as failed and fall back to CPU
       gpuFailed.add(canvas);
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        if (shouldClear) ctx.clearRect(0, 0, canvas.width, canvas.height);
-        cpuDrawTrajectories(ctx, trajectories, segmentIndex, normalizedStyle);
-      }
+      drawCpuFallback(canvas, trajectories, segmentIndex, normalizedStyle, shouldClear);
       return;
     }
 
