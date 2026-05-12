@@ -20,7 +20,10 @@
 		"train:eulerian-vs-lagrangian": "tsx scripts/eulerian_vs_lagrangian/train.ts",
 		"compute:eulerian-vs-lagrangian-grids": "tsx scripts/eulerian_vs_lagrangian/compute_velocity_grid.ts",
 		"sample:eulerian-vs-lagrangian": "tsx scripts/eulerian_vs_lagrangian/sample_trajectories.ts",
-		"prepare:eulerian-vs-lagrangian": "npm run train:eulerian-vs-lagrangian && npm run compute:eulerian-vs-lagrangian-grids && npm run sample:eulerian-vs-lagrangian"
+		"prepare:eulerian-vs-lagrangian": "npm run train:eulerian-vs-lagrangian && npm run compute:eulerian-vs-lagrangian-grids && npm run sample:eulerian-vs-lagrangian",
+		"train:ot-coupling": "tsx scripts/optimal_transport_coupling/train.ts",
+		"sample:ot-coupling": "tsx scripts/optimal_transport_coupling/sample.ts",
+		"prepare:ot-coupling": "npm run train:ot-coupling && npm run sample:ot-coupling"
 	},
 	"devDependencies": {
 		"@diffusion-explorer/diffusion": "*",
