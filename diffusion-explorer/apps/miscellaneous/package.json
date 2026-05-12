@@ -16,7 +16,11 @@
 		"train:flow-dlic": "tsx scripts/flow_model_dlic/train.ts",
 		"compute:flow-dlic-grids": "tsx scripts/flow_model_dlic/compute_velocity_grid.ts",
 		"sample:flow-dlic": "tsx scripts/flow_model_dlic/sample_trajectories.ts",
-		"prepare:flow-dlic": "npm run train:flow-dlic && npm run compute:flow-dlic-grids && npm run sample:flow-dlic"
+		"prepare:flow-dlic": "npm run train:flow-dlic && npm run compute:flow-dlic-grids && npm run sample:flow-dlic",
+		"train:eulerian-vs-lagrangian": "tsx scripts/eulerian_vs_lagrangian/train.ts",
+		"compute:eulerian-vs-lagrangian-grids": "tsx scripts/eulerian_vs_lagrangian/compute_velocity_grid.ts",
+		"sample:eulerian-vs-lagrangian": "tsx scripts/eulerian_vs_lagrangian/sample_trajectories.ts",
+		"prepare:eulerian-vs-lagrangian": "npm run train:eulerian-vs-lagrangian && npm run compute:eulerian-vs-lagrangian-grids && npm run sample:eulerian-vs-lagrangian"
 	},
 	"devDependencies": {
 		"@diffusion-explorer/diffusion": "*",
