@@ -1,33 +1,60 @@
 <!-- Demonstrates Euler sampler trajectory with ground truth, approximation, error, and time-dependent vector field -->
 
+<script lang="ts" context="module">
+  export interface EulerStepDemoVectorFieldData {
+    gridResolution: number;
+    timeSteps: number[];
+    domainRange: { xMin: number; xMax: number; yMin: number; yMax: number };
+    velocities: number[][][];
+    gridPoints: number[][];
+  }
+
+  export interface EulerStepDemoSettings {
+    interactiveSettings: { maxUserTrajectories: number };
+    stylingSettings: {
+      trajectory: { endpointRadius: number };
+      label: { color: string; fontSize: number; opacity: number };
+    };
+  }
+
+  // Minimal duck-typed interface — accepts any FlowModelClient-like object.
+  export interface EulerStepDemoFlowModelClientLike {
+    stopRequest(id: string): void;
+    sampleFromInitialPoints(
+      initialPoints: number[][],
+      numSteps: number,
+      options: object,
+      onStep?: (step: number, x_t: number[][]) => void
+    ): { requestId: string; promise: Promise<unknown> };
+  }
+</script>
+
 <script lang="ts">
   import { onMount, onDestroy, type Snippet } from "svelte";
   import * as d3 from "d3";
-  import {
-    Figure,
-    TimeSlider,
-    Slider,
-    drawScatterPlot,
-    drawVectorField,
-    drawTrajectories,
-    Timeline,
-    FigureLegend,
-    useCanvas2D,
-    useVisibilityHandler,
-  } from "@diffusion-explorer/ui";
-  import type { FlowModelClient } from "@diffusion-explorer/diffusion";
-  import { settings, type VectorFieldData } from "$lib/settings";
+  import Figure from "../components/Figure.svelte";
+  import TimeSlider from "../components/TimeSlider.svelte";
+  import Slider from "../components/Slider.svelte";
+  import FigureLegend from "../components/FigureLegend.svelte";
+  import { drawScatterPlot } from "../plotting/plotting";
+  import { drawVectorField } from "../plotting/vector_field";
+  import { drawTrajectories } from "../plotting/trajectories";
+  import { useCanvas2D } from "../plotting/canvas";
+  import { Timeline, useVisibilityHandler } from "tempus";
 
   // ----------------------------------------------------------------
   // Props
   // ----------------------------------------------------------------
 
+  // App-specific settings (label styling, trajectory endpoint, max user trajectories)
+  export let settings: EulerStepDemoSettings;
+
   // FlowModelClient instance (passed from parent, created with correct base path)
-  export let flowMatchingClient: FlowModelClient | null = null;
+  export let flowMatchingClient: EulerStepDemoFlowModelClientLike | null = null;
 
   // Data
   export let targetDistribution: number[][] = [];
-  export let flowMatchingVectorField: VectorFieldData | null = null;
+  export let flowMatchingVectorField: EulerStepDemoVectorFieldData | null = null;
 
   // Layout
   export let canvasWidth = 450;

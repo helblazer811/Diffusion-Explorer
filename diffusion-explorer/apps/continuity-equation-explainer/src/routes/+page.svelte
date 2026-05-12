@@ -9,7 +9,7 @@
   // Figure imports
   import { CrownJewel } from "$lib/figures/CrownJewel";
   import ProbabilityPathIntro from "$lib/figures/ProbabilityPathIntro.svelte";
-  import EulerStepDemo from "$lib/figures/EulerStepDemo.svelte";
+  import { EulerStepDemo } from "@diffusion-explorer/ui";
   import FlowInvertibility from "$lib/figures/FlowInvertibility.svelte";
   import InvertibilityExplanation from "$lib/figures/InvertibilityExplanation.svelte";
   import MassConservation from "$lib/figures/MassConservation.svelte";
@@ -311,6 +311,7 @@
 
   {#if flowInvertibilityData && flowMatchingVectorField}
     <EulerStepDemo
+      {settings}
       {flowMatchingClient}
       targetDistribution={flowInvertibilityData.targetDistribution}
       {flowMatchingVectorField}
