@@ -591,23 +591,32 @@
         default: return [-half + local * 2 * half, -half];
       }
     }}
+    rightCurveFn={createClosedCurve({
+      baseRadius: 0.85,
+      amplitudes: [0.22, 0.16, 0.1],
+      phases: [0, 0.7, 1.3],
+      frequencies: [1, 2, 3],
+    })}
     vectorFieldFn={createWavyVectorField({ amplitude: 0.35, frequency: 1.6 })}
     gridResolution={3}
+    rightGridResolution={6}
     domainMargin={0.6}
   >
-    <strong>The divergence theorem on a square region.</strong>
-    The region is tiled by a 3×3 grid of sub-cells. Each cell carries outward arrows — a discrete
-    picture of <Katex math={"\\nabla \\cdot \\mathbf{F}"} /> inside. Left: a wave propagates from
-    the center outward; as it passes each shared interior edge, the opposing arrow pair flashes and
-    fades — interior contributions cancel pairwise. Only the arrows on the outer boundary survive,
-    and they pulse to emphasize that they are exactly the surface integral
-    <Katex math={"\\int_{\\partial V} \\mathbf{F} \\cdot \\hat{n}\\, dS"} />. Right: the same
-    discrete divergence as a propagating wave of outward arrows. Streamlines of
-    <Katex math={"\\mathbf{F}"} /> shown faintly behind for context.
+    <strong>The divergence theorem on any region.</strong>
+    Each region is tiled by sub-cells; every cell carries outward arrows — a discrete picture of
+    <Katex math={"\\nabla \\cdot \\mathbf{F}"} /> inside. A wave propagates from the center
+    outward; as it passes each shared interior edge the opposing arrow pair flashes and retracts —
+    interior contributions cancel pairwise. Only the arrows on the outer boundary survive, and
+    they are exactly the surface integral
+    <Katex math={"\\int_{\\partial V} \\mathbf{F} \\cdot \\hat{n}\\, dS"} />.
+    <em>Left:</em> a square region on a coarse 3×3 grid.
+    <em>Right:</em> the same argument on an arbitrary smooth region with a finer subdivision.
+    Streamlines of <Katex math={"\\mathbf{F}"} /> shown faintly behind for context.
   </DivergenceTheoremFigure>
 
   <!--
-    Arbitrary-shape variant: hidden for now, kept in source for the future.
+    Older standalone arbitrary-shape variant — kept commented for reference.
+    The visualization is now embedded as the RHS of the figure above.
     <DivergenceTheoremFigure
       curveFn={createClosedCurve({
         baseRadius: 0.85,

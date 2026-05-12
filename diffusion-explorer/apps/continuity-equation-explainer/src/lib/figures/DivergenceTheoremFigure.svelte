@@ -52,6 +52,13 @@
 
   export let curveFn: CurveFn;
   export let gridResolution = 3;
+  // The RHS pane shows the SAME wave-cancellation visualization as the LHS,
+  // but on a more complex closed curve with finer subdivisions — making the
+  // point that the divergence theorem works for arbitrary shapes. If
+  // rightCurveFn is null we fall back to curveFn (matching the original
+  // single-shape behavior).
+  export let rightCurveFn: CurveFn | null = null;
+  export let rightGridResolution = 6;
   export let vectorFieldFn: VectorFieldFn = createWavyVectorField({
     amplitude: 0.3,
     frequency: 1.5,
@@ -136,6 +143,7 @@
   let leftStreamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let rightStreamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let leftWaveAnim: WaveCancellationAnimation<AnimationState> | null = null;
+  let rightWaveAnim: WaveCancellationAnimation<AnimationState> | null = null;
 
   let boundingBox: { xMin: number; xMax: number; yMin: number; yMax: number } | null = null;
   let isInitialized = false;
@@ -273,6 +281,77 @@
     return { cells: out, cellSizePx: scaleLength(step) };
   }
 
+  /**
+   * Build the RHS wave-cancellation grid: tile the bounding box with
+   * rightGridResolution × rightGridResolution cells, keep those fully inside
+   * the right curve, and pick the cell closest to the bbox center as the
+   * wave origin. Returns cell specs in pixel coordinates.
+   */
+  function buildRightGrid(): {
+    cells: GridCellSpec[];
+    cellSizePx: number;
+    centerCell: { row: number; col: number };
+  } {
+    const rCurve = rightCurveFn ?? curveFn;
+    const surfaceSamples = sampleSurfacePoints(rCurve, 360);
+    const bbox = computeBoundingBox(surfaceSamples.points);
+
+    const dimX = bbox.xMax - bbox.xMin;
+    const dimY = bbox.yMax - bbox.yMin;
+    const maxDim = Math.max(dimX, dimY);
+    const step = maxDim / rightGridResolution;
+    const cx = (bbox.xMin + bbox.xMax) / 2;
+    const cy = (bbox.yMin + bbox.yMax) / 2;
+    const totalGridSize = step * rightGridResolution;
+    const gridXMin = cx - totalGridSize / 2;
+    const gridYMin = cy - totalGridSize / 2;
+
+    type Candidate = { center: [number, number]; row: number; col: number };
+    const candidates: Candidate[] = [];
+    for (let row = 0; row < rightGridResolution; row++) {
+      for (let col = 0; col < rightGridResolution; col++) {
+        const xMin = gridXMin + col * step;
+        const xMax = xMin + step;
+        const yMin = gridYMin + row * step;
+        const yMax = yMin + step;
+        const center: [number, number] = [(xMin + xMax) / 2, (yMin + yMax) / 2];
+        if (!isPointInside(center, surfaceSamples)) continue;
+        const corners: [number, number][] = [
+          [xMin, yMin],
+          [xMax, yMin],
+          [xMin, yMax],
+          [xMax, yMax],
+        ];
+        if (!corners.every((c) => isPointInside(c, surfaceSamples))) continue;
+        candidates.push({ center, row, col });
+      }
+    }
+
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < candidates.length; i++) {
+      const dx = candidates[i].center[0] - cx;
+      const dy = candidates[i].center[1] - cy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestDist) {
+        bestDist = d2;
+        bestIdx = i;
+      }
+    }
+    const origin = candidates[bestIdx] ?? { row: 0, col: 0 };
+
+    const cellSpecs: GridCellSpec[] = candidates.map((c) => {
+      const [pxX, pxY] = toPixel(c.center);
+      return { cx: pxX, cy: pxY, row: c.row, col: c.col };
+    });
+
+    return {
+      cells: cellSpecs,
+      cellSizePx: scaleLength(step),
+      centerCell: { row: origin.row, col: origin.col },
+    };
+  }
+
   async function runInitialComputation() {
     boundingBox = computeGridCells();
 
@@ -289,6 +368,24 @@
       headRadius: cellArrowHeadRadius,
     });
     if (leftCanvas) await leftWaveAnim.init(leftCanvas);
+
+    // Build the RHS pane's wave-cancellation animation on a finer grid filtered
+    // to the right curve's interior. Cells along the curve naturally pick up
+    // "boundary" status (their outward direction has no neighbor).
+    const rightGrid = buildRightGrid();
+    if (rightGrid.cells.length > 0) {
+      rightWaveAnim = WaveCancellationAnimation.create<AnimationState>({
+        cells: rightGrid.cells,
+        gridResolution: rightGridResolution,
+        centerCell: rightGrid.centerCell,
+        cellSizePx: rightGrid.cellSizePx,
+        arrowPadding: cellArrowPadding,
+        color: cellArrowColor,
+        strokeWidth: cellArrowStrokeWidth,
+        headRadius: cellArrowHeadRadius,
+      });
+      if (rightCanvas) await rightWaveAnim.init(rightCanvas);
+    }
 
     if (showStreamlines) {
       const domain = {
@@ -387,13 +484,73 @@
   // Drawing
   // ----------------------------------------------------------------
 
-  function drawSurface(ctx: CanvasRenderingContext2D) {
-    drawClosedCurve(ctx, curveFn, (p) => toPixel(p), {
+  function drawSurface(ctx: CanvasRenderingContext2D, curve: CurveFn = curveFn) {
+    drawClosedCurve(ctx, curve, (p) => toPixel(p), {
       fillColor: surfaceFillColor,
       fillOpacity: surfaceFillOpacity,
       strokeColor: surfaceStrokeColor,
       strokeWidth: surfaceStrokeWidth,
     });
+  }
+
+  /**
+   * Draw the RHS subdivision lines clipped to the right curve's interior.
+   * The grid matches buildRightGrid: a rightGridResolution × rightGridResolution
+   * tiling of the curve's bounding box, with lines visible only where the
+   * curve covers them.
+   */
+  function drawRightSubdivisions(ctx: CanvasRenderingContext2D) {
+    if (!boundingBox) return;
+    const rCurve = rightCurveFn ?? curveFn;
+
+    ctx.save();
+    // Clip to the right curve's interior so grid lines only appear inside it.
+    ctx.beginPath();
+    const samples = 360;
+    for (let i = 0; i <= samples; i++) {
+      const theta = (i / samples) * 2 * Math.PI;
+      const [px, py] = toPixel(rCurve(theta));
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.clip();
+
+    // Build the same grid layout used by buildRightGrid.
+    const surfaceSamples = sampleSurfacePoints(rCurve, 360);
+    const bbox = computeBoundingBox(surfaceSamples.points);
+    const dimX = bbox.xMax - bbox.xMin;
+    const dimY = bbox.yMax - bbox.yMin;
+    const maxDim = Math.max(dimX, dimY);
+    const step = maxDim / rightGridResolution;
+    const cx = (bbox.xMin + bbox.xMax) / 2;
+    const cy = (bbox.yMin + bbox.yMax) / 2;
+    const totalGridSize = step * rightGridResolution;
+    const gridXMin = cx - totalGridSize / 2;
+    const gridYMin = cy - totalGridSize / 2;
+
+    ctx.strokeStyle = subdivisionColor;
+    ctx.lineWidth = subdivisionWidth;
+    ctx.globalAlpha = subdivisionOpacity;
+
+    for (let i = 1; i < rightGridResolution; i++) {
+      const xDom = gridXMin + i * step;
+      const [x1, y1] = toPixel([xDom, gridYMin]);
+      const [x2, y2] = toPixel([xDom, gridYMin + totalGridSize]);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      const yDom = gridYMin + i * step;
+      const [hx1, hy1] = toPixel([gridXMin, yDom]);
+      const [hx2, hy2] = toPixel([gridXMin + totalGridSize, yDom]);
+      ctx.beginPath();
+      ctx.moveTo(hx1, hy1);
+      ctx.lineTo(hx2, hy2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   /**
@@ -494,49 +651,17 @@
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     drawStreamlineOverlay(ctx);
 
-    // 2. Surface fill + outline
-    drawSurface(ctx);
+    // 2. Surface fill + outline — uses the (more complex) right curve.
+    drawSurface(ctx, rightCurveFn ?? curveFn);
 
-    // 3. Grid cells with outward-propagating arrows
-    ctx.save();
-    ctx.strokeStyle = cellArrowColor;
-    ctx.fillStyle = cellArrowColor;
-    ctx.lineWidth = cellArrowStrokeWidth;
+    // 3. Subdivision lines clipped to the right curve.
+    drawRightSubdivisions(ctx);
 
-    // The wave sweeps across the cells over one full cycle.
-    // For each cell, the local phase is shifted by its distance from the central cell.
-    const denom = Math.max(maxCellDistance + 1, 1);
-
-    for (const cell of cells) {
-      // Local phase t in [0, 1] driven by global arrowPhase, advanced earlier for closer cells.
-      const offset = cell.distanceFromCenter / denom;
-      let local = state.arrowPhase - offset;
-      local = local - Math.floor(local); // wrap to [0, 1)
-
-      // Pulse profile: grow from 0 → 1 in first half, then decay back to 0.
-      // Smooth bell so arrows don't snap at the wrap.
-      const pulse = Math.max(0, Math.sin(local * Math.PI));
-
-      const [cxPx, cyPx] = toPixel(cell.center);
-      const halfWPx = scaleLength(cell.cellWidthDomain / 2) * (1 - cellArrowPadding);
-      const halfHPx = scaleLength(cell.cellHeightDomain / 2) * (1 - cellArrowPadding);
-
-      // Four cardinal arrows from the center
-      const dirs: [number, number, number][] = [
-        [1, 0, halfWPx], // right
-        [-1, 0, halfWPx], // left
-        [0, -1, halfHPx], // up (canvas y is flipped)
-        [0, 1, halfHPx], // down
-      ];
-
-      ctx.globalAlpha = 0.25 + 0.75 * pulse; // always faintly visible, brighter when pulse fires
-      for (const [dx, dy, lenMax] of dirs) {
-        const len = lenMax * (0.15 + 0.85 * pulse); // grow with the pulse
-        drawArrow(ctx, cxPx, cyPx, cxPx + dx * len, cyPx + dy * len, cellArrowHeadRadius);
-      }
+    // 4. Wave-cancellation animation (same logic as LHS, on finer cells that
+    //    are filtered to fit the irregular shape).
+    if (rightWaveAnim?.initialized) {
+      rightWaveAnim.draw(state);
     }
-    ctx.globalAlpha = 1;
-    ctx.restore();
   }
 
   // ----------------------------------------------------------------
