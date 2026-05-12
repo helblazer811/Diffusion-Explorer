@@ -1018,6 +1018,12 @@
     cursor: crosshair;
   }
 
+  .left-canvas-container {
+    /* Breathing room to the LEFT of the canvas so the bar chart's labels
+       don't crowd the figure-content's left edge. */
+    margin-left: 24px;
+  }
+
   .density-canvas {
     width: 100%;
     height: 100%;
