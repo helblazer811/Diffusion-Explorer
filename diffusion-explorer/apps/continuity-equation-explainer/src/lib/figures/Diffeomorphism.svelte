@@ -14,6 +14,7 @@
     plotContours,
     plotMeshGrid,
     drawMathjax,
+    drawScatterPlot,
     type ComputedContours,
   } from "@diffusion-explorer/ui";
 
@@ -51,14 +52,17 @@
   // Number of nearest cached trajectories to use for IDW interpolation per grid corner
   export let idwNeighbors = 8;
 
-  // Contour styling
+  // Contour styling (intermediate `p_t` only — source/target are scatter plots)
   export let contourBandwidth = 14;
   export let contourThresholds = 4;
   export let intermediateContourColor = "#f17720";
   export let intermediateContourOpacity = 0.5;
-  export let staticContourColor = "#3b82f6";
-  export let staticContourOpacity = 0.18;
   export let contourMinThreshold = 0.0005;
+
+  // Source / target scatter styling (blue points, like FlowInvertibility)
+  export let scatterColor = "#3b82f6";
+  export let scatterRadius = 4;
+  export let scatterOpacity = 0.35;
 
   // Warped grid (thick dark gray)
   export let warpedGridColor = "#374151";
@@ -94,9 +98,9 @@
 
   let scales: SourceTargetScales | null = null;
 
-  // Cached: contours per timestep + source/target
-  let sourceContourData: ComputedContours | null = null;
-  let targetContourData: ComputedContours | null = null;
+  // Cached: contours per timestep + source/target scatter pixel coords
+  let sourcePixelCoords: number[][] = [];
+  let targetPixelCoords: number[][] = [];
   let intermediateContourFrames: ComputedContours[] = [];
 
   // gridFrames[step][i][j] = [x, y] in domain coords (built by IDW from cached trajectories)
@@ -206,15 +210,16 @@
       distributionScaleFactor,
     });
 
-    // Source / target contours
-    sourceContourData = computeContours(sourceStarts, {
-      bandwidth: contourBandwidth,
-      thresholds: contourThresholds,
-    });
-    targetContourData = computeContours(targetSamples, {
-      bandwidth: contourBandwidth,
-      thresholds: contourThresholds,
-    });
+    // Source / target scatter pixel coords — anchored at t=0 (source) and t=1
+    // (target), using the same getPixelX projection the contour code used.
+    sourcePixelCoords = sourceStarts.map(([x, y]) => [
+      getPixelX(x, scales!.sourceMeanX, 0),
+      scales!.yScale(y),
+    ]);
+    targetPixelCoords = targetSamples.map(([x, y]) => [
+      getPixelX(x, scales!.targetMeanX, 1),
+      scales!.yScale(y),
+    ]);
 
     // Per-step intermediate contours and mean X
     intermediateContourFrames = [];
@@ -310,28 +315,12 @@
 
     const { time: t, frame, centerX } = state;
 
-    // --- Static background contours ---
-    if (sourceContourData) {
-      plotContours(ctx, sourceContourData, {
-        xScale: (dataX) => getPixelX(dataX, scales!.sourceMeanX, 0),
-        yScale: (dataY) => scales!.yScale(dataY),
-        fillColor: staticContourColor,
-        opacity: staticContourOpacity,
-        minThreshold: contourMinThreshold,
-        fill: true,
-        stroke: false,
-      });
+    // --- Static background scatter (source + target) ---
+    if (sourcePixelCoords.length) {
+      drawScatterPlot(ctx, sourcePixelCoords, scatterRadius, scatterColor, scatterOpacity);
     }
-    if (targetContourData) {
-      plotContours(ctx, targetContourData, {
-        xScale: (dataX) => getPixelX(dataX, scales!.targetMeanX, 1),
-        yScale: (dataY) => scales!.yScale(dataY),
-        fillColor: staticContourColor,
-        opacity: staticContourOpacity,
-        minThreshold: contourMinThreshold,
-        fill: true,
-        stroke: false,
-      });
+    if (targetPixelCoords.length) {
+      drawScatterPlot(ctx, targetPixelCoords, scatterRadius, scatterColor, scatterOpacity);
     }
 
     // --- Intermediate dynamic contour (orange) ---
@@ -373,7 +362,7 @@
       latexFontSize,
       0,
       latexLabelOffsetY,
-      { color: staticContourColor }
+      { color: scatterColor }
     );
     drawMathjax(
       ctx,
@@ -383,7 +372,7 @@
       latexFontSize,
       0,
       latexLabelOffsetY,
-      { color: staticContourColor }
+      { color: scatterColor }
     );
     if (t >= 0.1 && t <= 0.9) {
       drawMathjax(
