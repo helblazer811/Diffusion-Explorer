@@ -7,6 +7,8 @@
     Katex,
     StreamlineAnimation,
     Timeline,
+    drawTrajectories,
+    generateStreamlines,
     type VectorFieldFn,
     type StreamlineAnimationState,
   } from "@diffusion-explorer/ui";
@@ -25,8 +27,8 @@
 
   // Streamline generation
   export let domainRange = { xMin: -2, xMax: 2, yMin: -2, yMax: 2 };
-  export let density: number | [number, number] = 7.0;
-  export let minPathLength = 0.25;
+  export let density: number | [number, number] = 40.0;
+  export let minPathLength = 1.5;
   export let segmentLength = 0.01;
 
   // Styling
@@ -35,8 +37,21 @@
   export let gradientSubdivisions = 2;
 
   // Animation pulse settings (in pixels)
-  export let pulseWidthPixels = 300;
-  export let pulsePauseWidthPixels = 0;
+  export let pulseWidthPixels = 400;
+  export let pulsePauseWidthPixels = 30;
+  /**
+   * Gamma on pulse alpha ramp (tail → head). 1 = linear (default).
+   *   > 1 — head-loaded comet: trail dies off quickly behind head.
+   *   < 1 — tail-loaded: trail stays visible far behind head.
+   */
+  export let pulseGamma = 2.0;
+
+  // Alpha rendering mode:
+  //   'pulse'    — animated GPU pulses traveling along each streamline (default)
+  //   'velocity' — static CPU render with per-segment alpha = local |v| / maxV
+  export let alphaMode: 'pulse' | 'velocity' = 'pulse';
+  export let velocityAlphaFloor = 0.05;
+  export let velocityAlphaGamma = 0.7;
 
   // ----------------------------------------------------------------
   // State
@@ -76,18 +91,16 @@
   // Helpers
   // ----------------------------------------------------------------
 
-  // Three "curling sources" arranged in a triangle: each location has both
-  // a radial source and a vortex, so each point emits flow while also rotating it.
+  // Two "curling sources": each location has both a radial source and a vortex,
+  // so each point emits flow while also rotating it.
   const sources: { x: number; y: number; strength: number }[] = [
-    { x:  0.00, y:  0.95, strength:  1.5 },
-    { x: -0.82, y: -0.48, strength:  1.5 },
-    { x:  0.82, y: -0.48, strength:  1.5 },
+    { x: -0.8, y: 0, strength:  1.5 },
+    { x:  0.8, y: 0, strength:  1.5 },
   ];
 
   const vortices: { x: number; y: number; strength: number }[] = [
-    { x:  0.00, y:  0.95, strength:  1.5 },
-    { x: -0.82, y: -0.48, strength: -1.5 },
-    { x:  0.82, y: -0.48, strength:  1.5 },
+    { x: -0.8, y: 0, strength:  1.5 },
+    { x:  0.8, y: 0, strength:  1.5 },
   ];
 
   const EPS_SQ = 0.05;
@@ -169,25 +182,38 @@
     if (!canvas1 || !canvas2 || !canvas3) return;
 
     const toPixel = createToPixel(canvasWidth, canvasHeight);
-    const domain = { ...domainRange };
+
+    // Integrate streamlines over a domain larger than the view so they
+    // can flow off-screen at their natural endpoints. toPixel still
+    // uses domainRange, so anything outside maps off-canvas and clips.
+    const overscan = 1.0;
+    const integrationDomain = {
+      xMin: domainRange.xMin - overscan,
+      xMax: domainRange.xMax + overscan,
+      yMin: domainRange.yMin - overscan,
+      yMax: domainRange.yMax + overscan,
+    };
 
     const commonOptions = {
       backend: 'gpu' as const,
       dpr,
-      domain,
+      domain: integrationDomain,
       toPixel,
       density,
       minPathLength,
       segmentLength,
+      integrationDirection: 'both' as const,
       color: streamlineColor,
       strokeWidth: streamlineWidth,
       pulseWidthPixels,
       pulsePauseWidthPixels,
+      pulseGamma,
       offsets: 'random' as const,
       duration: 24,
       pulseFrequency: 0.125,
     };
 
+    // Seed points still cover only the visible view domain.
     const uniformStartPoints = generateUniformStartPoints(domainRange, 80);
 
     animFull = StreamlineAnimation.create({
@@ -199,6 +225,7 @@
     animCurl = StreamlineAnimation.create({
       vectorFieldFn: curlComponentField(),
       ...commonOptions,
+      startPoints: uniformStartPoints,
     });
 
     animDiv = StreamlineAnimation.create({
@@ -222,6 +249,98 @@
     timeline.looping = true;
     timeline.add(animFull.clip, { start: 0, end: 1 });
     timeline.onTick((_t, state) => draw(state));
+  }
+
+  // ----------------------------------------------------------------
+  // Velocity-encoded static render (alphaMode = 'velocity')
+  // ----------------------------------------------------------------
+
+  function estimateMaxSpeed(
+    field: VectorFieldFn,
+    domain: typeof domainRange,
+    gridSize = 60
+  ): number {
+    let maxSq = 0;
+    for (let i = 0; i <= gridSize; i++) {
+      for (let j = 0; j <= gridSize; j++) {
+        const x = domain.xMin + (domain.xMax - domain.xMin) * (i / gridSize);
+        const y = domain.yMin + (domain.yMax - domain.yMin) * (j / gridSize);
+        const [vx, vy] = field(x, y);
+        const m2 = vx * vx + vy * vy;
+        if (m2 > maxSq) maxSq = m2;
+      }
+    }
+    return Math.sqrt(maxSq);
+  }
+
+  function computeVelocityAlphas(
+    rawStreamline: number[][],
+    field: VectorFieldFn,
+    maxV: number
+  ): number[] {
+    if (maxV <= 0) return rawStreamline.map(() => 1);
+    return rawStreamline.map(([x, y]) => {
+      const [vx, vy] = field(x, y);
+      const m = Math.min(1, Math.sqrt(vx * vx + vy * vy) / maxV);
+      return velocityAlphaFloor + (1 - velocityAlphaFloor) * Math.pow(m, velocityAlphaGamma);
+    });
+  }
+
+  async function renderVelocityPanel(
+    canvas: HTMLCanvasElement | null,
+    field: VectorFieldFn,
+    integrationDomain: typeof domainRange,
+    toPixel: (p: [number, number]) => [number, number],
+    startPoints: [number, number][] | undefined
+  ): Promise<void> {
+    if (!canvas) return;
+    const rawStreamlines = generateStreamlines(field, {
+      domainMin: [integrationDomain.xMin, integrationDomain.yMin],
+      domainMax: [integrationDomain.xMax, integrationDomain.yMax],
+      density,
+      integrationDirection: 'both',
+      minlength: minPathLength,
+      segmentLength,
+      startPoints,
+    });
+    const maxV = estimateMaxSpeed(field, integrationDomain);
+    const perSegmentAlphas = rawStreamlines.map((s) =>
+      computeVelocityAlphas(s, field, maxV)
+    );
+    const pixelStreamlines = rawStreamlines.map((s) =>
+      s.map((p) => toPixel(p as [number, number]))
+    );
+    // Pass the canvas element (pristine, no 2D context attached) to use the
+    // GPU rendering path. drawTrajectories caches a GPUTrajectoryRenderer
+    // per canvas internally.
+    await drawTrajectories(canvas, pixelStreamlines, 0, {
+      strokeWidth: streamlineWidth,
+      color: streamlineColor,
+      opacity: 1.0,
+      pointRadius: 0,
+      showPreview: false,
+      showHeadMarker: false,
+      perSegmentAlphas,
+      gradientSubdivisions,
+    });
+  }
+
+  async function runVelocityRender() {
+    if (!canvas1 || !canvas2 || !canvas3) return;
+    const toPixel = createToPixel(canvasWidth, canvasHeight);
+    const overscan = 1.0;
+    const integrationDomain = {
+      xMin: domainRange.xMin - overscan,
+      xMax: domainRange.xMax + overscan,
+      yMin: domainRange.yMin - overscan,
+      yMax: domainRange.yMax + overscan,
+    };
+    const uniformStartPoints = generateUniformStartPoints(domainRange, 80);
+    await Promise.all([
+      renderVelocityPanel(canvas1, fullField(), integrationDomain, toPixel, uniformStartPoints),
+      renderVelocityPanel(canvas2, curlComponentField(), integrationDomain, toPixel, undefined),
+      renderVelocityPanel(canvas3, divergenceField(), integrationDomain, toPixel, uniformStartPoints),
+    ]);
   }
 
   // ----------------------------------------------------------------
@@ -300,6 +419,7 @@
   // Reactive Blocks
   // ----------------------------------------------------------------
 
+  // Both modes use WebGPU on pristine canvases — just size them to physical pixels.
   $: if (canvas1 && canvas2 && canvas3 && !canvasesReady) {
     sizeGpuCanvas(canvas1);
     sizeGpuCanvas(canvas2);
@@ -309,13 +429,18 @@
 
   $: if (!isInitialized && canvasesReady) {
     isInitialized = true;
-    runInitialComputation().then(() => {
-      setupTimeline();
-      if (timeline) {
-        draw(timeline.initialState);
-        if (playingByDefault) startAnimation();
-      }
-    });
+    if (alphaMode === 'pulse') {
+      runInitialComputation().then(() => {
+        setupTimeline();
+        if (timeline) {
+          draw(timeline.initialState);
+          if (playingByDefault) startAnimation();
+        }
+      });
+    } else {
+      // Static, one-shot render — no Timeline, no animation.
+      runVelocityRender();
+    }
   }
 
   $: if (isInitialized) handleVisibilityChange($isActive);

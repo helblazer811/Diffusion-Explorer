@@ -154,3 +154,21 @@ export {
   type PulsingPathlineAnimationOptions,
 } from './animation/animations/pulsing-pathline-animation';
 
+export {
+  StreakletAnimation,
+  type StreakletAnimationState,
+  type StreakletAnimationData,
+  type StreakletAnimationOptions,
+  type StreakletSeedingBias,
+  type StreakletSpeedColorMode,
+} from './animation/animations/streaklet-animation';
+
+export {
+  StatelessStreakletAnimation,
+  type StatelessStreakletAnimationData,
+  type StatelessStreakletAnimationOptions,
+  type StatelessStreakletSeedingBias,
+  type StatelessStreakletSpeedColorMode,
+  type StatelessStreakletBackend,
+} from './animation/animations/stateless-streaklet-animation';
+
