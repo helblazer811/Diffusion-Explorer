@@ -411,6 +411,7 @@
 </script>
 
 <figure class="hd-figure" bind:this={figureElement} style="width: {width}px;">
+  <h2 class="hd-headline">Helmholtz Decomposition</h2>
   <div class="hd-grid" style="--canvas-aspect: {canvasW} / {canvasH}; --gap: {gap}px;">
     <div class="hd-title hd-col-1"><Katex math={String.raw`\mathbf{F}_{\text{combined}}`} /></div>
     <div class="hd-title hd-col-2"><Katex math={String.raw`\mathbf{F}_{\text{curl}}`} /></div>
@@ -437,17 +438,24 @@
   </div>
 
   <figcaption class="hd-caption">
-    <strong>Same decomposition, rendered with Dynamic LIC.</strong>
-    Dynamic Line Integral Convolution advects a noise texture along each field's streamlines, producing a flowing texture that conveys local velocity direction and magnitude. The decomposition into curl and divergence components is identical to the streamline version above.
+    The same decomposition rendered with Dynamic LIC, advecting noise along the field to convey local direction and magnitude.
   </figcaption>
 </figure>
 
 <style>
   .hd-figure {
-    margin: 2rem 0;
+    margin: 2rem auto;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+  }
+
+  .hd-headline {
+    text-align: center;
+    font-size: 4.5rem;
+    font-weight: 450;
+    color: #444;
+    margin: 0 0 1rem 0;
   }
 
   .hd-grid {
@@ -462,7 +470,7 @@
 
   .hd-title {
     grid-row: 1;
-    font-size: 2.25rem;
+    font-size: 3.0rem;
     color: #444;
     padding-bottom: 0.1rem;
   }
@@ -471,19 +479,23 @@
     width: 100%;
     height: auto;
     aspect-ratio: var(--canvas-aspect);
+    border-radius: 12px;
   }
   .hd-op {
     grid-row: 2;
-    font-size: 2.25rem;
+    font-size: 3.5rem;
     font-weight: 300;
     color: #444;
     line-height: 1;
   }
+  .hd-op-row-title {
+    grid-row: 1;
+  }
   .hd-sub {
     grid-row: 3;
-    font-size: 1.725rem;
-    color: #444;
-    min-height: 2.1rem;
+    font-size: 2.5rem;
+    color: #888;
+    min-height: 2.8rem;
     padding-top: 0.25rem;
   }
   .hd-col-1 { grid-column: 1; }
@@ -493,9 +505,10 @@
   .hd-op-2 { grid-column: 4; }
 
   .hd-caption {
-    font-size: 1.5rem;
+    font-size: 2.25rem;
     line-height: 1.5;
-    color: #666;
-    text-align: left;
+    color: #999;
+    text-align: center;
+    margin-top: 0.5rem;
   }
 </style>
