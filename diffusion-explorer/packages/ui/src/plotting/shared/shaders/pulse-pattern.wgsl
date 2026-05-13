@@ -169,22 +169,27 @@ fn computePulseSDF(
 
 /**
  * Compute pulse alpha based on position within pattern.
- * Linear gradient from 0 at tail to 1 at head, or 1.0 for binary mode.
+ * Gamma-curved gradient from 0 at tail to 1 at head, or 1.0 for binary mode.
  *
  * @param arcLength - Position along the path (logical pixels)
  * @param bodyStart - Arc length where pulse body starts (logical pixels)
  * @param pulseWidth - Width of pulse body (logical pixels)
  * @param binaryPulse - 0.0 for gradient, 1.0 for solid
+ * @param pulseGamma - Exponent applied to position-along-pulse before mix.
+ *   1.0 = linear (default behavior). >1 = head-loaded (steep falloff behind
+ *   head). <1 = tail-loaded (slow falloff, head fades in gently).
  * @returns Alpha value (0.0 to 1.0)
  */
 fn computePulseAlpha(
   arcLength: f32,
   bodyStart: f32,
   pulseWidth: f32,
-  binaryPulse: f32
+  binaryPulse: f32,
+  pulseGamma: f32
 ) -> f32 {
   let normalizedPos = saturate((arcLength - bodyStart) / pulseWidth);
-  return mix(normalizedPos, 1.0, binaryPulse);
+  let curved = pow(normalizedPos, pulseGamma);
+  return mix(curved, 1.0, binaryPulse);
 }
 
 /**

@@ -44,6 +44,7 @@ const DEFAULT_BASE_OPACITY = 0.8;
 const DEFAULT_COLOR = '#3b82f6';
 const DEFAULT_PREVIEW_OPACITY = 0.3;
 const DEFAULT_ARROWHEAD_SIZE = 2.0;
+const DEFAULT_PULSE_GAMMA = 1.0;
 
 // Uniform buffer size (must be 16-byte aligned)
 // 19 floats * 4 bytes = 76 bytes, round up to 80 for alignment
@@ -199,6 +200,7 @@ export class PulsingPathsRenderer {
   private previewOpacity: number;
   private showArrowhead: boolean;
   private arrowheadSize: number;
+  private pulseGamma: number;
 
   private constructor(
     device: GPUDevice,
@@ -232,6 +234,7 @@ export class PulsingPathsRenderer {
     this.previewOpacity = options.previewOpacity ?? DEFAULT_PREVIEW_OPACITY;
     this.showArrowhead = options.showArrowhead ?? false;
     this.arrowheadSize = options.arrowheadSize ?? DEFAULT_ARROWHEAD_SIZE;
+    this.pulseGamma = options.pulseGamma ?? DEFAULT_PULSE_GAMMA;
   }
 
   /**
@@ -528,11 +531,12 @@ export class PulsingPathsRenderer {
     const previewOpacity = style.previewOpacity ?? this.previewOpacity;
     const showArrowhead = style.showArrowhead ?? this.showArrowhead;
     const arrowheadSize = style.arrowheadSize ?? this.arrowheadSize;
+    const pulseGamma = style.pulseGamma ?? this.pulseGamma;
 
     // Uniform layout matches shader struct:
     // width, height, dpr, phase, thickness, pulseWidth, pulseSpacing,
     // baseOpacity, binaryPulse, colorR, colorG, colorB, colorA, showPreview, previewOpacity,
-    // showArrowhead, arrowheadSize
+    // showArrowhead, arrowheadSize, pulseGamma
     const uniformData = new Float32Array(20); // 80 bytes / 4
     uniformData[0] = this.canvasWidth;   // Physical pixels
     uniformData[1] = this.canvasHeight;  // Physical pixels
@@ -551,7 +555,8 @@ export class PulsingPathsRenderer {
     uniformData[14] = previewOpacity;
     uniformData[15] = showArrowhead ? 1.0 : 0.0;
     uniformData[16] = arrowheadSize;
-    // Padding to 80 bytes (indices 17-19 unused)
+    uniformData[17] = pulseGamma;
+    // Padding to 80 bytes (indices 18-19 unused)
 
     this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
@@ -624,6 +629,7 @@ export class PulsingPathsRenderer {
     const previewOpacity = style.previewOpacity ?? this.previewOpacity;
     const showArrowhead = style.showArrowhead ?? this.showArrowhead;
     const arrowheadSize = style.arrowheadSize ?? this.arrowheadSize;
+    const pulseGamma = style.pulseGamma ?? this.pulseGamma;
 
     // Uniform layout matches shader struct
     const uniformData = new Float32Array(20);
@@ -644,6 +650,7 @@ export class PulsingPathsRenderer {
     uniformData[14] = previewOpacity;
     uniformData[15] = showArrowhead ? 1.0 : 0.0;
     uniformData[16] = arrowheadSize;
+    uniformData[17] = pulseGamma;
 
     this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
@@ -711,6 +718,9 @@ export class PulsingPathsRenderer {
     }
     if (options.arrowheadSize !== undefined) {
       this.arrowheadSize = options.arrowheadSize;
+    }
+    if (options.pulseGamma !== undefined) {
+      this.pulseGamma = options.pulseGamma;
     }
   }
 

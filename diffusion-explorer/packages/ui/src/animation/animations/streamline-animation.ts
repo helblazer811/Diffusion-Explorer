@@ -104,6 +104,13 @@ export interface StreamlineAnimationBaseOptions {
   baseOpacity?: number;
   offsets?: 'random' | 'synchronized';
   binaryPulse?: boolean;
+  /**
+   * Exponent on the pulse's tail->head alpha ramp (GPU backend only).
+   *   1.0 (default) — linear gradient (current behavior).
+   *   > 1 — head-loaded: trail dies off quickly, leading edge dominates.
+   *   < 1 — tail-loaded: trail stays visible far behind head.
+   */
+  pulseGamma?: number;
 
   /** Duration of the animation in seconds. Should match the timeline duration. */
   duration: number;
@@ -624,6 +631,7 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       baseOpacity = 0.8,
       offsets: offsetMode = 'synchronized',
       binaryPulse = false,
+      pulseGamma = 1.0,
       // Timing
       duration,
       pulseFrequency = 1,
@@ -683,6 +691,7 @@ export class StreamlineAnimation<TState extends StreamlineAnimationState>
       pulseGap: pulsePauseWidthPixels,
       baseOpacity,
       binaryPulse,
+      pulseGamma,
       color,
     };
 

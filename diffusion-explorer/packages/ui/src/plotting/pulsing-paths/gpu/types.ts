@@ -108,6 +108,13 @@ export interface PulsingPathsRendererOptions {
    * Default: 2.0 (arrowhead length = 2 * thickness)
    */
   arrowheadSize?: number;
+  /**
+   * Exponent on the pulse's tail->head alpha ramp.
+   *   1.0 (default) — linear gradient.
+   *   > 1 — head-loaded: trail dies off quickly, leading edge dominates.
+   *   < 1 — tail-loaded: trail stays visible far behind head.
+   */
+  pulseGamma?: number;
 }
 
 /**
@@ -132,6 +139,8 @@ export interface PulsingPathsRenderStyle {
   showArrowhead?: boolean;
   /** Optional override for arrowhead size */
   arrowheadSize?: number;
+  /** Optional override for pulse gamma (alpha ramp exponent) */
+  pulseGamma?: number;
 }
 
 /**

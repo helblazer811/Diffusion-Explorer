@@ -17,6 +17,7 @@
 		<li><a href="/divergence_and_curl">Divergence and Curl</a></li>
 		<li><a href="/helmholtz_decomposition">Helmholtz Decomposition</a></li>
 		<li><a href="/helmholtz_decomposition_dlic">Helmholtz Decomposition (DLIC)</a></li>
+		<li><a href="/helmholtz_decomposition_streaklet">Helmholtz Decomposition (Streaklet)</a></li>
 		<li><a href="/diffusion_horizontal">Diffusion Horizontal</a></li>
 		<li><a href="/diffusion_vs_ddim">Diffusion vs DDIM</a></li>
 		<li><a href="/optimal_transport_coupling">Optimal Transport Coupling</a></li>
