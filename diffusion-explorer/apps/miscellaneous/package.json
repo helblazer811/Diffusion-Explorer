@@ -23,7 +23,8 @@
 		"prepare:eulerian-vs-lagrangian": "npm run train:eulerian-vs-lagrangian && npm run compute:eulerian-vs-lagrangian-grids && npm run sample:eulerian-vs-lagrangian",
 		"train:ot-coupling": "tsx scripts/optimal_transport_coupling/train.ts",
 		"sample:ot-coupling": "tsx scripts/optimal_transport_coupling/sample.ts",
-		"prepare:ot-coupling": "npm run train:ot-coupling && npm run sample:ot-coupling"
+		"prepare:ot-coupling": "npm run train:ot-coupling && npm run sample:ot-coupling",
+		"train:class-conditioning": "tsx scripts/class_conditioning/train.ts"
 	},
 	"devDependencies": {
 		"@diffusion-explorer/diffusion": "*",
