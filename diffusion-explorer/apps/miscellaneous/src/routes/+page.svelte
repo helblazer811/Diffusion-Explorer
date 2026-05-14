@@ -32,6 +32,7 @@
 		<li><a href="/discrete_to_continuous_flow">Discrete to Continuous Flow</a></li>
 		<li><a href="/topographic_contours">Topographic Contours</a></li>
 		<li><a href="/eulerian_vs_lagrangian">Eulerian vs Lagrangian</a></li>
+		<li><a href="/class_conditioning">Class Conditioning</a></li>
 	</ul>
 </section>
 
