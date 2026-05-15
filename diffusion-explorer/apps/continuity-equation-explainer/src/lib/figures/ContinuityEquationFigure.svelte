@@ -404,7 +404,9 @@
         thickness: pathlineThickness,
         pulseWidth: pathPulseWidth,
         pulseGap: pathPulseGap,
-        offsets: "synchronized",
+        // Random per-path phase offsets so the pulses don't move in lockstep
+        // — they're sample trajectories, not a coordinated wavefront.
+        offsets: "random",
         duration: animationDuration,
         pulseFrequency: pathPulseFrequency,
         showPreview: true,
