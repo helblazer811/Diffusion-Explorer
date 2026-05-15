@@ -28,7 +28,6 @@
     Timeline,
     StreamlineAnimation,
     PulsingPathlineAnimation,
-    StatelessStreakletAnimation,
     computeContours,
     plotContours,
     drawMathjax,
@@ -36,9 +35,6 @@
     type VectorFieldFn,
     type StreamlineAnimationState,
     type PulsingPathlineAnimationState,
-    type StreakletAnimationState,
-    type StatelessStreakletBackend,
-    type StatelessStreakletSeedingBias,
     type ComputedContours,
   } from "@diffusion-explorer/ui";
   import * as d3 from "d3";
@@ -92,12 +88,10 @@
   export let contourStepSize = 0.004;
   export let animationDuration = 6;
 
-  // Right-pane visualization mode.
-  //   • "pathlines":  integrate forward/backward from seed points around x.
-  //   • "streamlines": GPU streamlines clipped to a circle around x.
-  //   • "streaklets":  wind-map particle advection through the convergent
-  //                    field, clipped to a circle around the cursor.
-  export let rhsMode: "pathlines" | "streamlines" | "streaklets" = "pathlines";
+  // Right-pane visualization mode. Pathlines: integrate forward/backward
+  // from seed points around x to show the local convergent flow. Streamlines:
+  // GPU-rendered field streamlines clipped to a circle around x.
+  export let rhsMode: "pathlines" | "streamlines" = "pathlines";
 
   // Streamlines (right pane) — fewer pulses per second with longer pulses.
   export let streamlineColor = "#f97316"; // orange
@@ -130,20 +124,6 @@
   export let pathPulseWidth = 60;
   export let pathPulseGap = 140;
   export let pathPulseFrequency = 0.25;
-
-  // Streaklets (right pane) — wind-map-style advection of many particles
-  // through the convergent field. Mirrors the defaults from the Helmholtz
-  // streaklet figure but tuned smaller for this smaller canvas.
-  export let streakletColor = "#f97316"; // orange
-  export let streakletStrokeWidth = 2.5;
-  export let streakletNumParticles = 80;
-  export let streakletTrailLength = 60;
-  export let streakletBaseLifetimeFrames = 240;
-  export let streakletSpeedScale = 0.015;
-  export let streakletSpeedGamma = 0.7;
-  export let streakletAlphaFloor = 0.05;
-  export let streakletSeedingBias: StatelessStreakletSeedingBias = "uniform";
-  export let streakletBackend: StatelessStreakletBackend = "cpu";
 
   // Translucent white mute between the density and the foreground layers.
   // The right pane uses a stronger mute so the orange streamlines/pathlines
@@ -200,16 +180,13 @@
   let isInitialized = false;
 
   type AnimationState = StreamlineAnimationState &
-    PulsingPathlineAnimationState &
-    StreakletAnimationState & {
+    PulsingPathlineAnimationState & {
       contourFrame: number;
     };
 
   let timeline: Timeline<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let pathlineAnim: PulsingPathlineAnimation<AnimationState> | null = null;
-  let streakletAnim: StatelessStreakletAnimation<AnimationState> | null = null;
-  let lastStreakletTime = 0;
   let activeField: VectorFieldFn | null = null;
   let contourFrames: ComputedContours[] = [];
   let densitySeries: number[] = []; // per-frame, normalized to [0, 1]
@@ -391,25 +368,7 @@
     const toPixelBound = (p: [number, number]) => toPixel(p, cW, cH);
     const domain = getDomain();
 
-    if (rhsMode === "streaklets") {
-      streakletAnim = StatelessStreakletAnimation.create<AnimationState>({
-        vectorFieldFn: field,
-        domain,
-        toPixel: toPixelBound,
-        numParticles: streakletNumParticles,
-        trailLength: streakletTrailLength,
-        baseLifetimeFrames: streakletBaseLifetimeFrames,
-        speedScale: streakletSpeedScale,
-        seedingBias: streakletSeedingBias,
-        color: streakletColor,
-        strokeWidth: streakletStrokeWidth,
-        background: "rgba(0,0,0,0)",
-        speedColorMode: "alpha",
-        speedGamma: streakletSpeedGamma,
-        alphaFloor: streakletAlphaFloor,
-        backend: streakletBackend,
-      });
-    } else if (rhsMode === "streamlines") {
+    if (rhsMode === "streamlines") {
       streamlineAnim = StreamlineAnimation.create<AnimationState>({
         backend: "gpu",
         vectorFieldFn: field,
@@ -503,14 +462,13 @@
   }
 
   function setupTimeline(cW: number, cH: number) {
-    const rhsAnim = streamlineAnim ?? pathlineAnim ?? streakletAnim;
+    const rhsAnim = streamlineAnim ?? pathlineAnim;
     if (!rhsAnim) return;
 
     timeline = new Timeline<AnimationState>();
     timeline.initialState = {
       streamlinePhase: 0,
       pulsingPathlinePhase: 0,
-      dt: 0,
       contourFrame: 0,
     };
     timeline.duration = animationDuration;
@@ -634,16 +592,6 @@
     if (pathlineAnim?.initialized) {
       pathlineAnim.draw(state, [0, 0, 0, 0]);
     }
-    if (streakletAnim?.initialized) {
-      // StatelessStreakletAnimation advances by wall-clock dt rather than
-      // a phase variable, so derive dt from successive performance.now()s.
-      const now = performance.now();
-      const dt = lastStreakletTime === 0
-        ? 0.016
-        : Math.min(0.1, (now - lastStreakletTime) / 1000);
-      lastStreakletTime = now;
-      streakletAnim.draw({ ...state, dt });
-    }
 
     // Density on the back canvas — no mute overlay; streamlines stand out
     // visually because they're rendered above.
@@ -701,15 +649,9 @@
     : [0, 0];
 
   // Center of the streamline clip circle, in percentages of the GPU canvas.
-  // For streamline mode the clip stays at the fixed point (the GPU canvas is
-  // translated to make the converging pattern follow the cursor). For
-  // streaklet mode the clip itself follows the cursor — the streaklet
-  // animation runs in domain coordinates, so we use the cursor's pixel
-  // position directly.
   $: streamlineClipCenterPct = canvasWidth && canvasHeight
     ? (() => {
-        const anchor = rhsMode === "streaklets" ? (cursorDomain ?? fixedPoint) : fixedPoint;
-        const [px, py] = toPixel(anchor, canvasWidth, canvasHeight);
+        const [px, py] = toPixel(fixedPoint, canvasWidth, canvasHeight);
         return [(px / canvasWidth) * 100, (py / canvasHeight) * 100];
       })()
     : [50, 50];
@@ -733,7 +675,6 @@
     if (timeline) timeline.pause();
     if (streamlineAnim) streamlineAnim.destroy();
     if (pathlineAnim) pathlineAnim.destroy();
-    if (streakletAnim) streakletAnim.destroy();
   });
 
   // ----------------------------------------------------------------
@@ -847,18 +788,8 @@
         const dpr = window.devicePixelRatio || 1;
         gpuCanvas.width = canvasWidth * dpr;
         gpuCanvas.height = canvasHeight * dpr;
-        if (streamlineAnim) {
-          await streamlineAnim.init(gpuCanvas);
-        } else if (pathlineAnim) {
-          await pathlineAnim.init(gpuCanvas);
-        } else if (streakletAnim) {
-          // CPU backend draws via Canvas2D and needs the DPR pre-scale.
-          if (streakletBackend === "cpu") {
-            const ctx = gpuCanvas.getContext("2d");
-            if (ctx) ctx.scale(dpr, dpr);
-          }
-          await streakletAnim.init(gpuCanvas);
-        }
+        if (streamlineAnim) await streamlineAnim.init(gpuCanvas);
+        else if (pathlineAnim) await pathlineAnim.init(gpuCanvas);
       }
 
       if (timeline) {
@@ -1015,7 +946,7 @@
         bind:this={gpuCanvas}
         class="gpu-canvas"
         style="
-          {rhsMode === 'streamlines' || rhsMode === 'streaklets'
+          {rhsMode === 'streamlines'
             ? `clip-path: circle(${streamlineClipRadius}px at ${streamlineClipCenterPct[0]}% ${streamlineClipCenterPct[1]}%);`
             : ''}
           transform: translate({gpuTranslate[0]}px, {gpuTranslate[1]}px);

@@ -262,7 +262,7 @@
   date="2025"
 />
 
-<ContinuityEquationFigure rhsMode="streaklets">
+<ContinuityEquationFigure>
   <strong>The continuity equation, pointwise.</strong>
   Both panes show the same probability density contracting onto a fixed point <Katex math={"x"} />
   (orange dot) under a convergent flow.
