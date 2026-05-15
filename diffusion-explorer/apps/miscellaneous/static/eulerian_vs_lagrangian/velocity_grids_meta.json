@@ -1,0 +1,12 @@
+{
+  "numTimesteps": 200,
+  "gridSize": 128,
+  "domain": {
+    "xMin": -3,
+    "xMax": 3,
+    "yMin": -3,
+    "yMax": 3
+  },
+  "bytesPerTimestep": 131072,
+  "totalBytes": 26214400
+}

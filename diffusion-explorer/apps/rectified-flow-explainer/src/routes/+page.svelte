@@ -24,9 +24,8 @@
   import OTCoupling from "$lib/figures/OTCoupling.svelte";
   import ProbabilityPath from "$lib/figures/ProbabilityPath.svelte";
   import HighlightTrajectory from "$lib/figures/HighlightTrajectory.svelte";
-  import CurvedTrajectoryIntro from "$lib/figures/CurvedTrajectoryIntro.svelte";
+  import { CurvedTrajectoryIntro, EulerStepDemo } from "@diffusion-explorer/ui";
   import EulerSamplerFigure from "$lib/figures/EulerSamplerFigure.svelte";
-  import EulerStepDemo from "$lib/figures/EulerStepDemo.svelte";
   import RectifiedFlowSuperimposed from "$lib/figures/RectifiedFlowSuperimposed.svelte";
   import CrownJewel from "$lib/figures/CrownJewel.svelte";
   import LinearInterpolation from "$lib/figures/LinearInterpolation.svelte";
@@ -395,12 +394,12 @@
   {#if showOtherFigures}
     <div id="figure-2">
       <CurvedTrajectoryIntro
+        {settings}
         width={figureWidth}
         {flowMatchingClient}
         sourceDistributionSamples={$sourceDistributionSamples}
         targetDistributionSamples={$targetDistributionSamples}
         allTimeSamples={$allTimeSamples}
-        isTraining={$isTraining}
       >
         <div class="caption">
           <span class="figure-number">Figure 2:</span>
@@ -622,6 +621,7 @@
 
   {#if showOtherFigures}
     <EulerStepDemo
+      {settings}
       {flowMatchingClient}
       targetDistribution={$targetDistributionSamples}
       flowMatchingVectorField={$vectorFieldData}
@@ -1293,24 +1293,28 @@
       </VectorFieldCurvatureComparison>
     </div>
   {/if}
-  <h1 id="acknowledgements" class="section-heading">Acknowledgements</h1>
-  <p>I'd like to acknowledge my friend <a href="https://sebasguthdz.github.io/">Sebastián Gutiérrez Hernández</a> for his valuable feedback on this project, particularly on the 
-    formal explanations presented in this article. I would also like to thank <a href="https://bhoov.com/">Benjamin Hoover</a>, <a href="https://poloclub.github.io/">Polo Chau</a>, and <a href="https://the-vivek.netlify.app/">Vivek Anand</a> for their 
-    feedback on the visualizations and writing. 
-  </p>
+  <div class="article-footer">
+    <h2 id="acknowledgements" class="section-heading">Acknowledgements</h2>
+    <p>I'd like to acknowledge my friend <a href="https://sebasguthdz.github.io/">Sebastián Gutiérrez Hernández</a> for his valuable feedback on this project, particularly on the
+      formal explanations presented in this article. I would also like to thank <a href="https://bhoov.com/">Benjamin Hoover</a>, <a href="https://poloclub.github.io/">Polo Chau</a>, and <a href="https://the-vivek.netlify.app/">Vivek Anand</a> for their
+      feedback on the visualizations and writing.
+    </p>
 
-  <h1 id="references" class="section-heading">References</h1>
-  <Bibliography {citations} {bibEntries} />
+    <h2 id="references" class="section-heading">References</h2>
+    <Bibliography {citations} {bibEntries} />
 
-<h1 id="cite" class="section-heading">How to Cite</h1>
-<div class="cite-section">
-  <p>If you found this explainer helpful, please consider citing it:</p>
-  <pre><code
-      >@article{"{"}helbling2025rectifiedflows,
+    <h2 id="cite" class="section-heading">How to Cite</h2>
+    <div class="cite-section">
+      <p>If you found this explainer helpful, please consider citing it:</p>
+      <pre><code
+          >@article{"{"}helbling2025rectifiedflows,
 title = {"{"}A Visual Introduction to Rectified Flows{"}"},
 author = {"{"}Helbling, Alec{"}"},
 year = {"{"}2025{"}"},
 url = {"{"}https://alechelbling.com/rectified-flows{"}"}
 {"}"}</code
-    ></pre>
-</div>
+        ></pre>
+    </div>
+
+    <h2 id="comments" class="section-heading">Comments</h2>
+  </div>

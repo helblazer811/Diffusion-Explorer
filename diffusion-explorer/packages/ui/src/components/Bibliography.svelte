@@ -32,7 +32,6 @@
 <style>
   .bibliography-list {
     padding-left: 1.5rem;
-    font-size: 1rem;
     line-height: 1.6;
   }
 

@@ -8,11 +8,16 @@ setWasmPaths("/tfjs-backend-wasm/");
 import "@tensorflow/tfjs-backend-wasm";
 
 import { FlowModel } from '../flow_matching/flow_matching';
+import { ConditionalFlowModel } from '../flow_matching/conditional_flow_matching';
 import { generateUniformGridSamples } from '../utils';
 
 const backend = "webgl";
-const trainingObjectiveToModelClass: Record<string, typeof FlowModel> = {
+// Registry allows both unconditional and conditional flow models. We use `any`
+// here because TS cannot narrow across the two distinct base classes (Model
+// vs ConditionalModel); call sites cast as needed.
+const trainingObjectiveToModelClass: Record<string, any> = {
   "Flow Matching": FlowModel,
+  "Conditional Flow Matching": ConditionalFlowModel,
 };
 
 // ===== Request tracking for cancellation =====
@@ -160,7 +165,21 @@ async function handleSamplingRequest(
     const numPoints = gridPoints.shape[0];
     const t = tf.fill([numPoints, 1], timeValue || 0.5);
 
-    const velocities = ourModel.forward(gridPoints, t);
+    let velocities: tf.Tensor;
+    if (trainingObjective === "Conditional Flow Matching") {
+      // Resolve cond to a [numPoints, condDim] tensor. Default = class 0 if unspecified.
+      let condTensor: tf.Tensor2D;
+      if (samplingOptions.cond) {
+        condTensor = (samplingOptions.cond as tf.Tensor).rank === 1
+          ? tf.oneHot((samplingOptions.cond as tf.Tensor1D).toInt(), modelConfig.condDim).toFloat() as tf.Tensor2D
+          : samplingOptions.cond as tf.Tensor2D;
+      } else {
+        condTensor = tf.zeros([numPoints, modelConfig.condDim]) as tf.Tensor2D;
+      }
+      velocities = (ourModel as any).forward(gridPoints, t, condTensor);
+    } else {
+      velocities = ourModel.forward(gridPoints, t);
+    }
     const gridPointsArray = gridPoints.arraySync();
     const velocitiesArray = velocities.arraySync();
 
@@ -212,9 +231,24 @@ async function handleTrainRequest(requestId: string, data: any) {
   await initializeBackend();
 
   const ModelClass = trainingObjectiveToModelClass[trainingObjective];
-  const ourModel = new ModelClass(modelConfig.dim, modelConfig.hidden);
+  const isConditional =
+    trainingObjective === "Conditional Diffusion" ||
+    trainingObjective === "Conditional Flow Matching";
+  const ourModel = isConditional
+    ? new ModelClass(modelConfig.dim, modelConfig.condDim ?? 0, modelConfig.hidden)
+    : new ModelClass(modelConfig.dim, modelConfig.hidden);
 
   const { pointsTensor, classesTensor } = await loadDataset(datasetPath);
+
+  const emitEpoch = (epoch: number, intermediateSamples: number[][] | null, loss?: number) => {
+    self.postMessage({
+      requestId,
+      type: "epoch_chunk",
+      epoch,
+      intermediateSamples,
+      loss,
+    });
+  };
 
   if (trainingObjective === "Conditional Diffusion") {
     if (classesTensor === null) {
@@ -227,15 +261,22 @@ async function handleTrainRequest(requestId: string, data: any) {
       trainingConfig.batchSize,
       trainingConfig.updateInterval,
       shouldStop,
-      (epoch: number, intermediateSamples: number[][], loss: number) => {
-        self.postMessage({
-          requestId,
-          type: "epoch_chunk",
-          epoch,
-          intermediateSamples,
-          loss,
-        });
-      }
+      emitEpoch,
+    );
+  } else if (trainingObjective === "Conditional Flow Matching") {
+    if (classesTensor === null) {
+      throw new Error("Classes tensor is null for conditional flow matching model");
+    }
+    await (ourModel as any).train(
+      pointsTensor as tf.Tensor2D,
+      classesTensor,
+      trainingConfig.epochs,
+      trainingConfig.batchSize,
+      trainingConfig.updateInterval,
+      shouldStop,
+      emitEpoch,
+      null,                          // source_distribution
+      trainingConfig.condDropProb ?? 0.1,
     );
   } else {
     await ourModel.train(
@@ -244,15 +285,7 @@ async function handleTrainRequest(requestId: string, data: any) {
       trainingConfig.batchSize,
       trainingConfig.updateInterval,
       shouldStop,
-      (epoch: number, intermediateSamples: number[][], loss: number) => {
-        self.postMessage({
-          requestId,
-          type: "epoch_chunk",
-          epoch,
-          intermediateSamples,
-          loss,
-        });
-      }
+      emitEpoch,
     );
   }
 

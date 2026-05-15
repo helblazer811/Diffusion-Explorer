@@ -15,8 +15,12 @@
 	<h2 class="section-heading">Experiments</h2>
 	<ul class="experiment-list">
 		<li><a href="/divergence_and_curl">Divergence and Curl</a></li>
+		<li><a href="/helmholtz_decomposition">Helmholtz Decomposition</a></li>
+		<li><a href="/helmholtz_decomposition_dlic">Helmholtz Decomposition (DLIC)</a></li>
+		<li><a href="/helmholtz_decomposition_streaklet">Helmholtz Decomposition (Streaklet)</a></li>
 		<li><a href="/diffusion_horizontal">Diffusion Horizontal</a></li>
 		<li><a href="/diffusion_vs_ddim">Diffusion vs DDIM</a></li>
+		<li><a href="/optimal_transport_coupling">Optimal Transport Coupling</a></li>
 		<li><a href="/pull_toward_mean">Pull Toward Mean</a></li>
 		<li><a href="/one_dimensional_flow">One-Dimensional Flow</a></li>
 		<li><a href="/stokes_theorem">Stokes' Theorem</a></li>
@@ -26,6 +30,8 @@
 		<li><a href="/streamline_generation">Streamline Generation</a></li>
 		<li><a href="/marching_squares">Marching Squares</a></li>
 		<li><a href="/discrete_to_continuous_flow">Discrete to Continuous Flow</a></li>
+		<li><a href="/topographic_contours">Topographic Contours</a></li>
+		<li><a href="/eulerian_vs_lagrangian">Eulerian vs Lagrangian</a></li>
 	</ul>
 </section>
 

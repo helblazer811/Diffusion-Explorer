@@ -48,6 +48,8 @@ struct Uniforms {
   // Arrowhead options
   showArrowhead: f32,  // 0.0 = no arrowhead, 1.0 = show arrowhead
   arrowheadSize: f32,  // Size multiplier relative to thickness (default: 2.0)
+  // Pulse shape
+  pulseGamma: f32,     // Exponent on tail->head alpha ramp. 1.0 = linear.
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -299,13 +301,14 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Anti-aliased alpha from signed distance
   let alpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
 
-  // Linear alpha interpolation along pulse (0.0 at tail/bodyStart, 1.0 at head/bodyEnd)
+  // Gamma-curved alpha interpolation along pulse (0.0 at tail/bodyStart, 1.0 at head/bodyEnd)
   // When binaryPulse=1.0, use solid pulses instead of gradient
   let pulseAlpha = computePulseAlpha(
     arcLength,
     pulseInfo.bodyStart,
     uniforms.pulseWidth,
-    uniforms.binaryPulse
+    uniforms.binaryPulse,
+    uniforms.pulseGamma
   );
 
   // Combine SDF alpha, pulse alpha, and base opacity

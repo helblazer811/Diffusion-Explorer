@@ -16,7 +16,15 @@
 		"train:flow-dlic": "tsx scripts/flow_model_dlic/train.ts",
 		"compute:flow-dlic-grids": "tsx scripts/flow_model_dlic/compute_velocity_grid.ts",
 		"sample:flow-dlic": "tsx scripts/flow_model_dlic/sample_trajectories.ts",
-		"prepare:flow-dlic": "npm run train:flow-dlic && npm run compute:flow-dlic-grids && npm run sample:flow-dlic"
+		"prepare:flow-dlic": "npm run train:flow-dlic && npm run compute:flow-dlic-grids && npm run sample:flow-dlic",
+		"train:eulerian-vs-lagrangian": "tsx scripts/eulerian_vs_lagrangian/train.ts",
+		"compute:eulerian-vs-lagrangian-grids": "tsx scripts/eulerian_vs_lagrangian/compute_velocity_grid.ts",
+		"sample:eulerian-vs-lagrangian": "tsx scripts/eulerian_vs_lagrangian/sample_trajectories.ts",
+		"prepare:eulerian-vs-lagrangian": "npm run train:eulerian-vs-lagrangian && npm run compute:eulerian-vs-lagrangian-grids && npm run sample:eulerian-vs-lagrangian",
+		"train:ot-coupling": "tsx scripts/optimal_transport_coupling/train.ts",
+		"sample:ot-coupling": "tsx scripts/optimal_transport_coupling/sample.ts",
+		"prepare:ot-coupling": "npm run train:ot-coupling && npm run sample:ot-coupling",
+		"train:class-conditioning": "tsx scripts/class_conditioning/train.ts"
 	},
 	"devDependencies": {
 		"@diffusion-explorer/diffusion": "*",
@@ -30,6 +38,7 @@
 		"svelte-check": "^4.3.4",
 		"tsx": "^4.7.0",
 		"typescript": "^5.9.3",
+		"@types/three": "^0.170.0",
 		"vite": "^7.2.6"
 	},
 	"dependencies": {
@@ -38,6 +47,7 @@
 		"@tensorflow/tfjs-core": "^4.22.0",
 		"@tensorflow/tfjs-node": "^4.22.0",
 		"d3": "^7.9.0",
-		"reveal.js": "^5.2.1"
+		"reveal.js": "^5.2.1",
+		"three": "^0.170.0"
 	}
 }

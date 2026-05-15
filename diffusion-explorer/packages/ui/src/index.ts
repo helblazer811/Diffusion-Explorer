@@ -1,3 +1,16 @@
+// Shared figures (extracted from byte-identical duplicates in apps)
+export { default as CurvedTrajectoryIntro } from './figures/CurvedTrajectoryIntro.svelte';
+export type {
+  CurvedTrajectoryIntroSettings,
+  FlowModelClientLike,
+} from './figures/CurvedTrajectoryIntro.svelte';
+export { default as EulerStepDemo } from './figures/EulerStepDemo.svelte';
+export type {
+  EulerStepDemoSettings,
+  EulerStepDemoVectorFieldData,
+  EulerStepDemoFlowModelClientLike,
+} from './figures/EulerStepDemo.svelte';
+
 // Existing components
 export { default as Katex } from './components/Katex.svelte';
 export { default as AnnotatedEquation } from './components/AnnotatedEquation.svelte';
@@ -57,6 +70,7 @@ export * from './plotting/plotting';
 export * from './plotting/trajectories';
 export * from './plotting/contours';
 export * from './plotting/vector_field';
+export * from './plotting/velocity_grid';
 export * from './plotting/mathjax';
 export * from './plotting/pathlines';
 export * from './plotting/streamlines/index';  // New unified module with CPU/GPU support
@@ -139,4 +153,22 @@ export {
   type PulsingPathlineAnimationState,
   type PulsingPathlineAnimationOptions,
 } from './animation/animations/pulsing-pathline-animation';
+
+export {
+  StreakletAnimation,
+  type StreakletAnimationState,
+  type StreakletAnimationData,
+  type StreakletAnimationOptions,
+  type StreakletSeedingBias,
+  type StreakletSpeedColorMode,
+} from './animation/animations/streaklet-animation';
+
+export {
+  StatelessStreakletAnimation,
+  type StatelessStreakletAnimationData,
+  type StatelessStreakletAnimationOptions,
+  type StatelessStreakletSeedingBias,
+  type StatelessStreakletSpeedColorMode,
+  type StatelessStreakletBackend,
+} from './animation/animations/stateless-streaklet-animation';
 
