@@ -16,7 +16,7 @@
   import { settings, type VectorFieldData } from "$lib/settings";
 
   // Figure imports
-  import { CrownJewel } from "$lib/figures/CrownJewel";
+  import { TrainedCNFFlow } from "$lib/figures/TrainedCNFFlow";
   import ProbabilityPathIntro from "$lib/figures/ProbabilityPathIntro.svelte";
   import { EulerStepDemo } from "@diffusion-explorer/ui";
   import FlowInvertibility from "$lib/figures/FlowInvertibility.svelte";
@@ -846,12 +846,12 @@
     the model is just an MLP plus an ODE solver.
   </p>
 
-  <CrownJewel contourBandwidth={10} numScatterSamples={300}>
+  <TrainedCNFFlow contourBandwidth={10} numScatterSamples={300}>
     <strong>A trained CNF in action.</strong>
     The orange contours show the evolving probability density as samples flow from a Gaussian
     source distribution to the two-moons target distribution (blue points). Click anywhere to
     trace backward trajectories showing where samples originated.
-  </CrownJewel>
+  </TrainedCNFFlow>
 </section>
 
 <hr class="section-divider" />
