@@ -119,7 +119,7 @@
   // (a few steps get you to x), but the backward leg needs many steps to
   // reach far enough out that paths read as a real starburst.
   export let pathForwardSteps = 12;
-  export let pathBackwardSteps = 90;
+  export let pathBackwardSteps = 35;
   export let pathStepSize = 0.04;
   export let pathPulseWidth = 60;
   export let pathPulseGap = 140;
