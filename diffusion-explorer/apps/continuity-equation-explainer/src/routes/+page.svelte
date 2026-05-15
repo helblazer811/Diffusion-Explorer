@@ -519,8 +519,9 @@
     equals the negative flux <Katex math={"\\rho \\mathbf{v}"} /> through the boundary
     <Katex math={"S"} />.
     <em>Left:</em> The probability density <Katex math={"\\rho"} /> evolving inside the volume.
-    <em>Right:</em> The flux vectors <Katex math={"\\rho \\mathbf{v}"} /> and surface normals
-    <Katex math={"\\hat{n}"} /> at the boundary.
+    <em>Right:</em> The flux <Katex math={"\\rho \\mathbf{v}"} /> sampled at uniform points along
+    the boundary <Katex math={"S"} /> — each arrow contributes to the surface integral on the right
+    of the equation.
   </MassConservation>
   <p>
     This integral statement is the entire physical content we need. To convert it into the local

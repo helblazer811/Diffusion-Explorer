@@ -100,11 +100,29 @@
   export let contourStepSize = 0.005;
   export let contourAnimationDuration = 4;
 
+  // Right pane mode:
+  //   • "streamlines":     wind-map streamlines + a single rotating ρv/n̂ pair
+  //                        (the original visualization).
+  //   • "boundary-arrows": animated blue density behind a white mute layer +
+  //                        uniformly-spaced blue ρv arrows along the boundary,
+  //                        one of them labeled.
+  export let rhsMode: "streamlines" | "boundary-arrows" = "boundary-arrows";
+
   // Right canvas styling (Surface with rotating vectors)
   export let surfaceFillColor = "#ffffff"; // White
   export let surfaceFillOpacity = 0.5;
   export let surfaceStrokeColor = "#f97316"; // Orange
   export let surfaceStrokeWidth = 3;
+
+  // Boundary-arrows mode: uniform ρv arrows along ∂V.
+  export let boundaryArrowCount = 16;
+  // Which arrow gets the "ρv" label (index into 0..count-1).
+  export let boundaryArrowLabelIndex = 4;
+  export let boundaryArrowColor = "#3b82f6"; // Blue (matches density)
+  // White opaque rectangle drawn between the density and the surface arrows
+  // so the boundary arrows read clearly against the soft blue density.
+  export let rightDensityMuteColor = "#ffffff";
+  export let rightDensityMuteOpacity = 0.7;
 
   // Surface label
   export let surfaceLabelText = "S";
@@ -476,6 +494,130 @@
     );
   }
 
+  /**
+   * RHS in "boundary-arrows" mode:
+   *   0. animated blue density (same data as LHS)
+   *   1. white opaque rectangle for contrast
+   *   2. surface fill + outline
+   *   3. N uniformly-spaced ρv arrows along the boundary, one labeled
+   *   4. S label
+   */
+  function drawRightBoundaryArrows(
+    ctx: CanvasRenderingContext2D,
+    cWidth: number,
+    cHeight: number,
+    state: AnimationState,
+    curve: (theta: number) => [number, number],
+    vectorField: (x: number, y: number) => [number, number],
+    toPixelBound: (p: [number, number]) => [number, number],
+  ) {
+    if (!boundingBox) return;
+    ctx.clearRect(0, 0, cWidth, cHeight);
+
+    // 1. Animated blue density (same gaussian-mixture frame as LHS).
+    const currentContours = gaussianContourFrames[state.contourFrame];
+    if (currentContours) {
+      plotContours(ctx, currentContours, {
+        xScale: (x) => toPixelBound([x, 0])[0],
+        yScale: (y) => toPixelBound([0, y])[1],
+        fillColor: gaussianContourColor,
+        opacity: gaussianContourOpacity,
+        fill: true,
+        stroke: false,
+      });
+    }
+
+    // 2. White opaque mute layer so boundary arrows + outline stand out
+    // clearly against the blue density behind them.
+    ctx.save();
+    ctx.globalAlpha = rightDensityMuteOpacity;
+    ctx.fillStyle = rightDensityMuteColor;
+    ctx.fillRect(0, 0, cWidth, cHeight);
+    ctx.restore();
+
+    // 3. Surface fill + outline.
+    drawClosedCurve(ctx, curve, toPixelBound, {
+      fillColor: surfaceFillColor,
+      fillOpacity: surfaceFillOpacity,
+      strokeColor: surfaceStrokeColor,
+      strokeWidth: surfaceStrokeWidth,
+    });
+
+    // 4. N uniform ρv arrows along the boundary.
+    const vecPixelLen = scaleLength(vectorLength, cWidth) * vectorScale;
+    ctx.save();
+    ctx.strokeStyle = boundaryArrowColor;
+    ctx.fillStyle = boundaryArrowColor;
+    ctx.lineWidth = vectorWidth;
+    let labeled: { ax: number; ay: number; dx: number; dy: number } | null = null;
+    for (let i = 0; i < boundaryArrowCount; i++) {
+      const t = i / boundaryArrowCount;
+      const phi = t * 2 * Math.PI;
+      const [bx, by] = curve(phi);
+      const [pxB, pyB] = toPixelBound([bx, by]);
+
+      // Field at this boundary point, unit-normalized so arrows are the same
+      // length regardless of |F| variation.
+      const [vx, vy] = vectorField(bx, by);
+      const mag = Math.hypot(vx, vy);
+      const ux = mag > 1e-9 ? vx / mag : 1;
+      const uy = mag > 1e-9 ? vy / mag : 0;
+
+      // Canvas y is flipped relative to math y.
+      const ex = pxB + ux * vecPixelLen;
+      const ey = pyB - uy * vecPixelLen;
+
+      drawArrow(ctx, pxB, pyB, ex, ey, arrowHeadSize);
+      if (i === boundaryArrowLabelIndex) {
+        labeled = { ax: ex, ay: ey, dx: ux, dy: uy };
+      }
+    }
+    ctx.restore();
+
+    // Label one of the arrows with ρv.
+    if (labeled) {
+      const lx = labeled.ax + labeled.dx * labelOffset;
+      const ly = labeled.ay - labeled.dy * labelOffset;
+      drawMathjax(
+        ctx,
+        "\\rho \\mathbf{v}",
+        lx,
+        ly,
+        labelFontSize,
+        0,
+        labelFontSize / 2,
+        {
+          color: boundaryArrowColor,
+          stroke: labelStrokeColor,
+          strokeWidth: labelStrokeWidth,
+          strokeOpacity: labelStrokeOpacity,
+        },
+      );
+    }
+
+    // 5. S label above the surface.
+    const centerX = (boundingBox.xMin + boundingBox.xMax) / 2;
+    const centerY = (boundingBox.yMin + boundingBox.yMax) / 2;
+    const bbHeight = boundingBox.yMax - boundingBox.yMin;
+    const labelY = centerY - surfaceLabelYOffset * bbHeight;
+    const [slx, sly] = toPixelBound([centerX, labelY]);
+    drawMathjax(
+      ctx,
+      surfaceLabelText,
+      slx,
+      sly + surfaceLabelFontSize / 2,
+      surfaceLabelFontSize,
+      0,
+      0,
+      {
+        color: surfaceLabelColor,
+        stroke: surfaceLabelStrokeColor,
+        strokeWidth: surfaceLabelStrokeWidth,
+        strokeOpacity: 0.8,
+      },
+    );
+  }
+
   function drawRight(
     state: AnimationState,
     cWidth: number,
@@ -484,8 +626,16 @@
     vectorField?: (x: number, y: number) => [number, number]
   ) {
     const ctx = rightCanvas2d.ctx;
-    if (!ctx || !boundingBox || !streamlineAnim || !curve || !vectorField) return;
+    if (!ctx || !boundingBox || !curve || !vectorField) return;
 
+    const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
+
+    if (rhsMode === "boundary-arrows") {
+      drawRightBoundaryArrows(ctx, cWidth, cHeight, state, curve, vectorField, toPixelBound);
+      return;
+    }
+
+    if (!streamlineAnim) return;
     const { theta } = state;
 
     // 1. Draw streamlines to GPU canvas (behind)
@@ -495,9 +645,6 @@
 
     // 2. Clear 2D overlay canvas and draw surface/vectors on top
     ctx.clearRect(0, 0, cWidth, cHeight);
-
-    // Create toPixel function bound to current canvas dimensions
-    const toPixelBound = (p: [number, number]) => toPixel(p, cWidth, cHeight);
 
     // Draw surface outline on top
     drawClosedCurve(ctx, curve, toPixelBound, {
