@@ -21,7 +21,7 @@
   import { EulerStepDemo } from "@diffusion-explorer/ui";
   import FlowInvertibility from "$lib/figures/FlowInvertibility.svelte";
   import InvertibilityExplanation from "$lib/figures/InvertibilityExplanation.svelte";
-  import MassConservation from "$lib/figures/MassConservation.svelte";
+  import MassConservation from "$lib/figures/MassConservation/MassConservation.svelte";
   import ContinuityEquationFigure from "$lib/figures/ContinuityEquationFigure.svelte";
   import DivergenceIntro from "$lib/figures/DivergenceIntro.svelte";
   import DivergenceTheoremFigure from "$lib/figures/DivergenceTheoremFigure.svelte";

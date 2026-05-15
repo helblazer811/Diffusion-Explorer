@@ -25,7 +25,12 @@
     drawClosedCurve,
     getTangentAndNormal,
     type CurveFn,
-  } from "./DivergenceTheorem/divergence_theorem";
+  } from "../DivergenceTheorem/divergence_theorem";
+  import {
+    drawBoundaryArrowHalos,
+    drawBoundaryArrowPulses,
+    type ArrowGeom,
+  } from "./boundary-arrow-pulse";
 
   // ----------------------------------------------------------------
   // Props
@@ -128,6 +133,16 @@
   export let boundaryArrowHaloWidth = 4;
   export let boundaryArrowHaloColor = "#ffffff";
 
+  // Pulse animation along boundary arrows. Each arrow's pulse travels from
+  // its base to its tip and lights up the arrowhead as it arrives.
+  export let boundaryPulseDuration = 1.6; // seconds per cycle
+  export let boundaryPulseWidthFrac = 0.22;
+  export let boundaryPulsePauseFrac = 0.25;
+  // Per-arrow stagger: each arrow lags the previous by `staggerFraction` of
+  // the cycle. 0 = all synced, 1/N = uniform rotation around the boundary.
+  export let boundaryPulseStaggerFraction = 1 / 16;
+  export let boundaryPulseBaseAlpha = 0.45;
+
   // Surface label
   export let surfaceLabelText = "S";
   export let surfaceLabelFontSize = 28;
@@ -187,6 +202,7 @@
   type AnimationState = StreamlineAnimationState & {
     theta: number; // 0-2π for rotation around surface (right side only)
     contourFrame: number; // 0 to (contourAnimationSteps-1) for left side contour animation
+    pulsePhase: number; // 0..1 — boundary-arrow pulse cycle
   };
 
   // Animation objects
@@ -402,6 +418,18 @@
       { start: 0, end: 1 }
     );
 
+    // Boundary-arrow pulse phase clip (used only in boundary-arrows mode).
+    timeline.add(
+      {
+        name: "BoundaryArrowPulse",
+        reduce(t: number) {
+          const loops = totalDuration / boundaryPulseDuration;
+          return { pulsePhase: (t * loops) % 1 };
+        },
+      },
+      { start: 0, end: 1 }
+    );
+
     timeline.onTick((_t, state) => {
       drawLeft(state, cWidth, cHeight, curve);
       drawRight(state, cWidth, cHeight, curve, vectorField);
@@ -547,12 +575,10 @@
       strokeWidth: surfaceStrokeWidth,
     });
 
-    // 4. N uniform ρv arrows along the boundary. Each arrow is drawn twice:
-    //    a thicker white halo first, then the blue arrow on top — so the
-    //    arrows have a clear white outline against the (slightly visible)
-    //    blue density behind them.
+    // 4. N uniform ρv arrows along the boundary, rendered in three passes:
+    //   a. white halo (drawBoundaryArrowHalos)
+    //   b. dim base + bright pulse stripe (drawBoundaryArrowPulses)
     const vecPixelLen = scaleLength(vectorLength, cWidth) * vectorScale;
-    type ArrowGeom = { sx: number; sy: number; ex: number; ey: number; ux: number; uy: number };
     const arrows: ArrowGeom[] = [];
     let labeled: { ax: number; ay: number; dx: number; dy: number } | null = null;
     for (let i = 0; i < boundaryArrowCount; i++) {
@@ -571,31 +597,27 @@
       }
     }
 
-    // 4a. White halo pass (thicker stroke + bigger arrowhead).
-    if (boundaryArrowHaloWidth > 0) {
-      ctx.save();
-      ctx.strokeStyle = boundaryArrowHaloColor;
-      ctx.fillStyle = boundaryArrowHaloColor;
-      ctx.lineWidth = vectorWidth + 2 * boundaryArrowHaloWidth;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      for (const a of arrows) {
-        drawArrow(ctx, a.sx, a.sy, a.ex, a.ey, arrowHeadSize + boundaryArrowHaloWidth);
-      }
-      ctx.restore();
-    }
+    drawBoundaryArrowHalos(ctx, arrows, {
+      shaftWidth: vectorWidth,
+      haloWidth: boundaryArrowHaloWidth,
+      haloColor: boundaryArrowHaloColor,
+      arrowHeadSize,
+    });
 
-    // 4b. Blue arrow pass on top of the halos.
-    ctx.save();
-    ctx.strokeStyle = boundaryArrowColor;
-    ctx.fillStyle = boundaryArrowColor;
-    ctx.lineWidth = vectorWidth;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    for (const a of arrows) {
-      drawArrow(ctx, a.sx, a.sy, a.ex, a.ey, arrowHeadSize);
-    }
-    ctx.restore();
+    const phaseOffsets = arrows.map((_, i) => i * boundaryPulseStaggerFraction);
+    drawBoundaryArrowPulses(ctx, arrows, {
+      phase: state.pulsePhase,
+      shaftWidth: vectorWidth,
+      haloWidth: boundaryArrowHaloWidth,
+      haloColor: boundaryArrowHaloColor,
+      arrowHeadSize,
+      baseColor: boundaryArrowColor,
+      pulseColor: boundaryArrowColor,
+      pulseWidthFrac: boundaryPulseWidthFrac,
+      pulsePauseFrac: boundaryPulsePauseFrac,
+      phaseOffsets,
+      baseAlpha: boundaryPulseBaseAlpha,
+    });
 
     // Label one of the arrows with ρv.
     if (labeled) {
