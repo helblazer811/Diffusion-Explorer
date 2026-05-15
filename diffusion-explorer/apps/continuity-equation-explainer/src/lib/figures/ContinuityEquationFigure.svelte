@@ -136,8 +136,8 @@
   // streaklet figure but tuned smaller for this smaller canvas.
   export let streakletColor = "#f97316"; // orange
   export let streakletStrokeWidth = 2.5;
-  export let streakletNumParticles = 350;
-  export let streakletTrailLength = 80;
+  export let streakletNumParticles = 80;
+  export let streakletTrailLength = 60;
   export let streakletBaseLifetimeFrames = 240;
   export let streakletSpeedScale = 0.015;
   export let streakletSpeedGamma = 0.7;
