@@ -122,7 +122,11 @@
   // White opaque rectangle drawn between the density and the surface arrows
   // so the boundary arrows read clearly against the soft blue density.
   export let rightDensityMuteColor = "#ffffff";
-  export let rightDensityMuteOpacity = 0.7;
+  export let rightDensityMuteOpacity = 0.25;
+  // Width of the white halo drawn around each boundary arrow (px on each side
+  // of the colored stroke). Set to 0 to disable.
+  export let boundaryArrowHaloWidth = 4;
+  export let boundaryArrowHaloColor = "#ffffff";
 
   // Surface label
   export let surfaceLabelText = "S";
@@ -543,34 +547,53 @@
       strokeWidth: surfaceStrokeWidth,
     });
 
-    // 4. N uniform ρv arrows along the boundary.
+    // 4. N uniform ρv arrows along the boundary. Each arrow is drawn twice:
+    //    a thicker white halo first, then the blue arrow on top — so the
+    //    arrows have a clear white outline against the (slightly visible)
+    //    blue density behind them.
     const vecPixelLen = scaleLength(vectorLength, cWidth) * vectorScale;
-    ctx.save();
-    ctx.strokeStyle = boundaryArrowColor;
-    ctx.fillStyle = boundaryArrowColor;
-    ctx.lineWidth = vectorWidth;
+    type ArrowGeom = { sx: number; sy: number; ex: number; ey: number; ux: number; uy: number };
+    const arrows: ArrowGeom[] = [];
     let labeled: { ax: number; ay: number; dx: number; dy: number } | null = null;
     for (let i = 0; i < boundaryArrowCount; i++) {
-      const t = i / boundaryArrowCount;
-      const phi = t * 2 * Math.PI;
+      const phi = (i / boundaryArrowCount) * 2 * Math.PI;
       const [bx, by] = curve(phi);
       const [pxB, pyB] = toPixelBound([bx, by]);
-
-      // Field at this boundary point, unit-normalized so arrows are the same
-      // length regardless of |F| variation.
       const [vx, vy] = vectorField(bx, by);
       const mag = Math.hypot(vx, vy);
       const ux = mag > 1e-9 ? vx / mag : 1;
       const uy = mag > 1e-9 ? vy / mag : 0;
-
-      // Canvas y is flipped relative to math y.
       const ex = pxB + ux * vecPixelLen;
-      const ey = pyB - uy * vecPixelLen;
-
-      drawArrow(ctx, pxB, pyB, ex, ey, arrowHeadSize);
+      const ey = pyB - uy * vecPixelLen; // canvas y is flipped vs math y
+      arrows.push({ sx: pxB, sy: pyB, ex, ey, ux, uy });
       if (i === boundaryArrowLabelIndex) {
         labeled = { ax: ex, ay: ey, dx: ux, dy: uy };
       }
+    }
+
+    // 4a. White halo pass (thicker stroke + bigger arrowhead).
+    if (boundaryArrowHaloWidth > 0) {
+      ctx.save();
+      ctx.strokeStyle = boundaryArrowHaloColor;
+      ctx.fillStyle = boundaryArrowHaloColor;
+      ctx.lineWidth = vectorWidth + 2 * boundaryArrowHaloWidth;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      for (const a of arrows) {
+        drawArrow(ctx, a.sx, a.sy, a.ex, a.ey, arrowHeadSize + boundaryArrowHaloWidth);
+      }
+      ctx.restore();
+    }
+
+    // 4b. Blue arrow pass on top of the halos.
+    ctx.save();
+    ctx.strokeStyle = boundaryArrowColor;
+    ctx.fillStyle = boundaryArrowColor;
+    ctx.lineWidth = vectorWidth;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    for (const a of arrows) {
+      drawArrow(ctx, a.sx, a.sy, a.ex, a.ey, arrowHeadSize);
     }
     ctx.restore();
 
