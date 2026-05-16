@@ -130,7 +130,7 @@
   export let rightDensityMuteOpacity = 0.25;
   // Width of the white halo drawn around each boundary arrow (px on each side
   // of the colored stroke). Set to 0 to disable.
-  export let boundaryArrowHaloWidth = 4;
+  export let boundaryArrowHaloWidth = 0;
   export let boundaryArrowHaloColor = "#ffffff";
 
   // Pulse animation along boundary arrows. Each arrow's pulse travels from
