@@ -29,7 +29,7 @@
 
   let {
     // Layout
-    canvasWidth = 800,
+    canvasWidth = 960,
     canvasHeight = 400,
     margin = 20,
     dpiScale = 3,
@@ -66,7 +66,7 @@
     // Domain — viewport is rotated: domain y becomes horizontal (canvas x), domain x becomes
     // vertical (canvas y). Sized so the limit cycle (~4 in x, ~5.6 in y) fills the 2:1 canvas
     // with some margin for surrounding field.
-    domain = { xMin: -2.7, xMax: 2.7, yMin: -5.4, yMax: 5.4 } as VelocityGridDomain,
+    domain = { xMin: -2.7, xMax: 2.7, yMin: -6.48, yMax: 6.48 } as VelocityGridDomain,
 
     // Quiver — uniform grid in canvas pixel space (axis-aligned, never rotated).
     // Arrows at each pixel sample the *transformed* field so they stay consistent
@@ -125,7 +125,7 @@
     // Anisotropic stretch of the new (rotated) frame's axes — applied AFTER
     // rotation, so stretchX stretches the new-frame horizontal, stretchY the
     // new-frame vertical. Both default to 1 (no stretch).
-    stretchX = 1.4,
+    stretchX = 1.75,
     stretchY = 1,
 
     // Time slider
