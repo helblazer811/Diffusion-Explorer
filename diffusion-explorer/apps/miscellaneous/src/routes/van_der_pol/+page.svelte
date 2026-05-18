@@ -33,7 +33,7 @@
     display: flex;
     justify-content: center;
     width: 100%;
-    max-width: 800px;
+    max-width: 960px;
     margin: 0 auto;
   }
 </style>
