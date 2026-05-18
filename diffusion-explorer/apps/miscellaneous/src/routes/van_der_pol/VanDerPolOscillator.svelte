@@ -596,7 +596,7 @@
 
   .vdp-caption {
     display: block;
-    font-size: 1.7rem;
+    font-size: 1.45rem;
     line-height: 1.55;
     /* Match `quiverInsetFraction` (0.04) so the caption text starts flush with
        the leftmost column of arrows in the quiver. */
