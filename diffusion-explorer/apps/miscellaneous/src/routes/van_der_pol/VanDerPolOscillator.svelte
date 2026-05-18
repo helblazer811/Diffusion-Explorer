@@ -36,20 +36,31 @@
 
     // ODE
     mu = 1.0,
-    // Each entry seeds its own trajectory; they're animated in a staggered
-    // round-robin so the convergence is visible from several starts at once.
-    startPoints = [
-      [3, 0],
-      [-3, 0],
-      [0, 3.2],
-      [0, -3.2],
-      [0.1, 0.1],
-      [2.5, 2],
-      [-2.5, -2],
-    ] as [number, number][],
-    // New trajectory begins when the previous is this fraction through its run.
-    staggerFraction = 0.1,
-    dt = 0.005,
+    // Lead trajectory: one point starts the animation alone, then a moment
+    // later the synchronized cluster appears (see clusterStartTime below).
+    leadStartPoint = [3, 0] as [number, number],
+    // Cluster — N points evenly spaced on an ellipse (in domain coords)
+    // around the attractor. Placed outside the limit cycle so trajectories
+    // spiral inward; angular ordering matches the dynamics' counter-clockwise
+    // rotation (on screen, with y pointing down) so the points act like a
+    // coherent rotating front with minimal mutual overlap.
+    clusterEllipseRadiusX = 2.5,
+    clusterEllipseRadiusY = 3.0,
+    clusterEllipseCenterX = 0,
+    clusterEllipseCenterY = 0,
+    clusterEllipsePhaseOffset = 0,
+    clusterCount = 10,
+    // When the cluster appears relative to the timeline (0–1). Cluster points
+    // launch at this offset plus a small per-point stagger (see below) so
+    // they're nearly — but not exactly — synchronized.
+    clusterStartTime = 0.05,
+    // Per-cluster-point stagger. Sized so the cascade fills the rest of the
+    // loop: last cluster offset + visibility = ~1.0, so the timeline restarts
+    // right when the last point finishes fading.
+    //   last_offset = clusterStartTime + (clusterCount - 1) * staggerFraction
+    //   visibility = (pathlineLifetimeSegments + pathlineFadeOutSegments) / numSteps
+    clusterStaggerFraction = 0.05,
+    dt = 0.008,
     numSteps = 6000,
 
     // Domain — viewport is rotated: domain y becomes horizontal (canvas x), domain x becomes
@@ -62,35 +73,50 @@
     // with the rotated/stretched trajectory.
     gridSpacingPixels = 45,
     arrowScale = 11,
-    arrowStrokeWidth = 1.5,
+    arrowStrokeWidth = 3.75,
     arrowHeadRadius = 3,
     arrowOpacity = 0.6,
     showArrowHeads = false,
     quiverInsetFraction = 0.04,
 
     // Pathline
-    pathlineStrokeWidth = 5,
-    pathlinePointRadius = 5,
+    pathlineStrokeWidth = 9.4,
+    pathlinePointRadius = 9.4,
     pathlineOpacity = 1.0,
     pathlineFadeFloor = 0.0,
+    // Gamma on the head→tail alpha ramp. 1 = linear (default).
+    //   > 1 — head-loaded comet: alpha drops off rapidly behind the head.
+    //   < 1 — tail-loaded: alpha stays high deeper into the trail.
+    pathlineFadeGamma = 2.5,
+    // Thin white halo around the head dot (and faintly the trail) so the
+    // moving point reads against the gray limit-cycle backdrop.
+    pathlineOutlineColor = "#ffffff",
+    pathlineOutlineOpacity = 1.0,
+    pathlineOutlineStrokeWidth = 1.5,
     // Length of the visible trail behind the head, in integration segments.
     // Older segments are fully transparent — this prevents low-alpha laps from
     // accumulating to opaque under source-over compositing.
-    pathlineTrailWindow = 100,
-    // After the head traverses this many segments, the whole pathline (head +
-    // trail) disappears until its next staggered start. Keep this less than
-    // numSteps to avoid stacking many simultaneous pathlines on the cycle.
-    pathlineLifetimeSegments = 2000,
+    pathlineTrailWindow = 150,
+    // After the head propagates this many segments, the pathline enters its
+    // fade-out phase. The head keeps moving during fade-out so the system
+    // doesn't look frozen — only its opacity drops to zero.
+    pathlineLifetimeSegments = 900,
+    // Duration of the fade-out phase, in integration segments. During this
+    // window the head continues to advance but all alphas scale linearly to 0.
+    pathlineFadeOutSegments = 400,
 
     // Static limit-cycle backdrop (drawn under the animated trail)
     showLimitCycle = true,
     limitCycleColor = "#475569",
     limitCycleOpacity = 0.9,
-    limitCycleStrokeWidth = 3.5,
+    limitCycleStrokeWidth = 6.6,
 
     // Animation
-    animationDurationMs = 30000,
+    animationDurationMs = 50000,
     playingByDefault = true,
+    // Seconds to wait after page load before the timeline starts — gives time
+    // to start a screen recording. Set to 0 to start immediately.
+    initialPlayDelaySeconds = 3,
 
     // Additional viewport rotation (degrees, clockwise on screen) applied AFTER the
     // 90° axes swap. Use to align the limit cycle's long axis with horizontal.
@@ -281,6 +307,22 @@
       return applyMatrix2(M, [vx, vy]);
     });
 
+    // Build the full list of starting points: lead first, then a ring of
+    // clusterCount points evenly spaced on an ellipse around the attractor.
+    // Positive θ steps go counter-clockwise in math (x, y), which — under
+    // the axes-swap + y-flip + rotation transform — reads as clockwise on
+    // screen, the opposite direction from the Van der Pol flow. Consecutive
+    // launches therefore start behind each other in the flow direction so
+    // each new point follows the previous one's trail.
+    const clusterDomainPoints: [number, number][] = [];
+    for (let i = 0; i < clusterCount; i++) {
+      const theta = clusterEllipsePhaseOffset + (2 * Math.PI * i) / clusterCount;
+      const x = clusterEllipseCenterX + clusterEllipseRadiusX * Math.cos(theta);
+      const y = clusterEllipseCenterY + clusterEllipseRadiusY * Math.sin(theta);
+      clusterDomainPoints.push([x, y]);
+    }
+    const allStartPoints: [number, number][] = [leadStartPoint, ...clusterDomainPoints];
+
     // Trajectories: integrate one per start point, map each to pixel coords,
     // and create a PathlineAnimation per trajectory (all rendering to the same
     // canvas via CPU backend — they composite naturally in draw order).
@@ -288,7 +330,7 @@
     trailAlphasPerAnim = [];
 
     let referenceTraj: number[][] | null = null;
-    for (const sp of startPoints) {
+    for (const sp of allStartPoints) {
       const traj = integrateTrajectory(sp, dt, numSteps);
       if (referenceTraj === null) referenceTraj = traj;
       const pixelPathline = traj.map(toPixel);
@@ -309,10 +351,12 @@
       trailAlphasPerAnim.push(new Array(pixelPathline.length).fill(0));
     }
 
-    // Limit-cycle backdrop: tail of any converged trajectory approximates one
-    // period of the cycle. Use the first start point's trajectory for simplicity.
+    // Limit-cycle backdrop: take the tail of a converged trajectory. Sized
+    // generously (~1.3 cycle periods at dt=0.003) so the loop fully closes
+    // regardless of small dt changes; the extra wraparound just redraws the
+    // same pixels harmlessly.
     if (referenceTraj) {
-      const cycleSamples = Math.min(referenceTraj.length, 1400);
+      const cycleSamples = Math.min(referenceTraj.length, 3000);
       limitCyclePixel = referenceTraj
         .slice(referenceTraj.length - cycleSamples)
         .map(toPixel);
@@ -326,12 +370,13 @@
   ): void {
     const floor = pathlineFadeFloor;
     const denom = head - tailStart;
+    const gamma = pathlineFadeGamma;
     for (let i = 0; i < alphas.length; i++) {
       if (i > head || i <= tailStart || denom <= 0) {
         alphas[i] = 0;
       } else {
         const t = (i - tailStart) / denom;
-        alphas[i] = floor + (1 - floor) * t;
+        alphas[i] = floor + (1 - floor) * Math.pow(t, gamma);
       }
     }
   }
@@ -399,32 +444,81 @@
     drawLimitCycle();
 
     // --- Dynamic Foreground ---
-    // Each trajectory has its own local time = (t - i*stagger) wrapped to [0, 1).
-    // Two phases per animation, parameterised by the local segment count `segs`:
-    //   • Propagation: segs ∈ [0, lifetime]. Head advances at `segs`; trail of
-    //     length `window` follows behind. Standard comet.
-    //   • Fade-out:   segs ∈ (lifetime, lifetime + window]. Head freezes at
-    //     `lifetime`; tail (= segs - window) keeps advancing, so visible
-    //     length shrinks linearly to 0 and the head dot fades with it.
-    //   • Beyond:     segs > lifetime + window — fully invisible until the
-    //     next staggered restart.
+    // Animation 0 (lead) starts at t=0; animations 1..N (cluster) at staggered
+    // offsets starting at clusterStartTime. Each animation has two phases:
+    //   • Propagation: segs ∈ [0, lifetime]. Head advances, trail of length
+    //     `window` follows behind at full opacity.
+    //   • Fade-out:   segs ∈ (lifetime, lifetime + fadeOut]. Head KEEPS moving
+    //     so the dynamics stay visibly alive, but a fade factor scales every
+    //     alpha (trail + head + outline) linearly to 0.
+    //   • Beyond:     segs > lifetime + fadeOut — fully invisible until the
+    //     timeline loops.
     const window = pathlineTrailWindow;
+    const fadeOut = pathlineFadeOutSegments;
     for (let i = 0; i < pathlineAnimations.length; i++) {
       const anim = pathlineAnimations[i];
-      const offset = i * staggerFraction;
-      const localT = ((t - offset) % 1 + 1) % 1;
-      const segs = Math.floor(localT * anim.data.numSegments);
-      const head = Math.min(segs, pathlineLifetimeSegments);
+      const offset = i === 0 ? 0 : clusterStartTime + (i - 1) * clusterStaggerFraction;
+      const localT = t - offset;
+      if (localT < 0) continue;
+      // Fractional segment index — drawTrajectories interpolates linearly
+      // between adjacent points for the head marker, so slowing down the
+      // timeline (larger animationDurationMs) yields smooth sub-segment
+      // motion without needing more integration steps.
+      const segs = localT * anim.data.numSegments;
+
+      // Fade factor: 1 during propagation, linear 1→0 during fade-out.
+      let fadeFactor = 1;
+      if (segs > pathlineLifetimeSegments) {
+        const into = segs - pathlineLifetimeSegments;
+        fadeFactor = 1 - into / fadeOut;
+        if (fadeFactor <= 0) continue;
+      }
+
+      // Head keeps moving (capped only by available trajectory length).
+      const head = Math.min(segs, anim.data.numSegments - 1);
       const tailStart = segs - window;
       const visibleLen = head - tailStart;
       if (visibleLen <= 0) continue;
+
       updateTrailAlphasFor(trailAlphasPerAnim[i], head, tailStart);
-      // Head dot stays at full opacity for the whole visible lifetime, then
-      // disappears suddenly when visibleLen reaches 0 (handled by `continue`).
-      anim.draw({
-        segmentIndex: head,
-        perSegmentAlphas: [trailAlphasPerAnim[i]],
-      } as AnimationState);
+      // Apply fade factor to every per-segment alpha during phase 2.
+      if (fadeFactor < 1) {
+        const alphas = trailAlphasPerAnim[i];
+        for (let j = 0; j < alphas.length; j++) alphas[j] *= fadeFactor;
+      }
+
+      anim.draw(
+        {
+          segmentIndex: head,
+          perSegmentAlphas: [trailAlphasPerAnim[i]],
+        } as AnimationState,
+        { opacity: pathlineOpacity * fadeFactor }
+      );
+
+      // Thin white outline around the head dot only — fades with the rest.
+      // Use the interpolated head position so the outline tracks the smooth
+      // head motion (not snapped to integer segment endpoints).
+      const points = anim.data.pathlines[0];
+      const floorH = Math.floor(head);
+      const fracH = head - floorH;
+      const baseIdx = Math.min(floorH, points.length - 1);
+      const nextIdx = Math.min(baseIdx + 1, points.length - 1);
+      const headX = points[baseIdx][0] + fracH * (points[nextIdx][0] - points[baseIdx][0]);
+      const headY = points[baseIdx][1] + fracH * (points[nextIdx][1] - points[baseIdx][1]);
+      ctx.save();
+      ctx.strokeStyle = pathlineOutlineColor;
+      ctx.globalAlpha = pathlineOutlineOpacity * fadeFactor;
+      ctx.lineWidth = pathlineOutlineStrokeWidth;
+      ctx.beginPath();
+      ctx.arc(
+        headX,
+        headY,
+        pathlinePointRadius + pathlineOutlineStrokeWidth / 2,
+        0,
+        2 * Math.PI
+      );
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
@@ -455,7 +549,13 @@
 
         if (timeline) {
           draw(0);
-          if (playingByDefault) timeline.play();
+          if (playingByDefault) {
+            if (initialPlayDelaySeconds > 0) {
+              setTimeout(() => timeline?.play(), initialPlayDelaySeconds * 1000);
+            } else {
+              timeline.play();
+            }
+          }
         }
       });
     }
@@ -480,11 +580,8 @@
 
   {#snippet caption()}
     <span class="vdp-caption">
-      <strong>A stable limit cycle.</strong>
-      Trajectories launched from different points all spiral onto the same
-      closed orbit. The cycle is an isolated attractor in phase space: nearby
-      paths get pulled toward it, and once on it, the system traces the same
-      periodic motion forever.
+      <strong>A stable limit cycle</strong> is an isolated closed orbit that
+      nearby trajectories converge to over time.
     </span>
   {/snippet}
 </Figure>
@@ -498,7 +595,12 @@
   }
 
   .vdp-caption {
-    font-size: 1.35rem;
+    display: block;
+    font-size: 1.7rem;
     line-height: 1.55;
+    /* Match `quiverInsetFraction` (0.04) so the caption text starts flush with
+       the leftmost column of arrows in the quiver. */
+    padding-left: 4%;
+    padding-right: 4%;
   }
 </style>
