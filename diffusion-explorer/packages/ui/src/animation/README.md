@@ -43,14 +43,14 @@ resolution through a priority-based layer system.
 ## Core Concepts
 
 ### Clip (Reducer Pattern)
-Clips are functions that take time and current state, returning partial state updates.
+Clips are pure functions of local time, returning partial state updates.
 They close over any external values they need (no params argument).
 
 ```typescript
 const fadeClip: Clip<State> = {
   name: 'fade',
   duration: 0.5,  // 50% of timeline duration
-  reduce(t, current) {
+  reduce(t) {
     return { opacity: t };  // Partial state update
   }
 };
