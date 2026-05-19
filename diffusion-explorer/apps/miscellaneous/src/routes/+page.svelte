@@ -34,6 +34,7 @@
 		<li><a href="/eulerian_vs_lagrangian">Eulerian vs Lagrangian</a></li>
 		<li><a href="/van_der_pol">Van der Pol Limit Cycle</a></li>
 		<li><a href="/limit_cycle_stability">Limit Cycle Stability</a></li>
+		<li><a href="/lorenz_attractor">Lorenz Attractor</a></li>
 		<li><a href="/class_conditioning">Class Conditioning</a></li>
 	</ul>
 </section>
