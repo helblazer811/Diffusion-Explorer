@@ -328,12 +328,15 @@
       // Left panel integration clip
       const leftClip: Clip<AnimationState> = {
         name: `left-integration-${i}`,
-        reduce: (t: number, current: Readonly<AnimationState>) => {
+        reduce: (t: number) => {
           const segmentIndex = Math.min(
             Math.floor(t * leftNumSegments),
             leftNumSegments - 1
           );
-          const newCompleted = new Set(current.leftCompletedPathlines);
+          // Trajectory `i` completes 0..i-1 by the time it starts. We emit
+          // a fresh Set rather than reading from prior state — last-wins on
+          // track merge makes the read of `current` vestigial.
+          const newCompleted = new Set<number>();
           for (let j = 0; j < i; j++) {
             newCompleted.add(j);
           }
@@ -352,13 +355,14 @@
       // Right panel integration clip
       const rightClip: Clip<AnimationState> = {
         name: `right-integration-${i}`,
-        reduce: (t: number, current: Readonly<AnimationState>) => {
+        reduce: (t: number) => {
           const segmentIndex = Math.min(
             Math.floor(t * rightNumSegments),
             rightNumSegments - 1
           );
-          const newCompleted = new Set(current.rightCompletedPathlines);
-          const newRemoved = new Set(current.rightRemovedPathlines);
+          // Fresh sets emit 0..i-1 deterministically; track merge is last-wins.
+          const newCompleted = new Set<number>();
+          const newRemoved = new Set<number>();
           for (let j = 0; j < i; j++) {
             if (collisionMap.has(j)) {
               newRemoved.add(j);
@@ -389,9 +393,10 @@
 
         const flashFadeClip: Clip<AnimationState> = {
           name: `flash-fade-${i}`,
-          reduce: (t: number, current: Readonly<AnimationState>) => {
-            const newCompleted = new Set(current.rightCompletedPathlines);
-            const newRemoved = new Set(current.rightRemovedPathlines);
+          reduce: (t: number) => {
+            // Fresh sets — same construction as right-integration; last-wins.
+            const newCompleted = new Set<number>();
+            const newRemoved = new Set<number>();
             for (let j = 0; j < i; j++) {
               if (collisionMap.has(j)) {
                 newRemoved.add(j);
