@@ -291,7 +291,13 @@
         .add({ name: 'GreenArrow', reduce(t) { return { greenArrowOpacity: t }; } }, { durationMs: 700 });
       wait();
       builder
-        .add({ name: 'FadeArrows', reduce(t) { return { orangeArrowOpacity: 1 - t, greenArrowOpacity: 1 - t }; } }, { durationMs: 500 })
+        .add(
+          [
+            { name: 'FadeOrangeArrows', reduce(t) { return { orangeArrowOpacity: 1 - t }; } },
+            { name: 'FadeGreenArrow', reduce(t) { return { greenArrowOpacity: 1 - t }; } },
+          ],
+          { durationMs: 500 },
+        )
         .add({ name: 'Trajectory', reduce(t) { return { trajectoryProgress: t }; } }, { durationMs: trajectoryDuration });
     } else {
       // Blog mode: skip coupling, start with two paths + intersection visible
