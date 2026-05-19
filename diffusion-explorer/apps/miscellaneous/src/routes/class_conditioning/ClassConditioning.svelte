@@ -539,19 +539,22 @@
     //    the two canonical paths (one per class). The z marker + label
     //    stay put. The averaged-velocity arrow has not appeared yet.
     builder.add(
-      {
-        name: "EnterUncertaintyView",
-        reduce(t) {
-          const u = smoothstep(t);
-          return {
-            couplingsFade: 1 - u,
-            zPairHighlightAlpha: 1 - u,
-            canonicalAAlpha: u,
-            canonicalBAlpha: u,
-            probeLabelAlpha: u,
-          };
+      [
+        {
+          name: "FadeOutCouplings",
+          reduce(t) {
+            const u = smoothstep(t);
+            return { couplingsFade: 1 - u, zPairHighlightAlpha: 1 - u };
+          },
         },
-      },
+        {
+          name: "FadeInCanonicalPaths",
+          reduce(t) {
+            const u = smoothstep(t);
+            return { canonicalAAlpha: u, canonicalBAlpha: u, probeLabelAlpha: u };
+          },
+        },
+      ],
       { durationMs: 900 },
     );
     builder.add(createPauseClip(), { durationMs: 500 });
@@ -595,19 +598,26 @@
     //    drop the class-B canonical + averaged-velocity arrow, colorize
     //    the kept (class A) canonical.
     builder.add(
-      {
-        name: "RevealClassADensity",
-        reduce(t) {
-          const u = smoothstep(t);
-          return {
-            densityCondAlpha: u,
-            canonicalBAlpha: 1 - u,
-            canonicalColorMix: u,
-            ambiguityAlpha: 1 - u,
-            conditionedClass: 0 as 0,
-          };
+      [
+        {
+          name: "FadeOutNonAElements",
+          reduce(t) {
+            const u = smoothstep(t);
+            return { canonicalBAlpha: 1 - u, ambiguityAlpha: 1 - u };
+          },
         },
-      },
+        {
+          name: "RevealClassADensity",
+          reduce(t) {
+            const u = smoothstep(t);
+            return {
+              densityCondAlpha: u,
+              canonicalColorMix: u,
+              conditionedClass: 0 as 0,
+            };
+          },
+        },
+      ],
       { durationMs: 1000 },
     );
     builder.add(createPauseClip(), { durationMs: 1000 });
@@ -636,19 +646,26 @@
     // H. Flip to class B: fade out the class-A canonical + arrow, fade
     //    in the class-B contour + canonical.
     builder.add(
-      {
-        name: "RevealClassBDensity",
-        reduce(t) {
-          const u = smoothstep(t);
-          return {
-            canonicalAAlpha: 1 - u,
-            condVelocityAAlpha: 1 - u,
-            densityCondBAlpha: u,
-            canonicalBAlpha: u,
-            conditionedClass: 1 as 1,
-          };
+      [
+        {
+          name: "FadeOutClassAElements",
+          reduce(t) {
+            const u = smoothstep(t);
+            return { canonicalAAlpha: 1 - u, condVelocityAAlpha: 1 - u };
+          },
         },
-      },
+        {
+          name: "RevealClassBElements",
+          reduce(t) {
+            const u = smoothstep(t);
+            return {
+              densityCondBAlpha: u,
+              canonicalBAlpha: u,
+              conditionedClass: 1 as 1,
+            };
+          },
+        },
+      ],
       { durationMs: 1000 },
     );
     builder.add(createPauseClip(), { durationMs: 1000 });
