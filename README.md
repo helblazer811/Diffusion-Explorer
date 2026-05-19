@@ -70,7 +70,3 @@ npm run dev
 ```
 
 and then access it in your browser at the specified port.
-
-## Other Visualizations
-
-You can also see some other interesting (non-interactive) visualizations in `/other-visualizations`.
