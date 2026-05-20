@@ -310,15 +310,6 @@
     // Cache numSteps for clip closure
     cachedNumSteps = $allTimeSamples?.length || 1;
 
-    const tl = Timeline.from<AnimationState>({
-      duration: animationDuration / 1000,
-      initialState: { time: 0, currentStep: 0, centerX: scales.sourceCenterPixelX },
-      clips: [
-        { clip: mainClip, ...{ start: 0, end: 1 } },
-      ],
-    });
-    player = new Player(tl, { looping: true, endPause: animationPauseTime / 1000 });
-
     // Main animation clip - computes derived state from t
     const mainClip = {
       name: "Animation",
@@ -331,9 +322,14 @@
       }
     };
 
-    // Add main animation clip
-
-    // Set timeline duration and end pause
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: { time: 0, currentStep: 0, centerX: scales.sourceCenterPixelX },
+      clips: [
+        { clip: mainClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true, endPause: animationPauseTime / 1000 });
 
     // Register tick callback
     player.onTick((t, state) => {

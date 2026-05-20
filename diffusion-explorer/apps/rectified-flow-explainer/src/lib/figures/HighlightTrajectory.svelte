@@ -278,15 +278,6 @@
     // Initialize with canvas
     await pathlineAnimation.init(canvas);
 
-    const tl = Timeline.from<AnimationState>({
-      duration: animationDuration / 1000,
-      initialState: {},
-      clips: [
-        { clip: mainClip, ...{ start: 0, end: 1 } },
-      ],
-    });
-    player = new Player(tl, { looping: true, endPause: pauseBeforeRestart / 1000 });
-
     // Main animation clip - combines PathlineAnimation's segmentIndex with time and clickedSegmentIndex
     const mainClip = {
       name: "Animation",
@@ -299,9 +290,14 @@
       },
     };
 
-    // Add main animation clip
-
-    // Set timeline duration and end pause
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: {},
+      clips: [
+        { clip: mainClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true, endPause: pauseBeforeRestart / 1000 });
 
     // Register tick callback
     player.onTick((_t, state) => {
