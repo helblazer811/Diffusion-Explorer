@@ -9,7 +9,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     DoubleFigure,
     Katex,
     Timeline,
@@ -113,7 +113,7 @@
   let ctxLeft: CanvasRenderingContext2D | null = $state(null);
   let ctxRight: CanvasRenderingContext2D | null = $state(null);
 
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let isInitialized = $state(false);
   let loadError: string | null = $state(null);
 
@@ -133,7 +133,7 @@
 
   // Visibility
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -257,16 +257,19 @@
       segmentIndex: 0,
     };
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = initialState;
-    timeline.duration = animationDurationMs / 1000;
-    timeline.looping = true;
-
-    timeline.add(syncClip, { start: 0, end: 1 });
-
-    timeline.onTick((_, state) => {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDurationMs / 1000,
+      initialState: initialState,
+      clips: [
+        { clip: syncClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((_, state) => {
       draw(state);
     });
+
+
 
     console.log("[EulerianVsLagrangian] Timeline setup complete");
   }
@@ -348,8 +351,8 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) {
-      timeline.dispose();
+    if (player) {
+      player?.dispose();
     }
   });
 
@@ -375,9 +378,9 @@
         setupTimeline();
         isInitialized = true;
 
-        if (playingByDefault && timeline) {
-          draw(timeline.initialState);
-          timeline.play();
+        if (playingByDefault && player) {
+          draw(player!.timeline.initialState);
+          player.play();
         }
       });
     }
@@ -429,7 +432,7 @@
 
   {#snippet footer()}
     <TimeSlider
-      timeline={timeline as any}
+      timeline={player}
       color={resolvedTimeSliderColor}
       showPlayButton
       maxWidth="644px"

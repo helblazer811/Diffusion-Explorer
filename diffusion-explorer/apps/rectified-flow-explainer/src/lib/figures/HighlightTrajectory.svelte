@@ -2,7 +2,7 @@
   import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import type { FlowModelClient } from "@diffusion-explorer/diffusion";
-  import {
+  import { Player,
     Figure,
     TimeSlider,
     Slider,
@@ -107,7 +107,7 @@
 
   // Animation state - Timeline system
   let initialized = false;
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // PathlineAnimation instance
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
@@ -133,7 +133,7 @@
 
   // Visibility tracking
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -278,12 +278,14 @@
     // Initialize with canvas
     await pathlineAnimation.init(canvas);
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      time: 0,
-      segmentIndex: 0,
-      clickedSegmentIndex: 0,
-    };
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: {},
+      clips: [
+        { clip: mainClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true, endPause: pauseBeforeRestart / 1000 });
 
     // Main animation clip - combines PathlineAnimation's segmentIndex with time and clickedSegmentIndex
     const mainClip = {
@@ -298,15 +300,11 @@
     };
 
     // Add main animation clip
-    timeline.add(mainClip, { start: 0, end: 1 });
 
     // Set timeline duration and end pause
-    timeline.duration = animationDuration / 1000;
-    timeline.setEndPause(pauseBeforeRestart / 1000);
-    timeline.looping = true;
 
     // Register tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       rawSliderValue = _t;
       currentDisplayTime = reverseSlider ? 1 - _t : _t;
       draw(state);
@@ -314,23 +312,23 @@
   }
 
   function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+    if (!player) return;
+    player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   export function restart() {
-    if (timeline) {
-      timeline.seek(0);
-      timeline.play();
+    if (player) {
+      player.seek(0);
+      player.play();
     }
   }
 
   export function pause() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -356,7 +354,7 @@
 
     // Distribution labels
     if (sourceLabelText && scales) {
-      const requestRedraw = () => { if (timeline) draw(timeline.state); };
+      const requestRedraw = () => { if (player) draw(player.state); };
       drawMathjax(ctx, sourceLabelText, scales.sourceCenterPixelX, marginHeight / 2 + labelFontSize, labelFontSize, 0, labelFontSize, { color: '#333' }, requestRedraw);
       if (targetLabelText) {
         drawMathjax(ctx, targetLabelText, scales.targetCenterPixelX, marginHeight / 2 + labelFontSize, labelFontSize, 0, labelFontSize, { color: '#333' }, requestRedraw);
@@ -576,7 +574,7 @@
     pathlineAnimation = null; // Stop drawing old trajectory
 
     // Reset animation state and start
-    if (timeline) timeline.reset();
+    if (player) player.reset();
     startAnimation();
 
     // Sample with streaming
@@ -620,7 +618,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -639,7 +637,7 @@
     runInitialComputation();
     setupTimeline().then(() => {
       initialized = true;
-      draw(timeline!.initialState);
+      draw(player!.initialState);
       if (playingByDefault) startAnimation();
     });
   }
@@ -679,19 +677,18 @@
               maxLabel="t=1"
               maxWidth={sliderMaxWidth}
               labelSize={sliderLabelSize}
-              onInput={(v) => { if (timeline) timeline.seek(v); }}
-              onDragStart={() => { if (timeline) timeline.startSeeking(); }}
-              onDragEnd={() => { if (timeline) timeline.endSeeking(); }}
+              onInput={(v) => { if (player) player.seek(v); }}
+              
+              
             />
           </div>
         {:else}
-          <TimeSlider
-            {timeline}
+          <TimeSlider timeline={player}
             color={settings.stylingSettings.trajectory.color}
             minLabel={reverseSlider ? 't=1' : 't=0'}
             maxLabel={reverseSlider ? 't=0' : 't=1'}
             displayTime={reverseSlider ? currentDisplayTime : null}
-            onSeekByDisplayTime={reverseSlider ? (t) => { if (timeline) timeline.seek(1 - t); } : null}
+            onSeekByDisplayTime={reverseSlider ? (t) => { if (player) player.seek(1 - t); } : null}
           />
         {/if}
       {/if}

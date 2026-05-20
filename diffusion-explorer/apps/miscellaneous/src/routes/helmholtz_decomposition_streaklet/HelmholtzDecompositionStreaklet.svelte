@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { writable, type Writable } from "svelte/store";
-  import {
+  import { Player,
     Katex,
     StatelessStreakletAnimation,
     Timeline,
@@ -63,7 +63,7 @@
   let isInitialized = false;
   let wasPlayingBeforeHidden = false;
 
-  let timeline: Timeline<StreakletAnimationState> | null = null;
+  let player: Player<StreakletAnimationState> | null = null;
   let animFull: StatelessStreakletAnimation<StreakletAnimationState> | null = null;
   let animCurl: StatelessStreakletAnimation<StreakletAnimationState> | null = null;
   let animDiv: StatelessStreakletAnimation<StreakletAnimationState> | null = null;
@@ -201,18 +201,21 @@
 
   function setupTimeline() {
     if (!animFull || !animCurl || !animDiv) return;
-    timeline = new Timeline<StreakletAnimationState>();
-    timeline.initialState = { dt: 0 };
+    const tl = Timeline.from<StreakletAnimationState>({
+      duration: 1,
+      initialState: { dt: 0 },
+      clips: [
+        { clip: animFull.clip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
     // Duration is arbitrary — streaklets have no phase and no loop period.
     // We just want the Timeline to keep ticking and to support play/pause.
-    timeline.duration = 1;
-    timeline.looping = true;
 
     // No-op clips (the animations' own clips return empty partial state).
-    timeline.add(animFull.clip, { start: 0, end: 1 });
 
     let lastReal = performance.now();
-    timeline.onTick(() => {
+    player.onTick(() => {
       const now = performance.now();
       const dt = Math.min(0.1, (now - lastReal) / 1000);
       lastReal = now;
@@ -225,11 +228,11 @@
   }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -237,8 +240,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!player) return;
+    if (!active && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -275,7 +278,7 @@
   });
 
   onDestroy(() => {
-    if (timeline) timeline.dispose();
+    if (player) player?.dispose();
     if (observer) observer.disconnect();
     animFull?.destroy();
     animCurl?.destroy();
@@ -297,7 +300,7 @@
     isInitialized = true;
     runInitialComputation().then(() => {
       setupTimeline();
-      if (timeline && playingByDefault) startAnimation();
+      if (player && playingByDefault) startAnimation();
     });
   }
 

@@ -5,7 +5,7 @@
   import type { Snippet } from 'svelte';
   import type { Writable } from 'svelte/store';
   import * as d3 from 'd3';
-  import { DoubleFigure, TimeSlider, drawVectorField, Timeline, useCanvas2D, useVisibilityHandler } from '@diffusion-explorer/ui';
+  import { Player, DoubleFigure, TimeSlider, drawVectorField, Timeline, useCanvas2D, useVisibilityHandler } from '@diffusion-explorer/ui';
   import { settings, type VectorFieldData } from '$lib/settings';
 
   // ----------------------------------------------------------------
@@ -81,14 +81,14 @@
   let rightGridPositions: number[][] = [];
 
   // Animation - Timeline system
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // Initialization
   let isInitialized = false;
 
   // Visibility
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -150,30 +150,32 @@
   };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { time: 0 };
-
-    // Add main animation clip
-    timeline.add(mainClip, { start: 0, end: 1 });
-
-    // Set timeline duration and end pause
-    timeline.duration = animationDuration / 1000;
-    timeline.setEndPause(animationPauseTime / 1000);
-    timeline.looping = true;
-
-    // Register tick callback
-    timeline.onTick((_t, state) => {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: { time: 0 },
+      clips: [
+        { clip: mainClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true, endPause: animationPauseTime / 1000 });
+    player.onTick((_t, state) => {
       draw(state);
     });
+
+    // Add main animation clip
+
+    // Set timeline duration and end pause
+
+    // Register tick callback
   }
 
   function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+    if (!player) return;
+    player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -232,7 +234,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -242,7 +244,7 @@
   $: if (!isInitialized && isDataValid && leftCanvas && rightCanvas) {
     runInitialComputation();
     setupTimeline();
-    draw(timeline!.initialState);
+    draw(player!.initialState);
     if (playingByDefault) startAnimation();
   }
 
@@ -281,7 +283,7 @@
     {/snippet}
 
     {#snippet footer()}
-      <TimeSlider {timeline} color="#f17720" />
+      <TimeSlider timeline={player} color="#f17720" />
     {/snippet}
   </DoubleFigure>
 {:else}

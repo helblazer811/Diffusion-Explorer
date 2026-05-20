@@ -2,7 +2,7 @@
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
   import { type Writable } from "svelte/store";
-  import {
+  import { Player,
     DoubleFigure,
     TimeSlider,
     drawScatterPlot,
@@ -134,7 +134,7 @@
   const rightSpeedMultiplier = 0.5; // Right animation runs at 2x speed (half duration)
 
   // Timeline for animation
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // Initialization
   let isInitialized = false;
@@ -147,7 +147,7 @@
 
   // Visibility
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // User-defined trajectory state (supports multiple trajectories)
   let userStartPoints: number[][] = []; // Array of [x, y] domain coordinates
@@ -274,26 +274,24 @@
   };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      leftTime: 0,
-      leftSegmentIndex: 0,
-      rightTime: 0,
-      rightSegmentIndex: 0,
-    };
+    const tl = Timeline.from<AnimationState>({
+      duration: (animationDuration - endPauseDurationMs) / 1000,
+      initialState: {},
+      clips: [
+        { clip: leftSegmentClip, ...{ start: 0, end: 1 } },
+        { clip: rightSegmentClip, ...{ start: 0, end: rightSpeedMultiplier } },
+      ],
+    });
+    player = new Player(tl, { looping: looping, endPause: endPauseDurationMs / 1000 });
 
     // Add clips - both start at 0, right finishes at 0.5 (2x speed)
     // Note: No explicit pause clip needed - Timeline holds final state for ended clips
-    timeline.add(leftSegmentClip, { start: 0, end: 1 });
-    timeline.add(rightSegmentClip, { start: 0, end: rightSpeedMultiplier });
+
 
     // Set timeline duration (animation only) and end pause
-    timeline.duration = (animationDuration - endPauseDurationMs) / 1000;
-    timeline.setEndPause(endPauseDurationMs / 1000);
-    timeline.looping = looping;
 
     // Register tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       leftTime = state.leftTime;
       rightTime = state.rightTime;
       leftCurrentSegmentIndex = state.leftSegmentIndex;
@@ -305,16 +303,16 @@
   }
 
   function startAnimation() {
-    if (!timeline || timeline.isPlaying) return;
-    timeline.play();
+    if (!player || player.isPlaying) return;
+    player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   function resetAnimation() {
-    if (timeline) timeline.reset();
+    if (player) player.reset();
     leftTime = 0;
     rightTime = 0;
     leftCurrentSegmentIndex = 0;
@@ -323,7 +321,7 @@
 
   export function restart() {
     resetAnimation();
-    if (timeline) timeline.play();
+    if (player) player.play();
     isPlaying = true;
   }
 
@@ -427,8 +425,8 @@
     rightTime = rightCurrentSegmentIndex / numSegments;
 
     // Seek timeline to corresponding position (leftTime is already normalized 0-1)
-    if (timeline) {
-      timeline.seek(leftTime);
+    if (player) {
+      player.seek(leftTime);
     }
 
     // Update visualizations
@@ -447,10 +445,10 @@
     );
     rightTime = rightCurrentSegmentIndex / numSegments;
 
-    // Calculate timeline position (right covers 0 to rightSpeedMultiplier of timeline)
+    // Calculate timeline position (right covers 0 to rightSpeedMultiplier of player)
     const timelinePosition = rightTime * rightSpeedMultiplier;
 
-    // Sync left side (left covers full timeline, so leftTime = timelinePosition)
+    // Sync left side (left covers full player, so leftTime = timelinePosition)
     leftTime = timelinePosition;
     leftCurrentSegmentIndex = Math.min(
       Math.floor(leftTime * numSegments),
@@ -458,8 +456,8 @@
     );
 
     // Seek timeline to corresponding position
-    if (timeline) {
-      timeline.seek(timelinePosition);
+    if (player) {
+      player.seek(timelinePosition);
     }
 
     // Update visualizations
@@ -577,7 +575,7 @@
 
   onDestroy(() => {
     // Dispose timeline (stops animation and cleans up)
-    timeline?.dispose();
+    player?.dispose();
 
     // Destroy PathlineAnimation instances
     leftPathlineAnimation?.destroy();
@@ -603,9 +601,9 @@
     });
   }
 
-  $: if (isPlaying && pathsInitialized && timeline && !timeline.isPlaying)
+  $: if (isPlaying && pathsInitialized && player && !player.isPlaying)
     startAnimation();
-  $: if (!isPlaying && timeline?.isPlaying) stopAnimation();
+  $: if (!isPlaying && player?.isPlaying) stopAnimation();
 
   // Handle visibility changes (pause when off-screen, resume when back)
   $: if (figureIsActive !== undefined && isInitialized) {

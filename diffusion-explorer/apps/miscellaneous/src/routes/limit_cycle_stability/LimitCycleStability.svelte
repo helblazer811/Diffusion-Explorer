@@ -13,7 +13,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     Figure,
     Timeline,
     PathlineAnimation,
@@ -125,7 +125,7 @@
   let canvas: HTMLCanvasElement | null = $state(null);
   let ctx: CanvasRenderingContext2D | null = $state(null);
 
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
   let trailAlphas: number[] = [];
   let kicks: Kick[] = [];
@@ -136,7 +136,7 @@
   let limitCyclePixel: number[][] = [];
 
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -402,12 +402,15 @@
 
   function setupTimeline() {
     if (!pathlineAnimation) return;
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { segmentIndex: 0 };
-    timeline.duration = animationDurationMs / 1000;
-    timeline.looping = true;
-    timeline.add(pathlineAnimation.clip, { start: 0, end: 1 });
-    timeline.onTick((t: number) => draw(t));
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDurationMs / 1000,
+      initialState: { segmentIndex: 0 },
+      clips: [
+        { clip: pathlineAnimation.clip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((t: number) => draw(t));
   }
 
   // ----------------------------------------------------------------
@@ -556,7 +559,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.dispose();
+    if (player) player?.dispose();
     if (pathlineAnimation) pathlineAnimation.destroy();
   });
 
@@ -576,13 +579,13 @@
         setupTimeline();
         isInitialized = true;
 
-        if (timeline) {
+        if (player) {
           draw(0);
           if (playingByDefault) {
             if (initialPlayDelaySeconds > 0) {
-              setTimeout(() => timeline?.play(), initialPlayDelaySeconds * 1000);
+              setTimeout(() => player?.play(), initialPlayDelaySeconds * 1000);
             } else {
-              timeline.play();
+              player.play();
             }
           }
         }

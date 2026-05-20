@@ -2,7 +2,7 @@
   import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, Timeline, useCanvas2D, createPauseClip, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Player, Figure, TimeSlider, drawScatterPlot, Timeline, useCanvas2D, createPauseClip, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
 
@@ -82,7 +82,7 @@
 
   // Animation - Timeline system
   let currentSegmentIndex: number = 0;
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // PathlineAnimation instance
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
@@ -92,7 +92,7 @@
 
   // Visibility tracking
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Pre-computed coordinates
   let scaledTargetDistribution: number[][] = [];
@@ -174,27 +174,30 @@
     // Initialize the animation with the canvas
     await pathlineAnimation.init(canvas);
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { segmentIndex: 0 };
-
-    // Use PathlineAnimation's clip
-    timeline.add(pathlineAnimation.clip, { start: 0, end: timing.pauseStart });
-    timeline.add(createPauseClip(), { start: timing.pauseStart, end: 1 });
-
-    // Configure timeline
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
-
-    // Register tick callback
-    timeline.onTick((_t, state) => {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: { segmentIndex: 0 },
+      clips: [
+        { clip: pathlineAnimation.clip, ...{ start: 0, end: timing.pauseStart } },
+        { clip: createPauseClip(), ...{ start: timing.pauseStart, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((_t, state) => {
       currentSegmentIndex = state.segmentIndex;
       draw(state);
     });
+
+    // Use PathlineAnimation's clip
+
+    // Configure timeline
+
+    // Register tick callback
   }
 
   function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+    if (!player) return;
+    player.play();
   }
 
   // ----------------------------------------------------------------
@@ -294,7 +297,7 @@
 
     // Reset animation state and start
     currentSegmentIndex = 0;
-    if (timeline) timeline.reset();
+    if (player) player.reset();
     startAnimation();
 
     // Sample using streaming - use same number of steps as passed-in trajectories
@@ -326,7 +329,7 @@
 
   onDestroy(() => {
     // Stop timeline animation
-    if (timeline) timeline.pause();
+    if (player) player.pause();
 
     // Cancel any pending worker requests to prevent orphaned promises
     if (activeRequestId && flowMatchingClient) {
@@ -362,8 +365,7 @@
             onclick={handleCanvasClick}
             style="cursor: pointer; width: 100%; height: auto; aspect-ratio: {canvasWidth}/{canvasHeight};"
           ></canvas>
-          <TimeSlider
-            {timeline}
+          <TimeSlider timeline={player}
             step={numSegments > 0 ? 1 / numSegments : 0.01}
             color={trajectoryColor}
           />

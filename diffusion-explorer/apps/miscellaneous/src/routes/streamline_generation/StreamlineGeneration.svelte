@@ -11,11 +11,11 @@
   import {
     DoubleFigure,
     TimelineBuilder,
+    Player,
     createPauseClip,
     useCanvas2D,
     useVisibilityHandler,
     type Clip,
-    type Timeline,
   } from "@diffusion-explorer/ui";
   import {
     divergingSpiral,
@@ -136,7 +136,7 @@
   let ctxRight = $derived(canvasRight ? canvas2dRight.ctx : null);
 
   // Timeline and animation
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let currentState: AnimationState | null = $state(null);
   let isInitialized = $state(false);
 
@@ -154,7 +154,7 @@
 
   // Visibility
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -298,9 +298,7 @@
 
     // Use TimelineBuilder for incremental construction with ms durations
     const builder = new TimelineBuilder<AnimationState>()
-      .setInitialState(initialState)
-      .setLooping(true)
-      .setEndPause(timing.endPauseMs);
+      .setInitialState(initialState);
 
     // Total duration for flash+fade animation
     const totalFlashDurationMs =
@@ -445,11 +443,12 @@
     }
 
     // Build timeline (duration auto-computed from accumulated clips)
-    timeline = builder.build();
+    const timeline = builder.build();
+    player = new Player(timeline, { looping: true, endPause: timing.endPauseMs / 1000 });
     currentState = initialState;
 
     // On tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       currentState = { ...state };
       draw(state);
     });
@@ -565,8 +564,8 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) {
-      timeline.dispose();
+    if (player) {
+      player.dispose();
     }
   });
 
@@ -579,9 +578,9 @@
       isInitialized = true;
       runInitialComputation();
       setupTimeline().then(() => {
-        if (playingByDefault && timeline) {
-          draw(timeline.initialState);
-          timeline.play();
+        if (playingByDefault && player) {
+          draw(player.timeline.initialState);
+          player.play();
         }
       });
     }

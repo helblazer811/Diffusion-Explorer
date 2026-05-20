@@ -1,25 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import type { Player } from '@diffusion-explorer/ui';
   import Slider from './Slider.svelte';
-
-  // Duck-typed transport surface. TimeSlider works against any object that
-  // exposes the read+write playback surface below. Both the legacy mutable
-  // `Timeline` (from `tempus/legacy`) and the new `Player` (from `tempus`)
-  // satisfy this — the legacy class also exposes `t` / `timeline` getters
-  // for inspector compatibility, and the new Player has every method here.
-  type TransportLike = {
-    isPlaying: boolean;
-    duration?: number;            // legacy Timeline
-    time?: number;                 // legacy Timeline
-    t?: number;                    // new Player
-    play(): void;
-    pause(): void;
-    seek(t: number): void;
-    onTick(cb: (t: number, state: any) => void): () => void;
-    // Optional legacy-only seeking hooks; ignored on Player.
-    startSeeking?: () => void;
-    endSeeking?: () => void;
-  };
 
   // Props
   export let value = 0;
@@ -41,10 +23,10 @@
   export let maxWidth = '644px';
   export let labelSize = '1em';
 
-  // Optional Timeline/Player instance — when provided, TimeSlider drives
-  // playback directly (seek + play/pause). Accepts either a legacy mutable
-  // Timeline or a new Player (duck-typed).
-  export let timeline: TransportLike | null = null;
+  // Optional Player instance — when provided, TimeSlider drives playback
+  // directly (seek + play/pause). The prop name is kept as `timeline` for
+  // backwards compatibility with callsites; the value is a Player.
+  export let timeline: Player<unknown> | null = null;
 
   // Optional callbacks (not required when using timeline)
   export let onTogglePlay: (() => void) | null = null;  // Called when play/pause is clicked
@@ -60,19 +42,9 @@
   let playing = false;
   let unsubscribe: (() => void) | null = null;
 
-  // Helper: normalized playhead. Legacy Timeline exposes `time` + `duration`;
-  // Player exposes `t`. Both work via this small adapter.
-  function currentT(tl: TransportLike): number {
-    if (typeof tl.t === 'number') return tl.t;
-    if (typeof tl.time === 'number' && typeof tl.duration === 'number' && tl.duration > 0) {
-      return tl.time / tl.duration;
-    }
-    return 0;
-  }
-
-  // Subscribe to timeline tick updates when timeline changes
+  // Subscribe to player tick updates when the player changes.
   $: if (timeline) {
-    sliderValue = displayTime ?? currentT(timeline);
+    sliderValue = displayTime ?? timeline.t;
     playing = timeline.isPlaying;
 
     unsubscribe?.();
@@ -139,22 +111,16 @@
   }
 
   // Drag-pause: snapshot the play state and stop the clock at drag start;
-  // restore at drag end. Player has no `startSeeking`/`endSeeking` (those
-  // were a transport-state leak); legacy Timeline still uses them if
-  // available. We do both — the local snapshot covers the Player path, and
-  // the legacy hooks keep the previous "freeze the clock but stay rendered"
-  // behavior on figures that haven't migrated.
+  // restore at drag end.
   let wasPlayingAtDragStart = false;
   function handleDragStart() {
     if (!timeline) return;
     wasPlayingAtDragStart = timeline.isPlaying;
-    timeline.startSeeking?.();
     timeline.pause();
   }
 
   function handleDragEnd() {
     if (!timeline) return;
-    timeline.endSeeking?.();
     if (wasPlayingAtDragStart) timeline.play();
     wasPlayingAtDragStart = false;
   }

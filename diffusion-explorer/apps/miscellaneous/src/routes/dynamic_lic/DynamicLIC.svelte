@@ -8,7 +8,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     DoubleFigure,
     Timeline,
     TimeSlider,
@@ -100,7 +100,7 @@
   let ctxRight: CanvasRenderingContext2D | null = $state(null);
 
   // Timeline and animation
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let isInitialized = $state(false);
 
   // WebGPU context for DLIC (used during pre-computation)
@@ -117,7 +117,7 @@
 
   // Visibility
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Export state
   let isExporting = $state(false);
@@ -306,18 +306,21 @@
       dlicFrameIndex: 0,
     };
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = initialState;
-    timeline.duration = animationDurationMs / 1000;
-    timeline.looping = true;
-
-    // Two parallel clips, both [0, 1]
-    timeline.add(streamlineAnimation.clip, { start: 0, end: 1 });
-    timeline.add(dlicFrameClip, { start: 0, end: 1 });
-
-    timeline.onTick((_, state) => {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDurationMs / 1000,
+      initialState: initialState,
+      clips: [
+        { clip: streamlineAnimation.clip, ...{ start: 0, end: 1 } },
+        { clip: dlicFrameClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((_, state) => {
       draw(state);
     });
+
+    // Two parallel clips, both [0, 1]
+
 
     console.log(`[DynamicLIC] Timeline setup complete`);
   }
@@ -374,7 +377,7 @@
   // ----------------------------------------------------------------
 
   async function handleExport() {
-    if (!timeline || !canvasLeft || !canvasRight || isExporting) return;
+    if (!player || !canvasLeft || !canvasRight || isExporting) return;
 
     isExporting = true;
     exportProgress = 0;
@@ -382,7 +385,7 @@
     try {
       const videos = await exportAnimation(
         {
-          timeline,
+          player,
           draw,
           canvas: [canvasLeft, canvasRight],
         },
@@ -414,8 +417,8 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) {
-      timeline.dispose();
+    if (player) {
+      player?.dispose();
     }
     // Note: webgpuContext is destroyed after pre-computation, so no cleanup needed here
   });
@@ -442,9 +445,9 @@
         setupTimeline();
         isInitialized = true;
 
-        if (playingByDefault && timeline) {
-          draw(timeline.initialState);
-          timeline.play();
+        if (playingByDefault && player) {
+          draw(player!.timeline.initialState);
+          player.play();
         }
       });
     }
@@ -484,7 +487,7 @@
 
   {#snippet footer()}
     <div class="footer-controls">
-      <TimeSlider {timeline} showTicks={false} showTimeLabel={false} />
+      <TimeSlider timeline={player} showTicks={false} showTimeLabel={false} />
       <button
         class="export-button"
         onclick={handleExport}

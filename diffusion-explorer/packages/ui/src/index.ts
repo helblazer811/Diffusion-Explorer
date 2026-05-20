@@ -104,56 +104,39 @@ export {
   type PulsingPathsGPUData,
 } from './plotting/pulsing-paths';
 
-// Animation core — re-exported from `tempus/legacy` for backwards-compat with
-// figures that still drive a mutable Timeline directly. The post-refactor
-// shape (frozen Timeline + Player + Overlay) lives in `tempus` proper; figures
-// migrate at their own pace.
+// Animation core — frozen Timeline + Player + Overlay + Builder. The pre-
+// refactor mutable `Timeline` is gone; figures construct via TimelineBuilder
+// or `Timeline.from(spec)` and hold a Player.
 export {
-  Clock,
   Timeline,
   TimelineBuilder,
+  Player,
+  Overlay,
+  Clock,
   createPauseClip,
   isPauseClip,
   useVisibilityHandler,
   exportAnimation,
-  type Clip,
-  type ClipKind,
-  type ClipTiming,
-  type ClipOptions,
-  type ClipInfo,
-  type VisibilityState,
-  type TimelineBuilderAddOptions,
-  type TimelineBuilderAddAtOptions,
-  type TracksSpec,
-  type ExportableAnimation,
-} from 'tempus/legacy';
-
-// Animation interfaces (unchanged across the refactor).
-export {
-  type Animation,
-  type AnimationWithData,
-} from 'tempus';
-
-// Video export utilities (encoder is unchanged; the legacy `exportAnimation`
-// re-export above wraps the new Player-typed entry for mutable-Timeline
-// callers).
-export {
   streamingVideoExport,
   downloadBlob,
   downloadFrames,
-  type VideoExportOptions,
-} from 'tempus';
-
-// New (immutable) API surface for new code / agents. Existing figures don't
-// need these.
-export {
-  Player,
-  Overlay,
+  type Clip,
+  type ClipKind,
+  type ClipInfo,
+  type VisibilityState,
+  type VisibilityTarget,
+  type TimelineBuilderAddOptions,
+  type TimelineBuilderAddAtOptions,
+  type TracksSpec,
   type PlayerOptions,
   type TickCallback,
   type OverlayClip,
   type OverlayAddOptions,
   type TimelineSpec,
+  type VideoExportOptions,
+  type Animation,
+  type AnimationWithData,
+  type ExportableAnimation,
 } from 'tempus';
 
 // Inspector — Svelte UI component. Accepts either a Player (new) or a

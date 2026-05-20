@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     Figure,
     Katex,
     drawScatterPlot,
@@ -146,7 +146,7 @@
     inTrajectoryPhase: false,
   });
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let topPathlineAnimation: PathlineAnimation<AnimationState> | null = null;
   let bottomPathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
@@ -169,7 +169,7 @@
 
   // Visibility
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -369,33 +369,28 @@
       },
     };
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      segmentIndex: 0,
-      time: 0,
-      couplingProgress: 0,
-      couplingOpacity: 1,
-      inTrajectoryPhase: false,
-    };
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: {},
+      clips: [
+        { clip: couplingClip, ...{ start: 0, end: timing.couplingFadeEnd } },
+        { clip: trajectoryClip, ...{ start: timing.couplingFadeEnd, end: timing.trajectoryEnd } },
+        { clip: createPauseClip(), ...{ start: timing.trajectoryEnd, end: timing.pauseEnd } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.add(couplingClip, { start: 0, end: timing.couplingFadeEnd });
-    timeline.add(trajectoryClip, { start: timing.couplingFadeEnd, end: timing.trajectoryEnd });
-    timeline.add(createPauseClip(), { start: timing.trajectoryEnd, end: timing.pauseEnd });
-
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
-
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       currentState = state as AnimationState;
       drawAll();
     });
   }
 
   function startAnimation() {
-    if (timeline && !timeline.isPlaying) timeline.play();
+    if (player && !player.isPlaying) player.play();
   }
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -497,7 +492,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    timeline?.dispose();
+    player?.dispose();
   });
 
   // ----------------------------------------------------------------
@@ -520,7 +515,7 @@
       const unsub = figureIsActive.subscribe((active: boolean) => {
         handleVisibilityChange(active);
         if (!active) {
-          timeline?.resetState();
+          player?.reset();
         }
       });
       return unsub;

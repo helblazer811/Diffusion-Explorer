@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     DoubleFigure,
     TimeSlider,
     Timeline,
@@ -58,7 +58,7 @@
     discretePathIndex: number;
   };
 
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let currentState: AnimationState | null = $state(null);
   let currentTime = $state(0);
   let discreteSnapshotIndex = $state(0);
@@ -70,7 +70,7 @@
 
   // Visibility
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -141,15 +141,14 @@
   function setupTimeline() {
     console.log('[StreamlinePropagation] Setting up timeline');
 
-    timeline = new Timeline<AnimationState>();
-    timeline.duration = ANIMATION_DURATION_MS / 1000;  // 4 seconds
-    timeline.looping = true;
-
-    timeline.initialState = {
-      time: 0,
-      propagatedPathIndex: 0,
-      discretePathIndex: 0,
-    };
+    const tl = Timeline.from<AnimationState>({
+      duration: 1,
+      initialState: {},
+      clips: [
+        { clip: animationClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     // Main animation clip - just computes frame index from normalized time
     const animationClip: Clip<AnimationState> = {
@@ -165,9 +164,7 @@
       },
     };
 
-    timeline.add(animationClip, { start: 0, end: 1 });
-
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       // Force reactivity by creating new object
       currentState = { ...state };
       currentTime = state.time;
@@ -184,8 +181,8 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) {
-      timeline.dispose();
+    if (player) {
+      player?.dispose();
     }
   });
 
@@ -204,10 +201,10 @@
       setupTimeline();
       isInitialized = true;
 
-      if (playingByDefault && timeline) {
+      if (playingByDefault && player) {
         console.log('[StreamlinePropagation] Starting playback');
-        timeline.play();
-        console.log('[StreamlinePropagation] timeline.isPlaying:', timeline.isPlaying);
+        player.play();
+        console.log('[StreamlinePropagation] player.isPlaying:', player.isPlaying);
       }
     }
   });
@@ -255,8 +252,8 @@
   {/snippet}
 
   {#snippet footer()}
-    {#if timeline}
-      <TimeSlider {timeline} color={streamlineColor} />
+    {#if player}
+      <TimeSlider timeline={player} color={streamlineColor} />
     {/if}
   {/snippet}
 

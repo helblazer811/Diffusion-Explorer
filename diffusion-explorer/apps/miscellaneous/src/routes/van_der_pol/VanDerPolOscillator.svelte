@@ -11,7 +11,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     Figure,
     TimeSlider,
     Timeline,
@@ -148,7 +148,7 @@
   let canvas: HTMLCanvasElement | null = $state(null);
   let ctx: CanvasRenderingContext2D | null = $state(null);
 
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let pathlineAnimations: PathlineAnimation<AnimationState>[] = [];
   let trailAlphasPerAnim: number[][] = []; // one per-point alpha buffer per animation
   let isInitialized = $state(false);
@@ -158,7 +158,7 @@
   let limitCyclePixel: number[][] = [];
 
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -388,17 +388,20 @@
   function setupTimeline() {
     if (pathlineAnimations.length === 0) return;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { segmentIndex: 0 };
-    timeline.duration = animationDurationMs / 1000;
-    timeline.looping = true;
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDurationMs / 1000,
+      initialState: { segmentIndex: 0 },
+      clips: [
+        { clip: pathlineAnimations[0].clip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((t: number) => draw(t));
 
     // We compute per-animation segment indices manually in draw(); the
     // timeline just needs a clip so it keeps ticking. Use the first
     // animation's clip as the heartbeat.
-    timeline.add(pathlineAnimations[0].clip, { start: 0, end: 1 });
 
-    timeline.onTick((t: number) => draw(t));
   }
 
   // ----------------------------------------------------------------
@@ -527,7 +530,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.dispose();
+    if (player) player?.dispose();
     for (const anim of pathlineAnimations) anim.destroy();
   });
 
@@ -547,13 +550,13 @@
         setupTimeline();
         isInitialized = true;
 
-        if (timeline) {
+        if (player) {
           draw(0);
           if (playingByDefault) {
             if (initialPlayDelaySeconds > 0) {
-              setTimeout(() => timeline?.play(), initialPlayDelaySeconds * 1000);
+              setTimeout(() => player?.play(), initialPlayDelaySeconds * 1000);
             } else {
-              timeline.play();
+              player.play();
             }
           }
         }

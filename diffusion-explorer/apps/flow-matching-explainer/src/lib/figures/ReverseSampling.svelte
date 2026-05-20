@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Player, Figure, TimeSlider, drawScatterPlot, drawText, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D, PathlineAnimation, type PathlineAnimationState, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
   import type { Writable } from "svelte/store";
   import type { Snippet } from "svelte";
@@ -57,14 +57,14 @@
   let initialized = false;
   let isLoading = true;
   let loadingMessage = "Loading...";
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // PathlineAnimation instance
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Visibility tracking
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Pre-computed data
   let scales: {
@@ -288,23 +288,28 @@
     // Initialize with canvas
     await pathlineAnimation.init(canvas);
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { segmentIndex: 0 };
+    const tl = Timeline.from<AnimationState>({
+      duration: totalCycleDuration / 1000,
+      initialState: { segmentIndex: 0 },
+      clips: [
+        { clip: pathlineAnimation.clip, ...{ start: 0, end: forwardNorm } },
+        { clip: createPauseClip(), ...{ start: forwardNorm, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     // Total cycle: forward + pause (then loops back to start)
     const totalCycleDuration = animationDuration + pauseBeforeRestart;
     const forwardNorm = animationDuration / totalCycleDuration;
 
     // Add clips in sequence with explicit start/end
-    timeline.add(pathlineAnimation.clip, { start: 0, end: forwardNorm });
-    timeline.add(createPauseClip(), { start: forwardNorm, end: 1 });
+
 
     // Set duration in seconds
-    timeline.duration = totalCycleDuration / 1000;
-    timeline.looping = true;
+
 
     // Register tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
@@ -355,7 +360,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -374,8 +379,8 @@
     initializeData();
     setupTimeline().then(() => {
       initialized = true;
-      draw(timeline!.initialState);
-      if (playingByDefault) timeline!.play();
+      draw(player!.initialState);
+      if (playingByDefault) player!.play();
     });
   }
 
@@ -406,8 +411,7 @@
           style="width:100%;height:auto;max-width:{width}px;aspect-ratio:{width}/{height};"
         ></canvas>
       {/if}
-      <TimeSlider
-        {timeline}
+      <TimeSlider timeline={player}
         minLabel="t=1"
         maxLabel="t=0"
         color={settings.stylingSettings.trajectory.color}

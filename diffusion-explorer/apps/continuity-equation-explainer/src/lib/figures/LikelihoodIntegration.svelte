@@ -7,6 +7,7 @@
   import {
     Figure,
     TimelineBuilder,
+    Player,
     createPauseClip,
     useVisibilityHandler,
     useCanvas2D,
@@ -99,11 +100,11 @@
 
   // Animation state
   let initialized = false;
-  let timeline: ReturnType<TimelineBuilder<AnimationState>["build"]> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // Visibility tracking
   let figureIsActive: Writable<boolean> | undefined;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Pre-computed data
   let scales: ReturnType<typeof createSourceTargetScales> | null = null;
@@ -238,9 +239,7 @@
     };
 
     const builder = new TimelineBuilder<AnimationState>()
-      .setInitialState(initialState)
-      .setLooping(true)
-      .setEndPause(endPauseMs);
+      .setInitialState(initialState);
 
     // Build clips for each trajectory
     for (let traj = 0; traj < 2; traj++) {
@@ -266,10 +265,11 @@
       builder.add(createPauseClip<AnimationState>(), { durationMs: pauseAfterTrajectoryMs });
     }
 
-    timeline = builder.build();
+    const timeline = builder.build();
+    player = new Player(timeline, { looping: true, endPause: endPauseMs / 1000 });
 
     // Register tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
@@ -359,7 +359,7 @@
 
     // Helper to request redraw when MathJax finishes
     const requestRedraw = () => {
-      if (timeline) draw(timeline.state);
+      if (player) draw(player.state);
     };
 
     drawMathjax(
@@ -421,7 +421,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    timeline?.dispose();
+    player?.dispose();
   });
 
   // ----------------------------------------------------------------
@@ -449,9 +449,9 @@
     setupTimeline();
 
     initialized = true;
-    if (timeline) {
-      draw(timeline.initialState);
-      if (playingByDefault) timeline.play();
+    if (player) {
+      draw(player.timeline.initialState);
+      if (playingByDefault) player.play();
     }
   }
 

@@ -2,7 +2,7 @@
   import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import * as d3 from "d3";
-  import {
+  import { Player,
     DoubleFigure,
     TimeSlider,
     drawScatterPlot,
@@ -125,7 +125,7 @@
   let currentSegmentIndex = $state(0);
 
   // Timeline
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // PathlineAnimation instances for left and right panels
   let leftPathlineAnimation: PathlineAnimation<AnimationState> | null = null;
@@ -142,7 +142,7 @@
 
   // Visibility
   let figureIsActive: Writable<boolean> | undefined;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // User trajectory state
   let userStartPoints: number[][] = $state([]);
@@ -253,21 +253,23 @@
       },
     };
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      time: 0,
-      segmentIndex: 0,
-    };
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: {},
+      clips: [
+        { clip: segmentClip, ...{ start: 0, end: timing.pauseStart } },
+        { clip: createPauseClip(), ...{ start: timing.pauseStart, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     // Add clips using normalized timing
-    timeline.add(segmentClip, { start: 0, end: timing.pauseStart });
-    timeline.add(createPauseClip(), { start: timing.pauseStart, end: 1 });
+
 
     // Configure timeline
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
 
-    timeline.onTick((_t, state) => {
+
+    player.onTick((_t, state) => {
       currentTime = state.time;
       currentSegmentIndex = state.segmentIndex;
 
@@ -277,16 +279,16 @@
   }
 
   function startAnimation() {
-    if (!timeline || timeline.isPlaying) return;
-    timeline.play();
+    if (!player || player.isPlaying) return;
+    player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   function resetAnimation() {
-    if (timeline) timeline.reset();
+    if (player) player.reset();
     currentTime = 0;
     currentSegmentIndex = 0;
   }
@@ -403,8 +405,8 @@
     );
     currentTime = currentSegmentIndex / numSegments;
 
-    if (timeline) {
-      timeline.seek(currentTime);
+    if (player) {
+      player.seek(currentTime);
     }
 
     updateLeftVisualization();
@@ -505,7 +507,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    timeline?.dispose();
+    player?.dispose();
 
     if (activeFlowMatchingRequestId && flowMatchingClient) {
       flowMatchingClient.stopRequest(activeFlowMatchingRequestId);
@@ -529,13 +531,13 @@
   });
 
   $effect(() => {
-    if (isPlaying && pathsInitialized && timeline && !timeline.isPlaying) {
+    if (isPlaying && pathsInitialized && player && !player.isPlaying) {
       startAnimation();
     }
   });
 
   $effect(() => {
-    if (!isPlaying && timeline?.isPlaying) {
+    if (!isPlaying && player?.isPlaying) {
       stopAnimation();
     }
   });

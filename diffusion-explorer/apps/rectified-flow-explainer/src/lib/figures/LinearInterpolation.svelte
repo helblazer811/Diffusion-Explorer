@@ -4,7 +4,7 @@
   import { onDestroy } from "svelte";
   import type { Snippet } from "svelte";
   import type { Writable } from "svelte/store";
-  import { Figure, TimeSlider, drawScatterPlot, drawLine, drawCircle, drawText, drawMathjax, createSourceTargetScales, Timeline, createPauseClip, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Figure, TimeSlider, drawScatterPlot, drawLine, drawCircle, drawText, drawMathjax, createSourceTargetScales, Timeline, Player, createPauseClip, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -96,12 +96,12 @@
 
   // Animation state - Timeline system
   let isInitialized = false;
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let displayTime: number = 0;  // Semantic time for slider display (tracks state.time)
 
   // Visibility-based animation control
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -180,30 +180,28 @@
   };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { time: 0 };
-
     // Total cycle: forward + pause + backward + pause
     const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
     const forwardDuration = animationDuration / totalCycleDuration;
     const pauseNormalized = pauseDuration / totalCycleDuration;
 
-    // Add clips in sequence with proper timing objects
     const t1 = forwardDuration;
     const t2 = forwardDuration + pauseNormalized;
     const t3 = 2 * forwardDuration + pauseNormalized;
 
-    timeline.add(forwardClip, { start: 0, end: t1 });
-    timeline.add(createPauseClip(), { start: t1, end: t2 });
-    timeline.add(backwardClip, { start: t2, end: t3 });
-    timeline.add(createPauseClip(), { start: t3, end: 1 });
+    const timeline = Timeline.from<AnimationState>({
+      duration: totalCycleDuration / 1000,
+      initialState: { time: 0 },
+      clips: [
+        { clip: forwardClip,       start: 0,  end: t1 },
+        { clip: createPauseClip(), start: t1, end: t2 },
+        { clip: backwardClip,      start: t2, end: t3 },
+        { clip: createPauseClip(), start: t3, end: 1 },
+      ],
+    });
+    player = new Player(timeline, { looping: true });
 
-    // Set duration in seconds
-    timeline.duration = totalCycleDuration / 1000;
-    timeline.looping = true;
-
-    // Register tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       displayTime = state.time;  // Track semantic time for slider
       draw(state);
     });
@@ -211,19 +209,19 @@
 
   // Handle seeking by display time - map to forward clip's timeline range
   function handleSeekByDisplayTime(t: number) {
-    if (!timeline) return;
+    if (!player) return;
     const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
     const forwardEnd = animationDuration / totalCycleDuration;
-    timeline.seek(t * forwardEnd);
+    player.seek(t * forwardEnd);
   }
 
   function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+    if (!player) return;
+    player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -238,7 +236,7 @@
     // Draw text labels
     const textY = marginHeight / 2;
     if (useLatexLabels) {
-      const requestRedraw = () => { if (timeline) draw(timeline.state); };
+      const requestRedraw = () => { if (player) draw(player.state); };
       drawMathjax(ctx, sourceLabelText, scales.sourceCenterPixelX, textY + labelFontSize, labelFontSize, 0, labelFontSize * 1.0, { color: labelColor }, requestRedraw);
       drawMathjax(ctx, targetLabelText, scales.targetCenterPixelX, textY + labelFontSize, labelFontSize, 0, labelFontSize * 1.0, { color: labelColor }, requestRedraw);
     } else {
@@ -323,7 +321,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -340,7 +338,7 @@
     runInitialComputation();
     setupTimeline();
     isInitialized = true;
-    draw(timeline!.initialState);
+    draw(player!.timeline.initialState);
     if (playingByDefault) startAnimation();
   }
 
@@ -360,7 +358,7 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider {timeline} {displayTime} onSeekByDisplayTime={handleSeekByDisplayTime} color="#f17720" maxWidth={sliderMaxWidth} {showPlayButton} labelSize={sliderLabelSize} />
+      <TimeSlider timeline={player} {displayTime} onSeekByDisplayTime={handleSeekByDisplayTime} color="#f17720" maxWidth={sliderMaxWidth} {showPlayButton} labelSize={sliderLabelSize} />
     </div>
   {/snippet}
 </Figure>

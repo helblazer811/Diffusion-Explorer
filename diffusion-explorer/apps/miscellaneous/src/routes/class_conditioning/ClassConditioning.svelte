@@ -5,8 +5,8 @@
   import type { Writable } from "svelte/store";
   import {
     Figure,
-    Timeline,
     TimelineBuilder,
+    Player,
     createPauseClip,
     createSourceTargetScales,
     drawScatterPlot,
@@ -151,9 +151,9 @@
     probeLabelAlpha: 0,
   };
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let figureIsActive: Writable<boolean> | undefined;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -239,8 +239,8 @@
   // Used by drawMathjax to redraw the current state once a formula's SVG
   // finishes loading (MathJax renders asynchronously the first time).
   function requestRedraw() {
-    if (!timeline) return;
-    draw(timeline.state);
+    if (!player) return;
+    draw(player.state);
   }
 
   // Squared distance from point (px,py) to the segment (ax,ay)-(bx,by).
@@ -462,11 +462,10 @@
   // ----------------------------------------------------------------
 
   function setupTimeline() {
-    if (timeline) timeline.dispose?.();
+    if (player) player.dispose?.();
 
     const builder = new TimelineBuilder<AnimationState>()
-      .setInitialState({ ...initialState })
-      .setLooping(true);
+      .setInitialState({ ...initialState });
 
     // A. Fade in source noise + the two-class target mixture
     builder.add(
@@ -692,11 +691,13 @@
     );
     builder.add(createPauseClip(), { durationMs: 1800 });
 
-    timeline = builder.build();
-    // Slow the whole loop by 2x. Clip start/end are normalized [0,1] so
-    // doubling duration just stretches every phase + pause uniformly.
-    timeline.duration = timeline.duration * 2;
-    timeline.onTick((_t, state) => draw(state));
+    // Slow the whole loop by 2x. Clip starts/ends are normalized [0, 1] in
+    // the built Timeline, so giving the Builder an explicit duration that's
+    // 2× the auto-computed total stretches every phase + pause uniformly.
+    const totalMs = builder.totalDurationMs;
+    const timeline = builder.setDuration((totalMs * 2) / 1000).build();
+    player = new Player(timeline, { looping: true });
+    player.onTick((_t, state) => draw(state));
   }
 
   // ----------------------------------------------------------------
@@ -1172,7 +1173,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -1183,8 +1184,8 @@
     runInitialComputation();
     isInitialized = true;
     setupTimeline();
-    draw(timeline?.state ?? initialState);
-    if (playingByDefault) timeline?.play();
+    draw(player?.state ?? initialState);
+    if (playingByDefault) player?.play();
     // Redraw once MathJax glyphs (e.g. "z") finish loading
     mathjaxInitialized.then(() => requestRedraw());
   }
@@ -1208,7 +1209,7 @@
     {/snippet}
   </Figure>
   <div class="cc-inspector">
-    <TimelineInspector player={timeline} />
+    <TimelineInspector {player} />
   </div>
 </div>
 

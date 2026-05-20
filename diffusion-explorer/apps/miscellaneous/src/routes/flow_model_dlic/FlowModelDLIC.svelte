@@ -8,7 +8,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     DoubleFigure,
     Timeline,
     TimeSlider,
@@ -89,7 +89,7 @@
   let ctxRight: CanvasRenderingContext2D | null = $state(null);
 
   // Timeline and animation
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let isInitialized = $state(false);
 
   // WebGPU context for DLIC
@@ -121,7 +121,7 @@
 
   // Visibility
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Export state
   let isExporting = $state(false);
@@ -391,16 +391,19 @@
       segmentIndex: 0,
     };
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = initialState;
-    timeline.duration = animationDurationMs / 1000;
-    timeline.looping = true;
-
-    timeline.add(syncClip, { start: 0, end: 1 });
-
-    timeline.onTick((_, state) => {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDurationMs / 1000,
+      initialState: initialState,
+      clips: [
+        { clip: syncClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((_, state) => {
       draw(state);
     });
+
+
 
     console.log("[FlowModelDLIC] Timeline setup complete");
   }
@@ -478,7 +481,7 @@
   // ----------------------------------------------------------------
 
   async function handleExport() {
-    if (!timeline || !canvasLeft || !canvasRight || isExporting) return;
+    if (!player || !canvasLeft || !canvasRight || isExporting) return;
 
     isExporting = true;
     exportProgress = 0;
@@ -486,7 +489,7 @@
     try {
       const videos = await exportAnimation(
         {
-          timeline,
+          player,
           draw,
           canvas: [canvasLeft, canvasRight],
         },
@@ -516,8 +519,8 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) {
-      timeline.dispose();
+    if (player) {
+      player?.dispose();
     }
   });
 
@@ -543,9 +546,9 @@
         setupTimeline();
         isInitialized = true;
 
-        if (playingByDefault && timeline) {
-          draw(timeline.initialState);
-          timeline.play();
+        if (playingByDefault && player) {
+          draw(player!.timeline.initialState);
+          player.play();
         }
       });
     }
@@ -585,7 +588,7 @@
 
   {#snippet footer()}
     <div class="footer-controls">
-      <TimeSlider timeline={timeline as any} showTicks={false} showTimeLabel={false} />
+      <TimeSlider timeline={player} showTicks={false} showTimeLabel={false} />
       <button
         class="export-button"
         onclick={handleExport}

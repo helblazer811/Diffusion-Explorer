@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import {
+  import { Player,
     Timeline,
     StreamlineAnimation,
     drawArrow,
@@ -105,7 +105,7 @@
     theta: number; // 0-2π for rotation around curve
   };
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
 
   let boundingBox: BoundingBox | null = null;
@@ -174,40 +174,41 @@
   function setupTimeline() {
     if (!streamlineAnim) return;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { streamlinePhase: 0, theta: 0 };
-
-    const totalDuration = Math.max(streamlineDuration, rotationDuration);
-    timeline.duration = totalDuration;
-    timeline.looping = true;
-
-    // Add streamline clip from the animation
-    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
-
-    // Rotation clip
-    const rotationEnd = rotationDuration / totalDuration;
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: totalDuration,
+      initialState: { streamlinePhase: 0, theta: 0 },
+      clips: [
+        { clip: streamlineAnim.clip, ...{ start: 0, end: 1 } },
+        { clip: {
         name: "CurveRotation",
         reduce(t: number) {
           const loops = totalDuration / rotationDuration;
           return { theta: ((t * loops) % 1) * 2 * Math.PI };
         },
-      },
-      { start: 0, end: rotationEnd }
-    );
+      }, ...{ start: 0, end: rotationEnd } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.onTick((_t, state) => {
+    const totalDuration = Math.max(streamlineDuration, rotationDuration);
+
+
+    // Add streamline clip from the animation
+
+    // Rotation clip
+    const rotationEnd = rotationDuration / totalDuration;
+
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -366,8 +367,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!player) return;
+    if (!active && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -381,7 +382,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -393,7 +394,7 @@
     isInitialized = true; // Set early to prevent re-entry
     runInitialComputation().then(() => {
       setupTimeline();
-      draw(timeline!.initialState);
+      draw(player!.initialState);
       if (playingByDefault) startAnimation();
     });
   }

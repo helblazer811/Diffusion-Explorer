@@ -16,7 +16,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     Figure,
     Timeline,
     useVisibilityHandler,
@@ -102,14 +102,14 @@
   let canvas: HTMLCanvasElement | null = $state(null);
   let ctx: CanvasRenderingContext2D | null = $state(null);
 
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let isInitialized = $state(false);
 
   // 3D trajectory in centered world coordinates.
   let path3D: number[][] = [];
 
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // ODE
@@ -511,11 +511,14 @@
   // ----------------------------------------------------------------
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { time: 0 };
-    timeline.duration = animationDurationMs / 1000;
-    timeline.looping = true;
-    timeline.onTick((t: number) => draw(t));
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDurationMs / 1000,
+      initialState: { time: 0 },
+      clips: [
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((t: number) => draw(t));
   }
 
   // ----------------------------------------------------------------
@@ -523,7 +526,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.dispose();
+    if (player) player?.dispose();
   });
 
   $effect(() => {
@@ -536,13 +539,13 @@
       setupTimeline();
       isInitialized = true;
 
-      if (timeline) {
+      if (player) {
         draw(0);
         if (playingByDefault) {
           if (initialPlayDelaySeconds > 0) {
-            setTimeout(() => timeline?.play(), initialPlayDelaySeconds * 1000);
+            setTimeout(() => player?.play(), initialPlayDelaySeconds * 1000);
           } else {
-            timeline.play();
+            player.play();
           }
         }
       }

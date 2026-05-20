@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import {
+  import { Player,
     Figure,
     TimeSlider,
     computeContours,
@@ -145,11 +145,11 @@
   };
 
   // Timeline
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // Visibility handling
   let figureIsActive: import("svelte/store").Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
   let isInitialized = false;
 
   // Cached values for closures
@@ -295,13 +295,15 @@
     // Initialize the animation with the canvas
     await pathlineAnim.init(canvas);
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      segmentIndex: 0,
-      currentStep: 0,
-      time: 0,
-      centerX: scales.sourceCenterPixelX
-    };
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: {},
+      clips: [
+        { clip: mainClip, ...{ start: 0, end: timing.animationEnd } },
+        { clip: createPauseClip(), ...{ start: timing.animationEnd, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     // Main animation clip
     const mainClip = {
@@ -317,20 +319,15 @@
       }
     };
 
-    timeline.add(mainClip, { start: 0, end: timing.animationEnd });
-    timeline.add(createPauseClip(), { start: timing.animationEnd, end: 1 });
 
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
-
-    timeline.onTick((_, state) => {
+    player.onTick((_, state) => {
       draw(state);
     });
   }
 
   function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+    if (!player) return;
+    player.play();
   }
 
   // ----------------------------------------------------------------
@@ -338,8 +335,8 @@
   // ----------------------------------------------------------------
 
   function requestRedraw() {
-    if (timeline) {
-      draw(timeline.state);
+    if (player) {
+      draw(player.state);
     }
   }
 
@@ -539,7 +536,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -559,8 +556,8 @@
     isInitialized = true;
     runInitialComputation();
     setupTimeline().then(() => {
-      if (timeline) {
-        draw(timeline.initialState);
+      if (player) {
+        draw(player!.timeline.initialState);
         if (playingByDefault) startAnimation();
       }
     });
@@ -582,7 +579,7 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider {timeline} color={trajectoryColor} />
+      <TimeSlider timeline={player} color={trajectoryColor} />
     </div>
   {/snippet}
 
