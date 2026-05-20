@@ -5,6 +5,7 @@
   import type { Writable } from "svelte/store";
   import {
     Figure,
+    Timeline,
     TimelineBuilder,
     Player,
     createPauseClip,
@@ -691,11 +692,23 @@
     );
     builder.add(createPauseClip(), { durationMs: 1800 });
 
-    // Slow the whole loop by 2x. Clip starts/ends are normalized [0, 1] in
-    // the built Timeline, so giving the Builder an explicit duration that's
-    // 2× the auto-computed total stretches every phase + pause uniformly.
-    const totalMs = builder.totalDurationMs;
-    const timeline = builder.setDuration((totalMs * 2) / 1000).build();
+    // Slow the whole loop by 2x. Re-wrap the built Timeline with double the
+    // seconds-duration while preserving each clip's [0, 1] normalized
+    // timing — equivalent to the legacy `timeline.duration *= 2` trick,
+    // which only changed the clock rate (not the clip layout).
+    const built = builder.build();
+    const timeline = Timeline.from<AnimationState>({
+      duration: built.duration * 2,
+      initialState: built.initialState,
+      clips: built.clips.map(c => ({
+        clip: c.clip,
+        start: c.start,
+        end: c.end,
+        track: c.track,
+        kind: c.kind,
+        id: c.id,
+      })),
+    });
     player = new Player(timeline, { looping: true });
     player.onTick((_t, state) => draw(state));
   }
