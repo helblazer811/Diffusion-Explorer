@@ -523,9 +523,13 @@
       [xScale(p[0]), yScale(p[1])],
     ]);
 
-    // Reset and start animation immediately
+    // Reset and start animation immediately. We call startAnimation()
+    // directly because reassigning `isPlaying = true` is a no-op when the
+    // looping animation was already playing — Svelte 5 skips same-value
+    // assignments, so the reactive restart block (line ~605) never fires.
     resetAnimation();
     isPlaying = true;
+    startAnimation();
 
     // Helper to check if both samples are complete
     function checkComplete() {
