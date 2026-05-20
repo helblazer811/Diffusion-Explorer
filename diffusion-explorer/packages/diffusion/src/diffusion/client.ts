@@ -151,6 +151,36 @@ function cleanup(requestId: string): void {
     requestIdToWorker.delete(requestId);
 }
 
+// Cache pre-flight checks per URL so we don't HEAD on every dispatch.
+const workerUrlPreflightCache = new Map<string, Promise<void>>();
+
+/**
+ * Verify the worker script is reachable before instantiating workers. A missing
+ * bundle (e.g. `bundle-workers` not run in dev) otherwise surfaces as an empty
+ * `worker.onerror` event with all fields undefined — very hard to diagnose.
+ */
+function preflightWorkerUrl(workerUrl: string): Promise<void> {
+    let p = workerUrlPreflightCache.get(workerUrl);
+    if (p) return p;
+    p = fetch(workerUrl, { method: 'HEAD' }).then(res => {
+        if (!res.ok) {
+            const msg =
+                `[Diffusion Pool] Worker script not reachable: ${workerUrl} ` +
+                `(HTTP ${res.status}). ` +
+                `If you're running dev, run \`npm run bundle-workers\` in the app ` +
+                `directory. The dev script does not bundle workers automatically; ` +
+                `only \`npm run build\` does.`;
+            console.error(msg);
+            throw new Error(msg);
+        }
+    }).catch(err => {
+        workerUrlPreflightCache.delete(workerUrl);
+        throw err;
+    });
+    workerUrlPreflightCache.set(workerUrl, p);
+    return p;
+}
+
 /**
  * Lazily creates and returns the worker pool.
  */
@@ -164,15 +194,18 @@ function initializeWorkerPool(workerUrl: string): void {
 
     workerPoolUrl = workerUrl;
 
+    preflightWorkerUrl(workerUrl).catch(() => { /* already logged above */ });
+
     for (let i = 0; i < poolSize; i++) {
         const worker = new Worker(workerUrl, { type: 'module' });
 
         worker.onerror = (e) => {
             console.error(`[Diffusion Worker ${i} Error]`, {
-                message: e.message,
+                url: workerUrl,
+                message: e.message || '(empty — script likely failed to load; check the URL is served)',
                 filename: e.filename,
                 lineno: e.lineno,
-                colno: e.colno
+                colno: e.colno,
             });
         };
 
