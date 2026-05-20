@@ -1173,6 +1173,7 @@
         numPoints={100}
         numLinesToDraw={100}
         numTrajectoriesToShow={30}
+        animationDuration={18000}
       >
         <div class="caption">
           <span class="figure-number">Figure 14:</span>

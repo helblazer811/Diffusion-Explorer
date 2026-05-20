@@ -323,7 +323,7 @@
     const c3_couplingEnd = (timing.phase3CouplingEnd - timing.phase3Start) / phase3Duration;
 
     const tl = Timeline.from<AnimationState>({
-      duration: 1,
+      duration: animationDuration / 1000,
       initialState: {},
       clips: [
         { clip: {
