@@ -40,7 +40,7 @@
   import { drawVectorField } from "../plotting/vector_field";
   import { drawTrajectories } from "../plotting/trajectories";
   import { useCanvas2D } from "../plotting/canvas";
-  import { Timeline, useVisibilityHandler } from "tempus";
+  import { Timeline, useVisibilityHandler } from "tempus/legacy";
 
   // ----------------------------------------------------------------
   // Props

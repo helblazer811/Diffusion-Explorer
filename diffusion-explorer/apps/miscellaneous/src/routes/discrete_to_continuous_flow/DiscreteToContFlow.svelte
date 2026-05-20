@@ -10,6 +10,7 @@
     computeContours,
     plotContours,
     waitForPendingRenders,
+    TimelineInspector,
   } from '@diffusion-explorer/ui';
   import type { Clip } from '@diffusion-explorer/ui';
 
@@ -519,4 +520,5 @@
     use:canvas2d.bindCanvas
     style="width: 100%; height: auto; aspect-ratio: {width}/{height}; margin-top: 20px;"
   ></canvas>
+  <TimelineInspector player={timeline} />
 </div>

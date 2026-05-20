@@ -48,7 +48,7 @@
   import { createSourceTargetScales } from "../d3_utils";
   import { useCanvas2D } from "../plotting/canvas";
   import { PathlineAnimation, type PathlineAnimationState } from "../animation/animations/pathline-animation";
-  import { Timeline, useVisibilityHandler } from "tempus";
+  import { Timeline, useVisibilityHandler } from "tempus/legacy";
   import type { Writable } from "svelte/store";
 
   // ----------------------------------------------------------------

@@ -1,217 +1,212 @@
 # Animation System
 
-A composable animation system built around Timeline, Clip, and Layer abstractions.
-Clips are reducer functions that return partial state updates, enabling conflict
-resolution through a priority-based layer system.
+Tempus splits an animation into three pieces with sharp boundaries:
 
+1. **`TimelineBuilder<S>`** — the only mutable surface. Imperative,
+   chainable; you `.add(...)` clips and pauses, then `.build()`.
+2. **`Timeline<S>`** — frozen structure. `clips`, `duration`,
+   `initialState`, and a pure `stateAt(t): S`. This is the artifact an
+   agent or test or screenshot tool reasons about.
+3. **`Player<S>`** — the transport over a `Timeline`. Owns the
+   playhead, the RAF clock, `looping`, `endPause`, and the **overlay**
+   (a tiny mutable clip list for ephemeral interaction effects).
 
-## Architecture Overview
+`TimeSlider`, `TimelineInspector`, and `useVisibilityHandler` all take
+either a `Player` (new shape) or a legacy mutable `Timeline` (from
+`tempus/legacy`, kept around for figures that haven't migrated yet).
+
+## Why split
+
+The pre-refactor `Timeline` conflated three responsibilities — authored
+structure, playback state, and runtime mutation — which made it
+impossible to reason about an animation as a pure function of `t`. The
+split is what lets `timeline.stateAt(0.5)` answer "what does the
+animation look like at this point?" identically to playing through to
+that point. That property is the foundation for agent introspection,
+screenshot testing, and the inspector's hover/scrub determinism.
+
+See [`packages/tempus/docs/timeline.md`](../../../tempus/docs/timeline.md)
+and [`packages/tempus/docs/player.md`](../../../tempus/docs/player.md)
+for the full API reference.
+
+## Architecture overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Timeline                             │
-│              (single source of truth)                       │
-│                                                             │
-│   ┌─────────┐                                               │
-│   │  Clock  │ (internal - owns RAF loop)                    │
-│   └────┬────┘                                               │
-│        │ dt                                                 │
-│        ▼                                                    │
-│   time: 0 ──────────────────────────────────────────► 1    │
-│                                                             │
-│   Layer 0 (BASE):        │ Clip A      │ Clip B      │     │
-│   Layer 10 (INTERACTION):     │ Ephemeral │            │     │
-│                                                             │
-│   Higher layers override lower for conflicting state keys   │
-│                                                             │
-│   Methods: play() | pause() | seek(t) | reset()             │
-│            startSeeking() | endSeeking()                    │
-└─────────────────────────────────────────────────────────────┘
-        ▲                           │
-        │ seek()                    │ onTick(t, state)  (t is 0-1)
-        │ play/pause                │
-        │                           ▼
-┌───────────────┐           ┌───────────────┐
-│  TimeSlider   │           │    Figure     │
-│               │           │               │
-│ timeline.seek()│          │ draw(state)   │
-│ timeline.play()│          │               │
-└───────────────┘           └───────────────┘
+│                  TimelineBuilder<S>                         │
+│   (mutable scratch space; cursor model; .build())           │
+└────────────────────────────┬────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Timeline<S> (frozen)                     │
+│   clips, duration, initialState, stateAt(t): S              │
+│   (introspection surface for agents/tests)                  │
+└────────────────────────────┬────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Player<S>                                │
+│   t, time, state, isPlaying, looping, endPause              │
+│   play/pause/seek/reset/attach                              │
+│   overlay (ephemeral interaction clips)                     │
+│   onTick(cb)                                                │
+└────────────────────────────┬────────────────────────────────┘
+                             │ onTick(t, state)
+                             ▼
+                ┌──────────────────────┐
+                │   Figure / Canvas    │
+                │     draw(state)      │
+                └──────────────────────┘
 ```
 
+## Core concepts
 
-## Core Concepts
+### Clip (pure reducer)
 
-### Clip (Reducer Pattern)
-Clips are pure functions of local time, returning partial state updates.
-They close over any external values they need (no params argument).
+Clips are pure functions of *local* time and return partial state
+updates. They close over any external values they need.
 
 ```typescript
 const fadeClip: Clip<State> = {
   name: 'fade',
-  duration: 0.5,  // 50% of timeline duration
   reduce(t) {
-    return { opacity: t };  // Partial state update
+    return { opacity: t };
   }
 };
 ```
 
-### Layer Priority
-Higher layer numbers take precedence for conflicting state keys.
-Use built-in constants or any number:
+The reducer receives `t ∈ [0, 1]` (0 at clip start, 1 at clip end).
+Return a `Partial<State>` to write keys, or `null` to write nothing
+(prior contributions are preserved).
+
+### Insertion-order merge
+
+State at time `t` is computed by walking every clip in **insertion
+order**, evaluating each active clip at its local `t` (or `1` if the
+clip has ended), and merging partial updates last-wins. Tracks are
+purely visual — they do **not** affect state precedence.
+
+This is the model: later-added clips override earlier ones on the
+same state keys.
+
+### Overlay (ephemeral interaction clips)
+
+The Player owns an `overlay` — a minimal mutable clip list for hover
+effects, click flashes, and other transient state injections that
+shouldn't be part of the authored Timeline. Overlay clips are merged
+**after** the authored Timeline, so they always win on conflicting keys.
+They auto-remove after one play.
 
 ```typescript
-Layer.BASE = 0         // Default animations
-Layer.INTERACTION = 10 // Hover effects, temporary states
-Layer.OVERRIDE = 20    // User-triggered animations
+player.overlay.add(
+  { name: 'hover', reduce: () => ({ hoveredId: id, hoverOpacity: 1 }) },
+  { start: player.t, durationFraction: 1 },
+);
+
+// Click flash:
+player.overlay.add(
+  { name: 'flash', reduce: (t) => ({ flash: 1 - t }) },
+  { start: player.t, durationMs: 300 },
+);
 ```
 
-### Ephemeral Clips
-One-shot clips that auto-remove after playing once. Perfect for click animations.
+Replaces the old `timeline.playClip(...)` and `timeline.setState(...)`
+patterns.
+
+## Basic usage (new shape)
 
 ```typescript
-timeline.playClip({
-  name: 'flash',
-  duration: 0.3,
-  reduce(t) { return { flash: 1 - t }; }
-});
+import { TimelineBuilder, Player } from '@diffusion-explorer/ui';
+
+const timeline = new TimelineBuilder<{ segmentIndex: number }>()
+  .setInitialState({ segmentIndex: 0 })
+  .add(
+    {
+      name: 'segments',
+      reduce: (t) => ({ segmentIndex: Math.floor(t * 10) }),
+    },
+    { durationMs: 800 },
+  )
+  .build();
+
+const player = new Player(timeline, { looping: true });
+player.onTick((t, state) => draw(state));
+player.play();
 ```
 
-### Instant Clips (duration=0)
-For immediate state changes that should appear on the timeline for debugging.
+## TimeSlider integration
 
-```typescript
-timeline.setState('click', { clicked: true });
-```
-
-
-## TimeSlider Integration
-
-Pass the timeline directly - TimeSlider handles play/pause, seeking, and
-subscribes to time updates internally:
+`TimeSlider` accepts either a `Player` or a legacy `Timeline` directly
+via its `timeline` prop:
 
 ```svelte
-<TimeSlider {timeline} />
+<TimeSlider {timeline} />     <!-- timeline can be a Player too -->
 ```
 
-If you need custom rendering, register your own tick callback (multiple
-callbacks are supported):
+It handles `seek`, `play/pause`, and snapshot-then-restore on drag
+internally. (The pre-refactor `isSeeking` / `startSeeking` /
+`endSeeking` transport leak is gone in the new Player; the legacy
+Timeline still has it, and TimeSlider's duck-typed handler calls it
+if present so figures that haven't migrated keep their old behavior.)
 
-```svelte
-<script>
-  timeline.onTick((t, state) => draw(state));
-</script>
+For multiple independent sliders (like `CrownJewel`), make slider
+values part of state and control them via clips.
 
-<TimeSlider {timeline} />
-```
+## Legacy Timeline (compatibility path)
 
-For multiple independent sliders (like CrownJewel), make slider values
-part of state and control them via clips.
-
-
-## Seeking State
-
-When the user drags the time slider, the timeline enters seeking mode:
-- `isSeeking` becomes true
-- Time progression pauses (tick skips `dt`)
-- `seek()` still updates position normally
-- `isPlaying` remains unchanged
-
-This prevents the animation from "fighting" with user scrubbing.
+Figures predating this refactor instantiate a mutable `Timeline`
+directly:
 
 ```typescript
-// Check if user is currently scrubbing
-if (timeline.isSeeking) {
-  // e.g., skip expensive computations
-}
-```
+import { Timeline } from '@diffusion-explorer/ui';
 
-TimeSlider automatically calls `startSeeking()`/`endSeeking()` on drag.
-
-
-## Code Style Preferences
-
-- Use descriptive names for animation clips (e.g., `EulerSteps`, `FadeInTrajectories` instead of `clip1`, `anim`)
-
-
-## Usage Examples
-
-### Basic Animation
-```typescript
-const numSegments = 10;
-
-const timeline = new Timeline<{ segmentIndex: number }>();
-timeline.initialState = { segmentIndex: 0 };
-
-timeline.add({
-  name: 'segments',
-  duration: 0.8,
-  reduce(t) {
-    return { segmentIndex: Math.floor(t * numSegments) };
-  }
-}, 0);
-
-timeline.onTick((t, state) => draw(state));
+const timeline = new Timeline<S>();
+timeline.initialState = {...};
+timeline.duration = 2;
+timeline.looping = true;
+timeline.add(clip, { start: 0, end: 1 });
+timeline.onTick((t, s) => draw(s));
 timeline.play();
 ```
 
-### Hover Override
-```typescript
-let hoverId: string | null = null;
+This keeps working — the `Timeline` re-exported from
+`@diffusion-explorer/ui` is the **legacy mutable class**, backed by
+`tempus/legacy`. New figures should prefer the `TimelineBuilder + Player`
+shape; the legacy path is for incremental migration only.
 
-function onMouseEnter(id: string) {
-  hoverId = timeline.add({
-    name: 'hover',
-    duration: 1,
-    reduce() { return { hoveredId: id, hoverOpacity: 1 }; }
-  }, 'now', { layer: Layer.INTERACTION });
-}
+Legacy Timeline exposes a Player-shaped surface (`.t`, `.timeline`)
+so it can also be passed to `<TimelineInspector {player} />` without
+migration. (The inspector reads `player.timeline.clips`,
+`player.onTick`, `player.t`, `player.isPlaying`, `player.play/pause/seek`
+— all available on both classes.)
 
-function onMouseLeave() {
-  if (hoverId) timeline.remove(hoverId);
-}
-```
-
-
-## Timeline Lifecycle
+## Timeline lifecycle
 
 ### Cleanup
-Always call `timeline.dispose()` before creating a new Timeline instance to prevent memory leaks:
+
+Call `player.dispose()` (new) or `timeline.dispose()` (legacy) before
+discarding to stop the clock and clear subscribers.
+
+### Dynamic data updates
+
+When data changes (e.g., during streaming), rebuild the Timeline and
+swap it on the Player:
 
 ```typescript
-function setupTimeline() {
-  // Clean up previous timeline
-  timeline?.dispose();
-
-  timeline = new Timeline<AnimationState>();
-  // ... configure timeline
-}
+// New shape:
+const newTimeline = buildTimelineFromData(newData);
+player.attach(newTimeline);   // preserves t and isPlaying
 ```
 
-### Dynamic Data Updates
-When data changes (e.g., during streaming), prefer `replaceClips()` over recreating the timeline:
+`attach()` is the replacement for the legacy `replaceClips([...])`
+pattern.
 
-```typescript
-// Instead of calling setupTimeline() on every data change:
-timeline.replaceClips([
-  { clip: createMainClip(newData), start: 0 }
-]);
-```
+### State reset
 
-### State Reset
-Use `resetState()` to restart an animation from the beginning without rebuilding clips:
+`player.reset()` (or legacy `timeline.resetState()`) seeks to `t=0` and
+pauses. State is pure, so there's nothing to "reset" beyond the
+playhead.
 
-```typescript
-function handleRestart() {
-  timeline.resetState();
-  timeline.play();
-}
-```
-
-
-## Visibility Handling
-
-Use the `useVisibilityHandler` hook for consistent pause/resume when figures scroll in/out of view:
+## Visibility handling
 
 ```svelte
 <script lang="ts">
@@ -233,4 +228,13 @@ Use the `useVisibilityHandler` hook for consistent pause/resume when figures scr
 </Figure>
 ```
 
-This ensures animations pause when scrolled off-screen, reducing CPU usage.
+Pauses animations when scrolled off-screen, resumes when scrolled back.
+Works with either a Player or a legacy Timeline.
+
+## Code style
+
+- Use descriptive names for animation clips (e.g., `EulerSteps`,
+  `FadeInTrajectories` instead of `clip1`, `anim`).
+- Prefer the `TimelineBuilder + Player` shape for new figures.
+- Keep the authored Timeline frozen; for runtime mutation use the
+  `Player`'s `overlay` (transient) or rebuild + `attach()` (structural).

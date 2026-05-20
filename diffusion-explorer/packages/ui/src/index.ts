@@ -104,29 +104,62 @@ export {
   type PulsingPathsGPUData,
 } from './plotting/pulsing-paths';
 
-// Animation core (re-exported from tempus)
+// Animation core — re-exported from `tempus/legacy` for backwards-compat with
+// figures that still drive a mutable Timeline directly. The post-refactor
+// shape (frozen Timeline + Player + Overlay) lives in `tempus` proper; figures
+// migrate at their own pace.
 export {
   Clock,
   Timeline,
-  Layer,
+  TimelineBuilder,
   createPauseClip,
+  isPauseClip,
+  useVisibilityHandler,
+  exportAnimation,
   type Clip,
+  type ClipKind,
   type ClipTiming,
   type ClipOptions,
-  type Animation,
-  type AnimationWithData,
-  useVisibilityHandler,
+  type ClipInfo,
   type VisibilityState,
-  TimelineBuilder,
   type TimelineBuilderAddOptions,
   type TimelineBuilderAddAtOptions,
-  exportAnimation,
+  type TracksSpec,
+  type ExportableAnimation,
+} from 'tempus/legacy';
+
+// Animation interfaces (unchanged across the refactor).
+export {
+  type Animation,
+  type AnimationWithData,
+} from 'tempus';
+
+// Video export utilities (encoder is unchanged; the legacy `exportAnimation`
+// re-export above wraps the new Player-typed entry for mutable-Timeline
+// callers).
+export {
   streamingVideoExport,
   downloadBlob,
   downloadFrames,
   type VideoExportOptions,
-  type ExportableAnimation,
 } from 'tempus';
+
+// New (immutable) API surface for new code / agents. Existing figures don't
+// need these.
+export {
+  Player,
+  Overlay,
+  type PlayerOptions,
+  type TickCallback,
+  type OverlayClip,
+  type OverlayAddOptions,
+  type TimelineSpec,
+} from 'tempus';
+
+// Inspector — Svelte UI component. Accepts either a Player (new) or a
+// legacy mutable Timeline (which exposes a Player-shaped surface for this
+// purpose).
+export { default as TimelineInspector } from 'tempus/inspector/svelte';
 
 // Domain-specific animations
 export {

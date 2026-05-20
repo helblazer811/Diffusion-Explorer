@@ -1,7 +1,25 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { Timeline } from 'tempus';
   import Slider from './Slider.svelte';
+
+  // Duck-typed transport surface. TimeSlider works against any object that
+  // exposes the read+write playback surface below. Both the legacy mutable
+  // `Timeline` (from `tempus/legacy`) and the new `Player` (from `tempus`)
+  // satisfy this — the legacy class also exposes `t` / `timeline` getters
+  // for inspector compatibility, and the new Player has every method here.
+  type TransportLike = {
+    isPlaying: boolean;
+    duration?: number;            // legacy Timeline
+    time?: number;                 // legacy Timeline
+    t?: number;                    // new Player
+    play(): void;
+    pause(): void;
+    seek(t: number): void;
+    onTick(cb: (t: number, state: any) => void): () => void;
+    // Optional legacy-only seeking hooks; ignored on Player.
+    startSeeking?: () => void;
+    endSeeking?: () => void;
+  };
 
   // Props
   export let value = 0;
@@ -23,10 +41,10 @@
   export let maxWidth = '644px';
   export let labelSize = '1em';
 
-  // Optional Timeline instance - when provided, TimeSlider controls the timeline directly
-  // This enables seamless scrubbing while animation is playing
-  // See: packages/ui/src/animation/animation.ts for Timeline documentation
-  export let timeline: Timeline<unknown> | null = null;
+  // Optional Timeline/Player instance — when provided, TimeSlider drives
+  // playback directly (seek + play/pause). Accepts either a legacy mutable
+  // Timeline or a new Player (duck-typed).
+  export let timeline: TransportLike | null = null;
 
   // Optional callbacks (not required when using timeline)
   export let onTogglePlay: (() => void) | null = null;  // Called when play/pause is clicked
@@ -42,18 +60,25 @@
   let playing = false;
   let unsubscribe: (() => void) | null = null;
 
+  // Helper: normalized playhead. Legacy Timeline exposes `time` + `duration`;
+  // Player exposes `t`. Both work via this small adapter.
+  function currentT(tl: TransportLike): number {
+    if (typeof tl.t === 'number') return tl.t;
+    if (typeof tl.time === 'number' && typeof tl.duration === 'number' && tl.duration > 0) {
+      return tl.time / tl.duration;
+    }
+    return 0;
+  }
+
   // Subscribe to timeline tick updates when timeline changes
   $: if (timeline) {
-    // Sync initial state - use displayTime if provided, otherwise timeline time
-    sliderValue = displayTime ?? timeline.time / timeline.duration;
+    sliderValue = displayTime ?? currentT(timeline);
     playing = timeline.isPlaying;
 
-    // Subscribe to updates (replaces any previous subscription)
     unsubscribe?.();
     unsubscribe = timeline.onTick((t) => {
-      // Use displayTime prop if provided (it's reactively updated by parent)
       sliderValue = displayTime ?? t;
-      playing = timeline.isPlaying;
+      playing = timeline!.isPlaying;
     });
   } else {
     // No timeline: use legacy props
@@ -113,18 +138,25 @@
     if (onInput) onInput(newValue);
   }
 
-  // Handle drag start - pause time progression while seeking
+  // Drag-pause: snapshot the play state and stop the clock at drag start;
+  // restore at drag end. Player has no `startSeeking`/`endSeeking` (those
+  // were a transport-state leak); legacy Timeline still uses them if
+  // available. We do both — the local snapshot covers the Player path, and
+  // the legacy hooks keep the previous "freeze the clock but stay rendered"
+  // behavior on figures that haven't migrated.
+  let wasPlayingAtDragStart = false;
   function handleDragStart() {
-    if (timeline && 'startSeeking' in timeline) {
-      timeline.startSeeking();
-    }
+    if (!timeline) return;
+    wasPlayingAtDragStart = timeline.isPlaying;
+    timeline.startSeeking?.();
+    timeline.pause();
   }
 
-  // Handle drag end - resume time progression
   function handleDragEnd() {
-    if (timeline && 'endSeeking' in timeline) {
-      timeline.endSeeking();
-    }
+    if (!timeline) return;
+    timeline.endSeeking?.();
+    if (wasPlayingAtDragStart) timeline.play();
+    wasPlayingAtDragStart = false;
   }
 </script>
 

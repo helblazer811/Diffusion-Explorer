@@ -20,6 +20,7 @@
     ContourRenderer,
     createLinearColorScale,
     parseContourColor,
+    TimelineInspector,
   } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
@@ -1206,6 +1207,9 @@
       </div>
     {/snippet}
   </Figure>
+  <div class="cc-inspector">
+    <TimelineInspector player={timeline} />
+  </div>
 </div>
 
 <style>
@@ -1222,5 +1226,10 @@
     color: #777;
     margin: 0 0 0.4rem 0;
     line-height: 1.25;
+  }
+  .cc-inspector {
+    width: 100%;
+    max-width: 900px;
+    margin-top: 12px;
   }
 </style>
