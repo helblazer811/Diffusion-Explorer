@@ -244,7 +244,7 @@
   $: if (!isInitialized && isDataValid && leftCanvas && rightCanvas) {
     runInitialComputation();
     setupTimeline();
-    draw(player!.initialState);
+    draw(player!.state);
     if (playingByDefault) startAnimation();
   }
 

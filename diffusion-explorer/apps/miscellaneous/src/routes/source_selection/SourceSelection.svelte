@@ -415,7 +415,7 @@
     runInitialComputation();
     setupTimeline();
     isInitialized = true;
-    draw(player!.initialState);
+    draw(player!.state);
     player?.play();
   }
 

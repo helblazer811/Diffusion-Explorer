@@ -455,7 +455,7 @@
     runInitialComputation();
     Promise.all([setupTimeline(), initializeGPURenderer()]).then(() => {
       isInitialized = true;
-      draw(player!.initialState);
+      draw(player!.state);
       if (playingByDefault) startAnimation();
     });
   }

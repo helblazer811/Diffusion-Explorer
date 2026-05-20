@@ -576,7 +576,7 @@
     if (success) {
       setupTimeline().then(() => {
         initialized = true;
-        draw(player!.initialState);
+        draw(player!.state);
         startAnimation();
       });
     }

@@ -255,7 +255,7 @@
 
     isLoading = false;
     resetAnimation();
-    draw(player!.initialState);
+    draw(player!.state);
     startAnimation();
 
     let completedCount = 0;

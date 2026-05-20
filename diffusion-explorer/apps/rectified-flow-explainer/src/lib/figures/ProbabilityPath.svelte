@@ -557,7 +557,7 @@
       });
     }
 
-    draw(player!.initialState);
+    draw(player!.state);
     if (playingByDefault) startAnimation();
   }
 

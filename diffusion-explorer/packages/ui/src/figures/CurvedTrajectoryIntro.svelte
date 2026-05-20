@@ -437,7 +437,7 @@
     runInitialComputation();
     setupTimeline().then(() => {
       initialized = true;
-      draw(player!.initialState);
+      draw(player!.state);
       if (playingByDefault) player!.play();
     });
   }

@@ -394,7 +394,7 @@
     isInitialized = true; // Set early to prevent re-entry
     runInitialComputation().then(() => {
       setupTimeline();
-      draw(player!.initialState);
+      draw(player!.state);
       if (playingByDefault) startAnimation();
     });
   }
