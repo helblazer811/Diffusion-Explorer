@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
+  import TimelineInspector from 'tempus/inspector/svelte';
 
   export let title = undefined;
   export let left = undefined;
@@ -9,6 +10,11 @@
   export let caption = undefined;
   export let gap = 20;
   export let backgroundVisible = true;
+
+  // Developer mode: when true and a player is provided, render the
+  // TimelineInspector below the figure content. Code-only toggle.
+  export let player = undefined;
+  export let devMode = false;
 
   // Visibility state - exported so parent can bind to it
   export let isActive = writable(false);
@@ -80,6 +86,11 @@
       {@render right?.()}
     </div>
   </div>
+  {#if devMode && player}
+    <div class="figure-dev-inspector">
+      <TimelineInspector {player} />
+    </div>
+  {/if}
   {#if footer}
     <div class="figure-footer">
       {@render footer?.()}
@@ -143,6 +154,11 @@
     display: flex;
     justify-content: center;
     width: 100%;
+  }
+
+  .figure-dev-inspector {
+    width: 100%;
+    padding: 0.5rem 0;
   }
 
   .figure-caption {

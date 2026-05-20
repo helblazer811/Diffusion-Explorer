@@ -616,6 +616,8 @@
     {gap}
     {caption}
     {backgroundVisible}
+    {player}
+    devMode={settings.devMode}
     bind:isActive={figureIsActive}
   >
     {#snippet left()}
