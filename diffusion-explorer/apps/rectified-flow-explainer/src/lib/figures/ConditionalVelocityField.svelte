@@ -453,7 +453,7 @@
   }
 </script>
 
-<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+<Figure {caption} {backgroundVisible} {player} devMode={settings.devMode} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="width: 100%; max-width: {width}px;">
       <canvas

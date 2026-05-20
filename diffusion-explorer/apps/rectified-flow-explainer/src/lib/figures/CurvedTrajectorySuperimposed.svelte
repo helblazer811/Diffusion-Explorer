@@ -355,7 +355,7 @@
 </script>
 
 {#if isDataValid}
-  <Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+  <Figure {caption} {backgroundVisible} {player} devMode={settings.devMode} bind:isActive={figureIsActive}>
     {#snippet children()}
       <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
         <div style="width: 100%; max-width: {canvasWidth}px;">

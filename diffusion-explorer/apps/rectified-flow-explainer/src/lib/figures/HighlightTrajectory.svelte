@@ -648,7 +648,7 @@
   }
 </script>
 
-<Figure {caption} bind:isActive={figureIsActive} backgroundVisible={false}>
+<Figure {caption} {player} devMode={settings.devMode} bind:isActive={figureIsActive} backgroundVisible={false}>
   {#snippet children()}
     <div
       style="display:flex;flex-direction:column;align-items:center;width:100%;"

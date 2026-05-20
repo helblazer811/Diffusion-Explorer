@@ -593,7 +593,7 @@
   }
 </script>
 
-<Figure {caption} backgroundVisible={false} bind:isActive={figureIsActive}>
+<Figure {caption} backgroundVisible={false} {player} devMode={settings.devMode} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
       <canvas

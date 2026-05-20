@@ -24,6 +24,10 @@ export interface OTCouplingData {
 // ========== SETTINGS OBJECT ==========
 
 export const settings = {
+  // Developer mode: when true, figures render a TimelineInspector below them.
+  // Code-only toggle for now. Should be false on commits to main.
+  devMode: false,
+
   // Target distribution (relative path - base will be prepended at runtime)
   targetDistributionPointsPath: 'data/smiley_face.json',
 
