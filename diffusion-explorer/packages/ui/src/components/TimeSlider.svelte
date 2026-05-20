@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { Timeline } from 'tempus';
+  import type { Player } from '@diffusion-explorer/ui';
   import Slider from './Slider.svelte';
 
   // Props
@@ -23,10 +23,10 @@
   export let maxWidth = '644px';
   export let labelSize = '1em';
 
-  // Optional Timeline instance - when provided, TimeSlider controls the timeline directly
-  // This enables seamless scrubbing while animation is playing
-  // See: packages/ui/src/animation/animation.ts for Timeline documentation
-  export let timeline: Timeline<unknown> | null = null;
+  // Optional Player instance — when provided, TimeSlider drives playback
+  // directly (seek + play/pause). The prop name is kept as `timeline` for
+  // backwards compatibility with callsites; the value is a Player.
+  export let timeline: Player<unknown> | null = null;
 
   // Optional callbacks (not required when using timeline)
   export let onTogglePlay: (() => void) | null = null;  // Called when play/pause is clicked
@@ -42,18 +42,15 @@
   let playing = false;
   let unsubscribe: (() => void) | null = null;
 
-  // Subscribe to timeline tick updates when timeline changes
+  // Subscribe to player tick updates when the player changes.
   $: if (timeline) {
-    // Sync initial state - use displayTime if provided, otherwise timeline time
-    sliderValue = displayTime ?? timeline.time / timeline.duration;
+    sliderValue = displayTime ?? timeline.t;
     playing = timeline.isPlaying;
 
-    // Subscribe to updates (replaces any previous subscription)
     unsubscribe?.();
     unsubscribe = timeline.onTick((t) => {
-      // Use displayTime prop if provided (it's reactively updated by parent)
       sliderValue = displayTime ?? t;
-      playing = timeline.isPlaying;
+      playing = timeline!.isPlaying;
     });
   } else {
     // No timeline: use legacy props
@@ -113,18 +110,19 @@
     if (onInput) onInput(newValue);
   }
 
-  // Handle drag start - pause time progression while seeking
+  // Drag-pause: snapshot the play state and stop the clock at drag start;
+  // restore at drag end.
+  let wasPlayingAtDragStart = false;
   function handleDragStart() {
-    if (timeline && 'startSeeking' in timeline) {
-      timeline.startSeeking();
-    }
+    if (!timeline) return;
+    wasPlayingAtDragStart = timeline.isPlaying;
+    timeline.pause();
   }
 
-  // Handle drag end - resume time progression
   function handleDragEnd() {
-    if (timeline && 'endSeeking' in timeline) {
-      timeline.endSeeking();
-    }
+    if (!timeline) return;
+    if (wasPlayingAtDragStart) timeline.play();
+    wasPlayingAtDragStart = false;
   }
 </script>
 

@@ -104,29 +104,45 @@ export {
   type PulsingPathsGPUData,
 } from './plotting/pulsing-paths';
 
-// Animation core (re-exported from tempus)
+// Animation core — frozen Timeline + Player + Overlay + Builder. The pre-
+// refactor mutable `Timeline` is gone; figures construct via TimelineBuilder
+// or `Timeline.from(spec)` and hold a Player.
 export {
-  Clock,
   Timeline,
-  Layer,
-  createPauseClip,
-  type Clip,
-  type ClipTiming,
-  type ClipOptions,
-  type Animation,
-  type AnimationWithData,
-  useVisibilityHandler,
-  type VisibilityState,
   TimelineBuilder,
-  type TimelineBuilderAddOptions,
-  type TimelineBuilderAddAtOptions,
+  Player,
+  Overlay,
+  Clock,
+  createPauseClip,
+  isPauseClip,
+  useVisibilityHandler,
   exportAnimation,
   streamingVideoExport,
   downloadBlob,
   downloadFrames,
+  type Clip,
+  type ClipKind,
+  type ClipInfo,
+  type VisibilityState,
+  type VisibilityTarget,
+  type TimelineBuilderAddOptions,
+  type TimelineBuilderAddAtOptions,
+  type TracksSpec,
+  type PlayerOptions,
+  type TickCallback,
+  type OverlayClip,
+  type OverlayAddOptions,
+  type TimelineSpec,
   type VideoExportOptions,
+  type Animation,
+  type AnimationWithData,
   type ExportableAnimation,
 } from 'tempus';
+
+// Inspector — Svelte UI component. Accepts either a Player (new) or a
+// legacy mutable Timeline (which exposes a Player-shaped surface for this
+// purpose).
+export { default as TimelineInspector } from 'tempus/inspector/svelte';
 
 // Domain-specific animations
 export {

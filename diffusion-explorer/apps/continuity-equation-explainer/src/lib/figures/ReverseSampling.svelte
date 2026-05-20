@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import {
+  import { Player,
     Figure,
     TimeSlider,
     drawScatterPlot,
@@ -82,14 +82,14 @@
 
   // Animation state - Timeline system
   let initialized = false;
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // PathlineAnimation instance
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Visibility tracking
   let figureIsActive: import("svelte/store").Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Pre-computed data
   let scales: ReturnType<typeof createSourceTargetScales> | null = null;
@@ -211,23 +211,28 @@
     // Initialize with canvas
     await pathlineAnimation.init(canvas!);
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { segmentIndex: 0 };
+    const tl = Timeline.from<AnimationState>({
+      duration: totalCycleDuration / 1000,
+      initialState: { segmentIndex: 0 },
+      clips: [
+        { clip: pathlineAnimation.clip, ...{ start: 0, end: forwardNorm } },
+        { clip: createPauseClip(), ...{ start: forwardNorm, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     // Total cycle: forward + pause (then loops back to start)
     const totalCycleDuration = animationDuration + pauseBeforeRestart;
     const forwardNorm = animationDuration / totalCycleDuration;
 
     // Add clips in sequence with explicit start/end
-    timeline.add(pathlineAnimation.clip, { start: 0, end: forwardNorm });
-    timeline.add(createPauseClip(), { start: forwardNorm, end: 1 });
+
 
     // Set duration in seconds
-    timeline.duration = totalCycleDuration / 1000;
-    timeline.looping = true;
+
 
     // Register tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
@@ -269,7 +274,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -281,9 +286,9 @@
     initializeData();
     setupTimeline().then(() => {
       initialized = true;
-      if (timeline) {
-        draw(timeline.initialState);
-        if (playingByDefault) timeline.play();
+      if (player) {
+        draw(player!.timeline.initialState);
+        if (playingByDefault) player.play();
       }
     });
   }
@@ -302,8 +307,7 @@
         use:canvas2d.bindCanvas
         style="width:100%;height:auto;max-width:{width}px;aspect-ratio:{width}/{height};"
       ></canvas>
-      <TimeSlider
-        {timeline}
+      <TimeSlider timeline={player}
         minLabel="t=1"
         maxLabel="t=0"
         color={trajectoryColor}

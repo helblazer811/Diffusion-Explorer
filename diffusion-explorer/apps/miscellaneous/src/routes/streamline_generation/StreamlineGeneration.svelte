@@ -11,11 +11,11 @@
   import {
     DoubleFigure,
     TimelineBuilder,
+    Player,
     createPauseClip,
     useCanvas2D,
     useVisibilityHandler,
     type Clip,
-    type Timeline,
   } from "@diffusion-explorer/ui";
   import {
     divergingSpiral,
@@ -136,7 +136,7 @@
   let ctxRight = $derived(canvasRight ? canvas2dRight.ctx : null);
 
   // Timeline and animation
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let currentState: AnimationState | null = $state(null);
   let isInitialized = $state(false);
 
@@ -154,7 +154,7 @@
 
   // Visibility
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -298,9 +298,7 @@
 
     // Use TimelineBuilder for incremental construction with ms durations
     const builder = new TimelineBuilder<AnimationState>()
-      .setInitialState(initialState)
-      .setLooping(true)
-      .setEndPause(timing.endPauseMs);
+      .setInitialState(initialState);
 
     // Total duration for flash+fade animation
     const totalFlashDurationMs =
@@ -328,12 +326,15 @@
       // Left panel integration clip
       const leftClip: Clip<AnimationState> = {
         name: `left-integration-${i}`,
-        reduce: (t: number, current: Readonly<AnimationState>) => {
+        reduce: (t: number) => {
           const segmentIndex = Math.min(
             Math.floor(t * leftNumSegments),
             leftNumSegments - 1
           );
-          const newCompleted = new Set(current.leftCompletedPathlines);
+          // Trajectory `i` completes 0..i-1 by the time it starts. We emit
+          // a fresh Set rather than reading from prior state — last-wins on
+          // track merge makes the read of `current` vestigial.
+          const newCompleted = new Set<number>();
           for (let j = 0; j < i; j++) {
             newCompleted.add(j);
           }
@@ -352,13 +353,14 @@
       // Right panel integration clip
       const rightClip: Clip<AnimationState> = {
         name: `right-integration-${i}`,
-        reduce: (t: number, current: Readonly<AnimationState>) => {
+        reduce: (t: number) => {
           const segmentIndex = Math.min(
             Math.floor(t * rightNumSegments),
             rightNumSegments - 1
           );
-          const newCompleted = new Set(current.rightCompletedPathlines);
-          const newRemoved = new Set(current.rightRemovedPathlines);
+          // Fresh sets emit 0..i-1 deterministically; track merge is last-wins.
+          const newCompleted = new Set<number>();
+          const newRemoved = new Set<number>();
           for (let j = 0; j < i; j++) {
             if (collisionMap.has(j)) {
               newRemoved.add(j);
@@ -389,9 +391,10 @@
 
         const flashFadeClip: Clip<AnimationState> = {
           name: `flash-fade-${i}`,
-          reduce: (t: number, current: Readonly<AnimationState>) => {
-            const newCompleted = new Set(current.rightCompletedPathlines);
-            const newRemoved = new Set(current.rightRemovedPathlines);
+          reduce: (t: number) => {
+            // Fresh sets — same construction as right-integration; last-wins.
+            const newCompleted = new Set<number>();
+            const newRemoved = new Set<number>();
             for (let j = 0; j < i; j++) {
               if (collisionMap.has(j)) {
                 newRemoved.add(j);
@@ -440,11 +443,12 @@
     }
 
     // Build timeline (duration auto-computed from accumulated clips)
-    timeline = builder.build();
+    const timeline = builder.build();
+    player = new Player(timeline, { looping: true, endPause: timing.endPauseMs / 1000 });
     currentState = initialState;
 
     // On tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       currentState = { ...state };
       draw(state);
     });
@@ -560,8 +564,8 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) {
-      timeline.dispose();
+    if (player) {
+      player.dispose();
     }
   });
 
@@ -574,9 +578,9 @@
       isInitialized = true;
       runInitialComputation();
       setupTimeline().then(() => {
-        if (playingByDefault && timeline) {
-          draw(timeline.initialState);
-          timeline.play();
+        if (playingByDefault && player) {
+          draw(player.timeline.initialState);
+          player.play();
         }
       });
     }

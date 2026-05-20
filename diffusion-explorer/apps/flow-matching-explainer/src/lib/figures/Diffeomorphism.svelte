@@ -9,7 +9,7 @@ TODO:
   import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import { FlowModelClient } from "@diffusion-explorer/diffusion";
-  import {
+  import { Player,
     Figure,
     TimeSlider,
     drawScatterPlot,
@@ -107,7 +107,7 @@ TODO:
 
   // Animation state - Timeline system
   let isInitialized: boolean = false;
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let displayTime: number = 0;  // Semantic time for slider display (tracks state.time)
 
   // Visibility-based animation control
@@ -366,8 +366,17 @@ TODO:
   };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { time: 0 };
+    const tl = Timeline.from<AnimationState>({
+      duration: totalCycleDuration / 1000,
+      initialState: { time: 0 },
+      clips: [
+        { clip: forwardClip, ...{ start: 0, end: t1 } },
+        { clip: createPauseClip(), ...{ start: t1, end: t2 } },
+        { clip: backwardClip, ...{ start: t2, end: t3 } },
+        { clip: createPauseClip(), ...{ start: t3, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     // Total cycle: forward + pause + backward + pause
     const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
@@ -379,17 +388,14 @@ TODO:
     const t2 = forwardDuration + pauseNormalized;
     const t3 = 2 * forwardDuration + pauseNormalized;
 
-    timeline.add(forwardClip, { start: 0, end: t1 });
-    timeline.add(createPauseClip(), { start: t1, end: t2 });
-    timeline.add(backwardClip, { start: t2, end: t3 });
-    timeline.add(createPauseClip(), { start: t3, end: 1 });
+
+
 
     // Set duration in seconds
-    timeline.duration = totalCycleDuration / 1000;
-    timeline.looping = true;
+
 
     // Register tick callback
-    timeline.onTick((_t: number, state: AnimationState) => {
+    player.onTick((_t: number, state: AnimationState) => {
       displayTime = state.time;  // Track semantic time for slider
       draw(state);
     });
@@ -397,18 +403,18 @@ TODO:
 
   // Handle seeking by display time - map to forward clip's timeline range
   function handleSeekByDisplayTime(t: number): void {
-    if (!timeline) return;
+    if (!player) return;
     const totalCycleDuration = 2 * animationDuration + 2 * pauseDuration;
     const forwardEnd = animationDuration / totalCycleDuration;
-    timeline.seek(t * forwardEnd);
+    player.seek(t * forwardEnd);
   }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -486,8 +492,8 @@ TODO:
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(isActive: boolean): void {
-    if (!timeline) return;
-    if (!isActive && timeline.isPlaying) {
+    if (!player) return;
+    if (!isActive && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
@@ -501,7 +507,7 @@ TODO:
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
 
     // Cancel any pending worker request to prevent orphaned promises
     if (activeRequestId && client) {
@@ -528,7 +534,7 @@ TODO:
     initializeVisualization();
     setupTimeline();
     isInitialized = true;
-    draw(timeline.initialState);
+    draw(player!.timeline.initialState);
     if (playingByDefault) startAnimation();
   }
 
@@ -538,13 +544,13 @@ TODO:
   }
 
   // Redraw when grid data becomes available
-  $: if (isInitialized && allGridStates.length > 0 && timeline) {
-    draw(timeline.state);
+  $: if (isInitialized && allGridStates.length > 0 && player) {
+    draw(player.state);
   }
 
   // Redraw when contour data becomes available
-  $: if (isInitialized && precomputedContours.length > 0 && timeline) {
-    draw(timeline.state);
+  $: if (isInitialized && precomputedContours.length > 0 && player) {
+    draw(player.state);
   }
 </script>
 
@@ -558,7 +564,7 @@ TODO:
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider {timeline} {displayTime} onSeekByDisplayTime={handleSeekByDisplayTime} color="orange" />
+      <TimeSlider timeline={player} {displayTime} onSeekByDisplayTime={handleSeekByDisplayTime} color="orange" />
     </div>
   {/snippet}
 </Figure>

@@ -21,7 +21,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     DoubleFigure,
     Timeline,
     useCanvas2D,
@@ -121,7 +121,7 @@
   // ----------------------------------------------------------------
 
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Canvases — dual-canvas pattern matching MassConservation:
   //   - leftGpuCanvas / rightGpuCanvas: WebGPU surfaces for the streamline pulses
@@ -139,7 +139,7 @@
     arrowPhase: number; // 0..1 — drives the propagating-arrow wave (right)
   };
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let leftStreamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let rightStreamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let leftWaveAnim: WaveCancellationAnimation<AnimationState> | null = null;
@@ -440,25 +440,16 @@
   }
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      streamlinePhase: 0,
-      wavePhase: 0,
-      arrowPhase: 0,
-    };
-    timeline.duration = animationDuration;
-    timeline.looping = true;
-
-    // Streamline clip: sets `streamlinePhase` on the state (drives pulse position).
-    // We add one — both panes' animations read the same `streamlinePhase` and render
-    // in sync.
-    if (leftStreamlineAnim) {
-      timeline.add(leftStreamlineAnim.clip, { start: 0, end: 1 });
-    }
-
-    // Our own clip: wave-cancellation phase (left) + propagating arrow wave (right).
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration,
+      initialState: {
+        streamlinePhase: 0,
+        wavePhase: 0,
+        arrowPhase: 0,
+      },
+      clips: [
+        { clip: leftStreamlineAnim.clip, ...{ start: 0, end: 1 } },
+        { clip: {
         name: "DivergenceTheoremCycle",
         reduce(t: number): Partial<AnimationState> {
           return {
@@ -466,18 +457,19 @@
             arrowPhase: t,
           };
         },
-      },
-      { start: 0, end: 1 }
-    );
+      }, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.onTick((_, state) => {
+    player.onTick((_, state) => {
       drawLeft(state);
       drawRight(state);
     });
   }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   // ----------------------------------------------------------------
@@ -669,7 +661,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // Force re-init when inputs that affect *streamline geometry* change
@@ -710,9 +702,9 @@
     isInitialized = true;
     runInitialComputation().then(() => {
       setupTimeline();
-      if (timeline) {
-        drawLeft(timeline.initialState);
-        drawRight(timeline.initialState);
+      if (player) {
+        drawLeft(player!.timeline.initialState);
+        drawRight(player!.timeline.initialState);
         if (playingByDefault) startAnimation();
       }
     });

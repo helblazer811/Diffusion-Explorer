@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { writable, type Writable } from "svelte/store";
-  import {
+  import { Player,
     Katex,
     Timeline,
     initWebGPUContext,
@@ -82,7 +82,7 @@
   let dlicError: string | null = null;
   let isPrecomputing = false;
   let precomputeProgress = 0;
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let isInitialized = false;
   let wasPlayingBeforeHidden = false;
 
@@ -271,20 +271,23 @@
   };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { dlicFrameIndex: 0 };
-    timeline.duration = animationDurationMs / 1000;
-    timeline.looping = true;
-    timeline.add(dlicFrameClip, { start: 0, end: 1 });
-    timeline.onTick((_t, state) => draw(state));
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDurationMs / 1000,
+      initialState: { dlicFrameIndex: 0 },
+      clips: [
+        { clip: dlicFrameClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((_t, state) => draw(state));
   }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -339,8 +342,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!player) return;
+    if (!active && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -377,7 +380,7 @@
   });
 
   onDestroy(() => {
-    if (timeline) timeline.dispose();
+    if (player) player?.dispose();
     if (observer) observer.disconnect();
     if (webgpuContext) {
       webgpuContext.destroy();
@@ -398,8 +401,8 @@
     drawLoading();
     runInitialComputation().then(() => {
       setupTimeline();
-      if (timeline) {
-        draw(timeline.initialState);
+      if (player) {
+        draw(player!.timeline.initialState);
         if (playingByDefault && webgpuAvailable) startAnimation();
       } else if (!webgpuAvailable) {
         drawLoading();

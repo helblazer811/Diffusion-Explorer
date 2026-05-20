@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { Timeline, type Clip } from '@diffusion-explorer/ui';
+  import { Player, Timeline, type Clip } from '@diffusion-explorer/ui';
   import GaussianConcentration from './GaussianConcentration.svelte';
   import ChiSquaredTheory from './ChiSquaredTheory.svelte';
 
@@ -13,37 +13,36 @@
 
   // Shared animation state: continuous d on log scale
   type AnimState = { d: number };
-  let timeline: Timeline<AnimState> | null = null;
+  let player: Player<AnimState> | null = null;
   let animState: AnimState = { d: D_MIN };
 
   function setupTimeline() {
-    timeline = new Timeline<AnimState>();
-    timeline.initialState = { d: D_MIN };
-
-    timeline.add({
+    const tl = Timeline.from<AnimState>({
+      duration: 10,
+      initialState: { d: D_MIN },
+      clips: [
+        { clip: {
       name: 'SweepLog',
       reduce(t: number) {
         const d = Math.exp(LOG_MIN + t * (LOG_MAX - LOG_MIN));
         return { d: Math.min(Math.round(d), D_MAX) };
       },
-    }, { start: 0, end: 1 });
-
-    timeline.duration = 10;
-    timeline.looping = true;
-    timeline.setEndPause(2);
-
-    timeline.onTick((_t: number, state: Readonly<AnimState>) => {
+    }, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true, endPause: 2 });
+    player.onTick((_t: number, state: Readonly<AnimState>) => {
       animState = { d: state.d };
     });
   }
 
   onMount(() => {
     setupTimeline();
-    timeline!.play();
+    player!.play();
   });
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 </script>
 

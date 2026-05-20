@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import {
+  import { Player,
     Timeline,
     drawArrow,
     useCanvas2D,
@@ -112,7 +112,7 @@
     theta: number; // 0-2π for rotation around surface
   };
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // Bounding box for the curve
   let boundingBox: {
@@ -233,50 +233,48 @@
   }
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { streamlinePhase: 0, theta: 0 };
-
-    const totalDuration = Math.max(streamlineDuration, rotationDuration);
-    timeline.duration = totalDuration;
-    timeline.looping = true;
-
-    // Streamline phase clip
-    const streamlineEnd = streamlineDuration / totalDuration;
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: totalDuration,
+      initialState: { streamlinePhase: 0, theta: 0 },
+      clips: [
+        { clip: {
         name: "StreamlinePhase",
         reduce(t: number) {
           const loops = totalDuration / streamlineDuration;
           return { streamlinePhase: (t * loops) % 1 };
         },
-      },
-      { start: 0, end: streamlineEnd }
-    );
-
-    // Rotation clip
-    const rotationEnd = rotationDuration / totalDuration;
-    timeline.add(
-      {
+      }, ...{ start: 0, end: streamlineEnd } },
+        { clip: {
         name: "SurfaceRotation",
         reduce(t: number) {
           const loops = totalDuration / rotationDuration;
           return { theta: ((t * loops) % 1) * 2 * Math.PI };
         },
-      },
-      { start: 0, end: rotationEnd }
-    );
+      }, ...{ start: 0, end: rotationEnd } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.onTick((_t, state) => {
+    const totalDuration = Math.max(streamlineDuration, rotationDuration);
+
+
+    // Streamline phase clip
+    const streamlineEnd = streamlineDuration / totalDuration;
+
+    // Rotation clip
+    const rotationEnd = rotationDuration / totalDuration;
+
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -418,8 +416,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!player) return;
+    if (!active && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -440,7 +438,7 @@
   });
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
     if (streamlineRenderer) streamlineRenderer.destroy();
   });
 
@@ -454,7 +452,7 @@
     setupTimeline();
     initializeGPURenderer().then(() => {
       isInitialized = true;
-      draw(timeline!.initialState);
+      draw(player!.state);
       if (playingByDefault) startAnimation();
     });
   }

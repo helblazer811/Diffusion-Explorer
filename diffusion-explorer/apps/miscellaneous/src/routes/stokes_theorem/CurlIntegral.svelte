@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import {
+  import { Player,
     Timeline,
     StreamlineAnimation,
     drawArrow,
@@ -109,7 +109,7 @@
     fillCellIndex: number; // 0 to totalGridCells, which cell we're filling
   };
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
 
   let boundingBox: BoundingBox | null = null;
@@ -267,47 +267,44 @@
   function setupTimeline() {
     if (!streamlineAnim) return;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { streamlinePhase: 0, curlRotationAngle: 0, fillCellIndex: 0 };
-    timeline.duration = streamlineDuration;
-    timeline.looping = true;
-
-    // Add streamline clip
-    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
-
-    // Curl rotation clip
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: streamlineDuration,
+      initialState: { streamlinePhase: 0, curlRotationAngle: 0, fillCellIndex: 0 },
+      clips: [
+        { clip: streamlineAnim.clip, ...{ start: 0, end: 1 } },
+        { clip: {
         name: "CurlRotation",
         reduce(t: number) {
           return { curlRotationAngle: t * rotationsPerCycle * 2 * Math.PI };
         },
-      },
-      { start: 0, end: 1 }
-    );
-
-    // Progressive fill clip - animates cell index from 0 to totalGridCells
-    timeline.add(
-      {
+      }, ...{ start: 0, end: 1 } },
+        { clip: {
         name: "SurfaceFill",
         reduce(t: number) {
           return { fillCellIndex: t * totalGridCells };
         },
-      },
-      { start: 0, end: fillDuration }
-    );
+      }, ...{ start: 0, end: fillDuration } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.onTick((_t, state) => {
+    // Add streamline clip
+
+    // Curl rotation clip
+
+    // Progressive fill clip - animates cell index from 0 to totalGridCells
+
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -516,8 +513,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!player) return;
+    if (!active && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -531,7 +528,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -543,7 +540,7 @@
     isInitialized = true; // Set early to prevent re-entry
     runInitialComputation().then(() => {
       setupTimeline();
-      draw(timeline!.initialState);
+      draw(player!.state);
       if (playingByDefault) startAnimation();
     });
   }

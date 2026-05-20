@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import {
+  import { Player,
     Figure,
     TimeSlider,
     drawScatterPlot,
@@ -109,12 +109,12 @@
   };
 
   // Animation state - Timeline system
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let cachedNumSteps = 1;
 
   // Visibility-based animation control
   let figureIsActive;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
   let isInitialized = false;
 
   // Derived state
@@ -271,8 +271,15 @@
   function setupTimeline() {
     cachedNumSteps = trajectories.length > 0 ? trajectories.length - 1 : 1;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { time: 0, segmentIndex: 0 };
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: { time: 0, segmentIndex: 0 },
+      clips: [
+        { clip: mainClip, ...{ start: 0, end: timing.pauseStart } },
+        { clip: createPauseClip(), ...{ start: timing.pauseStart, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     const mainClip = {
       name: "FlowAnimation",
@@ -284,13 +291,8 @@
       }
     };
 
-    timeline.add(mainClip, { start: 0, end: timing.pauseStart });
-    timeline.add(createPauseClip(), { start: timing.pauseStart, end: 1 });
 
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
-
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
@@ -383,9 +385,9 @@
 
   function handleSourceTypeChange(type: SourceType) {
     if (type === activeSourceType) return;
-    if (timeline) {
-      timeline.pause();
-      timeline.seek(0);
+    if (player) {
+      player.pause();
+      player.seek(0);
     }
     onSourceChange(type);
   }
@@ -395,7 +397,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -413,8 +415,8 @@
     runInitialComputation();
     setupTimeline();
     isInitialized = true;
-    draw(timeline!.initialState);
-    timeline?.play();
+    draw(player!.state);
+    player?.play();
   }
 
   // React to source type changes (recompute trajectories)
@@ -426,10 +428,10 @@
     selectTrajectoryIndices();
     computeTrajectoryPixelCoords();
     cachedNumSteps = trajectories.length > 0 ? trajectories.length - 1 : 1;
-    if (timeline) {
-      timeline.seek(0);
-      draw(timeline.initialState);
-      timeline.play();
+    if (player) {
+      player.seek(0);
+      draw(player!.timeline.initialState);
+      player.play();
     }
   }
 
@@ -471,7 +473,7 @@
           ></canvas>
         </div>
         <div class="controls">
-          <TimeSlider {timeline} color={trajectoryColor} />
+          <TimeSlider timeline={player} color={trajectoryColor} />
         </div>
       </div>
     </div>

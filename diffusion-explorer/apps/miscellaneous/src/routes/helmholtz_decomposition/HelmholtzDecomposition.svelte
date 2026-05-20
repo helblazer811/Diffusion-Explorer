@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { writable, type Writable } from "svelte/store";
-  import {
+  import { Player,
     Katex,
     StreamlineAnimation,
     Timeline,
@@ -74,7 +74,7 @@
   let isInitialized = false;
   let wasPlayingBeforeHidden = false;
 
-  let timeline: Timeline<StreamlineAnimationState> | null = null;
+  let player: Player<StreamlineAnimationState> | null = null;
 
   let animFull: StreamlineAnimation<StreamlineAnimationState> | null = null;
   let animCurl: StreamlineAnimation<StreamlineAnimationState> | null = null;
@@ -243,12 +243,15 @@
 
   function setupTimeline() {
     if (!animFull) return;
-    timeline = new Timeline<StreamlineAnimationState>();
-    timeline.initialState = { streamlinePhase: 0 };
-    timeline.duration = 24;
-    timeline.looping = true;
-    timeline.add(animFull.clip, { start: 0, end: 1 });
-    timeline.onTick((_t, state) => draw(state));
+    const tl = Timeline.from<StreamlineAnimationState>({
+      duration: 24,
+      initialState: { streamlinePhase: 0 },
+      clips: [
+        { clip: animFull.clip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((_t, state) => draw(state));
   }
 
   // ----------------------------------------------------------------
@@ -348,11 +351,11 @@
   // ----------------------------------------------------------------
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -373,8 +376,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!player) return;
+    if (!active && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -411,7 +414,7 @@
   });
 
   onDestroy(() => {
-    if (timeline) timeline.dispose();
+    if (player) player?.dispose();
     if (observer) observer.disconnect();
   });
 
@@ -432,8 +435,8 @@
     if (alphaMode === 'pulse') {
       runInitialComputation().then(() => {
         setupTimeline();
-        if (timeline) {
-          draw(timeline.initialState);
+        if (player) {
+          draw(player!.timeline.initialState);
           if (playingByDefault) startAnimation();
         }
       });

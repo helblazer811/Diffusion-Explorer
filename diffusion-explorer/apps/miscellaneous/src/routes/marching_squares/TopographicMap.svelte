@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { Figure, useCanvas2D, Timeline, type Clip } from '@diffusion-explorer/ui';
+  import { Player, Figure, useCanvas2D, Timeline, type Clip } from '@diffusion-explorer/ui';
   import * as d3 from 'd3';
   import { loadVolcanoData } from './topography-data';
   import {
@@ -175,20 +175,8 @@
   // ================================================================
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-
     const totalRows = gridSize;
     const totalIterations = totalRows * numLevels;
-
-    timeline.initialState = {
-      currentLevel: 0,
-      currentRowIndex: -1,
-      completedLevels: [],
-    };
-
-    timeline.duration = totalIterations * 0.15; // Slower since fewer iterations
-    timeline.looping = true;
-    timeline.setEndPause(2);
 
     const rowIterationClip: Clip<AnimationState> = {
       name: 'RowIteration',
@@ -212,11 +200,14 @@
       },
     };
 
-    timeline.add(rowIterationClip, { start: 0.05, end: 1 }); // Add initial pause
-
-    timeline.onTick((_, state) => {
-      draw(state);
+    const tl = Timeline.from<AnimationState>({
+      duration: 1,
+      initialState: {},
+      clips: [
+        { clip: rowIterationClip, start: 0.05, end: 1 },
+      ],
     });
+    player = new Player(tl, { looping: true, endPause: 2 });
   }
 
   // ================================================================
@@ -478,11 +469,11 @@
   // ================================================================
 
   function handleVisibilityChange(isVisible: boolean) {
-    if (!timeline) return;
+    if (!player) return;
     if (isVisible) {
-      timeline.play();
+      player.play();
     } else {
-      timeline.pause();
+      player.pause();
     }
   }
 
@@ -506,12 +497,12 @@
     setupTimeline();
     isInitialized = true;
 
-    draw(timeline.state);
+    draw(player.state);
   });
 
   onDestroy(() => {
-    if (timeline) {
-      timeline.dispose();
+    if (player) {
+      player?.dispose();
     }
   });
 

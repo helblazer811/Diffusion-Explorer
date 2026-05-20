@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
   import * as d3 from "d3";
-  import {
+  import { Player,
     Figure,
     TimeSlider,
     Timeline,
@@ -48,7 +48,7 @@
   let fgCanvasElement: HTMLCanvasElement | null = null;
   const fgCanvas2d = useCanvas2D(width, height);
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
   let figureIsActive: Writable<boolean> | undefined;
   let setupComplete = false;
@@ -204,15 +204,15 @@
     // Initialize animation with the foreground canvas
     await pathlineAnimation.init(fgCanvasElement);
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { segmentIndex: 0 };
-    timeline.looping = true;
-    timeline.duration = animationDuration;
-
-    timeline.add(pathlineAnimation.clip, { start: 0, end: 1 });
-    timeline.setEndPause(1); // Pause 1 second at end before looping
-
-    timeline.onTick((_, state) => draw(state));
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration,
+      initialState: { segmentIndex: 0 },
+      clips: [
+        { clip: pathlineAnimation.clip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true, endPause: 1 });
+    player.onTick((_, state) => draw(state));
   }
 
   // ----------------------------------------------------------------
@@ -328,7 +328,7 @@
   // Event Handlers
   // ----------------------------------------------------------------
 
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   function cancelAllActiveRequests() {
     // Cancel all in-progress trajectory requests
@@ -465,9 +465,9 @@
     await runInitialComputation();
     await setupTimeline();
 
-    if (timeline) {
-      draw(timeline.initialState);
-      timeline.play();
+    if (player) {
+      draw(player!.timeline.initialState);
+      player.play();
     }
   }
 
@@ -493,7 +493,7 @@
   });
 
   onDestroy(() => {
-    timeline?.dispose();
+    player?.dispose();
     unsubscribeVisibility?.();
     cancelAllActiveRequests();
   });
@@ -531,7 +531,7 @@
     <div class="vertical-label right-label">Target Distribution</div>
   </div>
   <div class="slider-container">
-    <TimeSlider {timeline} color="#3B369F" />
+    <TimeSlider timeline={player} color="#3B369F" />
   </div>
 </Figure>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
-  import { Figure, drawScatterPlot, drawLine, drawCircle, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, Timeline, createPauseClip, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Player, Figure, drawScatterPlot, drawLine, drawCircle, drawArrow, drawMathjax, createSourceTargetScales, useCanvas2D, Timeline, createPauseClip, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
   // ----------------------------------------------------------------
@@ -96,11 +96,11 @@
   let isInitialized: boolean = false;
 
   // Animation state - Timeline system
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // Visibility-based animation control
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Pre-computed pixel coordinates
   let sourcePixelCoords: number[][] = [];
@@ -256,19 +256,16 @@
   let prevTime: number = 0;
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { t: 0 };
-
-    // Add clips using normalized timing
-    timeline.add(forwardClip, { start: 0, end: timing.forwardEnd });
-    timeline.add(createPauseClip(), { start: timing.forwardEnd, end: 1 });
-
-    // Configure timeline
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
-
-    // Register tick callback - detect loop by normalized time (0-1) jumping backwards
-    timeline.onTick((time, state) => {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: { t: 0 },
+      clips: [
+        { clip: forwardClip, ...{ start: 0, end: timing.forwardEnd } },
+        { clip: createPauseClip(), ...{ start: timing.forwardEnd, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((time, state) => {
       // Detect loop: normalized time jumped from near end back to start
       if (prevTime > 0.9 && time < 0.1) {
         selectNextSourcePath();
@@ -276,6 +273,12 @@
       prevTime = time;
       draw(state);
     });
+
+    // Add clips using normalized timing
+
+    // Configure timeline
+
+    // Register tick callback - detect loop by normalized time (0-1) jumping backwards
   }
 
   // ----------------------------------------------------------------
@@ -423,7 +426,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -440,8 +443,8 @@
     runInitialComputation();
     setupTimeline();
     isInitialized = true;
-    draw(timeline!.initialState);
-    if (playingByDefault) timeline?.play();
+    draw(player!.state);
+    if (playingByDefault) player?.play();
   }
 
   // Handle visibility changes (pause when off-screen, resume when back)
@@ -450,7 +453,7 @@
   }
 </script>
 
-<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+<Figure {caption} {backgroundVisible} {player} devMode={settings.devMode} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="width: 100%; max-width: {width}px;">
       <canvas

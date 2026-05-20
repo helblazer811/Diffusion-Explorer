@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import {
+  import { Player,
     Figure,
     Katex,
     Timeline,
@@ -89,7 +89,7 @@
     curvedPathProgress: number; // 0-1
   };
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
 
   // Pre-computed paths (in domain coordinates)
@@ -98,7 +98,7 @@
 
   // Visibility handling
   let figureIsActive: import("svelte/store").Writable<boolean> | undefined;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -244,53 +244,46 @@
   function setupTimeline() {
     if (!streamlineAnim) return;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      streamlinePhase: 0,
-      straightPathProgress: 0,
-      curvedPathProgress: 0,
-    };
-    timeline.duration = animationDuration;
-    timeline.looping = true;
-
-    // Streamline clip (runs continuously)
-    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
-
-    // Straight path progress clip
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration,
+      initialState: {},
+      clips: [
+        { clip: streamlineAnim.clip, ...{ start: 0, end: 1 } },
+        { clip: {
         name: "StraightPathProgress",
         reduce(t: number) {
           // t is already 0-1 within the clip's range
           return { straightPathProgress: t };
         },
-      },
-      { start: 0, end: timing.straightPathEnd }
-    );
-
-    // Curved path progress clip
-    timeline.add(
-      {
+      }, ...{ start: 0, end: timing.straightPathEnd } },
+        { clip: {
         name: "CurvedPathProgress",
         reduce(t: number) {
           // t is already 0-1 within the clip's range
           return { curvedPathProgress: t };
         },
-      },
-      { start: timing.pause1End, end: timing.curvedPathEnd }
-    );
+      }, ...{ start: timing.pause1End, end: timing.curvedPathEnd } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.onTick((_t, state) => {
+    // Streamline clip (runs continuously)
+
+    // Straight path progress clip
+
+    // Curved path progress clip
+
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -438,7 +431,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -450,7 +443,7 @@
     isInitialized = true; // Set early to prevent re-entry
     runInitialComputation().then(() => {
       setupTimeline();
-      draw(timeline!.initialState);
+      draw(player!.state);
       if (playingByDefault) startAnimation();
     });
   }
@@ -480,7 +473,7 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <!-- <TimeSlider {timeline} showTicks={false} showTimeLabel={false} /> -->
+      <!-- <TimeSlider timeline={player} showTicks={false} showTimeLabel={false} /> -->
     </div>
   {/snippet}
 </Figure>

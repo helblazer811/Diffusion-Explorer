@@ -6,7 +6,7 @@
   import TitleBar from "$lib/components/TitleBar.svelte";
   import ControlBar from "$lib/components/ControlBar.svelte";
   import DistributionEditWindow from "$lib/components/DistributionEditWindow.svelte";
-  import {
+  import { Player,
     TimeSlider,
     Timeline,
     type Clip,
@@ -290,14 +290,17 @@
   // ----------------------------------------------------------------
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { time: 0 };
-    timeline.duration = 10; // 10 second animation cycle
-    timeline.looping = true;
-    timeline.add(forwardClip, { start: 0, end: 1 });
+    const tl = Timeline.from<AnimationState>({
+      duration: 1,
+      initialState: { time: 0 },
+      clips: [
+        { clip: forwardClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     // Sync timeline state to playbackState store and trigger redraw
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       playbackState.update((p) => ({ ...p, time: state.time }));
       drawForeground(state);
     });
@@ -525,11 +528,11 @@
   function handleKeydown(event: KeyboardEvent) {
     if (event.code === "Space") {
       event.preventDefault();
-      if (!$isTraining && !$isEditing && timeline) {
-        if (timeline.isPlaying) {
-          timeline.pause();
+      if (!$isTraining && !$isEditing && player) {
+        if (player.isPlaying) {
+          player.pause();
         } else {
-          timeline.play();
+          player.play();
         }
       }
     }
@@ -603,7 +606,7 @@
       (_step, x_t) => {
         tempTrajectory.push([x_t[0][0], x_t[0][1]]);
         streamedTrajectory = [...tempTrajectory];
-        if (timeline) drawForeground(timeline.state);
+        if (player) drawForeground(player.state);
       }
     );
 
@@ -638,7 +641,7 @@
     if (typeof window !== "undefined") {
       window.removeEventListener("keydown", handleKeydown);
     }
-    timeline?.dispose();
+    player?.dispose();
     if (activeRequestId && pathClient) {
       pathClient.stopRequest(activeRequestId);
     }
@@ -649,11 +652,11 @@
   // ----------------------------------------------------------------
 
   // Sync timeline with isPlaying store
-  $: if (timeline && $isPlaying !== undefined) {
-    if ($isPlaying && !timeline.isPlaying) {
-      timeline.play();
-    } else if (!$isPlaying && timeline.isPlaying) {
-      timeline.pause();
+  $: if (player && $isPlaying !== undefined) {
+    if ($isPlaying && !player.isPlaying) {
+      player.play();
+    } else if (!$isPlaying && player.isPlaying) {
+      player.pause();
     }
   }
 
@@ -682,14 +685,14 @@
   }
 
   // Redraw when intermediate training samples update (timeline is stopped during training)
-  $: if ($trainingState.intermediateSamples && timeline) {
-    drawForeground(timeline.state);
+  $: if ($trainingState.intermediateSamples && player) {
+    drawForeground(player.state);
   }
 
   // Trigger background redraw when visibility changes
   $: if ($visibility) {
     bgNeedsRedraw = true;
-    if (timeline) drawForeground(timeline.state);
+    if (player) drawForeground(player.state);
   }
 
   // Editing start/stop
@@ -791,13 +794,13 @@
   // Trigger redraw when precomputed contours or current data changes
   $: if (
     canvasReady &&
-    timeline &&
+    player &&
     (sourceContours ||
       targetContours ||
       allTimeContours.length > 0 ||
       $distributionData.current)
   ) {
-    drawForeground(timeline.state);
+    drawForeground(player.state);
   }
 
   // Create path client when model/objective changes
@@ -881,7 +884,7 @@
   </div>
   <div class="time-slider-wrapper">
     <TimeSlider
-      timeline={timeline as any}
+      player={timeline as any}
       disabled={$isTraining || $isEditing}
     />
   </div>

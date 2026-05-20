@@ -40,7 +40,7 @@
   import { drawVectorField } from "../plotting/vector_field";
   import { drawTrajectories } from "../plotting/trajectories";
   import { useCanvas2D } from "../plotting/canvas";
-  import { Timeline, useVisibilityHandler } from "tempus";
+  import { Timeline, Player, useVisibilityHandler } from "tempus";
 
   // ----------------------------------------------------------------
   // Props
@@ -167,7 +167,7 @@
 
   // Visibility
   let figureIsActive: boolean;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Animation state type
   type AnimationState = {
@@ -178,7 +178,7 @@
   };
 
   // Timeline and playback state
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let animState: AnimationState = { time: 0, currentStep: 0, segmentIndex: 0, segmentProgress: 0 };
 
   // Derived values from animation state
@@ -255,7 +255,7 @@
 
     isLoading = false;
     resetAnimation();
-    draw(timeline!.initialState);
+    draw(player!.state);
     startAnimation();
 
     let completedCount = 0;
@@ -324,19 +324,23 @@
       }
     };
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      time: 0,
-      currentStep: 0,
-      segmentIndex: 0,
-      segmentProgress: 0,
-    };
-    timeline.add(eulerStepClip, { start: 0, end: 1 });
-    timeline.duration = EULER_REAL_DURATION / 1000;
-    timeline.setEndPause(PAUSE_BEFORE_RESTART / 1000);
-    timeline.looping = true;
-
-    timeline.onTick((t, state) => {
+    const tl = Timeline.from<AnimationState>({
+      duration: EULER_REAL_DURATION / 1000,
+      initialState: {
+        time: 0,
+        currentStep: 0,
+        segmentIndex: 0,
+        segmentProgress: 0,
+      },
+      clips: [
+        { clip: eulerStepClip, start: 0, end: 1 },
+      ],
+    });
+    player = new Player(tl, {
+      looping: true,
+      endPause: PAUSE_BEFORE_RESTART / 1000,
+    });
+    player.onTick((t, state) => {
       if (!isInitialized || isLoading) return;
       rawSliderValue = t;
       animState = state;
@@ -345,18 +349,18 @@
   }
 
   function startAnimation() {
-    if (!timeline || timeline.isPlaying) return;
-    timeline.play();
+    if (!player || player.isPlaying) return;
+    player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   function resetAnimation() {
-    if (!timeline) return;
-    timeline.reset();
-    animState = timeline.initialState;
+    if (!player) return;
+    player.reset();
+    animState = player!.timeline.initialState;
   }
 
   // ----------------------------------------------------------------
@@ -546,14 +550,14 @@
   });
 
   onDestroy(() => {
-    timeline?.dispose();
+    player?.dispose();
   });
 
   // ----------------------------------------------------------------
   // Reactive Blocks
   // ----------------------------------------------------------------
 
-  $: if (isDataValid && canvas && !isInitialized && timeline) {
+  $: if (isDataValid && canvas && !isInitialized && player) {
     runInitialComputation();
   }
 
@@ -561,7 +565,7 @@
   $: if (figureIsActive !== undefined && isInitialized) {
     handleVisibilityChange($figureIsActive);
     // If becoming visible and timeline exists but has no trajectory data yet, restart
-    if ($figureIsActive && timeline && !timeline.isPlaying && approximationTrajectories.every(t => t.length <= 1)) {
+    if ($figureIsActive && player && !player.isPlaying && approximationTrajectories.every(t => t.length <= 1)) {
       computeAllTrajectories();
     }
   }
@@ -601,14 +605,11 @@
               maxLabel="t=1"
               maxWidth={sliderMaxWidth}
               labelSize={sliderLabelSize}
-              onInput={(v) => { if (timeline) timeline.seek(v); }}
-              onDragStart={() => { if (timeline) timeline.startSeeking(); }}
-              onDragEnd={() => { if (timeline) timeline.endSeeking(); }}
+              onInput={(v) => { if (player) player.seek(v); }}
             />
           </div>
         {:else}
-          <TimeSlider
-            {timeline}
+          <TimeSlider timeline={player}
             step={1 / NUM_STEPS}
             discreteFill={true}
             color={approximationColor}

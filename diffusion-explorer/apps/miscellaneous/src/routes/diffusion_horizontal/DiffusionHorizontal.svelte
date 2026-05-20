@@ -5,7 +5,7 @@
   import type { Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
+  import { Player, Figure, TimeSlider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, createSourceTargetScales, Timeline, useCanvas2D } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
   // Props
@@ -97,7 +97,7 @@
   };
 
   // Animation state - Timeline system
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // Cached numSteps for clip closure
   let cachedNumSteps = 1;
@@ -182,8 +182,14 @@
     // Cache numSteps for clip closure
     cachedNumSteps = $allTimeSamples?.length || 1;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { time: 0, currentStep: 0, centerX: scales.sourceCenterPixelX };
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: { time: 0, currentStep: 0, centerX: scales.sourceCenterPixelX },
+      clips: [
+        { clip: mainClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true, endPause: animationPauseTime / 1000 });
 
     // Main animation clip - computes derived state from t
     const mainClip = {
@@ -198,26 +204,22 @@
     };
 
     // Add main animation clip
-    timeline.add(mainClip, { start: 0, end: 1 });
 
     // Set timeline duration and end pause
-    timeline.duration = animationDuration / 1000;
-    timeline.setEndPause(animationPauseTime / 1000);
-    timeline.looping = true;
 
     // Register tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
 
   function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+    if (!player) return;
+    player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -351,8 +353,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(isActive: boolean) {
-    if (!timeline) return;
-    if (!isActive && timeline.isPlaying) {
+    if (!player) return;
+    if (!isActive && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (isActive && wasPlayingBeforeHidden) {
@@ -367,7 +369,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -385,7 +387,7 @@
     runInitialComputation();
     setupTimeline();
     isInitialized = true;
-    draw(timeline!.initialState);
+    draw(player!.state);
     if (playingByDefault) startAnimation();
   }
 
@@ -407,7 +409,7 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider {timeline} color="#f17720" />
+      <TimeSlider timeline={player} color="#f17720" />
     </div>
   {/snippet}
 </Figure>

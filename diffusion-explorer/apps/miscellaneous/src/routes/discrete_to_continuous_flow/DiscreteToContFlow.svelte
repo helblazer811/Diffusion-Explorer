@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import {
     TimelineBuilder,
+    Player,
     createPauseClip,
     useCanvas2D,
     drawScatterPlot,
@@ -10,6 +11,7 @@
     computeContours,
     plotContours,
     waitForPendingRenders,
+    TimelineInspector,
   } from '@diffusion-explorer/ui';
   import type { Clip } from '@diffusion-explorer/ui';
 
@@ -181,7 +183,7 @@
   // Animations
   // ----------------------------------------------------------------
 
-  let timeline: ReturnType<TimelineBuilder<AnimState>['build']>;
+  let player: Player<AnimState> | null = null;
 
   function createSweepClip(numSteps: number, isDiscrete: boolean): Clip<AnimState> {
     return {
@@ -264,9 +266,7 @@
     };
 
     const builder = new TimelineBuilder<AnimState>()
-      .setInitialState(initialState)
-      .setLooping(looping)
-      .setEndPause(3000);
+      .setInitialState(initialState);
 
     // 1. K=4 sweep
     builder.add(createSweepClip(4, true), { durationMs: 4000 });
@@ -283,9 +283,10 @@
     // 7. Continuous sweep (K=∞)
     builder.add(createSweepClip(256, false), { durationMs: 5000 });
 
-    timeline = builder.build();
+    const timeline = builder.build();
+    player = new Player(timeline, { looping, endPause: 3 });
 
-    timeline.onTick((_t: number, state: Readonly<AnimState>) => {
+    player.onTick((_t: number, state: Readonly<AnimState>) => {
       draw(state);
     });
   }
@@ -448,12 +449,13 @@
   // ----------------------------------------------------------------
 
   export function restart() {
-    timeline.reset();
-    timeline.play();
+    if (!player) return;
+    player.reset();
+    player.play();
   }
 
   export function pause() {
-    timeline.pause();
+    player?.pause();
   }
 
   $effect(() => {
@@ -503,13 +505,11 @@
     setupTimeline();
     isInitialized = true;
     await prewarmMathjaxCache();
-    timeline.play();
+    player?.play();
   }
 
   onDestroy(() => {
-    if (timeline) {
-      timeline.pause();
-    }
+    player?.pause();
   });
 </script>
 
@@ -519,4 +519,5 @@
     use:canvas2d.bindCanvas
     style="width: 100%; height: auto; aspect-ratio: {width}/{height}; margin-top: 20px;"
   ></canvas>
+  <TimelineInspector {player} />
 </div>

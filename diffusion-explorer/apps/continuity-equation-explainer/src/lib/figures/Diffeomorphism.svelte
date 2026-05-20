@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import * as d3 from "d3";
-  import {
+  import { Player,
     Figure,
     TimeSlider,
     Timeline,
@@ -115,10 +115,10 @@
     centerX: number;
   };
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   let figureIsActive: import("svelte/store").Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
   let isInitialized = false;
 
   // ----------------------------------------------------------------
@@ -270,15 +270,11 @@
     if (!scales || !data) return;
     const numSteps = data.config.numSteps;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      time: 0,
-      frame: 0,
-      centerX: scales.sourceCenterPixelX,
-    };
-
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: {},
+      clips: [
+        { clip: {
         name: "FlowAnimation",
         reduce(t: number) {
           return {
@@ -289,20 +285,17 @@
               t * (scales!.targetCenterPixelX - scales!.sourceCenterPixelX),
           };
         },
-      },
-      { start: 0, end: 1 }
-    );
+      }, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true, endPause: animationPauseTime / 1000 });
 
-    timeline.duration = animationDuration / 1000;
-    timeline.setEndPause(animationPauseTime / 1000);
-    timeline.looping = true;
-
-    timeline.onTick((_, state) => draw(state));
+    player.onTick((_, state) => draw(state));
   }
 
   function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+    if (!player) return;
+    player.play();
   }
 
   // ----------------------------------------------------------------
@@ -393,7 +386,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -409,8 +402,8 @@
     isInitialized = true;
     runInitialComputation();
     setupTimeline();
-    if (timeline) {
-      draw(timeline.initialState);
+    if (player) {
+      draw(player!.timeline.initialState);
       if (playingByDefault) startAnimation();
     }
   }
@@ -430,7 +423,7 @@
           style="width: 100%; height: auto; aspect-ratio: {width}/{height};"
         ></canvas>
       </div>
-      <TimeSlider {timeline} color={intermediateContourColor} />
+      <TimeSlider timeline={player} color={intermediateContourColor} />
     </div>
   {/snippet}
 </Figure>

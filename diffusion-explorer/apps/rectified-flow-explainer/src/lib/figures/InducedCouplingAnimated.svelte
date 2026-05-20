@@ -2,7 +2,7 @@
   import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import type { FlowModelClient } from "@diffusion-explorer/diffusion";
-  import { Figure, MultiStateToggleButton, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler, PathlineAnimation, type PathlineAnimationState } from "@diffusion-explorer/ui";
+  import { Player, Figure, MultiStateToggleButton, drawScatterPlot, drawText, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler, PathlineAnimation, type PathlineAnimationState } from "@diffusion-explorer/ui";
   import { clipTrajectoriesToStartingRadius } from "@diffusion-explorer/diffusion";
   import { settings } from "$lib/settings";
 
@@ -117,7 +117,7 @@
   let isGeneratingTrajectories: boolean = false;
 
   // Playback control
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
   let currentState: AnimationState = {
     segmentIndex: 0,
@@ -129,7 +129,7 @@
 
   // Visibility tracking
   let figureIsActive: Writable<boolean> | undefined;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
   let initialized: boolean = false;
 
   // State index for toggle button (derived from animation state)
@@ -322,18 +322,11 @@
     const phase3Duration = timing.phase3End - timing.phase3Start;
     const c3_couplingEnd = (timing.phase3CouplingEnd - timing.phase3Start) / phase3Duration;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      segmentIndex: 0,
-      stateIndex: 0,
-      naiveCouplingProgress: 0,
-      naiveCouplingOpacity: 1,
-      inducedCouplingProgress: 0
-    };
-
-    // Clip 1: Independent Coupling (stateIndex = 0)
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: {},
+      clips: [
+        { clip: {
         name: "IndependentCoupling",
         reduce(t: number) {
           if (t < c1_couplingEnd) {
@@ -353,13 +346,8 @@
             return { stateIndex: 0, naiveCouplingProgress: 1, naiveCouplingOpacity: 0, segmentIndex: 0, inducedCouplingProgress: 0 };
           }
         }
-      },
-      { start: timing.phase1Start, end: timing.phase1End }
-    );
-
-    // Clip 2: Simulate Flow (stateIndex = 1)
-    timeline.add(
-      {
+      }, ...{ start: timing.phase1Start, end: timing.phase1End } },
+        { clip: {
         name: "SimulateFlow",
         reduce(t: number) {
           if (t < c2_trajectoryEnd) {
@@ -371,13 +359,8 @@
             return { stateIndex: 1, naiveCouplingProgress: 0, naiveCouplingOpacity: 0, segmentIndex: cachedNumSegments, inducedCouplingProgress: 0 };
           }
         }
-      },
-      { start: timing.phase2Start, end: timing.phase2End }
-    );
-
-    // Clip 3: Induced Coupling (stateIndex = 2)
-    timeline.add(
-      {
+      }, ...{ start: timing.phase2Start, end: timing.phase2End } },
+        { clip: {
         name: "InducedCoupling",
         reduce(t: number) {
           if (t < c3_couplingEnd) {
@@ -389,38 +372,33 @@
             return { stateIndex: 2, naiveCouplingProgress: 0, naiveCouplingOpacity: 0, segmentIndex: cachedNumSegments, inducedCouplingProgress: 1 };
           }
         }
-      },
-      { start: timing.phase3Start, end: timing.phase3End }
-    );
-
-    // Set timeline duration and looping
-    timeline.duration = animationDuration / 1000; // Convert to seconds
-    timeline.looping = true;
-
-    // Register tick callback
-    timeline.onTick((_, state) => {
+      }, ...{ start: timing.phase3Start, end: timing.phase3End } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((_, state) => {
       currentState = state;
       draw(state);
     });
   }
 
   function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+    if (!player) return;
+    player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   export function restart() {
-    if (!timeline) return;
-    timeline.resetState();
-    timeline.play();
+    if (!player) return;
+    player.reset();
+    player.play();
   }
 
   export function pause() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -552,14 +530,14 @@
   // ----------------------------------------------------------------
 
   function jumpToState(newStateIndex: number) {
-    if (!timeline) return;
+    if (!player) return;
 
     // Seek to the start of the appropriate phase using timing object
     const seekTime = [timing.phase1Start, timing.phase2Start, timing.phase3Start][newStateIndex] ?? 0;
 
-    const wasPlaying = timeline.isPlaying;
+    const wasPlaying = player.isPlaying;
     // seek() triggers onTick callbacks which updates currentState and calls draw()
-    timeline.seek(seekTime);
+    player.seek(seekTime);
 
     // Resume playing if it was playing before
     if (wasPlaying) {
@@ -598,7 +576,7 @@
     if (success) {
       setupTimeline().then(() => {
         initialized = true;
-        draw(timeline!.initialState);
+        draw(player!.state);
         startAnimation();
       });
     }
@@ -607,15 +585,15 @@
   // Handle visibility changes — reset on slide exit so next visit starts from stage 1
   $: if (figureIsActive !== undefined && initialized) {
     if (!$figureIsActive) {
-      timeline?.pause();
-      timeline?.resetState();
+      player?.pause();
+      player?.reset();
     } else {
-      timeline?.play();
+      player?.play();
     }
   }
 </script>
 
-<Figure {caption} backgroundVisible={false} bind:isActive={figureIsActive}>
+<Figure {caption} backgroundVisible={false} {player} devMode={settings.devMode} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
       <canvas

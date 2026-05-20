@@ -8,7 +8,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     Figure,
     Katex,
     Timeline,
@@ -104,7 +104,7 @@
   let isInitialized = $state(false);
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
 
-  let timeline: Timeline<AnimationState> | null = $state(null);
+  let player: Player<AnimationState> | null = $state(null);
   let innerSquareAnimations: PulsingSquareAnimation<AnimationState>[] = $state(
     []
   );
@@ -222,28 +222,28 @@
 
     const initialState: AnimationState = { phase: 0 };
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = initialState;
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
-
-    // Single clip for phase - all squares share the same phase
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: initialState,
+      clips: [
+        { clip: {
         name: "PulsePhase",
         reduce(t: number) {
           return { phase: t };
         },
-      },
-      { start: 0, end: 1 }
-    );
+      }, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.onTick((_t, state) => {
+    // Single clip for phase - all squares share the same phase
+
+    player.onTick((_t, state) => {
       draw(state);
     });
   }
 
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Drawing
@@ -437,8 +437,8 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) {
-      timeline.dispose();
+    if (player) {
+      player?.dispose();
     }
   });
 
@@ -451,9 +451,9 @@
       isInitialized = true;
       runInitialComputation();
       setupTimeline().then(() => {
-        if (playingByDefault && timeline) {
-          draw(timeline.initialState);
-          timeline.play();
+        if (playingByDefault && player) {
+          draw(player!.timeline.initialState);
+          player.play();
         }
       });
     }

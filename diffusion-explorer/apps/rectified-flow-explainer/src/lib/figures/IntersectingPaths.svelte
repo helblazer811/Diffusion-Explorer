@@ -1,7 +1,7 @@
 <!-- Visualizes intersecting linear paths between source and target distributions with velocity vectors at intersection. -->
 
 <script lang="ts">
-  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjax, createSourceTargetScales, dataToPixelX, useCanvas2D, mathjaxInitialized, Timeline, TimelineBuilder, createPauseClip, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Figure, drawScatterPlot, drawText, drawArrow, drawMathjax, createSourceTargetScales, dataToPixelX, useCanvas2D, mathjaxInitialized, Player, TimelineBuilder, createPauseClip, useVisibilityHandler } from "@diffusion-explorer/ui";
   import type { Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import { onDestroy } from "svelte";
@@ -120,7 +120,13 @@
     trajectoryProgress: 0,
   };
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
+  // Slide-mode pause points: normalized [0, 1] positions where the clock
+  // should halt waiting for `advance()`. Built by `setupCouplingTimeline`
+  // and consumed by an onTick gate-emulator.
+  let pausePoints: number[] = [];
+  let nextPauseIdx = 0;
+  let gateArmed = true;
   let bgCouplingPaths: [number, number, number, number][] = []; // [sx,sy,tx,ty]
   let combinedTrajectoryPixels: number[][] = [];
   let combinedMeanX = 0;
@@ -138,7 +144,7 @@
   let arrowData: ArrowData | null = null;
 
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -265,15 +271,24 @@
   // ----------------------------------------------------------------
 
   function setupCouplingTimeline() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
 
     const builder = new TimelineBuilder<AnimationState>()
-      .setInitialState({ ...initialState })
-      .setLooping(autoPlay);
+      .setInitialState({ ...initialState });
 
-    const wait = () => autoPlay
-      ? builder.add(createPauseClip(), { durationMs: autoPlayPauseMs })
-      : builder.waitForInput();
+    // In slides mode (autoPlay = false) the figure halts at each "phase
+    // boundary" until the user clicks Advance. Tempus no longer has gates;
+    // we record the cursor position at each boundary here and install an
+    // onTick handler below that pauses the player when crossing one.
+    const pausePointsMs: number[] = [];
+
+    const wait = () => {
+      if (autoPlay) {
+        builder.add(createPauseClip(), { durationMs: autoPlayPauseMs });
+      } else {
+        pausePointsMs.push(builder.currentTimeMs);
+      }
+    };
 
     if (!autoPlay) {
       // Slides mode: full staged animation with coupling paths
@@ -291,7 +306,13 @@
         .add({ name: 'GreenArrow', reduce(t) { return { greenArrowOpacity: t }; } }, { durationMs: 700 });
       wait();
       builder
-        .add({ name: 'FadeArrows', reduce(t) { return { orangeArrowOpacity: 1 - t, greenArrowOpacity: 1 - t }; } }, { durationMs: 500 })
+        .add(
+          [
+            { name: 'FadeOrangeArrows', reduce(t) { return { orangeArrowOpacity: 1 - t }; } },
+            { name: 'FadeGreenArrow', reduce(t) { return { greenArrowOpacity: 1 - t }; } },
+          ],
+          { durationMs: 500 },
+        )
         .add({ name: 'Trajectory', reduce(t) { return { trajectoryProgress: t }; } }, { durationMs: trajectoryDuration });
     } else {
       // Blog mode: skip coupling, start with two paths + intersection visible
@@ -314,11 +335,33 @@
         .add(createPauseClip(), { durationMs: 1500 });
     }
 
-    timeline = builder.build();
+    const timeline = builder.build();
+    player = new Player(timeline, { looping: autoPlay });
 
-    timeline.onTick((_t, state) => {
+    // Convert phase-boundary positions to normalized [0, 1].
+    const totalMs = timeline.duration * 1000;
+    pausePoints = totalMs > 0 ? pausePointsMs.map(ms => ms / totalMs) : [];
+    nextPauseIdx = 0;
+    gateArmed = true;
+
+    player.onTick((t, state) => {
       draw(state);
-      if (_t >= 1.0) animationComplete = true;
+      if (t >= 1.0) animationComplete = true;
+      // Slide-mode gate emulation: pause when crossing the next phase
+      // boundary. Defer the seek+pause out of the tick callback to avoid
+      // re-entering onTick from inside itself.
+      if (!gateArmed) return;
+      if (nextPauseIdx < pausePoints.length && t >= pausePoints[nextPauseIdx]) {
+        gateArmed = false;
+        const target = pausePoints[nextPauseIdx];
+        nextPauseIdx++;
+        queueMicrotask(() => {
+          if (!player) return;
+          player.seek(target);
+          player.pause();
+          gateArmed = true;
+        });
+      }
     });
   }
 
@@ -331,7 +374,7 @@
     ctx.clearRect(0, 0, width, height);
 
     const latexColor = settings.stylingSettings.figureLatex.color;
-    const requestRedraw = () => draw(timeline?.state ?? initialState);
+    const requestRedraw = () => draw(player?.state ?? initialState);
 
     if (showCouplingAnimation) {
       drawCouplingAnimated(state, latexColor, requestRedraw);
@@ -530,34 +573,38 @@
   // Lifecycle
   // ----------------------------------------------------------------
 
-  // Advance animation stage. Returns true if animation is in progress, false if all done.
+  // Advance to the next phase. Returns true if animation is in progress,
+  // false if all phases are done. Resumes the clock past the current gate
+  // (a queued onTick-emulated pause-point).
   export function advance(): boolean {
     if (!showCouplingAnimation) return false;
     if (animationComplete) {
       onNextSlide?.();
       return false;
     }
-    timeline?.advance(); // no-op if not at a waitForInput point
+    player?.play();
     return true;
   }
 
   export function restart() {
     animationComplete = false;
-    timeline?.resetState();
-    timeline?.play();
+    nextPauseIdx = 0;
+    gateArmed = true;
+    player?.reset();
+    player?.play();
   }
   export function pause() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   function handleCanvasClick() {
     if (!showCouplingAnimation) return;
-    timeline?.advance(); // no-op if not waiting for input
+    player?.play();
     // Slide advancement is handled naturally: data-no-advance is present until
     // animationComplete, so the deckEl click listener only fires after all stages finish.
   }
 
-  onDestroy(() => { if (timeline) timeline.pause(); });
+  onDestroy(() => { if (player) player.pause(); });
 
   // ----------------------------------------------------------------
   // Reactive Blocks
@@ -574,7 +621,7 @@
     if (showCouplingAnimation) {
       draw(initialState);
       setupCouplingTimeline();
-      if (playingByDefault) timeline!.play();
+      if (playingByDefault) player!.play();
       // Start trajectory computation in background
       if (flowMatchingClient) {
         computeFlowTrajectories().catch(err => console.error('[IntersectingPaths] Trajectory error:', err));
@@ -586,7 +633,7 @@
   }
 
   $: if (isInitialized && showCouplingAnimation) {
-    mathjaxInitialized.then(() => draw(timeline?.state ?? initialState));
+    mathjaxInitialized.then(() => draw(player?.state ?? initialState));
   }
 
   $: if (figureIsActive !== undefined && isInitialized) {
@@ -594,10 +641,11 @@
       if (!$figureIsActive) {
         // On slide exit: reset so next visit starts from stage 0
         animationComplete = false;
-        timeline?.pause();
-        timeline?.resetState();
+        nextPauseIdx = 0;
+        gateArmed = true;
+        player?.reset();
       } else if (playingByDefault) {
-        timeline?.play();
+        player?.play();
       }
     } else {
       handleVisibilityChange($figureIsActive);
@@ -605,7 +653,7 @@
   }
 </script>
 
-<Figure {caption} bind:isActive={figureIsActive} {backgroundVisible}>
+<Figure {caption} {player} devMode={settings.devMode} bind:isActive={figureIsActive} {backgroundVisible}>
   {#snippet children()}
     <div
       style="width:100%;max-width:{width}px;"

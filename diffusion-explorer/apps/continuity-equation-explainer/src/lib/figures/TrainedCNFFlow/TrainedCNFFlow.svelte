@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     Figure,
     Timeline,
     useVisibilityHandler,
@@ -150,7 +150,7 @@
   // Caption derived from children
   $: caption = children;
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let figureIsActive: Writable<boolean> | undefined;
   let setupComplete = false;
   let unsubscribeVisibility: (() => void) | null = null;
@@ -400,33 +400,28 @@
   // ----------------------------------------------------------------
 
   function setupTimeline() {
-    timeline = new Timeline<AnimationState>();
-
-    // Fixed frame at CONTOUR_TIME (0.9 for smiley face appearance)
-    const fixedFrameIndex = Math.round(CONTOUR_TIME * (numFrames - 1));
-
-    timeline.initialState = {
-      pulsingPathlinePhase: 0,
-      pulsePhase: 0,
-      contourFrameIndex: fixedFrameIndex, // Fixed, no animation
-    };
-    timeline.looping = true;
-    timeline.duration = animationDuration;
-
-    // Pulse phase animation (2 loops per timeline cycle)
-    // Update both pulsePhase (legacy) and pulsingPathlinePhase (GPU animation)
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration,
+      initialState: {},
+      clips: [
+        { clip: {
         name: "PulsePhase",
         reduce: (t: number) => ({
           pulsePhase: (t * 2) % 1,
           pulsingPathlinePhase: (t * 2) % 1,
         }),
-      },
-      { start: 0, end: 1 }
-    );
+      }, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.onTick((t, state) => {
+    // Fixed frame at CONTOUR_TIME (0.9 for smiley face appearance)
+    const fixedFrameIndex = Math.round(CONTOUR_TIME * (numFrames - 1));
+
+    // Pulse phase animation (2 loops per timeline cycle)
+    // Update both pulsePhase (legacy) and pulsingPathlinePhase (GPU animation)
+
+    player.onTick((t, state) => {
       draw(state);
     });
   }
@@ -473,7 +468,7 @@
       latexFontSize,
       0, 0,
       { color: labelColor },
-      () => timeline?.tick(timeline.time)
+      () => { if (player) player.seek(player.t); }
     );
 
     // Target distribution label (p_1) - using MathJax
@@ -485,7 +480,7 @@
       latexFontSize,
       0, 0,
       { color: labelColor },
-      () => timeline?.tick(timeline.time)
+      () => { if (player) player.seek(player.t); }
     );
 
     // Center distribution label (p_t) - using MathJax
@@ -498,7 +493,7 @@
       latexFontSize,
       0, 0,
       { color: labelColor },
-      () => timeline?.tick(timeline.time)
+      () => { if (player) player.seek(player.t); }
     );
 
     // Draw dashed region box around clicked area
@@ -551,7 +546,7 @@
         latexFontSize,
         0, 0,
         { color: regionBoxColor },
-        () => timeline?.tick(timeline.time)
+        () => { if (player) player.seek(player.t); }
       );
 
       // Draw "V" label in the center of the box (offset down slightly)
@@ -563,7 +558,7 @@
         latexFontSize,
         0, 0,
         { color: "#ffffff", stroke: regionBoxColor, strokeWidth: 2 },
-        () => timeline?.tick(timeline.time)
+        () => { if (player) player.seek(player.t); }
       );
     }
 
@@ -579,7 +574,7 @@
   // Event Handlers
   // ----------------------------------------------------------------
 
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
 
   /**
@@ -654,8 +649,8 @@
       ];
 
       // Redraw to show updated box position
-      if (timeline) {
-        draw(timeline.state);
+      if (player) {
+        draw(player.state);
       }
     }
   }
@@ -667,8 +662,8 @@
       regionCenterAtDragStart = null;
 
       // Trajectories are fixed from hard-coded points, just redraw
-      if (timeline) {
-        draw(timeline.state);
+      if (player) {
+        draw(player.state);
       }
     }
   }
@@ -749,9 +744,9 @@
     await runInitialComputation();
     setupTimeline();
 
-    if (timeline) {
-      draw(timeline.initialState);
-      timeline.play();
+    if (player) {
+      draw(player!.timeline.initialState);
+      player.play();
 
       // Use sampled trajectories from hard-coded points (GPU animation)
       console.log("Setting up trajectories from hard-coded points");
@@ -823,7 +818,7 @@
   });
 
   onDestroy(() => {
-    timeline?.dispose();
+    player?.dispose();
     unsubscribeVisibility?.();
     contourRenderer?.destroy();
     pulsingAnimation?.destroy();

@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import {
+  import { Player,
     useCanvas2D,
     Timeline,
     drawMathjax,
@@ -114,7 +114,7 @@
   // Combined animation state - streamlinePhase drives the GPU renderer
   type AnimationState = { streamlinePhase: number } & CreateGridAnimationState & SubdivideGridAnimationState & DivergenceArrowAnimationState;
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let createGridAnim: CreateGridAnimation<AnimationState> | null = null;
   let subdivideGridAnim: SubdivideGridAnimation<AnimationState> | null = null;
   let arrowAnim: DivergenceArrowAnimation<AnimationState> | null = null;
@@ -389,48 +389,30 @@
       arrowAnim.init(canvas),
     ]);
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      streamlinePhase: 0,
-      createGridProgress: 0,
-      subdivideProgress: 0,
-      arrowProgress: 0
-    };
-    timeline.duration = animationDuration;
-    timeline.looping = true;
-    timeline.endPauseDuration = 2; // 2 second pause at end before looping
-
-    // Streamlines: full duration [0, 1] - drives GPU renderer phase
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration,
+      initialState: {},
+      clips: [
+        { clip: {
         name: "StreamlinePhase",
         reduce(t: number) {
           return { streamlinePhase: t };
         },
-      },
-      { start: 0, end: 1 }
-    );
-
-    // CreateGrid: [0, 0.12] (~2 seconds)
-    timeline.add(createGridAnim.clip, { start: 0, end: 0.12 });
-
-    // Subdivide: [0.12, 0.22] (~1.5 seconds)
-    timeline.add(subdivideGridAnim.clip, { start: 0.12, end: 0.22 });
-
-    // Arrows: [0.22, 1.0] (~12.5 seconds, ~4 seconds per repetition)
-    timeline.add(arrowAnim.clip, { start: 0.22, end: 1 });
-
-    timeline.onTick((_t, state) => {
-      draw(state);
+      }, ...{ start: 0, end: 1 } },
+        { clip: createGridAnim.clip, ...{ start: 0, end: 0.12 } },
+        { clip: subdivideGridAnim.clip, ...{ start: 0.12, end: 0.22 } },
+        { clip: arrowAnim.clip, ...{ start: 0.22, end: 1 } },
+      ],
     });
+    player = new Player(tl, { looping: true });
   }
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -438,8 +420,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!player) return;
+    if (!active && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -460,7 +442,7 @@
   });
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
     if (streamlineRenderer) streamlineRenderer.destroy();
   });
 
@@ -473,7 +455,7 @@
     runInitialComputation();
     Promise.all([setupTimeline(), initializeGPURenderer()]).then(() => {
       isInitialized = true;
-      draw(timeline!.initialState);
+      draw(player!.state);
       if (playingByDefault) startAnimation();
     });
   }

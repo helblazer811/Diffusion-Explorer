@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import {
+  import { Player,
     TripleFigure,
     Katex,
     StreamlineAnimation,
@@ -69,7 +69,7 @@
   let wasPlayingBeforeHidden = false;
 
   // Timeline for animation
-  let timeline: Timeline<StreamlineAnimationState> | null = null;
+  let player: Player<StreamlineAnimationState> | null = null;
 
   // Streamline animations
   let anim1: StreamlineAnimation<StreamlineAnimationState> | null = null;
@@ -209,18 +209,21 @@
     // Animation duration in seconds
     const animationDuration = 8;
 
-    timeline = new Timeline<StreamlineAnimationState>();
-    timeline.initialState = { streamlinePhase: 0 };
-    timeline.duration = animationDuration;
-    timeline.looping = true;
-
-    // Add the streamline phase clip (all animations share the same phase)
-    timeline.add(anim1.clip, { start: 0, end: 1 });
-
-    // Register draw callback
-    timeline.onTick((_t, state) => {
+    const tl = Timeline.from<StreamlineAnimationState>({
+      duration: animationDuration,
+      initialState: { streamlinePhase: 0 },
+      clips: [
+        { clip: anim1.clip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
+    player.onTick((_t, state) => {
       draw(state)
     });
+
+    // Add the streamline phase clip (all animations share the same phase)
+
+    // Register draw callback
   }
 
   // ----------------------------------------------------------------
@@ -228,11 +231,11 @@
   // ----------------------------------------------------------------
 
   function startAnimation() {
-    if (timeline) timeline.play();
+    if (player) player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -257,8 +260,8 @@
   // ----------------------------------------------------------------
 
   function handleVisibilityChange(active: boolean) {
-    if (!timeline) return;
-    if (!active && timeline.isPlaying) {
+    if (!player) return;
+    if (!active && player.isPlaying) {
       wasPlayingBeforeHidden = true;
       stopAnimation();
     } else if (active && wasPlayingBeforeHidden) {
@@ -272,7 +275,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.dispose();
+    if (player) player?.dispose();
   });
 
   // ----------------------------------------------------------------
@@ -284,8 +287,8 @@
     isInitialized = true; // Set early to prevent re-entry
     runInitialComputation().then(() => {
       setupTimeline();
-      if (timeline) {
-        draw(timeline.initialState);
+      if (player) {
+        draw(player!.timeline.initialState);
         if (playingByDefault) startAnimation();
       }
     });

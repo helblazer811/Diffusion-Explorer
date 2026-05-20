@@ -48,7 +48,7 @@
   import { createSourceTargetScales } from "../d3_utils";
   import { useCanvas2D } from "../plotting/canvas";
   import { PathlineAnimation, type PathlineAnimationState } from "../animation/animations/pathline-animation";
-  import { Timeline, useVisibilityHandler } from "tempus";
+  import { Timeline, Player, useVisibilityHandler } from "tempus";
   import type { Writable } from "svelte/store";
 
   // ----------------------------------------------------------------
@@ -104,14 +104,14 @@
 
   // Animation state - Timeline system (Timeline owns Clock internally)
   let initialized = false;
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // PathlineAnimation instance for clip generation
   let pathlineAnimation: PathlineAnimation<AnimationState> | null = null;
 
   // Visibility tracking
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Pre-computed data (computed once on mount/data change)
   let scales: SourceTargetScales | null = null;
@@ -245,19 +245,18 @@
     // Initialize the animation with the canvas
     await pathlineAnimation.init(canvas);
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { segmentIndex: 0 };
-
-    // Set timeline duration in seconds (animation time, not including pause)
-    timeline.duration = animationDuration / 1000;
-    timeline.looping = true;
-    timeline.endPauseDuration = pauseBeforeRestart / 1000;
-
-    // Use the clip from PathlineAnimation
-    timeline.add(pathlineAnimation.clip, { start: 0, end: 1 });
-
-    // Register tick callback
-    timeline.onTick((_, state) => draw(state));
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: { segmentIndex: 0 },
+      clips: [
+        { clip: pathlineAnimation.clip, start: 0, end: 1 },
+      ],
+    });
+    player = new Player(tl, {
+      looping: true,
+      endPause: pauseBeforeRestart / 1000,
+    });
+    player.onTick((_, state) => draw(state));
   }
 
   // ----------------------------------------------------------------
@@ -373,9 +372,9 @@
     });
 
     // Reset animation and start
-    if (timeline) {
-      timeline.reset();
-      timeline.play();
+    if (player) {
+      player.reset();
+      player.play();
     }
 
     // Sample all user points with streaming
@@ -419,7 +418,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   });
 
   // ----------------------------------------------------------------
@@ -438,8 +437,8 @@
     runInitialComputation();
     setupTimeline().then(() => {
       initialized = true;
-      draw(timeline!.initialState);
-      if (playingByDefault) timeline!.play();
+      draw(player!.state);
+      if (playingByDefault) player!.play();
     });
   }
 
@@ -460,8 +459,7 @@
         onclick={handleCanvasClick}
         style="cursor:pointer;width:100%;height:auto;max-width:{width}px;aspect-ratio:{width}/{height};"
       ></canvas>
-      <TimeSlider
-        {timeline}
+      <TimeSlider timeline={player}
         color={settings.stylingSettings.trajectory.color}
       />
     </div>

@@ -4,7 +4,7 @@
 <script lang="ts">
   import { tick, onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
-  import {
+  import { Player,
     DoubleFigure,
     useCanvas2D,
     useVisibilityHandler,
@@ -206,12 +206,12 @@
   };
 
   // Animation objects
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let gaussianContourFrames: ComputedContours[] = [];
 
   // Visibility handler
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -384,29 +384,19 @@
 
     const totalDuration = Math.max(streamlineDuration, rotationDuration, contourAnimationDuration);
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { streamlinePhase: 0, theta: 0, contourFrame: 0 };
-    timeline.duration = totalDuration;
-    timeline.looping = true;
-
-    // Add streamline clip from the animation (for right side)
-    timeline.add(streamlineAnim.clip, { start: 0, end: 1 });
-
-    // Add rotation clip for the surface vectors (runs full duration, loops internally)
-    timeline.add(
-      {
+    const tl = Timeline.from<AnimationState>({
+      duration: totalDuration,
+      initialState: { streamlinePhase: 0, theta: 0, contourFrame: 0, pulsePhase: 0 },
+      clips: [
+        { clip: streamlineAnim.clip, ...{ start: 0, end: 1 } },
+        { clip: {
         name: "SurfaceRotation",
         reduce(t: number) {
           const loops = totalDuration / rotationDuration;
           return { theta: ((t * loops) % 1) * 2 * Math.PI };
         },
-      },
-      { start: 0, end: 1 }
-    );
-
-    // Add contour animation clip (cycles through frames for left side)
-    timeline.add(
-      {
+      }, ...{ start: 0, end: 1 } },
+        { clip: {
         name: "ContourAnimation",
         reduce(t: number) {
           const loops = totalDuration / contourAnimationDuration;
@@ -414,23 +404,19 @@
           const contourFrame = Math.floor(frameProgress * contourAnimationSteps);
           return { contourFrame: Math.min(contourFrame, contourAnimationSteps - 1) };
         },
-      },
-      { start: 0, end: 1 }
-    );
-
-    // Boundary-arrow pulse phase clip (used only in boundary-arrows mode).
-    timeline.add(
-      {
+      }, ...{ start: 0, end: 1 } },
+        { clip: {
         name: "BoundaryArrowPulse",
         reduce(t: number) {
           const loops = totalDuration / boundaryPulseDuration;
           return { pulsePhase: (t * loops) % 1 };
         },
-      },
-      { start: 0, end: 1 }
-    );
+      }, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       drawLeft(state, cWidth, cHeight, curve);
       drawRight(state, cWidth, cHeight, curve, vectorField);
     });
@@ -810,7 +796,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
     if (streamlineAnim) streamlineAnim.destroy();
   });
 
@@ -855,10 +841,10 @@
         await streamlineAnim.init(gpuCanvas);
       }
 
-      if (timeline) {
-        drawLeft(timeline.initialState, canvasWidth, canvasHeight, curveFn);
-        drawRight(timeline.initialState, canvasWidth, canvasHeight, curveFn, vectorFieldFn);
-        if (playingByDefault) timeline.play();
+      if (player) {
+        drawLeft(player!.timeline.initialState, canvasWidth, canvasHeight, curveFn);
+        drawRight(player!.timeline.initialState, canvasWidth, canvasHeight, curveFn, vectorFieldFn);
+        if (playingByDefault) player.play();
       }
     });
   }

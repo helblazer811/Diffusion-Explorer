@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import * as d3 from "d3";
-  import {
+  import { Player,
     DoubleFigure,
     drawScatterPlot,
     drawTrajectories,
@@ -130,7 +130,7 @@
 
   // Visibility
   let figureIsActive: boolean;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // Animation timing config (in ms)
   const segmentDuration = 600;
@@ -148,7 +148,7 @@
   };
 
   // Timeline for animation
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // Track previous end pause state for detecting transitions
   let prevLeftInEndPause = false;
@@ -619,7 +619,7 @@
   // Setup timeline for the current step count
   function setupTimeline() {
     // Clean up previous timeline to prevent memory leaks
-    timeline?.dispose();
+    player?.dispose();
 
     const currentSteps = stepValues[currentStepIndex];
     const cycleTime = segmentDuration + segmentPauseDuration;
@@ -629,32 +629,30 @@
     const endPauseNormalized = endPauseDuration / totalMs;
 
     // Create new timeline
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      leftSegmentIndex: 0,
-      leftSegmentProgress: 0,
-      leftInEndPause: false,
-      rightSegmentIndex: 0,
-      rightSegmentProgress: 0,
-      rightInEndPause: false
-    };
+    const tl = Timeline.from<AnimationState>({
+      duration: totalMs / 1000,
+      initialState: {},
+      clips: [
+        { clip: createLeftSegmentClip(currentSteps, segmentPhaseMs), ...{ start: 0, end: segmentPhaseNormalized } },
+        { clip: createRightSegmentClip(currentSteps, segmentPhaseMs), ...{ start: 0, end: segmentPhaseNormalized } },
+        { clip: createLeftEndPauseClip(currentSteps), ...{ start: segmentPhaseNormalized, end: 1 } },
+        { clip: createRightEndPauseClip(currentSteps), ...{ start: segmentPhaseNormalized, end: 1 } },
+      ],
+    });
+    player = new Player(tl);
 
     // Add clips for both sides
-    timeline.add(createLeftSegmentClip(currentSteps, segmentPhaseMs), { start: 0, end: segmentPhaseNormalized });
-    timeline.add(createRightSegmentClip(currentSteps, segmentPhaseMs), { start: 0, end: segmentPhaseNormalized });
-    timeline.add(createLeftEndPauseClip(currentSteps), { start: segmentPhaseNormalized, end: 1 });
-    timeline.add(createRightEndPauseClip(currentSteps), { start: segmentPhaseNormalized, end: 1 });
+
+
+
 
     // Set timeline duration in seconds
-    timeline.duration = totalMs / 1000;
-    timeline.looping = false; // We handle looping manually for regeneration
 
-    // Reset transition tracking
-    prevLeftInEndPause = false;
+
     prevRightInEndPause = false;
 
     // Register tick callback
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       // Detect transitions into end pause state to trigger error line drawing
       if (state.leftInEndPause && !prevLeftInEndPause) {
         drawLeftErrorLines();
@@ -666,8 +664,8 @@
       prevRightInEndPause = state.rightInEndPause;
 
       // Handle looping - generate new random start point
-      if (timeline && timeline.isAtEnd) {
-        timeline.pause();
+      if (player && player.isAtEnd) {
+        player.pause();
 
         // Generate a new random starting point for the next cycle
         userStartPoints = [generateRandomStartPoint()];
@@ -718,12 +716,12 @@
   }
 
   function startApproxAnimation() {
-    if (!timeline || timeline.isPlaying) return;
-    timeline.play();
+    if (!player || player.isPlaying) return;
+    player.play();
   }
 
   function stopApproxAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   function resetApproxAnimation() {
@@ -750,7 +748,7 @@
   function handleCanvasClick(event: MouseEvent, side: "left" | "right") {
     // Stop current animation and reset
     stopApproxAnimation();
-    if (timeline) timeline.reset();
+    if (player) player.reset();
     prevLeftInEndPause = false;
     prevRightInEndPause = false;
 
@@ -827,7 +825,7 @@
   });
 
   onDestroy(() => {
-    timeline?.dispose();
+    player?.dispose();
   });
 </script>
 

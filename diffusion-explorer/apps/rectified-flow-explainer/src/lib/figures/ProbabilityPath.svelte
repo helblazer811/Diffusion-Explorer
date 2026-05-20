@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import * as d3 from "d3";
-  import { Figure, TimeSlider, Slider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, ContourRenderer, createLinearColorScale, parseContourColor, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
+  import { Player, Figure, TimeSlider, Slider, drawScatterPlot, drawText, drawMathjax, computeContours, plotContours, ContourRenderer, createLinearColorScale, parseContourColor, createSourceTargetScales, Timeline, useCanvas2D, useVisibilityHandler } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
   import type { Writable } from "svelte/store";
   import type { Snippet } from "svelte";
@@ -122,14 +122,14 @@
   };
 
   // Animation state - Timeline system
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
 
   // Cached numSteps for clip closure
   let cachedNumSteps = 1;
 
   // Visibility-based animation control
   let figureIsActive: Writable<boolean>;
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
   let isInitialized = false;
 
   // Derived
@@ -310,9 +310,6 @@
     // Cache numSteps for clip closure
     cachedNumSteps = $allTimeSamples?.length || 1;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = { time: 0, currentStep: 0, centerX: scales.sourceCenterPixelX };
-
     // Main animation clip - computes derived state from t
     const mainClip = {
       name: "Animation",
@@ -325,28 +322,29 @@
       }
     };
 
-    // Add main animation clip
-    timeline.add(mainClip, { start: 0, end: 1 });
-
-    // Set timeline duration and end pause
-    timeline.duration = animationDuration / 1000;
-    timeline.setEndPause(animationPauseTime / 1000);
-    timeline.looping = true;
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: { time: 0, currentStep: 0, centerX: scales.sourceCenterPixelX },
+      clips: [
+        { clip: mainClip, ...{ start: 0, end: 1 } },
+      ],
+    });
+    player = new Player(tl, { looping: true, endPause: animationPauseTime / 1000 });
 
     // Register tick callback
-    timeline.onTick((t, state) => {
+    player.onTick((t, state) => {
       draw(state);
       rawSliderValue = t;
     });
   }
 
   function startAnimation() {
-    if (!timeline) return;
-    timeline.play();
+    if (!player) return;
+    player.play();
   }
 
   function stopAnimation() {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
   }
 
   // ----------------------------------------------------------------
@@ -523,7 +521,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
     if (contourRenderer) {
       contourRenderer.destroy();
       contourRenderer = null;
@@ -553,13 +551,13 @@
     if (showContours && useGPUContours) {
       initGPUContours().then(() => {
         // Redraw with GPU contours once ready
-        if (timeline && contoursReady) {
-          draw(timeline.state);
+        if (player && contoursReady) {
+          draw(player.state);
         }
       });
     }
 
-    draw(timeline!.initialState);
+    draw(player!.state);
     if (playingByDefault) startAnimation();
   }
 
@@ -569,7 +567,7 @@
   }
 </script>
 
-<Figure {caption} {backgroundVisible} bind:isActive={figureIsActive}>
+<Figure {caption} {backgroundVisible} {player} devMode={settings.devMode} bind:isActive={figureIsActive}>
   {#snippet children()}
     <div
       style="display: flex; flex-direction: column; align-items: center; width: 100%;"
@@ -597,13 +595,13 @@
               maxLabel="t=1"
               maxWidth={sliderMaxWidth}
               labelSize={sliderLabelSize}
-              onInput={(v) => { if (timeline) timeline.seek(v); }}
-              onDragStart={() => { if (timeline) timeline.startSeeking(); }}
-              onDragEnd={() => { if (timeline) timeline.endSeeking(); }}
+              onInput={(v) => { if (player) player.seek(v); }}
+              
+              
             />
           </div>
         {:else}
-          <TimeSlider {timeline} color="#f17720" {showPlayButton} maxWidth={sliderMaxWidth} labelSize={sliderLabelSize} />
+          <TimeSlider timeline={player} color="#f17720" {showPlayButton} maxWidth={sliderMaxWidth} labelSize={sliderLabelSize} />
         {/if}
       {/if}
     </div>
