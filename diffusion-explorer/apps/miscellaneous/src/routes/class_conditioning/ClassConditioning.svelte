@@ -21,7 +21,6 @@
     ContourRenderer,
     createLinearColorScale,
     parseContourColor,
-    TimelineInspector,
   } from "@diffusion-explorer/ui";
 
   // ----------------------------------------------------------------
@@ -1210,7 +1209,7 @@
 
 <div class="cc-wrap" style="max-width:{width}px;">
   <h2 class="cc-title">Class Conditioning Makes Flow Matching Easier</h2>
-  <Figure bind:isActive={figureIsActive} {backgroundVisible}>
+  <Figure bind:isActive={figureIsActive} {backgroundVisible} {player} devMode={true}>
     {#snippet children()}
       <div style="width:100%;max-width:{width}px;">
         <canvas
@@ -1221,9 +1220,6 @@
       </div>
     {/snippet}
   </Figure>
-  <div class="cc-inspector">
-    <TimelineInspector {player} />
-  </div>
 </div>
 
 <style>
@@ -1240,10 +1236,5 @@
     color: #777;
     margin: 0 0 0.4rem 0;
     line-height: 1.25;
-  }
-  .cc-inspector {
-    width: 100%;
-    max-width: 900px;
-    margin-top: 12px;
   }
 </style>
