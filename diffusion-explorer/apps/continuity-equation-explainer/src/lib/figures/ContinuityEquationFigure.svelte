@@ -21,6 +21,7 @@
   import { tick, onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
   import {
+    Player,
     DoubleFigure,
     TimeSlider,
     useCanvas2D,
@@ -184,7 +185,7 @@
       contourFrame: number;
     };
 
-  let timeline: Timeline<AnimationState> | null = null;
+  let player: Player<AnimationState> | null = null;
   let streamlineAnim: StreamlineAnimation<AnimationState> | null = null;
   let pathlineAnim: PulsingPathlineAnimation<AnimationState> | null = null;
   let activeField: VectorFieldFn | null = null;
@@ -203,7 +204,7 @@
   // a cursor dot is shown instead; the bar tracks density at this point.
   let cursorDomain: [number, number] | null = null;
 
-  const { handleVisibilityChange } = useVisibilityHandler(() => timeline);
+  const { handleVisibilityChange } = useVisibilityHandler(() => player);
 
   // ----------------------------------------------------------------
   // Helpers
@@ -467,32 +468,30 @@
     const rhsAnim = streamlineAnim ?? pathlineAnim;
     if (!rhsAnim) return;
 
-    timeline = new Timeline<AnimationState>();
-    timeline.initialState = {
-      streamlinePhase: 0,
-      pulsingPathlinePhase: 0,
-      contourFrame: 0,
-    };
-    timeline.duration = animationDuration;
-    timeline.looping = true;
-
-    timeline.add(rhsAnim.clip, { start: 0, end: 1 });
-
-    timeline.add(
-      {
-        name: "ContourFrame",
-        reduce(t: number) {
-          const idx = Math.min(
-            Math.floor(t * contourAnimationSteps),
-            contourAnimationSteps - 1
-          );
-          return { contourFrame: idx };
-        },
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration,
+      initialState: {
+        streamlinePhase: 0,
+        pulsingPathlinePhase: 0,
+        contourFrame: 0,
       },
-      { start: 0, end: 1 }
-    );
+      clips: [
+        { clip: rhsAnim.clip, start: 0, end: 1 },
+        { clip: {
+          name: "ContourFrame",
+          reduce(t: number) {
+            const idx = Math.min(
+              Math.floor(t * contourAnimationSteps),
+              contourAnimationSteps - 1
+            );
+            return { contourFrame: idx };
+          },
+        }, start: 0, end: 1 },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
-    timeline.onTick((_t, state) => {
+    player.onTick((_t, state) => {
       currentContourFrame = state.contourFrame;
       drawLeft(state, cW, cH);
       drawRight(state, cW, cH);
@@ -674,7 +673,7 @@
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    if (timeline) timeline.pause();
+    if (player) player.pause();
     if (streamlineAnim) streamlineAnim.destroy();
     if (pathlineAnim) pathlineAnim.destroy();
   });
@@ -715,8 +714,8 @@
   // chart, the pathlines/streamlines clip center, etc., so trigger a manual
   // redraw using the timeline's current state.
   function redrawIfPaused() {
-    if (!timeline || timeline.isPlaying || !canvasWidth || !canvasHeight) return;
-    const state = timeline.state;
+    if (!player || player.isPlaying || !canvasWidth || !canvasHeight) return;
+    const state = player.state;
     drawLeft(state, canvasWidth, canvasHeight);
     drawRight(state, canvasWidth, canvasHeight);
   }
@@ -794,11 +793,11 @@
         else if (pathlineAnim) await pathlineAnim.init(gpuCanvas);
       }
 
-      if (timeline) {
-        drawLeft(timeline.initialState, canvasWidth, canvasHeight);
-        drawRight(timeline.initialState, canvasWidth, canvasHeight);
+      if (player) {
+        drawLeft(player.timeline.initialState, canvasWidth, canvasHeight);
+        drawRight(player.timeline.initialState, canvasWidth, canvasHeight);
         currentBarValue = densitySeries[0] ?? 0;
-        if (playingByDefault) timeline.play();
+        if (playingByDefault) player.play();
       }
     });
   }
@@ -966,7 +965,7 @@
 
   {#snippet footer()}
     <TimeSlider
-      timeline={timeline as import("@diffusion-explorer/ui").Timeline<unknown> | null}
+      timeline={player as import("@diffusion-explorer/ui").Player<unknown> | null}
       color="#9ca3af"
     />
   {/snippet}

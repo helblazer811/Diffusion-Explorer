@@ -402,19 +402,8 @@
   function setupTimeline() {
     if (!scales || pixelTrajectories.length === 0) return;
 
-    const tl = Timeline.from<AnimationState>({
-      duration: animationDuration / 1000,
-      initialState: {},
-      clips: [
-        { clip: mainClip, ...{ start: 0, end: timing.animationEnd } },
-        { clip: createPauseClip(), ...{ start: timing.animationEnd, end: 1 } },
-      ],
-    });
-    player = new Player(tl, { looping: true });
-
     const numSegments = pixelTrajectories[0].length - 1;
 
-    // Main animation clip
     const mainClip: Clip<AnimationState> = {
       name: "InvertibilityAnimation",
       reduce(t: number) {
@@ -425,6 +414,15 @@
       }
     };
 
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: {},
+      clips: [
+        { clip: mainClip, start: 0, end: timing.animationEnd },
+        { clip: createPauseClip(), start: timing.animationEnd, end: 1 },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     player.onTick((_, state) => {
       draw(state);

@@ -295,17 +295,6 @@
     // Initialize the animation with the canvas
     await pathlineAnim.init(canvas);
 
-    const tl = Timeline.from<AnimationState>({
-      duration: animationDuration / 1000,
-      initialState: {},
-      clips: [
-        { clip: mainClip, ...{ start: 0, end: timing.animationEnd } },
-        { clip: createPauseClip(), ...{ start: timing.animationEnd, end: 1 } },
-      ],
-    });
-    player = new Player(tl, { looping: true });
-
-    // Main animation clip
     const mainClip = {
       name: "FlowAnimation",
       reduce(t: number) {
@@ -319,6 +308,15 @@
       }
     };
 
+    const tl = Timeline.from<AnimationState>({
+      duration: animationDuration / 1000,
+      initialState: {},
+      clips: [
+        { clip: mainClip, start: 0, end: timing.animationEnd },
+        { clip: createPauseClip(), start: timing.animationEnd, end: 1 },
+      ],
+    });
+    player = new Player(tl, { looping: true });
 
     player.onTick((_, state) => {
       draw(state);

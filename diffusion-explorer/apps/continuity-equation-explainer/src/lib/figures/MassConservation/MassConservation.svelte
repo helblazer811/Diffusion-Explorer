@@ -71,11 +71,11 @@
   // Left canvas styling (Volume)
   export let volumeStrokeColor = "#f97316"; // Orange
   export let volumeStrokeWidth = 3;
-  export let volumeFillColor = "#ffedd5"; // Whiter orange tint
+  export let volumeFillColor = "#f97316"; // Orange fill to contrast with surface-only RHS
   export let volumeFillOpacity = 0.7;
   export let volumeLabelText = "V";
   export let volumeLabelFontSize = 32;
-  export let volumeLabelColor = "#f97316"; // Orange to match boundary
+  export let volumeLabelColor = "#ffffff"; // White, against orange fill
 
   // Density label (ρ above surface)
   export let densityLabelText = "\\rho";
@@ -111,7 +111,7 @@
   //   • "boundary-arrows": animated blue density behind a white mute layer +
   //                        uniformly-spaced blue ρv arrows along the boundary,
   //                        one of them labeled.
-  export let rhsMode: "streamlines" | "boundary-arrows" = "boundary-arrows";
+  export let rhsMode: "streamlines" | "boundary-arrows" = "streamlines";
 
   // Right canvas styling (Surface with rotating vectors)
   export let surfaceFillColor = "#ffffff"; // White
@@ -149,7 +149,7 @@
   export let surfaceLabelColor = "#f97316"; // Orange
   export let surfaceLabelStrokeColor = "white";
   export let surfaceLabelStrokeWidth = 110;
-  export let surfaceLabelYOffset = -0.7; // Fraction of bounding box height from center
+  export let surfaceLabelYOffset = -0.62; // Fraction of bounding box height from center
 
   // Rotation animation
   export let rotationDuration = 8; // seconds for one full rotation
@@ -457,9 +457,8 @@
       stroke: false,
     });
 
-    // 2. Overlay the volume interior with a light orange tint on top of the
-    // density. With <1 opacity, the contours still show through inside V but
-    // are muted by the orange wash — making V read as a distinct region.
+    // 2. Fill the volume interior with solid orange so V reads as a filled
+    // region, contrasting with the boundary-only treatment on the RHS.
     drawClosedCurve(ctx, curve, toPixelBound, {
       fillColor: volumeFillColor,
       fillOpacity: volumeFillOpacity,

@@ -262,22 +262,16 @@
   date="2025"
 />
 
-<ContinuityEquationFigure>
-  <strong>The continuity equation, pointwise.</strong>
-  Both panes show the same probability density contracting onto a fixed point <Katex math={"x"} />
-  (orange dot) under a convergent flow.
-  <em>Left:</em> <Katex math={"\\partial p_t(x) / \\partial t"} /> is the rate of change of
-  density at <Katex math={"x"} /> — visualized by the orange bar growing as density piles up
-  at the point.
-  <em>Right:</em> <Katex math={"-\\nabla \\cdot (p_t v_t)"} /> at <Katex math={"x"} /> is the rate
-  at which probability flux flows INTO the point — the converging orange streamlines.
-  Hover
-  <img
-    src="{base}/icons/tap.svg"
-    alt="hover"
-    style="width: 22px; height: 22px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
-  /> over either pane to query <Katex math={"p(\\cdot)"} /> at any other point.
-</ContinuityEquationFigure>
+<MassConservation>
+  <strong>Conservation of probability mass.</strong>
+  The change in probability density <Katex math={"\\rho"} /> inside a volume <Katex math={"V"} />
+  equals the negative flux <Katex math={"\\rho \\mathbf{v}"} /> through the boundary
+  <Katex math={"S"} />.
+  <em>Left:</em> The probability density <Katex math={"\\rho"} /> evolving inside the volume.
+  <em>Right:</em> The flux <Katex math={"\\rho \\mathbf{v}"} /> sampled at uniform points along
+  the boundary <Katex math={"S"} /> — each arrow contributes to the surface integral on the right
+  of the equation.
+</MassConservation>
 
 <hr class="section-divider" />
 
@@ -513,16 +507,22 @@
     the mass inside.
   </p>
 
-  <MassConservation>
-    <strong>Conservation of probability mass.</strong>
-    The change in probability density <Katex math={"\\rho"} /> inside a volume <Katex math={"V"} />
-    equals the negative flux <Katex math={"\\rho \\mathbf{v}"} /> through the boundary
-    <Katex math={"S"} />.
-    <em>Left:</em> The probability density <Katex math={"\\rho"} /> evolving inside the volume.
-    <em>Right:</em> The flux <Katex math={"\\rho \\mathbf{v}"} /> sampled at uniform points along
-    the boundary <Katex math={"S"} /> — each arrow contributes to the surface integral on the right
-    of the equation.
-  </MassConservation>
+  <ContinuityEquationFigure>
+    <strong>The continuity equation, pointwise.</strong>
+    Both panes show the same probability density contracting onto a fixed point <Katex math={"x"} />
+    (orange dot) under a convergent flow.
+    <em>Left:</em> <Katex math={"\\partial p_t(x) / \\partial t"} /> is the rate of change of
+    density at <Katex math={"x"} /> — visualized by the orange bar growing as density piles up
+    at the point.
+    <em>Right:</em> <Katex math={"-\\nabla \\cdot (p_t v_t)"} /> at <Katex math={"x"} /> is the rate
+    at which probability flux flows INTO the point — the converging orange streamlines.
+    Hover
+    <img
+      src="{base}/icons/tap.svg"
+      alt="hover"
+      style="width: 22px; height: 22px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+    /> over either pane to query <Katex math={"p(\\cdot)"} /> at any other point.
+  </ContinuityEquationFigure>
   <p>
     This integral statement is the entire physical content we need. To convert it into the local
     PDE form, we need two pieces of standard vector calculus.
@@ -551,15 +551,9 @@
     <strong>Three types of vector field divergence.</strong>
     The divergence of a vector field <Katex math={"\\mathbf{F} = (F_x, F_y)"} /> describes the rate
     at which "density" expands or contracts at a point.
-    <em>Left:</em> A converging field (sink) has negative divergence (<Katex
-      math={"\\nabla \\cdot \\mathbf{F} < 0"}
-    />).
-    <em>Center:</em> A diverging field (source) has positive divergence (<Katex
-      math={"\\nabla \\cdot \\mathbf{F} > 0"}
-    />).
-    <em>Right:</em> An incompressible field has zero divergence (<Katex
-      math={"\\nabla \\cdot \\mathbf{F} = 0"}
-    />).
+    <em>Left:</em> A converging field (sink) has negative divergence.
+    <em>Center:</em> A diverging field (source) has positive divergence.
+    <em>Right:</em> An incompressible field has zero divergence.
   </DivergenceIntro>
 
   <p>
@@ -593,27 +587,17 @@
         default: return [-half + local * 2 * half, -half];
       }
     }}
-    rightCurveFn={createClosedCurve({
-      baseRadius: 0.85,
-      amplitudes: [0.22, 0.16, 0.1],
-      phases: [0, 0.7, 1.3],
-      frequencies: [1, 2, 3],
-    })}
+    rightLayout="two-blocks"
+    twoBlocksCellSize={1.0}
     vectorFieldFn={createWavyVectorField({ amplitude: 0.35, frequency: 1.6 })}
     gridResolution={3}
-    rightGridResolution={6}
     domainMargin={0.6}
   >
-    <strong>The divergence theorem on any region.</strong>
-    Each region is tiled by sub-cells; every cell carries outward arrows — a discrete picture of
-    <Katex math={"\\nabla \\cdot \\mathbf{F}"} /> inside. A wave propagates from the center
-    outward; as it passes each shared interior edge the opposing arrow pair flashes and retracts —
-    interior contributions cancel pairwise. Only the arrows on the outer boundary survive, and
-    they are exactly the surface integral
+    <strong>The divergence theorem, cell-by-cell.</strong>
+    Every cell carries outward arrows. On each shared edge the opposing pair cancels, leaving only
+    the boundary arrows — which are exactly
     <Katex math={"\\int_{\\partial V} \\mathbf{F} \\cdot \\hat{n}\\, dS"} />.
-    <em>Left:</em> a square region on a coarse 3×3 grid.
-    <em>Right:</em> the same argument on an arbitrary smooth region with a finer subdivision.
-    Streamlines of <Katex math={"\\mathbf{F}"} /> shown faintly behind for context.
+    <em>Left:</em> 3×3 grid. <em>Right:</em> two adjacent cells isolating the cancellation.
   </DivergenceTheoremFigure>
 
   <!--

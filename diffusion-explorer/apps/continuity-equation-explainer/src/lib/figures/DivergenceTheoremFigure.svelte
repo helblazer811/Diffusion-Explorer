@@ -59,6 +59,12 @@
   // single-shape behavior).
   export let rightCurveFn: CurveFn | null = null;
   export let rightGridResolution = 6;
+  // RHS layout. "curve" = original irregular surface tiled by a fine grid.
+  // "two-blocks" = bypass the curve entirely and show two adjacent square
+  // cells side by side, emphasizing the cancellation along their shared edge.
+  export let rightLayout: "curve" | "two-blocks" = "curve";
+  // For "two-blocks": each block's side length in DOMAIN units.
+  export let twoBlocksCellSize = 1.0;
   export let vectorFieldFn: VectorFieldFn = createWavyVectorField({
     amplitude: 0.3,
     frequency: 1.5,
@@ -352,6 +358,32 @@
     };
   }
 
+  /**
+   * Build the RHS in "two-blocks" mode: two adjacent square cells centered
+   * horizontally and vertically in the canvas. Their shared vertical edge is
+   * the only interior boundary, so the wave-cancellation animation cleanly
+   * shows the inward-pointing pair canceling.
+   */
+  function buildTwoBlocksGrid(): {
+    cells: GridCellSpec[];
+    cellSizePx: number;
+    centerCell: { row: number; col: number };
+  } {
+    const half = twoBlocksCellSize / 2;
+    const leftCenter: [number, number] = [-half, 0];
+    const rightCenter: [number, number] = [half, 0];
+    const [lpx, lpy] = toPixel(leftCenter);
+    const [rpx, rpy] = toPixel(rightCenter);
+    return {
+      cells: [
+        { cx: lpx, cy: lpy, row: 0, col: 0 },
+        { cx: rpx, cy: rpy, row: 0, col: 1 },
+      ],
+      cellSizePx: scaleLength(twoBlocksCellSize),
+      centerCell: { row: 0, col: 0 },
+    };
+  }
+
   async function runInitialComputation() {
     boundingBox = computeGridCells();
 
@@ -372,11 +404,15 @@
     // Build the RHS pane's wave-cancellation animation on a finer grid filtered
     // to the right curve's interior. Cells along the curve naturally pick up
     // "boundary" status (their outward direction has no neighbor).
-    const rightGrid = buildRightGrid();
+    const rightGrid = rightLayout === "two-blocks"
+      ? buildTwoBlocksGrid()
+      : buildRightGrid();
+    const effectiveRightGridResolution =
+      rightLayout === "two-blocks" ? 2 : rightGridResolution;
     if (rightGrid.cells.length > 0) {
       rightWaveAnim = WaveCancellationAnimation.create<AnimationState>({
         cells: rightGrid.cells,
-        gridResolution: rightGridResolution,
+        gridResolution: effectiveRightGridResolution,
         centerCell: rightGrid.centerCell,
         cellSizePx: rightGrid.cellSizePx,
         arrowPadding: cellArrowPadding,
@@ -483,6 +519,38 @@
       strokeColor: surfaceStrokeColor,
       strokeWidth: surfaceStrokeWidth,
     });
+  }
+
+  /**
+   * "two-blocks" RHS layout: draw two adjacent filled-and-stroked squares
+   * centered horizontally about x=0 and vertically about y=0. Styling matches
+   * drawSurface for visual consistency with the LHS square.
+   */
+  function drawTwoBlocks(ctx: CanvasRenderingContext2D) {
+    const half = twoBlocksCellSize / 2;
+    const corners: Array<[[number, number], [number, number]]> = [
+      [[-2 * half, -half], [0, half]],          // left block: x ∈ [-S, 0]
+      [[0, -half], [2 * half, half]],            // right block: x ∈ [0, S]
+    ];
+    for (const [[x0, y0], [x1, y1]] of corners) {
+      // y in domain coords flips on canvas; toPixel handles it.
+      const [px0, py0] = toPixel([x0, y1]); // top-left
+      const [px1, py1] = toPixel([x1, y0]); // bottom-right
+      const w = px1 - px0;
+      const h = py1 - py0;
+
+      ctx.save();
+      ctx.globalAlpha = surfaceFillOpacity;
+      ctx.fillStyle = surfaceFillColor;
+      ctx.fillRect(px0, py0, w, h);
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = surfaceStrokeColor;
+      ctx.lineWidth = surfaceStrokeWidth;
+      ctx.strokeRect(px0, py0, w, h);
+      ctx.restore();
+    }
   }
 
   /**
@@ -643,11 +711,17 @@
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     drawStreamlineOverlay(ctx);
 
-    // 2. Surface fill + outline — uses the (more complex) right curve.
-    drawSurface(ctx, rightCurveFn ?? curveFn);
+    if (rightLayout === "two-blocks") {
+      // 2b. Two adjacent square blocks. Each block is drawn as a filled +
+      // stroked rectangle, matching the surface styling on the LHS.
+      drawTwoBlocks(ctx);
+    } else {
+      // 2. Surface fill + outline — uses the (more complex) right curve.
+      drawSurface(ctx, rightCurveFn ?? curveFn);
 
-    // 3. Subdivision lines clipped to the right curve.
-    drawRightSubdivisions(ctx);
+      // 3. Subdivision lines clipped to the right curve.
+      drawRightSubdivisions(ctx);
+    }
 
     // 4. Wave-cancellation animation (same logic as LHS, on finer cells that
     //    are filtered to fit the irregular shape).
