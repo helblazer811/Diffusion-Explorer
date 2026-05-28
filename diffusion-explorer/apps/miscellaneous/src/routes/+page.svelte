@@ -36,6 +36,7 @@
 		<li><a href="/limit_cycle_stability">Limit Cycle Stability</a></li>
 		<li><a href="/lorenz_attractor">Lorenz Attractor</a></li>
 		<li><a href="/class_conditioning">Class Conditioning</a></li>
+		<li><a href="/svgd">SVGD (Stein Variational Gradient Descent)</a></li>
 	</ul>
 </section>
 

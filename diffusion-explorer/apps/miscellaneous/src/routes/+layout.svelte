@@ -12,6 +12,12 @@
 	let fullBleed = $derived(
 		fullBleedPrefixes.some((p) => page.url.pathname.startsWith(p))
 	);
+
+	// Routes that want a black page background.
+	const darkBackgroundPrefixes = ['/svgd'];
+	let darkBackground = $derived(
+		darkBackgroundPrefixes.some((p) => page.url.pathname.startsWith(p))
+	);
 </script>
 
 <svelte:head>
@@ -19,6 +25,11 @@
 	{#if fullBleed}
 		<style>
 			body { padding: 0 !important; margin: 0 !important; }
+		</style>
+	{/if}
+	{#if darkBackground}
+		<style>
+			body { background: #000 !important; }
 		</style>
 	{/if}
 </svelte:head>
