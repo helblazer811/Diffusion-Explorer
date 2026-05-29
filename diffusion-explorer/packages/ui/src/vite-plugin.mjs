@@ -1,7 +1,6 @@
-import type { Plugin } from 'vite';
 import { readFileSync } from 'node:fs';
 
-export function wgslPlugin(): Plugin {
+export function wgslPlugin() {
   return {
     name: 'vite-plugin-wgsl',
     config() {

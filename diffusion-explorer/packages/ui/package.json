@@ -22,7 +22,7 @@
     "./styles/base.css": "./src/styles/base.css",
     "./styles/layout.css": "./src/styles/layout.css",
     "./vite-plugin": {
-      "import": "./src/vite-plugin.ts"
+      "import": "./src/vite-plugin.mjs"
     }
   },
   "dependencies": {
