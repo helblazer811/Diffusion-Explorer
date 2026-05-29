@@ -1,7 +1,11 @@
 {
-  "name": "@diffusion-explorer/diffusion",
+  "name": "@helblazer811/diffusion",
   "version": "0.1.0",
-  "private": true,
+  "files": ["src"],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
   "type": "module",
   "svelte": "./src/index.ts",
   "exports": {
