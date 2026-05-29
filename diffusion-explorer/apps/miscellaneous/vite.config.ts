@@ -1,6 +1,7 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { tempusDevPlugin } from '@helblazer811/tempus/vite';
+import { wgslPlugin } from '@helblazer811/ui/vite-plugin';
 import path from 'path';
 import fs from 'fs';
 
@@ -15,7 +16,7 @@ try {
 }
 
 export default defineConfig({
-	plugins: [sveltekit(), tempusDevPlugin()],
+	plugins: [sveltekit(), wgslPlugin(), tempusDevPlugin()],
 	server: {
 		headers: {
 			// Required for ffmpeg.wasm to use SharedArrayBuffer
