@@ -1,7 +1,7 @@
 {
 	"name": "diffusion-explorer-app",
 	"private": true,
-	"version": "0.0.1",
+	"version": "0.1.2",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
