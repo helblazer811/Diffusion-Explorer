@@ -1,7 +1,9 @@
 {
   "name": "@helblazer811/ui",
-  "version": "0.1.0",
-  "files": ["src"],
+  "version": "0.1.2",
+  "files": [
+    "src"
+  ],
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "public"
