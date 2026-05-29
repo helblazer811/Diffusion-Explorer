@@ -4,7 +4,7 @@
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
   import { Figure, useCanvas2D } from "@diffusion-explorer/ui";
-  import { TimelineBuilder, Player, type Clip } from "tempus";
+  import { TimelineBuilder, Player, type Clip } from "@helblazer811/tempus";
 
   export let width = 400;
   export let height = 200;
