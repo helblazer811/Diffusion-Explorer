@@ -137,12 +137,12 @@ export {
   type Animation,
   type AnimationWithData,
   type ExportableAnimation,
-} from 'tempus';
+} from '@helblazer811/tempus';
 
 // Inspector — Svelte UI component. Accepts either a Player (new) or a
 // legacy mutable Timeline (which exposes a Player-shaped surface for this
 // purpose).
-export { default as TimelineInspector } from 'tempus/inspector/svelte';
+export { default as TimelineInspector } from '@helblazer811/tempus/inspector/svelte';
 
 // Domain-specific animations
 export {

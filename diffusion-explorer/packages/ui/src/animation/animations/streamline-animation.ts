@@ -30,7 +30,7 @@
  * anim.draw(state);
  */
 
-import type { AnimationWithData, Clip } from 'tempus';
+import type { AnimationWithData, Clip } from '@helblazer811/tempus';
 import {
   generateStreamlines,
   computeStreamlineLengths,

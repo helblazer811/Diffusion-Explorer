@@ -21,7 +21,7 @@
   "dependencies": {
     "d3": "^7.9.0",
     "katex": "^0.16.22",
-    "tempus": "*"
+    "@helblazer811/tempus": "^0.1.0"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",

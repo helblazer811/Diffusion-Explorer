@@ -43,7 +43,7 @@
  * });
  */
 
-import type { AnimationWithData, Clip } from 'tempus';
+import type { AnimationWithData, Clip } from '@helblazer811/tempus';
 import type { VectorFieldFn, StreamlineDomain } from '../../plotting/streamlines/index';
 import { drawTrajectories } from '../../plotting/trajectories';
 // Re-use the state shape from the canvas-persistent streaklet so figures

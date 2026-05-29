@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
-  import TimelineInspector from 'tempus/inspector/svelte';
+  import TimelineInspector from '@helblazer811/tempus/inspector/svelte';
 
   export let children = undefined;
   export let caption = undefined;

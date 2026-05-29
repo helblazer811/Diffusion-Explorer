@@ -28,7 +28,7 @@
  * anim.draw(state);
  */
 
-import type { Animation, Clip } from 'tempus';
+import type { Animation, Clip } from '@helblazer811/tempus';
 import {
   PulsingPathsRenderer,
   type PulsingPathsRendererOptions,
