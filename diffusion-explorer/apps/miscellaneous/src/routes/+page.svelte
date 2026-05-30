@@ -37,6 +37,7 @@
 		<li><a href="/lorenz_attractor">Lorenz Attractor</a></li>
 		<li><a href="/class_conditioning">Class Conditioning</a></li>
 		<li><a href="/svgd">SVGD (Stein Variational Gradient Descent)</a></li>
+		<li><a href="/s_curve_springs">Dimensionality Reduction as Solving a Spring System</a></li>
 	</ul>
 </section>
 
