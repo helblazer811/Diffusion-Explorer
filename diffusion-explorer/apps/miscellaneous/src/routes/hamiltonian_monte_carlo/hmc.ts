@@ -63,29 +63,30 @@ export function distToLemniscate(pos: Vec2, numSamples: number = 500): number {
  * tf.tidy() so it can be passed to tf.grad.
  */
 export function makeLemniscateLogProb(sigma: number = 0.18): LogProbFn {
+  // Precompute lemniscate sample points as a [numSamples, 2] constant tensor.
+  // Log-density is a smooth-min over squared distances via log-sum-exp,
+  // which keeps the computation differentiable w.r.t. pos for tf.grad.
+  const numSamples = 500;
+  const curveData = new Float32Array(numSamples * 2);
+  for (let i = 0; i < numSamples; i++) {
+    const t = (2 * Math.PI * i) / numSamples;
+    const [cx, cy] = lemniscatePoint(t);
+    curveData[2 * i] = cx;
+    curveData[2 * i + 1] = cy;
+  }
+  const curvePoints = tf.tensor2d(curveData, [numSamples, 2]);
+  const invTwoSigmaSq = 1 / (2 * sigma * sigma);
+
   return (pos: tf.Tensor1D): tf.Scalar => {
     return tf.tidy(() => {
-      // Convert tensor to array to compute distance to lemniscate.
-      const posArray = pos.dataSync();
-      const px = posArray[0];
-      const py = posArray[1];
-
-      // Compute minimum distance to the lemniscate curve.
-      // Sample the curve parametrically.
-      let minDist = Infinity;
-      const numSamples = 500;
-      for (let i = 0; i < numSamples; i++) {
-        const t = (2 * Math.PI * i) / numSamples;
-        const [cx, cy] = lemniscatePoint(t);
-        const dx = px - cx;
-        const dy = py - cy;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < minDist) minDist = dist;
-      }
-
-      // Log-density: Gaussian with std sigma around the curve.
-      const logProb = -(minDist * minDist) / (2 * sigma * sigma);
-      return tf.scalar(logProb);
+      // diff: [numSamples, 2] = curvePoints - pos (broadcast over rows)
+      const diff = tf.sub(curvePoints, pos.reshape([1, 2]));
+      // sqDist: [numSamples]
+      const sqDist = tf.sum(tf.square(diff), 1);
+      // log( sum_i exp(-||pos - c_i||^2 / (2 sigma^2)) ) — smooth surrogate
+      // for -minDist^2 / (2 sigma^2), differentiable end-to-end.
+      const logits = tf.mul(sqDist, tf.scalar(-invTwoSigmaSq));
+      return tf.logSumExp(logits) as tf.Scalar;
     });
   };
 }
