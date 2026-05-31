@@ -325,7 +325,7 @@
 
   .hmc-title {
     color: #ffffff;
-    font-size: 5.1rem;
+    font-size: 3.4rem;
     font-weight: 300;
     text-align: center;
     margin: 0 0 1.25rem;
