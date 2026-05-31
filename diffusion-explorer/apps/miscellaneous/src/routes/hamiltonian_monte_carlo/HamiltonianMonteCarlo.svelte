@@ -49,8 +49,8 @@
     canvasWidth = 1440,
     canvasHeight = 810,
     numProposals = 150,
-    leapfrogSteps = 25,
-    stepSize = 0.12,
+    leapfrogSteps = 60,
+    stepSize = 0.05,
     domainRange = { xMin: -2.5, xMax: 2.5, yMin: -1.406, yMax: 1.406 },
     heatmapResolution = 960,
     heatmapBandwidth = 10,
@@ -60,7 +60,7 @@
     particleColor = "#ffffff",
     particleRadius = 9,
     particleOpacity = 0.95,
-    animationDuration = 12000,
+    animationDuration = 28000,
     seed = 42,
   }: Props = $props();
 
@@ -129,7 +129,7 @@
     const gridH = Math.round(gridW * (canvasHeight / canvasWidth));
 
     // Sample from the lemniscate Gaussian distribution.
-    const samples = sampleLemniscate(rng, 8000);
+    const samples = sampleLemniscate(rng, 80000);
     const density = computeRectKDE(
       samples,
       [xMin, xMax, yMin, yMax],
@@ -138,8 +138,11 @@
       heatmapBandwidth,
     );
 
+    // Separable Gaussian blur over the density grid to smooth out KDE noise.
+    const blurred = gaussianBlur2D(density, gridW, gridH, 4);
+
     let max = 0;
-    for (let i = 0; i < density.length; i++) if (density[i] > max) max = density[i];
+    for (let i = 0; i < blurred.length; i++) if (blurred[i] > max) max = blurred[i];
     const invMax = max > 0 ? 1 / max : 0;
 
     const offscreen = document.createElement("canvas");
@@ -150,7 +153,7 @@
 
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
-        const v = density[gy * gridW + gx] * invMax;
+        const v = blurred[gy * gridW + gx] * invMax;
         const c = d3.color(d3.interpolateInferno(v))?.rgb() ?? d3.rgb(0, 0, 0);
         // Flip y for canvas coordinates.
         const idx = ((gridH - 1 - gy) * gridW + gx) * 4;
@@ -300,11 +303,71 @@
       return unsubscribe;
     }
   });
+
+  // Separable Gaussian blur on a flat row-major grid (in-place safe).
+  // sigma is in pixels; kernel radius = ceil(3 * sigma).
+  function gaussianBlur2D(
+    src: Float32Array | number[],
+    w: number,
+    h: number,
+    sigma: number,
+  ): Float32Array {
+    const r = Math.max(1, Math.ceil(3 * sigma));
+    const kernel = new Float32Array(2 * r + 1);
+    const inv2s2 = 1 / (2 * sigma * sigma);
+    let ksum = 0;
+    for (let i = -r; i <= r; i++) {
+      const v = Math.exp(-i * i * inv2s2);
+      kernel[i + r] = v;
+      ksum += v;
+    }
+    for (let i = 0; i < kernel.length; i++) kernel[i] /= ksum;
+
+    const tmp = new Float32Array(w * h);
+    // Horizontal pass.
+    for (let y = 0; y < h; y++) {
+      const row = y * w;
+      for (let x = 0; x < w; x++) {
+        let acc = 0;
+        for (let k = -r; k <= r; k++) {
+          const xx = Math.min(w - 1, Math.max(0, x + k));
+          acc += src[row + xx] * kernel[k + r];
+        }
+        tmp[row + x] = acc;
+      }
+    }
+    // Vertical pass.
+    const out = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let acc = 0;
+        for (let k = -r; k <= r; k++) {
+          const yy = Math.min(h - 1, Math.max(0, y + k));
+          acc += tmp[yy * w + x] * kernel[k + r];
+        }
+        out[y * w + x] = acc;
+      }
+    }
+    return out;
+  }
 </script>
 
 <Figure bind:isActive={figureIsActive} backgroundVisible={false}>
   <div class="canvas-wrapper" style="max-width: {canvasWidth}px;">
     <h2 class="hmc-title">Hamiltonian Monte Carlo</h2>
+    <div class="hmc-equations" aria-label="Hamilton's equations">
+      <span class="hmc-eq">
+        <span class="frac"><span class="num">d<i>q</i></span><span class="den">d<i>t</i></span></span>
+        <span class="eq">=</span>
+        <span class="frac"><span class="num">∂<i>H</i></span><span class="den">∂<i>p</i></span></span>
+      </span>
+      <span class="hmc-eq">
+        <span class="frac"><span class="num">d<i>p</i></span><span class="den">d<i>t</i></span></span>
+        <span class="eq">=</span>
+        <span class="sign">−</span>
+        <span class="frac"><span class="num">∂<i>H</i></span><span class="den">∂<i>q</i></span></span>
+      </span>
+    </div>
     <canvas
       bind:this={canvas}
       use:canvas2d.bindCanvas
@@ -330,6 +393,49 @@
     text-align: center;
     margin: 0 0 1.25rem;
     letter-spacing: 0.01em;
+  }
+
+  .hmc-equations {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4rem;
+    color: #ffffff;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 1.7rem;
+    margin: 0 0 1rem;
+  }
+
+  .hmc-eq {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .hmc-eq .eq,
+  .hmc-eq .sign {
+    margin: 0 0.1rem;
+  }
+
+  .hmc-eq i {
+    font-style: italic;
+  }
+
+  .frac {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.05;
+    vertical-align: middle;
+  }
+
+  .frac .num {
+    border-bottom: 1px solid currentColor;
+    padding: 0 0.35em 0.05em;
+  }
+
+  .frac .den {
+    padding: 0.05em 0.35em 0;
   }
 
   .hmc-canvas {
