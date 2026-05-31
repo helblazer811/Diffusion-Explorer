@@ -5,6 +5,7 @@
   import * as tf from "@tensorflow/tfjs";
   import {
     Figure,
+    PathlineAnimation,
     Player,
     Timeline,
     createPauseClip,
@@ -69,6 +70,7 @@
   // ----------------------------------------------------------------
 
   let canvas: HTMLCanvasElement | null = $state(null);
+  let trajCanvas: HTMLCanvasElement | null = $state(null);
   const canvas2d = useCanvas2D(canvasWidth, canvasHeight);
   let ctx = $derived(canvas && canvas2d.ctx);
 
@@ -81,6 +83,20 @@
   let heatmapCanvas: HTMLCanvasElement | null = null;
 
   type AnimationState = { time: number; stepIndex: number; alpha: number };
+
+  // GPU-backed trajectory renderer. Replaces a hand-rolled per-segment stroke
+  // loop that was producing visible bright "dots" at every segment join: each
+  // segment was its own beginPath/stroke with lineCap: round, so adjacent
+  // round caps overlapped and double-painted in one frame. The GPU backend
+  // renders each segment as an SDF capsule with per-vertex alphaStart/alphaEnd
+  // interpolated in the fragment shader and proper premultiplied-alpha
+  // compositing — so cap stacking can't produce dots.
+  type DrawState = AnimationState & {
+    segmentIndex: number;
+    perSegmentAlphas: number[][];
+  };
+  let pathlineAnim: PathlineAnimation<DrawState> | null = null;
+  let pixelTrajectory: number[][] = [];
 
   let player: Player<AnimationState> | null = null;
   let isInitialized = $state(false);
@@ -118,6 +134,27 @@
 
     // Build heatmap.
     heatmapCanvas = buildHeatmapCanvas(rng);
+
+    // Build pixel-space pathline once (mirrors the world->pixel mapping used
+    // by the head-particle dot below) and initialize the GPU pathline renderer
+    // on the dedicated top canvas.
+    pixelTrajectory = trajectory.map(([x, y]) => [xScale!(x), yScale!(y)]);
+
+    if (trajCanvas) {
+      pathlineAnim = PathlineAnimation.fromTrajectories<DrawState>(
+        [pixelTrajectory],
+        {
+          backend: "gpu",
+          style: {
+            strokeWidth: pathlineWidth,
+            color: particleColor,
+            opacity: particleOpacity,
+            showHeadMarker: false,
+          },
+        },
+      );
+      await pathlineAnim.init(trajCanvas);
+    }
   }
 
   /**
@@ -216,8 +253,8 @@
     const px = xScale(x);
     const py = yScale(y);
 
-    // Draw pathline trail.
-    drawPathline(state, px, py);
+    // Draw pathline trail on the dedicated top canvas via the GPU renderer.
+    drawPathlineTrail(state);
 
     // Draw current particle as a white dot.
     ctx.fillStyle = particleColor;
@@ -229,45 +266,29 @@
   }
 
   /**
-   * Draw a fading tail of pathlineLength segments behind the particle.
+   * Render the fading-tail pathline to the GPU-backed top canvas.
+   * Builds a per-point alpha array that is full opacity at the head and falls
+   * off to zero `pathlineLength` segments behind, then hands it to the
+   * shared trajectory renderer (which clears the canvas internally).
    */
-  function drawPathline(state: AnimationState, px: number, py: number): void {
-    if (!ctx || !xScale || !yScale) return;
-    const { stepIndex } = state;
-    const start = Math.max(0, stepIndex - pathlineLength);
-
-    ctx.save();
-    ctx.lineWidth = pathlineWidth;
-    ctx.strokeStyle = particleColor;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    // Walk from oldest to current position.
-    for (let s = start; s < stepIndex; s++) {
-      const p = trajectory[s];
-      const q = trajectory[s + 1];
-      const idxFromHead = stepIndex - s;
-      const ageFrac = 1 - idxFromHead / pathlineLength;
-      if (ageFrac <= 0) continue;
-      ctx.globalAlpha = particleOpacity * Math.pow(ageFrac, pathlineFalloff);
-      ctx.beginPath();
-      ctx.moveTo(xScale(p[0]), yScale(p[1]));
-      ctx.lineTo(xScale(q[0]), yScale(q[1]));
-      ctx.stroke();
+  function drawPathlineTrail(state: AnimationState): void {
+    if (!pathlineAnim || pixelTrajectory.length === 0) return;
+    const { stepIndex, alpha } = state;
+    const numPoints = pixelTrajectory.length;
+    const alphas = new Array<number>(numPoints).fill(0);
+    // Per-point alpha falls off as pow(ageFrac, falloff) with point i's age
+    // measured from the current head (stepIndex) — a point exactly at the
+    // head has age 0, points pathlineLength behind have age 1.
+    for (let i = 0; i <= stepIndex; i++) {
+      const ageFrac = 1 - (stepIndex - i) / pathlineLength;
+      alphas[i] = ageFrac > 0 ? Math.pow(ageFrac, pathlineFalloff) : 0;
     }
-
-    // Final segment to current position.
-    if (stepIndex >= 0 && stepIndex < trajectory.length - 1) {
-      const last = trajectory[stepIndex];
-      ctx.globalAlpha = particleOpacity;
-      ctx.beginPath();
-      ctx.moveTo(xScale(last[0]), yScale(last[1]));
-      ctx.lineTo(px, py);
-      ctx.stroke();
-    }
-
-    ctx.globalAlpha = 1;
-    ctx.restore();
+    const segmentIndex = stepIndex + alpha;
+    pathlineAnim.draw({
+      ...state,
+      segmentIndex,
+      perSegmentAlphas: [alphas],
+    });
   }
 
   // ----------------------------------------------------------------
@@ -276,6 +297,7 @@
 
   onDestroy(() => {
     player?.dispose();
+    pathlineAnim?.destroy();
   });
 
   // ----------------------------------------------------------------
@@ -283,7 +305,7 @@
   // ----------------------------------------------------------------
 
   $effect(() => {
-    if (canvas && ctx && !isInitialized) {
+    if (canvas && ctx && trajCanvas && !isInitialized) {
       isInitialized = true;
       (async () => {
         await runInitialComputation();
@@ -368,11 +390,19 @@
         <span class="frac"><span class="num">∂<i>H</i></span><span class="den">∂<i>q</i></span></span>
       </span>
     </div>
-    <canvas
-      bind:this={canvas}
-      use:canvas2d.bindCanvas
-      class="hmc-canvas"
-    ></canvas>
+    <div class="hmc-canvas-stack">
+      <canvas
+        bind:this={canvas}
+        use:canvas2d.bindCanvas
+        class="hmc-canvas hmc-canvas-base"
+      ></canvas>
+      <canvas
+        bind:this={trajCanvas}
+        class="hmc-canvas hmc-canvas-traj"
+        width={canvasWidth}
+        height={canvasHeight}
+      ></canvas>
+    </div>
   </div>
 </Figure>
 
@@ -438,11 +468,31 @@
     padding: 0.05em 0.35em 0;
   }
 
+  .hmc-canvas-stack {
+    position: relative;
+    width: 100%;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
   .hmc-canvas {
     width: 100%;
     height: auto;
     display: block;
     background: #000;
     border-radius: 6px;
+  }
+
+  .hmc-canvas-base {
+    position: relative;
+    z-index: 0;
+  }
+
+  .hmc-canvas-traj {
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    pointer-events: none;
+    z-index: 1;
   }
 </style>
