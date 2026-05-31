@@ -55,12 +55,12 @@
     heatmapResolution = 960,
     heatmapBandwidth = 10,
     pathlineLength = 80,
-    pathlineWidth = 5,
+    pathlineWidth = 10,
     pathlineFalloff = 1.5,
     particleColor = "#ffffff",
-    particleRadius = 9,
+    particleRadius = 16,
     particleOpacity = 0.95,
-    animationDuration = 90000,
+    animationDuration = 180000,
     seed = 42,
   }: Props = $props();
 
