@@ -2,16 +2,19 @@
   import { onDestroy } from "svelte";
   import type { Writable } from "svelte/store";
   import * as d3 from "d3";
+  import * as tf from "@tensorflow/tfjs";
   import {
     Figure,
     Player,
     Timeline,
+    createPauseClip,
     useCanvas2D,
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { mulberry32 } from "$lib/hmc/random";
   import { computeRectKDE } from "$lib/hmc/kde";
-  import { sampleGMMBatch } from "$lib/hmc/gmm";
+  import { runHMCChain, type Vec2 } from "$lib/hmc/hmc";
+  import { makeGMMLogProb, sampleGMMBatch } from "$lib/hmc/gmm";
 
   // ----------------------------------------------------------------
   // Props
@@ -20,34 +23,38 @@
   interface Props {
     canvasWidth?: number;
     canvasHeight?: number;
+    numProposals?: number;
+    leapfrogSteps?: number;
+    stepSize?: number;
     domainRange?: { xMin: number; xMax: number; yMin: number; yMax: number };
     heatmapResolution?: number;
     heatmapBandwidth?: number;
-    pointPosition?: { x: number; y: number };
-    pointRadius?: number;
-    pointColor?: string;
-    pulseMaxRadius?: number;
-    pulseLineWidth?: number;
-    pulsePeriod?: number;
-    labelFontSize?: number;
-    captionFontSize?: number;
+    pathlineLength?: number;
+    pathlineWidth?: number;
+    pathlineFalloff?: number;
+    particleColor?: string;
+    particleRadius?: number;
+    particleOpacity?: number;
+    animationDuration?: number;
     seed?: number;
   }
 
   let {
-    canvasWidth = 720,
-    canvasHeight = 405,
+    canvasWidth = 1440,
+    canvasHeight = 810,
+    numProposals = 150,
+    leapfrogSteps = 60,
+    stepSize = 0.05,
     domainRange = { xMin: -2.5, xMax: 2.5, yMin: -1.406, yMax: 1.406 },
-    heatmapResolution = 480,
+    heatmapResolution = 960,
     heatmapBandwidth = 10,
-    pointPosition = { x: 1.7, y: 0.95 },
-    pointRadius = 8,
-    pointColor = "#1e40af",
-    pulseMaxRadius = 22,
-    pulseLineWidth = 2,
-    pulsePeriod = 1.6,
-    labelFontSize = 18,
-    captionFontSize = 16,
+    pathlineLength = 80,
+    pathlineWidth = 10,
+    pathlineFalloff = 1.5,
+    particleColor = "#1e40af",
+    particleRadius = 12,
+    particleOpacity = 0.95,
+    animationDuration = 180000,
     seed = 42,
   }: Props = $props();
 
@@ -62,9 +69,12 @@
   let xScale: d3.ScaleLinear<number, number> | undefined;
   let yScale: d3.ScaleLinear<number, number> | undefined;
 
+  // HMC trajectory as a flat array of Vec2.
+  let trajectory: Vec2[] = [];
+  // Pre-rendered heatmap on an offscreen canvas.
   let heatmapCanvas: HTMLCanvasElement | null = null;
 
-  type AnimationState = { pulse: number };
+  type AnimationState = { time: number; stepIndex: number; alpha: number };
 
   let player: Player<AnimationState> | null = null;
   let isInitialized = $state(false);
@@ -76,26 +86,40 @@
   // Setup
   // ----------------------------------------------------------------
 
-  function runInitialComputation(): void {
+  async function runInitialComputation(): Promise<void> {
+    await tf.ready();
+
     const { xMin, xMax, yMin, yMax } = domainRange;
     xScale = d3.scaleLinear().domain([xMin, xMax]).range([0, canvasWidth]);
     yScale = d3.scaleLinear().domain([yMin, yMax]).range([canvasHeight, 0]);
 
     const rng = mulberry32(seed);
+
+    const logProbFn = makeGMMLogProb();
+
+    const initialPos: Vec2 = [-0.7, -0.4];
+    trajectory = runHMCChain(
+      initialPos,
+      numProposals,
+      leapfrogSteps,
+      stepSize,
+      logProbFn,
+      rng,
+    );
+
     heatmapCanvas = buildHeatmapCanvas(rng);
   }
 
   /**
-   * Render the 3-Gaussian-mixture target density to an offscreen canvas
-   * using a blue colormap. Low-density pixels fade to transparent so the
-   * figure reads as inline ink on the page background.
+   * Render the target density (3-Gaussian mixture) to an offscreen canvas
+   * with a blue colormap, matching the rest of the explainer's figures.
    */
   function buildHeatmapCanvas(rng: () => number): HTMLCanvasElement {
     const { xMin, xMax, yMin, yMax } = domainRange;
     const gridW = heatmapResolution;
     const gridH = Math.round(gridW * (canvasHeight / canvasWidth));
 
-    const samples = sampleGMMBatch(rng, 60000);
+    const samples = sampleGMMBatch(rng, 80000);
     const density = computeRectKDE(
       samples,
       [xMin, xMax, yMin, yMax],
@@ -103,7 +127,9 @@
       gridH,
       heatmapBandwidth,
     );
-    const blurred = gaussianBlur2D(density, gridW, gridH, 3);
+
+    // Separable Gaussian blur over the density grid to smooth out KDE noise.
+    const blurred = gaussianBlur2D(density, gridW, gridH, 4);
 
     let max = 0;
     for (let i = 0; i < blurred.length; i++) if (blurred[i] > max) max = blurred[i];
@@ -136,18 +162,21 @@
   // ----------------------------------------------------------------
 
   function setupTimeline(): void {
-    // Pulsing outline ring: t in [0, 1] maps to one expanding/fading ring.
-    const pulseClip = {
-      name: "Pulse",
+    const segmentClip = {
+      name: "HMCSteps",
       reduce(t: number) {
-        return { pulse: t };
+        const float = t * (trajectory.length - 1);
+        const stepIndex = Math.min(Math.floor(float), trajectory.length - 2);
+        return { time: t, stepIndex, alpha: float - stepIndex };
       },
     };
 
     const tl = Timeline.from<AnimationState>({
-      duration: pulsePeriod,
-      initialState: { pulse: 0 },
-      clips: [{ clip: pulseClip, start: 0, end: 1 }],
+      duration: animationDuration / 1000,
+      initialState: { time: 0, stepIndex: 0, alpha: 0 },
+      clips: [
+        { clip: segmentClip, start: 0, end: 1 },
+      ],
     });
 
     player = new Player(tl, { looping: true });
@@ -165,43 +194,64 @@
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     ctx.drawImage(heatmapCanvas, 0, 0, canvasWidth, canvasHeight);
 
-    const px = xScale(pointPosition.x);
-    const py = yScale(pointPosition.y);
+    // --- Dynamic foreground ---
+    const { stepIndex, alpha } = state;
 
-    // Always-on filled point.
-    ctx.fillStyle = pointColor;
+    const a = trajectory[stepIndex];
+    const b = trajectory[Math.min(stepIndex + 1, trajectory.length - 1)];
+    const x = a[0] + (b[0] - a[0]) * alpha;
+    const y = a[1] + (b[1] - a[1]) * alpha;
+    const px = xScale(x);
+    const py = yScale(y);
+
+    drawPathline(state, px, py);
+
+    ctx.fillStyle = particleColor;
+    ctx.globalAlpha = particleOpacity;
     ctx.beginPath();
-    ctx.arc(px, py, pointRadius, 0, 2 * Math.PI);
+    ctx.arc(px, py, particleRadius, 0, 2 * Math.PI);
     ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 
-    // "x" label above the point.
-    ctx.fillStyle = pointColor;
-    ctx.font = `italic ${labelFontSize}px serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText("x", px, py - pointRadius - 8);
+  /**
+   * Draw a fading tail of pathlineLength segments behind the particle.
+   */
+  function drawPathline(state: AnimationState, px: number, py: number): void {
+    if (!ctx || !xScale || !yScale) return;
+    const { stepIndex } = state;
+    const start = Math.max(0, stepIndex - pathlineLength);
 
-    // "A Lonely Point" caption below the point.
-    ctx.fillStyle = "#444";
-    ctx.font = `${captionFontSize}px ${getComputedStyle(canvas!).fontFamily || "sans-serif"}`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText("A Lonely Point", px, py + pointRadius + 8);
+    ctx.save();
+    ctx.lineWidth = pathlineWidth;
+    ctx.strokeStyle = particleColor;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-    // --- Dynamic foreground: pulsing outline ring ---
-    const t = state.pulse;
-    const ringRadius = pointRadius + (pulseMaxRadius - pointRadius) * t;
-    const ringAlpha = 1 - t;
-    if (ringAlpha > 0) {
-      ctx.save();
-      ctx.globalAlpha = ringAlpha;
-      ctx.strokeStyle = pointColor;
-      ctx.lineWidth = pulseLineWidth;
+    for (let s = start; s < stepIndex; s++) {
+      const p = trajectory[s];
+      const q = trajectory[s + 1];
+      const idxFromHead = stepIndex - s;
+      const ageFrac = 1 - idxFromHead / pathlineLength;
+      if (ageFrac <= 0) continue;
+      ctx.globalAlpha = particleOpacity * Math.pow(ageFrac, pathlineFalloff);
       ctx.beginPath();
-      ctx.arc(px, py, ringRadius, 0, 2 * Math.PI);
+      ctx.moveTo(xScale(p[0]), yScale(p[1]));
+      ctx.lineTo(xScale(q[0]), yScale(q[1]));
       ctx.stroke();
-      ctx.restore();
     }
+
+    if (stepIndex >= 0 && stepIndex < trajectory.length - 1) {
+      const last = trajectory[stepIndex];
+      ctx.globalAlpha = particleOpacity;
+      ctx.beginPath();
+      ctx.moveTo(xScale(last[0]), yScale(last[1]));
+      ctx.lineTo(px, py);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   // ----------------------------------------------------------------
@@ -219,10 +269,12 @@
   $effect(() => {
     if (canvas && ctx && !isInitialized) {
       isInitialized = true;
-      runInitialComputation();
-      setupTimeline();
-      draw({ pulse: 0 });
-      player?.play();
+      (async () => {
+        await runInitialComputation();
+        setupTimeline();
+        draw({ time: 0, stepIndex: 0, alpha: 0 });
+        player?.play();
+      })();
     }
   });
 
@@ -235,7 +287,8 @@
     }
   });
 
-  // Separable Gaussian blur on a flat row-major grid.
+  // Separable Gaussian blur on a flat row-major grid (in-place safe).
+  // sigma is in pixels; kernel radius = ceil(3 * sigma).
   function gaussianBlur2D(
     src: Float32Array | number[],
     w: number,
@@ -254,6 +307,7 @@
     for (let i = 0; i < kernel.length; i++) kernel[i] /= ksum;
 
     const tmp = new Float32Array(w * h);
+    // Horizontal pass.
     for (let y = 0; y < h; y++) {
       const row = y * w;
       for (let x = 0; x < w; x++) {
@@ -265,6 +319,7 @@
         tmp[row + x] = acc;
       }
     }
+    // Vertical pass.
     const out = new Float32Array(w * h);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
@@ -285,7 +340,7 @@
     <canvas
       bind:this={canvas}
       use:canvas2d.bindCanvas
-      class="lonely-point-canvas"
+      class="hmc-canvas"
     ></canvas>
   </div>
 </Figure>
@@ -293,11 +348,12 @@
 <style>
   .canvas-wrapper {
     width: 100%;
-    margin: 0 auto;
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
     box-sizing: border-box;
   }
 
-  .lonely-point-canvas {
+  .hmc-canvas {
     width: 100%;
     height: auto;
     display: block;
