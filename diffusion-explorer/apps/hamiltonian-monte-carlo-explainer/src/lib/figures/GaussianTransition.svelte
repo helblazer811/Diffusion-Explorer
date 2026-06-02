@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import * as d3 from "d3";
   import {
@@ -9,6 +9,9 @@
     useCanvas2D,
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
+  import { settings } from "$lib/settings";
+
+  const { colors, point } = settings.stylingSettings;
 
   // ----------------------------------------------------------------
   // Props
@@ -24,22 +27,28 @@
     proposalColor?: string;
     lineColor?: string;
     labelColor?: string;
+    labelFontSize?: number;
+    pastAlpha?: number;
     stepDuration?: number;
     seed?: number;
+    caption?: Snippet;
   }
 
   let {
     canvasWidth = 1440,
-    canvasHeight = 360,
+    canvasHeight = 280,
     numSteps = 9,
-    proposalSigma = 36,
-    pointRadius = 8,
-    pointColor = "#1e40af",
-    proposalColor = "#1e40af",
-    lineColor = "#1e40af",
+    proposalSigma = 48,
+    pointRadius = point.radius,
+    pointColor = colors.point,
+    proposalColor = colors.point,
+    lineColor = colors.point,
     labelColor = "#111111",
+    labelFontSize = 22,
+    pastAlpha = 0.35,
     stepDuration = 2.4,
     seed = 7,
+    caption,
   }: Props = $props();
 
   // ----------------------------------------------------------------
@@ -55,7 +64,7 @@
 
   type AnimationState = {
     stepIndex: number;
-    phase: "point" | "contour" | "blink" | "line" | "fade";
+    phase: "point" | "contour" | "hold" | "blink" | "line" | "fade";
     phaseAlpha: number;
     blinkOn: boolean;
   };
@@ -93,16 +102,31 @@
 
   function runInitialComputation(): void {
     const rng = mulberry32(seed);
-    const padX = canvasWidth * 0.06;
-    const usableW = canvasWidth - 2 * padX;
-    const midY = canvasHeight * 0.55;
-    const jitterAmp = canvasHeight * 0.18;
+    // Outer proposal disk radius — pad horizontally so it never clips the
+    // canvas edges. Vertically, leave room above for the q(x'|x) label and
+    // below for the outer disk.
+    const outerRadius = proposalSigma * 2.0;
+    const padX = outerRadius + 12;
+    const labelHeadroom = outerRadius + labelFontSize + 14;
+    const padTop = labelHeadroom + 6;
+    const padBottom = outerRadius + 12;
+
+    const usableW = Math.max(1, canvasWidth - 2 * padX);
+    const midY = (padTop + (canvasHeight - padBottom)) / 2;
+    const yHalfBand = Math.max(
+      0,
+      (canvasHeight - padTop - padBottom) / 2,
+    );
+    const jitterAmp = yHalfBand * 0.6;
 
     points = [];
     for (let i = 0; i < numSteps; i++) {
       const t = numSteps === 1 ? 0.5 : i / (numSteps - 1);
       const x = padX + t * usableW;
-      const y = midY + gaussian(rng) * jitterAmp * 0.6;
+      // Clamp the Gaussian-jittered y into the safe vertical band so the
+      // outer disk + label always stay inside the canvas.
+      const yJ = Math.max(-yHalfBand, Math.min(yHalfBand, gaussian(rng) * jitterAmp));
+      const y = midY + yJ;
       points.push({ x, y });
     }
   }
@@ -114,10 +138,11 @@
   // Phase fractions within a single step. They sum to 1.
   const PHASE_FRACTIONS = {
     point: 0.12,
-    contour: 0.22,
-    blink: 0.18,
-    line: 0.20,
-    fade: 0.28,
+    contour: 0.20,
+    hold: 0.10,
+    blink: 0.16,
+    line: 0.16,
+    fade: 0.26,
   } as const;
 
   function setupTimeline(): void {
@@ -138,6 +163,7 @@
         const order: AnimationState["phase"][] = [
           "point",
           "contour",
+          "hold",
           "blink",
           "line",
           "fade",
@@ -152,9 +178,11 @@
           acc += f;
         }
 
-        // Blink the proposed point during the "blink" phase: visible, hidden, visible.
+        // Blink the proposed point during the "blink" phase: 2 off-pulses
+        // across 5 equal slices (on, off, on, off, on) to draw attention to
+        // x' the moment it appears.
         const blinkOn = phase === "blink"
-          ? phaseAlpha < 1 / 3 || phaseAlpha > 2 / 3
+          ? Math.floor(phaseAlpha * 5) % 2 === 0
           : phase === "line" || phase === "fade";
 
         return { stepIndex, phase, phaseAlpha, blinkOn };
@@ -186,6 +214,14 @@
     // --- Static background ---
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
+    // --- Past chain: persistent low-opacity orange dots and connectors ---
+    for (let i = 0; i < state.stepIndex; i++) {
+      const a = points[i];
+      const b = points[i + 1];
+      drawConnector(a, b, pastAlpha, 1);
+      drawDot(a.x, a.y, pointColor, pastAlpha);
+    }
+
     // --- Dynamic foreground ---
     const { stepIndex, phase, phaseAlpha, blinkOn } = state;
     const cur = points[stepIndex];
@@ -195,32 +231,57 @@
     // fades out during "fade".
     let contourAlpha = 0;
     if (phase === "contour") contourAlpha = phaseAlpha;
-    else if (phase === "blink" || phase === "line") contourAlpha = 1;
+    else if (phase === "hold" || phase === "blink" || phase === "line") contourAlpha = 1;
     else if (phase === "fade") contourAlpha = 1 - phaseAlpha;
 
-    // Proposed point opacity: matches blink-on flag, then steady through line+fade.
+    // Shared "fade-to-past" envelope: during the "fade" phase, every element
+    // that will become a past-step element on the next tick (current dot,
+    // proposed dot, connector) lerps from 1 → pastAlpha together. Then on
+    // step k+1's first frame the past-loop renders them at pastAlpha, with
+    // no blink at the handoff.
+    const fadeToPast =
+      phase === "fade" ? 1 - (1 - pastAlpha) * phaseAlpha : 1;
+
+    // Proposed point: blinks on/off during "blink" to grab the eye, holds
+    // full opacity during "line", then follows the shared fade-to-past.
     let proposalAlpha = 0;
     if (phase === "blink") proposalAlpha = blinkOn ? 1 : 0;
     else if (phase === "line") proposalAlpha = 1;
-    else if (phase === "fade") proposalAlpha = 1 - phaseAlpha;
+    else if (phase === "fade") proposalAlpha = fadeToPast;
 
-    // Connecting line opacity: grows during "line", fades during "fade".
+    // Connector: grows once during "line", holds full-length, then follows
+    // the shared fade-to-past envelope.
     let lineAlpha = 0;
-    if (phase === "line") lineAlpha = phaseAlpha;
-    else if (phase === "fade") lineAlpha = 1 - phaseAlpha;
+    let lineGrowT = 0;
+    if (phase === "line") {
+      lineAlpha = 1;
+      lineGrowT = phaseAlpha;
+    } else if (phase === "fade") {
+      lineAlpha = fadeToPast;
+      lineGrowT = 1;
+    }
 
     if (contourAlpha > 0) {
       drawProposalContours(cur.x, cur.y, contourAlpha);
-      drawLabel("p(x' | x)", cur.x, cur.y - proposalSigma * 3 - 14, contourAlpha);
+      drawLabel(
+        "q(x' | x)",
+        cur.x,
+        cur.y - proposalSigma * 2.0 - 14,
+        contourAlpha,
+      );
     }
 
     if (lineAlpha > 0) {
-      drawConnector(cur, next, lineAlpha);
+      // Show the arrowhead only while the line is actively growing toward x';
+      // once it reaches the destination (fade phase), strip the head so the
+      // segment lands as a plain line that matches its past-step appearance.
+      const showArrow = phase === "line";
+      drawConnector(cur, next, lineAlpha, lineGrowT, showArrow);
     }
 
-    // Current point — always visible.
-    drawDot(cur.x, cur.y, pointColor, 1);
-    drawLabel("x", cur.x, cur.y - pointRadius - 10, 1);
+    // Current point — full opacity, then follows the shared fade-to-past.
+    drawDot(cur.x, cur.y, pointColor, fadeToPast);
+    drawLabel("x", cur.x, cur.y - pointRadius - 10, fadeToPast);
 
     // Proposed point.
     if (proposalAlpha > 0) {
@@ -252,21 +313,21 @@
   ): void {
     if (!ctx) return;
     ctx.save();
-    ctx.lineWidth = 1.5;
     const rgb = d3.color(proposalColor)?.rgb();
-    const r = rgb?.r ?? 30;
-    const g = rgb?.g ?? 64;
-    const b = rgb?.b ?? 175;
+    const r = rgb?.r ?? 249;
+    const g = rgb?.g ?? 115;
+    const b = rgb?.b ?? 22;
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
 
-    // Three concentric rings at 1σ, 2σ, 3σ with decreasing opacity.
-    const sigmas = [1, 2, 3];
-    const ringOpacities = [0.85, 0.55, 0.30];
-    for (let i = 0; i < sigmas.length; i++) {
-      ctx.globalAlpha = alpha * ringOpacities[i];
-      ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+    // Filled concentric disks, drawn outer→inner so they stack and the
+    // center accumulates the darkest color (uniform per-ring alpha).
+    const radii = [2.0, 1.4, 0.8].map((s) => proposalSigma * s);
+    const ringAlpha = 0.18;
+    for (const radius of radii) {
+      ctx.globalAlpha = alpha * ringAlpha;
       ctx.beginPath();
-      ctx.arc(x, y, proposalSigma * sigmas[i], 0, 2 * Math.PI);
-      ctx.stroke();
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -275,6 +336,8 @@
     a: { x: number; y: number },
     b: { x: number; y: number },
     alpha: number,
+    growT: number,
+    showArrow: boolean = false,
   ): void {
     if (!ctx) return;
     // Trim the line so it starts and ends at the dot edges, not the centers.
@@ -284,21 +347,48 @@
     if (len < 1) return;
     const ux = dx / len;
     const uy = dy / len;
+    // When the arrowhead is showing, stop the line short of the destination
+    // dot so the head sits in a gap rather than tucked under the dot's edge.
+    // Without an arrow we keep the original edge-to-edge geometry so
+    // past-step connectors look unchanged.
+    const arrowGap = showArrow ? pointRadius + 6 : pointRadius;
     const start = { x: a.x + ux * pointRadius, y: a.y + uy * pointRadius };
+    const travel = Math.max(0, len - pointRadius - arrowGap);
     const end = {
-      x: a.x + ux * (pointRadius + (len - 2 * pointRadius) * alpha),
-      y: a.y + uy * (pointRadius + (len - 2 * pointRadius) * alpha),
+      x: a.x + ux * (pointRadius + travel * growT),
+      y: a.y + uy * (pointRadius + travel * growT),
     };
 
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = lineColor;
-    ctx.lineWidth = 2;
+    ctx.fillStyle = lineColor;
+    ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
     ctx.stroke();
+
+    if (showArrow) {
+      const headLength = 10;
+      const headWidth = 8;
+      // Perpendicular unit vector for the arrowhead's flare.
+      const px = -uy;
+      const py = ux;
+      // Tip extends past the line end so the head is fully visible in the
+      // gap between the line and the proposed dot.
+      const tipX = end.x + ux * headLength;
+      const tipY = end.y + uy * headLength;
+      ctx.beginPath();
+      ctx.moveTo(tipX, tipY);
+      ctx.lineTo(end.x + px * (headWidth / 2), end.y + py * (headWidth / 2));
+      ctx.lineTo(end.x - px * (headWidth / 2), end.y - py * (headWidth / 2));
+      ctx.closePath();
+      ctx.fill();
+    }
+
     ctx.restore();
   }
 
@@ -312,7 +402,7 @@
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = labelColor;
-    ctx.font = "italic 16px 'Computer Modern Serif', 'Times New Roman', serif";
+    ctx.font = `italic ${labelFontSize}px 'Computer Modern Serif', 'Times New Roman', serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     ctx.fillText(text, x, y);
@@ -356,7 +446,7 @@
   });
 </script>
 
-<Figure bind:isActive={figureIsActive} backgroundVisible={false}>
+<Figure bind:isActive={figureIsActive} backgroundVisible={false} {caption}>
   <div class="canvas-wrapper" style="max-width: {canvasWidth}px;">
     <canvas
       bind:this={canvas}
