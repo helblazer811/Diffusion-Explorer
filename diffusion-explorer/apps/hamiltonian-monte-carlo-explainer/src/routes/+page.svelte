@@ -13,6 +13,7 @@
   import GaussianTransition from "$lib/figures/GaussianTransition.svelte";
   import GaussianRandomWalk from "$lib/figures/GaussianRandomWalk.svelte";
   import GreedyAcceptance from "$lib/figures/GreedyAcceptance.svelte";
+  import MCMCBurnIn from "$lib/figures/MCMCBurnIn.svelte";
   import { base } from "$app/paths";
 
   const figureWidth = settings.stylingSettings.global.figureWidth;
@@ -88,6 +89,15 @@
 </p>
 
 <GreedyAcceptance canvasWidth={figureWidth} />
+
+<MCMCBurnIn canvasWidth={figureWidth}>
+  {#snippet caption()}
+    A chain started far from the mode takes a number of steps to drift toward
+    the stationary distribution. The early portion of the chain — the
+    <em>burn-in</em> — is unrepresentative of the target and is typically
+    discarded before computing estimates.
+  {/snippet}
+</MCMCBurnIn>
 
 <p>
   Greedy acceptance climbs uphill but gets trapped: each chain collapses onto
