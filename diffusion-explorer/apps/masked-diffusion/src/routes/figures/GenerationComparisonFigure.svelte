@@ -204,8 +204,8 @@
 <style>
 	.wrap {
 		display: flex;
-		flex-direction: column;
-		align-items: center;
+		flex-direction: row;
+		align-items: flex-start;
 		gap: 1.6rem;
 		width: 100%;
 		margin: 0 auto;
@@ -216,7 +216,19 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 0.5rem;
-		width: 100%;
+		flex: 1 1 0;
+		min-width: 0;
+	}
+
+	@media (max-width: 640px) {
+		.wrap {
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.row {
+			width: 100%;
+		}
 	}
 
 	.label {

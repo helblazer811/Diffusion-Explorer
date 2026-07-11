@@ -9,8 +9,7 @@
 export const TINY_STORY =
 	'Once there was a little cat named Milo who lived in a tall red house. ' +
 	'Every morning Milo would sit by the window and watch the birds fly. ' +
-	'One day a small yellow bird landed on the sill and chirped hello. ' +
-	'Milo smiled and the two became the very best of friends.';
+	'One day a small yellow bird landed on the sill and chirped hello.';
 
 export interface Tokenized {
 	/** The word tokens themselves (no leading whitespace or punctuation). */

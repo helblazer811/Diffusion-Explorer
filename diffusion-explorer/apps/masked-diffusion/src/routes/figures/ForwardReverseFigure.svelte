@@ -43,6 +43,12 @@
 		scalePulse?: boolean;
 		/** Toggle the smooth word↔mask opacity cross-fade at each flip instant. */
 		crossFade?: boolean;
+		/** Which of the two tracks to render. 'both' keeps the original figure;
+		 *  'continuous' shows only the smiley-diffusion track; 'masked' shows
+		 *  only the masked-text track. In every case the same triangle-wave
+		 *  timeline drives what's rendered, so a single time slider still scrubs
+		 *  it correctly. */
+		variant?: 'both' | 'continuous' | 'masked';
 	}
 
 	let {
@@ -52,8 +58,15 @@
 		seed = 7,
 		maskColor = '#cfe0f2',
 		scalePulse = true,
-		crossFade = true
+		crossFade = true,
+		variant = 'both'
 	}: Props = $props();
+
+	const showContinuous = variant === 'both' || variant === 'continuous';
+	const showMasked = variant === 'both' || variant === 'masked';
+	// Unique per-instance so two side-by-side variants don't collide on the
+	// same SVG marker ID.
+	const arrowMarkerId = `direction-arrowhead-${variant}`;
 
 	// --- Continuous flow: smiley face loaded from static asset (source), and
 	// a Gaussian cloud generated deterministically (target). A single sample
@@ -263,36 +276,72 @@
 	}
 </script>
 
-<div class="wrap" style="--mask-color: {maskColor}">
-	<div class="section">
-		<div class="section-label">Continuous Diffusion</div>
-		<div class="canvas-row">
-			<SmileyDiffusionFlow
-				{trajectory}
-				source={smiley}
-				target={gaussian}
-				{progress}
-				width={size}
-				height={CANVAS_HEIGHT}
-			/>
-		</div>
-	</div>
-
-	<div class="section">
-		<div class="section-label">Masked Diffusion</div>
-		<p class="paragraph">
-			{#each tokens as tok, i (i)}
-				<span class="pre">{leading[i]}</span><span class="slot" aria-label={tok}>
-					<span class="word" style="opacity: {tokenOpacity(i)}">{tok}</span
-					><span
-					class="mask"
-					style="opacity: {1 - tokenOpacity(i)}; transform: scale({maskScale(i)});"
-					>&nbsp;</span
+{#snippet directionBadge()}
+	<div class="direction-badge direction-badge-inline" class:is-reverse={!goingForward} aria-hidden="true">
+		<svg class="direction-arrow" viewBox="0 0 240 32" preserveAspectRatio="none">
+			<defs>
+				<marker
+					id={arrowMarkerId}
+					viewBox="0 -5 10 10"
+					refX={8}
+					refY={0}
+					markerWidth={5}
+					markerHeight={5}
+					orient="auto"
 				>
-				</span><span class="post">{trailing[i]}</span>
-			{/each}
-		</p>
+					<path d="M0,-5L10,0L0,5" fill="#c8ccd1" />
+				</marker>
+			</defs>
+			<line
+				x1={goingForward ? 4 : 236}
+				y1={16}
+				x2={goingForward ? 236 : 4}
+				y2={16}
+				stroke="#c8ccd1"
+				stroke-width="2.5"
+				marker-end="url(#{arrowMarkerId})"
+			/>
+		</svg>
+		<span class="direction-text">
+			{goingForward ? 'Forward' : 'Reverse'}
+		</span>
 	</div>
+{/snippet}
+
+<div class="wrap" style="--mask-color: {maskColor}">
+	{#if showContinuous}
+		<div class="section">
+			{@render directionBadge()}
+			<div class="canvas-row">
+				<SmileyDiffusionFlow
+					{trajectory}
+					source={smiley}
+					target={gaussian}
+					{progress}
+					width={size}
+					height={CANVAS_HEIGHT}
+				/>
+			</div>
+		</div>
+	{/if}
+
+	{#if showMasked}
+		<div class="section">
+			{@render directionBadge()}
+			<p class="paragraph">
+				{#each tokens as tok, i (i)}
+					<span class="pre">{leading[i]}</span><span class="slot" aria-label={tok}>
+						<span class="word" style="opacity: {tokenOpacity(i)}">{tok}</span
+						><span
+						class="mask"
+						style="opacity: {1 - tokenOpacity(i)}; transform: scale({maskScale(i)});"
+						>&nbsp;</span
+					>
+					</span><span class="post">{trailing[i]}</span>
+				{/each}
+			</p>
+		</div>
+	{/if}
 
 	<div class="slider-row">
 		<TimeSlider
@@ -382,6 +431,7 @@
 	}
 
 	.slider-row {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -389,8 +439,32 @@
 		width: 100%;
 	}
 
-	.direction {
-		font-size: 0.95rem;
+	.direction-badge {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 240px;
+		height: 32px;
+		margin: 0 auto 0.4rem;
+		pointer-events: none;
+	}
+
+	.direction-arrow {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+	}
+
+	.direction-text {
+		position: relative;
+		z-index: 1;
+		padding: 0 0.6rem;
+		background: #ffffff;
+		font-size: 1.15rem;
+		font-weight: 600;
 		color: #666;
+		letter-spacing: 0.02em;
 	}
 </style>

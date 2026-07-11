@@ -73,7 +73,7 @@ export async function loadBibliography(bibPath: string): Promise<Map<string, Bib
  * For hoverable references: just collects IDs for numbering (component handles display).
  */
 export function collectCitations(): CitationInfo[] {
-  const spans = document.querySelectorAll('span.citation[data-cite], span.hoverable-reference[data-cite]');
+  const spans = document.querySelectorAll('span.citation[data-cite], .hoverable-reference[data-cite]');
   const seen = new Map<string, number>();
   const citations: CitationInfo[] = [];
   let counter = 1;

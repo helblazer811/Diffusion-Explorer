@@ -10,7 +10,10 @@ const config = {
 	kit: {
 		adapter: adapter(),
 		paths: {
-			base: dev ? '' : '/masked-diffusion'
+			base: dev ? '' : '/blog/masked-diffusion'
+		},
+		prerender: {
+			handleMissingId: 'ignore'
 		}
 	}
 };

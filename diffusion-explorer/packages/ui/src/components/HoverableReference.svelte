@@ -8,7 +8,7 @@
   export let citations: CitationInfo[] = [];
 
   // Internal state
-  let spanElement: HTMLSpanElement;
+  let spanElement: HTMLElement;
   let showTooltip = false;
   let positionAbove = true;
   let horizontalAlign: 'left' | 'center' | 'right' = 'center';
@@ -50,39 +50,67 @@
   }
 </script>
 
-<span
-  class="hoverable-reference"
-  data-cite={id}
-  bind:this={spanElement}
-  on:mouseenter={handleMouseEnter}
-  on:mouseleave={handleMouseLeave}
-  role="note"
-  aria-label="Reference {number}: {entry?.title ?? 'Unknown reference'}"
->
-  [{number ?? '?'}]
-  {#if showTooltip && entry}
-    <div
-      class="tooltip"
-      class:above={positionAbove}
-      class:below={!positionAbove}
-      class:align-left={horizontalAlign === 'left'}
-      class:align-center={horizontalAlign === 'center'}
-      class:align-right={horizontalAlign === 'right'}
-      role="tooltip"
-      on:mouseenter={handleMouseEnter}
-      on:mouseleave={handleMouseLeave}
-    >
-      <div class="tooltip-title">{entry.title}</div>
-      <div class="tooltip-authors">{formatAuthors(entry.author)}</div>
-      <div class="tooltip-year">{entry.year}</div>
-      {#if entry.url}
-        <a href={entry.url} target="_blank" rel="noopener noreferrer" class="tooltip-link">
-          View paper
-        </a>
-      {/if}
-    </div>
-  {/if}
-</span>
+{#if entry?.url}
+  <a
+    class="hoverable-reference"
+    data-cite={id}
+    bind:this={spanElement}
+    on:mouseenter={handleMouseEnter}
+    on:mouseleave={handleMouseLeave}
+    href={entry.url}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Reference {number}: {entry?.title ?? 'Unknown reference'}"
+  >
+    [{number ?? '?'}]
+    {#if showTooltip && entry}
+      <span
+        class="tooltip"
+        class:above={positionAbove}
+        class:below={!positionAbove}
+        class:align-left={horizontalAlign === 'left'}
+        class:align-center={horizontalAlign === 'center'}
+        class:align-right={horizontalAlign === 'right'}
+        role="tooltip"
+        on:mouseenter={handleMouseEnter}
+        on:mouseleave={handleMouseLeave}
+      >
+        <span class="tooltip-title">{entry.title}</span>
+        <span class="tooltip-authors">{formatAuthors(entry.author)}</span>
+        <span class="tooltip-year">{entry.year}</span>
+      </span>
+    {/if}
+  </a>
+{:else}
+  <span
+    class="hoverable-reference"
+    data-cite={id}
+    bind:this={spanElement}
+    on:mouseenter={handleMouseEnter}
+    on:mouseleave={handleMouseLeave}
+    role="note"
+    aria-label="Reference {number}: {entry?.title ?? 'Unknown reference'}"
+  >
+    [{number ?? '?'}]
+    {#if showTooltip && entry}
+      <div
+        class="tooltip"
+        class:above={positionAbove}
+        class:below={!positionAbove}
+        class:align-left={horizontalAlign === 'left'}
+        class:align-center={horizontalAlign === 'center'}
+        class:align-right={horizontalAlign === 'right'}
+        role="tooltip"
+        on:mouseenter={handleMouseEnter}
+        on:mouseleave={handleMouseLeave}
+      >
+        <div class="tooltip-title">{entry.title}</div>
+        <div class="tooltip-authors">{formatAuthors(entry.author)}</div>
+        <div class="tooltip-year">{entry.year}</div>
+      </div>
+    {/if}
+  </span>
+{/if}
 
 <style>
   .hoverable-reference {
@@ -92,8 +120,26 @@
     cursor: default;
   }
 
+  a.hoverable-reference {
+    text-decoration: none;
+    cursor: pointer;
+    color: rgb(0, 100, 200);
+    display: inline-block;
+    padding: 1px 3px;
+    margin: 0 -1px;
+    border-radius: 4px;
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+
+  a.hoverable-reference:hover {
+    text-decoration: none;
+    color: rgb(0, 60, 140);
+    background-color: rgba(0, 0, 0, 0.06);
+  }
+
   .tooltip {
     position: absolute;
+    display: block;
     width: max-content;
     max-width: 300px;
     padding: 0.75rem 1rem;
@@ -104,6 +150,7 @@
     z-index: 1000;
     text-align: left;
     line-height: 1.4;
+    text-decoration: none;
   }
 
   .tooltip.align-center {
@@ -133,6 +180,7 @@
   }
 
   .tooltip-title {
+    display: block;
     font-weight: 600;
     font-size: 0.95rem;
     color: #333;
@@ -140,28 +188,16 @@
   }
 
   .tooltip-authors {
+    display: block;
     font-size: 0.9rem;
     color: #555;
     margin-bottom: 0.25rem;
   }
 
   .tooltip-year {
-    font-size: 0.85rem;
-    color: #777;
-  }
-
-  .tooltip-link {
     display: block;
     font-size: 0.85rem;
-    color: rgb(0, 100, 200);
-    text-decoration: none;
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid #e0e0e0;
-  }
-
-  .tooltip-link:hover {
-    text-decoration: underline;
+    color: #777;
   }
 
   @media (max-width: 600px) {

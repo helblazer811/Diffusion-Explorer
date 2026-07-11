@@ -36,11 +36,15 @@ export { default as TripleFigure } from './components/TripleFigure.svelte';
 export { default as TopNav } from './components/TopNav.svelte';
 export { default as ArticleHeader } from './components/ArticleHeader.svelte';
 export { default as PageContainer } from './components/PageContainer.svelte';
+export { default as Sidebar } from './components/Sidebar.svelte';
 
 // UI Controls
 export { default as PlayButton } from './components/PlayButton.svelte';
+export { default as PlayPauseResetButton } from './components/PlayPauseResetButton.svelte';
 export { default as Slider } from './components/Slider.svelte';
 export { default as TimeSlider } from './components/TimeSlider.svelte';
+export { default as NarratedTimeline } from './components/NarratedTimeline.svelte';
+export type { Chapter } from './components/NarratedTimeline.svelte';
 export { default as TextToggleButton } from './components/TextToggleButton.svelte';
 export { default as MultiStateToggleButton } from './components/MultiStateToggleButton.svelte';
 export { default as FigureLegend } from './components/FigureLegend.svelte';

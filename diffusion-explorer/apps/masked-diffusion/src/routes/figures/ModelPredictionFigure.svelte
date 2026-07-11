@@ -2,7 +2,9 @@
 	// Animated "what the model predicts" pipeline diagram for MDLM.
 	//
 	// Vertical layout, top to bottom, revealed one phase at a time on a
-	// looping tempus timeline (gated by `isActive` from the wrapping <Figure>).
+	// tempus timeline (gated by `isActive` from the wrapping <Figure>).
+	// Plays once when the figure enters view; a replay button in the
+	// top-left corner lets the reader restart the animation on demand.
 	//
 	//   Phase 1: (a) masked input sequence fades in.
 	//   Phase 2: (b) arrows down from each input into the transformer draw in.
@@ -19,14 +21,23 @@
 	import { onMount } from 'svelte';
 	import type { Writable } from 'svelte/store';
 	import { TimelineBuilder, Player } from '@helblazer811/tempus';
+	import { PlayPauseResetButton } from '@diffusion-explorer/ui';
 
 	interface Props {
 		isActive?: Writable<boolean>;
 		maskColor?: string;
+		maskTextColor?: string;
 		width?: number;
+		fontSize?: number;
 	}
 
-	let { isActive, maskColor = '#cfe0f2', width = 780 }: Props = $props();
+	let { isActive, maskColor = '#cfe0f2', maskTextColor = '#33506e', width = 780, fontSize = 16 }: Props = $props();
+
+	const maskLabelSize = fontSize * (12 / 16);
+	const txLabelSize = fontSize * (18 / 16);
+	const panelHeaderSize = fontSize * (15 / 16);
+	const barWordSize = fontSize * (14 / 16);
+	const probNumSize = fontSize * (12 / 16);
 
 	// --- Palette ---
 	const TEXT_COLOR = '#333';
@@ -101,9 +112,9 @@
 	const BAR_H = 18;
 	const BAR_PROB_W = 40;
 	const PANEL_W = BAR_LABEL_W + BAR_MAX_W + BAR_PROB_W + 16;
-	// y-coordinate the transformer→logits arrows aim for. Positioned ABOVE the
-	// LOGITS label (which is at BAR_Y_TOP - 22) so the arrowhead doesn't
-	// overlap the text.
+	// y-coordinate the transformer→probabilities arrows aim for. Positioned
+	// ABOVE the PROBABILITIES label (which is at BAR_Y_TOP - 22) so the
+	// arrowhead doesn't overlap the text.
 	const PANEL_Y_HEADER = BAR_Y_TOP - 36;
 	// Anchor each bar-chart panel horizontally so its center sits directly
 	// below its corresponding masked token — this way the arrow from the
@@ -127,7 +138,7 @@
 	// Timeline `u` runs 0 → 5 across the 5 animated phases (in order 2, 4, 5, 6, 7).
 	const P_IN = 700;
 	const P_HOLD = 500;
-	const P_SAMPLE = 2200;
+	const P_SAMPLE = 730;
 	const END_HOLD = 6500;
 	// Which phase indices are actually animated on the timeline, in play order.
 	const ANIMATED_PHASES = [2, 4, 5, 6, 7] as const;
@@ -138,6 +149,8 @@
 	}
 	let u = $state(0);
 	let player = $state<Player<State> | undefined>(undefined);
+	let isPlaying = $state(false);
+	const normalizedTime = $derived(Math.min(1, u / ANIMATED_PHASES.length));
 
 	function smoothstep(x: number): number {
 		const c = Math.max(0, Math.min(1, x));
@@ -208,13 +221,29 @@
 		return b.build();
 	}
 
+	function replay() {
+		if (!player) return;
+		player.reset();
+		u = 0;
+		player.play();
+		isPlaying = player.isPlaying;
+	}
+
+	function togglePlayPause() {
+		if (!player) return;
+		if (player.isPlaying) player.pause();
+		else player.play();
+		isPlaying = player.isPlaying;
+	}
+
 	onMount(() => {
 		player = new Player<State>(buildTimeline(), {
-			looping: true,
+			looping: false,
 			endPause: 0.05
 		});
 		player.onTick((_t, s) => {
 			u = s.u;
+			if (player) isPlaying = player.isPlaying;
 		});
 		const unsubActive = isActive?.subscribe((v) => {
 			if (!player) return;
@@ -224,6 +253,7 @@
 				player.reset();
 				u = 0;
 			}
+			isPlaying = player.isPlaying;
 		});
 		return () => {
 			unsubActive?.();
@@ -233,6 +263,12 @@
 </script>
 
 <div class="wrap" style="--mask-color: {maskColor}">
+	<PlayPauseResetButton
+		{isPlaying}
+		time={normalizedTime}
+		onclick={togglePlayPause}
+		onreset={replay}
+	/>
 	<svg
 		viewBox={`0 0 ${W} ${H}`}
 		preserveAspectRatio="xMidYMid meet"
@@ -282,9 +318,9 @@
 						y={SEQ_Y_TOP}
 						text-anchor="middle"
 						dominant-baseline="central"
-						font-size="12"
+						font-size={maskLabelSize}
 						font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, monospace"
-						fill="#33506e"
+						fill={maskTextColor}
 					>
 						[MASK]
 					</text>
@@ -294,7 +330,7 @@
 						y={SEQ_Y_TOP}
 						text-anchor="middle"
 						dominant-baseline="central"
-						font-size="16"
+						font-size={fontSize}
 						fill={TEXT_COLOR}
 					>
 						{tok}
@@ -339,7 +375,7 @@
 				y={TX_Y + TX_H / 2}
 				text-anchor="middle"
 				dominant-baseline="central"
-				font-size="18"
+				font-size={txLabelSize}
 				font-weight="600"
 				fill="#7a7f86"
 			>
@@ -378,12 +414,12 @@
 					y={BAR_Y_TOP - 22}
 					text-anchor="middle"
 					dominant-baseline="central"
-					font-size="15"
+					font-size={panelHeaderSize}
 					letter-spacing="0.05em"
 					font-weight="600"
 					fill={MUTED}
 				>
-					LOGITS
+					PROBABILITIES
 				</text>
 				{#each panel as row, r}
 					{@const rowY = BAR_Y_TOP + r * BAR_ROW_H}
@@ -399,7 +435,7 @@
 						y={rowY + BAR_ROW_H / 2}
 						text-anchor="end"
 						dominant-baseline="central"
-						font-size="14"
+						font-size={barWordSize}
 						fill={isHot ? ACCENT : TEXT_COLOR}
 						font-weight={isHot ? '600' : '400'}
 					>
@@ -421,7 +457,7 @@
 							y={rowY + BAR_ROW_H / 2}
 							text-anchor="end"
 							dominant-baseline="central"
-							font-size="12"
+							font-size={probNumSize}
 							fill="#fff"
 							font-weight="600"
 						>
@@ -433,7 +469,7 @@
 							y={rowY + BAR_ROW_H / 2}
 							text-anchor="start"
 							dominant-baseline="central"
-							font-size="12"
+							font-size={probNumSize}
 							fill={MUTED}
 						>
 							{row.p.toFixed(2)}
@@ -481,7 +517,7 @@
 					y={SEQ_Y_BOTTOM}
 					text-anchor="middle"
 					dominant-baseline="central"
-					font-size="16"
+					font-size={fontSize}
 					fill={inputTokens[i] === null ? ACCENT : TEXT_COLOR}
 					font-weight={inputTokens[i] === null ? '600' : '400'}
 				>
@@ -494,6 +530,7 @@
 
 <style>
 	.wrap {
+		position: relative;
 		width: 100%;
 		max-width: 780px;
 		margin: 0 auto;
