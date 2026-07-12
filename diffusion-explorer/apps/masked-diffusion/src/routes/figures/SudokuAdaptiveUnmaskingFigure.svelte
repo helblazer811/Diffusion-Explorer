@@ -52,7 +52,9 @@
 	const AXIS_COLOR = '#888';
 	const GRID_TICK_COLOR = '#e5e5e5';
 	const ADAPTIVE_COLOR = '#f17720';
-	const FIXED_COLOR = '#99BCDC';
+	// Gray keeps the fixed curve visually distinct from the blue [M]
+	// mask token in the sudoku panel — the two aren't the same idea.
+	const FIXED_COLOR = '#8a8a8a';
 	const CLUE_BG = '#dcdfe3';
 	const CLUE_TEXT = '#1a1a1a';
 	const FILL_TEXT = '#1a1a1a';
@@ -69,10 +71,17 @@
 	// confident earlier get lower orderIndex values. Positions 0..80.
 	let revealOrder = $state<number[]>([]);
 
-	// --- Line-graph data (placeholder — swap for real numbers later).
+	// --- Line-graph data.
+	// Anchored to Kim et al. 2025 ("Train for the Worst, Plan for the Best")
+	// Table 2, Standard Sudoku, T=50 reverse sampling steps:
+	//   MDM vanilla (random / fixed unmasking):    ~ 6.88%
+	//   MDM Top-probability margin (adaptive):     ~89.49%
+	// Kim et al. only report a single-point measurement at T=50; the
+	// shape between step counts is a plausible interpolation with
+	// saturating growth to those ceilings.
 	const STEPS = [1, 2, 4, 8, 16, 32, 64];
-	const ADAPTIVE_SOLVE_RATE = [0.05, 0.18, 0.42, 0.68, 0.83, 0.92, 0.95];
-	const FIXED_SOLVE_RATE = [0.02, 0.06, 0.15, 0.28, 0.42, 0.55, 0.62];
+	const ADAPTIVE_SOLVE_RATE = [0.02, 0.08, 0.22, 0.48, 0.72, 0.87, 0.9];
+	const FIXED_SOLVE_RATE = [0.005, 0.01, 0.02, 0.03, 0.05, 0.065, 0.07];
 
 	// --- Geometry.
 	const W = width;

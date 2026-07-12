@@ -1,21 +1,15 @@
 <script lang="ts">
-	// Causal self-attention figure — zoomed-in view of a single attention
-	// layer + its KV cache.
+	// Causal vs bidirectional attention — side-by-side comparison of the
+	// two attention patterns.
 	//
 	// Layout:
-	//   LHS: a small static "KV Cache" block, styled after the per-layer
-	//        cache rectangles in the KVCacheFigure (green K row on top,
-	//        pink V row below, one K/V pair per token).
-	//   RHS: the causal self-attention matrix (Q rows × K columns) inside
-	//        a gray "Attention Layer" container. The matrix fills in
-	//        row-by-row over time; each query row only attends to
-	//        past-and-current keys (lower-triangular). Below the matrix,
-	//        past → current arrows label the one-directional flow of
-	//        information.
+	//   LHS: causal self-attention matrix (Q rows × K columns). Each query
+	//        row only attends to past-and-current keys — lower-triangular.
+	//   RHS: bidirectional attention matrix. Every query attends to every
+	//        key — the full square is filled in.
 	//
-	// This figure zooms in on the causal structure introduced in the
-	// KV Caching figure above: the cache on the left is what the causal
-	// mask on the right makes possible.
+	// Both matrices fill in row-by-row over time so the difference in
+	// coverage between the two masks is immediately visible.
 
 	import { onMount } from 'svelte';
 	import type { Writable } from 'svelte/store';
@@ -33,19 +27,12 @@
 	const TEXT_COLOR = '#5a5a5a';
 	const MUTED = '#8892a0';
 	const BLOCK_LABEL_COLOR = '#5a5a5a';
-	const CELL_STROKE = '#e2e6ec'; // subtle heatmap-cell outline
+	const CELL_STROKE = '#e2e6ec';
 	const FOCUS_STROKE = '#F1942B';
-	const FWD_ARROW = '#F1942B';
-	const LAYER_FILL = '#f4f6fa';
-	const LAYER_STROKE = '#c8ccd1';
-	const K_FILL = '#4AD77A';
-	const V_FILL = '#EF6AAC';
-	const KV_STROKE = '#8892a0';
 
 	// Heatmap endpoints: low attention → white, high attention → orange.
-	// Interpolated in sRGB (good enough for a 0–1 fill on a small grid).
 	const HEAT_LOW = { r: 255, g: 255, b: 255 };
-	const HEAT_HIGH = { r: 241, g: 148, b: 43 }; // matches FWD_ARROW #F1942B
+	const HEAT_HIGH = { r: 241, g: 148, b: 43 };
 
 	function heatColor(t: number): string {
 		const c = Math.max(0, Math.min(1, t));
@@ -56,15 +43,12 @@
 	}
 
 	// --- Content ---
-	const tokens = ['Where', 'is', 'the', 'Eiffel', 'Tower', '?', 'In', 'Paris'];
+	const tokens = ['the', 'cat', 'sat', 'on', 'the', 'red', 'wool', 'mat'];
 	const N = tokens.length;
 
-	// Deterministic mock attention weights, row-normalized (softmax-shaped).
-	// Each row is a query; each column is a key. Values in [0, 1]; row i has
-	// nonzero weight only on columns j ≤ i (causal), and every allowed row
-	// sums to ~1. Hand-picked so different rows have visually distinct
-	// distributions — some rows sharpen on one column, some are spread out.
-	const rawWeights: number[][] = [
+	// Deterministic mock attention weights for the causal side, row-normalized.
+	// Row i has nonzero weight only on columns j ≤ i (lower-triangular).
+	const causalWeights: number[][] = [
 		[1.0, 0, 0, 0, 0, 0, 0, 0],
 		[0.35, 0.65, 0, 0, 0, 0, 0, 0],
 		[0.15, 0.25, 0.6, 0, 0, 0, 0, 0],
@@ -74,103 +58,109 @@
 		[0.04, 0.06, 0.08, 0.12, 0.15, 0.2, 0.35, 0],
 		[0.03, 0.05, 0.06, 0.1, 0.12, 0.14, 0.2, 0.3]
 	];
-	// Per-row max for scaling into the heatmap: each row's heaviest cell
-	// hits the deep-orange end of the ramp, lighter cells scale down.
-	const rowMax: number[] = rawWeights.map((row) =>
-		row.reduce((m, v) => Math.max(m, v), 0)
-	);
-	function attnHeat(i: number, j: number): number {
-		if (j > i || rowMax[i] === 0) return 0;
-		return rawWeights[i][j] / rowMax[i];
+
+	// Bidirectional weights: every row attends to every column. Values in
+	// [0, 1]; each row hand-picked with a distinct shape so different rows
+	// have visually distinct distributions (some sharp on one column, some
+	// spread out — same character as the causal side, just unrestricted).
+	const bidirWeights: number[][] = [
+		[0.5, 0.1, 0.06, 0.08, 0.08, 0.05, 0.06, 0.07],
+		[0.2, 0.45, 0.1, 0.06, 0.05, 0.04, 0.05, 0.05],
+		[0.08, 0.12, 0.4, 0.15, 0.1, 0.05, 0.05, 0.05],
+		[0.05, 0.05, 0.08, 0.5, 0.18, 0.04, 0.04, 0.06],
+		[0.04, 0.05, 0.06, 0.28, 0.4, 0.05, 0.06, 0.06],
+		[0.05, 0.06, 0.05, 0.1, 0.12, 0.35, 0.12, 0.15],
+		[0.05, 0.05, 0.06, 0.08, 0.1, 0.08, 0.42, 0.16],
+		[0.05, 0.05, 0.05, 0.1, 0.12, 0.05, 0.13, 0.45]
+	];
+
+	function rowMax(weights: number[][]): number[] {
+		return weights.map((row) => row.reduce((m, v) => Math.max(m, v), 0));
+	}
+	const causalRowMax = rowMax(causalWeights);
+	const bidirRowMax = rowMax(bidirWeights);
+
+	function causalHeat(i: number, j: number): number {
+		if (j > i || causalRowMax[i] === 0) return 0;
+		return causalWeights[i][j] / causalRowMax[i];
+	}
+	function bidirHeat(i: number, j: number): number {
+		if (bidirRowMax[i] === 0) return 0;
+		return bidirWeights[i][j] / bidirRowMax[i];
 	}
 
 	// --- Overall geometry ---
 	const W = width;
 
-	// Attention Layer (RHS) container geometry.
 	const CELL = 20;
-	const GAP = 3;
+	const GAP = 14;
 	const CELL_STEP = CELL + GAP;
 	const gridW = N * CELL_STEP - GAP;
 	const gridH = N * CELL_STEP - GAP;
 
-	// Inner padding inside the "Attention Layer" gray container.
-	const LAYER_TITLE_H = 30;
-	const LAYER_PAD_L = 108; // room for the "QUERIES" title + Q-token labels inside
-	const LAYER_PAD_R = 16;
-	const LAYER_PAD_T = LAYER_TITLE_H + 40; // room for Keys title + K-token labels inside
-	const LAYER_PAD_B = 16;
+	// Room around each matrix for the "QUERIES" title + Q-token labels
+	// (left) and the title + "KEYS" title + K-token labels (top).
+	const TITLE_H = 26;
+	const PAD_L = 60;
+	const PAD_R = 8;
+	const PAD_T = TITLE_H + 54;
+	const PAD_B = 12;
 
-	const LAYER_W = LAYER_PAD_L + gridW + LAYER_PAD_R;
-	const LAYER_H = LAYER_PAD_T + gridH + LAYER_PAD_B;
+	// Room below the matrix for the "input tokens → output token" arrow
+	// diagram that visualises which columns flow into the current query row.
+	const ARROW_ROW_GAP = 18; // gap between grid bottom and input-token strip
+	const ARROW_ARC_H = 46; // vertical height of the arcs
+	const ARROW_ROW_H = ARROW_ROW_GAP + ARROW_ARC_H + 14; // total extra height
 
-	// LHS: KV Cache mini-block. Sized proportionally to feel like a zoom-in
-	// of a single layer's cache from KVCacheFigure.
-	const CACHE_W = 240;
-	const CACHE_LABEL_H = 24;
-	const KV_CELL_W = 22;
-	const KV_HALF_H = 18;
-	const KV_CELL_H = KV_HALF_H * 2;
-	const KV_INNER_PADDING = 8;
-	const KV_LABEL_W = 16;
-	const KV_ROW_W = CACHE_W - 2 * KV_INNER_PADDING - KV_LABEL_W;
-	const KV_STRIDE = KV_ROW_W / N;
-	const CACHE_H = CACHE_LABEL_H + KV_CELL_H + 24; // label + K/V cells + padding
+	const PANEL_W = PAD_L + gridW + PAD_R;
+	const PANEL_H = PAD_T + gridH + PAD_B + ARROW_ROW_H;
 
-	// Column layout: cache on the left, attention layer on the right.
-	const COL_GAP = 40;
-	const LEFT_MARGIN = 20;
-	const CACHE_X = LEFT_MARGIN;
-	const LAYER_X = CACHE_X + CACHE_W + COL_GAP;
+	const COL_GAP = 24;
+	const LEFT_MARGIN = 12;
+	const LEFT_X = LEFT_MARGIN;
+	const RIGHT_X = LEFT_X + PANEL_W + COL_GAP;
 
-	// Total viewBox width from computed layout (fall back to `width` for
-	// SVG width; the intrinsic layout width `W_INTRINSIC` sets the viewBox).
-	const W_INTRINSIC = LAYER_X + LAYER_W + LEFT_MARGIN;
+	const W_INTRINSIC = RIGHT_X + PANEL_W + LEFT_MARGIN;
 
-	// Vertical layout: attention layer starts near the top; cache is
-	// centered vertically against it.
-	const TOP_MARGIN = 30;
-	const LAYER_Y = TOP_MARGIN;
-	const CACHE_Y = LAYER_Y + (LAYER_H - CACHE_H) / 2;
+	const TOP_MARGIN = 20;
+	const PANEL_Y = TOP_MARGIN;
 
-	// Room below the layer for the forward-arrow row + caption.
-	const ARROW_ROW_H = 60;
-	const H = LAYER_Y + LAYER_H + ARROW_ROW_H + 30;
+	const H = PANEL_Y + PANEL_H + 30;
 
-	// Attention-matrix geometry inside the layer container.
-	const gridX = LAYER_X + LAYER_PAD_L;
-	const gridY = LAYER_Y + LAYER_PAD_T;
+	function gridX(panelX: number): number {
+		return panelX + PAD_L;
+	}
+	const gridY = PANEL_Y + PAD_T;
 
-	function cellX(j: number): number {
-		return gridX + j * CELL_STEP;
+	function cellX(panelX: number, j: number): number {
+		return gridX(panelX) + j * CELL_STEP;
 	}
 	function cellY(i: number): number {
 		return gridY + i * CELL_STEP;
 	}
-	function kLabelX(j: number): number {
-		return gridX + j * CELL_STEP + CELL / 2;
+	function kLabelX(panelX: number, j: number): number {
+		return gridX(panelX) + j * CELL_STEP + CELL / 2;
 	}
 	function qLabelY(i: number): number {
 		return gridY + i * CELL_STEP + CELL / 2;
 	}
 
-	// K-axis title (inside the layer, above the grid) and Q-axis title
-	// (inside the layer, to the left of the grid, rotated).
-	const K_TITLE_Y = LAYER_Y + LAYER_TITLE_H + 8;
 	const K_LABEL_Y = gridY - 14;
+	const K_TITLE_Y = PANEL_Y + TITLE_H + 12;
 
-	// Cache cell x-positions (K/V pairs, one per token).
-	function kvCellX(tokenI: number): number {
-		return CACHE_X + KV_INNER_PADDING + KV_LABEL_W + tokenI * KV_STRIDE + KV_STRIDE / 2 - KV_CELL_W / 2;
-	}
-	const KV_CELL_Y = CACHE_Y + CACHE_LABEL_H + 4;
-
-	// Forward-arrow row sits just below the attention layer.
-	const FWD_ARROW_Y = LAYER_Y + LAYER_H + 22;
+	// Arrow-row geometry: a row of input tokens below the matrix, with
+	// arcs flowing from sources to the current query's target token.
+	const gridBottomY = gridY + gridH;
+	// Baseline the arcs launch from and land on (same y for source + target
+	// so the arc reads as a clean input→output loop).
+	const ARROW_BASE_Y = gridBottomY + ARROW_ROW_GAP + ARROW_ARC_H;
+	const ARROW_LABEL_Y = ARROW_BASE_Y + 14;
+	// Peak of the arcs (the "flow" upward toward the matrix). Arcs never
+	// enter the grid area.
+	const ARROW_PEAK_Y = gridBottomY + ARROW_ROW_GAP;
 
 	// --- Timeline ---
 	const REVEAL_MS = 8000;
-	const FWD_MS = 1800;
 	const HOLD_MS = 3200;
 
 	interface State {
@@ -219,7 +209,51 @@
 		return Math.min(N - 1, idx);
 	});
 
-	const fwdProgress = $derived(smoothstep(phaseProgress(2)));
+	// Fractional progress within the current row's dwell window, in [0, 1).
+	// A row is "focused" for 1/N of phase 1; we want pulses to loop several
+	// times within that window, so we multiply the intra-row fraction and
+	// keep the fractional part.
+	const PULSES_PER_ROW = 2;
+	const rowFrac = $derived.by<number>(() => {
+		const p1 = phaseProgress(1);
+		if (p1 <= 0 || p1 >= 1) return 0;
+		const within = p1 * N - Math.floor(p1 * N); // [0, 1)
+		const scaled = within * PULSES_PER_ROW;
+		return scaled - Math.floor(scaled);
+	});
+
+	// Evaluate a quadratic Bezier at parameter t.
+	function bezier(t: number, x0: number, y0: number, x1: number, y1: number, x2: number, y2: number) {
+		const mt = 1 - t;
+		return {
+			x: mt * mt * x0 + 2 * mt * t * x1 + t * t * x2,
+			y: mt * mt * y0 + 2 * mt * t * y1 + t * t * y2
+		};
+	}
+
+	// A "pulse" is a short segment of the arc that travels along it. This
+	// builds an SVG path `d` for the segment [tStart, tEnd] of the arc via
+	// short line samples — cheap and readable, no dash-offset tricks.
+	const PULSE_LEN = 0.28; // fraction of the arc lit up at any moment
+	const PULSE_SAMPLES = 12;
+	function pulsePath(
+		head: number,
+		x0: number,
+		y0: number,
+		x1: number,
+		y1: number,
+		x2: number,
+		y2: number
+	): string {
+		const tail = Math.max(0, head - PULSE_LEN);
+		let d = '';
+		for (let s = 0; s <= PULSE_SAMPLES; s++) {
+			const t = tail + (head - tail) * (s / PULSE_SAMPLES);
+			const p = bezier(t, x0, y0, x1, y1, x2, y2);
+			d += (s === 0 ? 'M ' : 'L ') + p.x.toFixed(2) + ' ' + p.y.toFixed(2) + ' ';
+		}
+		return d;
+	}
 
 	function buildTimeline() {
 		return new TimelineBuilder<State>()
@@ -228,11 +262,7 @@
 				{ name: 'reveal', reduce: (t: number) => ({ u: 0 + t }) },
 				{ durationMs: REVEAL_MS }
 			)
-			.add(
-				{ name: 'fwd-arrows', reduce: (t: number) => ({ u: 1 + t }) },
-				{ durationMs: FWD_MS }
-			)
-			.add({ name: 'hold', reduce: (_t: number) => ({ u: 3 }) }, { durationMs: HOLD_MS })
+			.add({ name: 'hold', reduce: (_t: number) => ({ u: 2 }) }, { durationMs: HOLD_MS })
 			.build();
 	}
 
@@ -263,7 +293,7 @@
 <div class="wrap">
 	<PlayPauseResetButton
 		{isPlaying}
-		time={u / 3}
+		time={u / 2}
 		onclick={() => (isPlaying ? pause() : play())}
 		onreset={reset}
 	/>
@@ -271,249 +301,162 @@
 		viewBox={`0 0 ${W_INTRINSIC} ${H}`}
 		preserveAspectRatio="xMidYMid meet"
 		role="img"
-		aria-label="Zoomed-in view of a single self-attention layer with its KV cache on the left, plus an animated causal attention matrix on the right filling in row-by-row."
+		aria-label="Side-by-side comparison of causal self-attention (left, lower-triangular) and bidirectional attention (right, fully filled)."
 	>
-		<defs>
-			<marker
-				id="caf-fwd"
-				viewBox="0 -5 10 10"
-				refX={8}
-				refY={0}
-				markerWidth={5}
-				markerHeight={5}
-				orient="auto"
-			>
-				<path d="M0,-5L10,0L0,5" fill={FWD_ARROW} />
-			</marker>
-		</defs>
-
-		<!-- =============================================================
-		     LHS: static KV Cache block (mirrors KVCacheFigure per-layer cache).
-		     ============================================================= -->
-		<rect
-			x={CACHE_X}
-			y={CACHE_Y}
-			width={CACHE_W}
-			height={CACHE_H}
-			rx="6"
-			ry="6"
-			fill="#ffffff"
-			stroke={LAYER_STROKE}
-			stroke-width="1"
-		/>
-		<text
-			x={CACHE_X + 8}
-			y={CACHE_Y + 6}
-			dominant-baseline="hanging"
-			font-size="14"
-			font-weight="500"
-			fill={BLOCK_LABEL_COLOR}
-			letter-spacing="0.02em"
-		>
-			KV Cache
-		</text>
-
-		<!-- K/V row labels -->
-		<text
-			x={CACHE_X + KV_INNER_PADDING + 2}
-			y={KV_CELL_Y + KV_HALF_H / 2}
-			text-anchor="start"
-			dominant-baseline="central"
-			font-size="11"
-			font-weight="600"
-			fill={MUTED}
-		>
-			K
-		</text>
-		<text
-			x={CACHE_X + KV_INNER_PADDING + 2}
-			y={KV_CELL_Y + KV_HALF_H + KV_HALF_H / 2}
-			text-anchor="start"
-			dominant-baseline="central"
-			font-size="11"
-			font-weight="600"
-			fill={MUTED}
-		>
-			V
-		</text>
-
-		<!-- K/V pair cells, one per token, statically filled. -->
-		{#each tokens as _tok, i}
-			{@const cx = kvCellX(i)}
-			<rect
-				x={cx}
-				y={KV_CELL_Y}
-				width={KV_CELL_W}
-				height={KV_HALF_H}
-				rx="2"
-				ry="2"
-				fill={K_FILL}
-				stroke={KV_STROKE}
-				stroke-width="0.75"
-			/>
-			<rect
-				x={cx}
-				y={KV_CELL_Y + KV_HALF_H}
-				width={KV_CELL_W}
-				height={KV_HALF_H}
-				rx="2"
-				ry="2"
-				fill={V_FILL}
-				stroke={KV_STROKE}
-				stroke-width="0.75"
-			/>
-		{/each}
-
-		<!-- =============================================================
-		     RHS: Attention Layer container with the causal matrix inside.
-		     ============================================================= -->
-		<rect
-			x={LAYER_X}
-			y={LAYER_Y}
-			width={LAYER_W}
-			height={LAYER_H}
-			rx="10"
-			ry="10"
-			fill={LAYER_FILL}
-			stroke={LAYER_STROKE}
-			stroke-width="1"
-		/>
-		<text
-			x={LAYER_X + LAYER_W / 2}
-			y={LAYER_Y + LAYER_TITLE_H / 2 + 6}
-			text-anchor="middle"
-			dominant-baseline="central"
-			font-size="15"
-			font-weight="600"
-			fill={BLOCK_LABEL_COLOR}
-			letter-spacing="0.02em"
-		>
-			Attention Layer
-		</text>
-
-		<!-- Axis titles inside the layer -->
-		<text
-			x={gridX + gridW / 2}
-			y={K_TITLE_Y}
-			text-anchor="middle"
-			dominant-baseline="central"
-			font-size="12"
-			font-weight="600"
-			letter-spacing="0.06em"
-			fill={TEXT_COLOR}
-		>
-			KEYS
-		</text>
-		<text
-			x={LAYER_X + LAYER_PAD_L / 2 - 20}
-			y={gridY + gridH / 2}
-			text-anchor="middle"
-			dominant-baseline="central"
-			font-size="12"
-			font-weight="600"
-			letter-spacing="0.06em"
-			fill={TEXT_COLOR}
-			transform={`rotate(-90 ${LAYER_X + LAYER_PAD_L / 2 - 20} ${gridY + gridH / 2})`}
-		>
-			QUERIES
-		</text>
-
-		<!-- K token labels (above grid) -->
-		{#each tokens as tok, j}
+		{#each [{ x: LEFT_X, title: 'Causal Self-Attention', heat: causalHeat, causal: true }, { x: RIGHT_X, title: 'Bidirectional Attention', heat: bidirHeat, causal: false }] as panel}
+			<!-- Panel title, centered above the KEYS axis (the grid), not the
+			     whole panel — the panel is asymmetric due to the QUERIES pad. -->
 			<text
-				x={kLabelX(j)}
-				y={K_LABEL_Y}
+				x={gridX(panel.x) + gridW / 2}
+				y={PANEL_Y + TITLE_H / 2 + 4}
 				text-anchor="middle"
 				dominant-baseline="central"
-				font-size="11"
-				fill={MUTED}
-			>
-				{tok}
-			</text>
-		{/each}
-
-		<!-- Q token labels (left of grid) -->
-		{#each tokens as tok, i}
-			<text
-				x={gridX - 10}
-				y={qLabelY(i)}
-				text-anchor="end"
-				dominant-baseline="central"
-				font-size="11"
-				fill={MUTED}
-			>
-				{tok}
-			</text>
-		{/each}
-
-		<!-- Heatmap cells: only lower-triangular cells appear, one row per
-		     beat. Fill colour ramps from white (low attention) to orange
-		     (high attention) using each row's row-normalized weights. -->
-		{#each tokens as _q, i}
-			{#each tokens as _k, j}
-				{@const allowed = j <= i}
-				{@const rp = rowProgress(i)}
-				{@const isFocus = focusRow === i}
-				{#if allowed && rp > 0.02}
-					<rect
-						x={cellX(j)}
-						y={cellY(i)}
-						width={CELL}
-						height={CELL}
-						rx={2}
-						ry={2}
-						fill={heatColor(attnHeat(i, j))}
-						stroke={CELL_STROKE}
-						stroke-width="0.75"
-						opacity={rp}
-					/>
-					{#if isFocus}
-						<rect
-							x={cellX(j) - 1}
-							y={cellY(i) - 1}
-							width={CELL + 2}
-							height={CELL + 2}
-							rx={3}
-							ry={3}
-							fill="none"
-							stroke={FOCUS_STROKE}
-							stroke-width="1.5"
-							opacity={0.9}
-						/>
-					{/if}
-				{/if}
-			{/each}
-		{/each}
-
-		<!-- =============================================================
-		     Forward arrows below the layer + label
-		     ============================================================= -->
-		<g opacity={fwdProgress}>
-			{#each Array(N - 1) as _, j}
-				{@const x1 = kLabelX(j) + 6}
-				{@const x2 = kLabelX(j + 1) - 6}
-				<line
-					x1={x1}
-					y1={FWD_ARROW_Y}
-					x2={x2}
-					y2={FWD_ARROW_Y}
-					stroke={FWD_ARROW}
-					stroke-width="2"
-					marker-end="url(#caf-fwd)"
-				/>
-			{/each}
-			<text
-				x={gridX + gridW / 2}
-				y={FWD_ARROW_Y + 22}
-				text-anchor="middle"
-				dominant-baseline="central"
-				font-size="13"
+				font-size="15"
 				font-weight="600"
-				fill={FWD_ARROW}
+				fill={BLOCK_LABEL_COLOR}
+				letter-spacing="0.02em"
 			>
-				One-directional flow of information
+				{panel.title}
 			</text>
-		</g>
+
+			<!-- Axis titles -->
+			<text
+				x={gridX(panel.x) + gridW / 2}
+				y={K_TITLE_Y}
+				text-anchor="middle"
+				dominant-baseline="central"
+				font-size="14"
+				font-weight="600"
+				letter-spacing="0.06em"
+				fill={TEXT_COLOR}
+			>
+				KEYS
+			</text>
+			{@const qx = panel.x + 12}
+			<text
+				x={qx}
+				y={gridY + gridH / 2}
+				text-anchor="middle"
+				dominant-baseline="central"
+				font-size="14"
+				font-weight="600"
+				letter-spacing="0.06em"
+				fill={TEXT_COLOR}
+				transform={`rotate(-90 ${qx} ${gridY + gridH / 2})`}
+			>
+				QUERIES
+			</text>
+
+			<!-- K token labels (above grid) -->
+			{#each tokens as tok, j}
+				<text
+					x={kLabelX(panel.x, j)}
+					y={K_LABEL_Y}
+					text-anchor="middle"
+					dominant-baseline="central"
+					font-size="13"
+					fill={MUTED}
+				>
+					{tok}
+				</text>
+			{/each}
+
+			<!-- Q token labels (left of grid) -->
+			{#each tokens as tok, i}
+				<text
+					x={gridX(panel.x) - 10}
+					y={qLabelY(i)}
+					text-anchor="end"
+					dominant-baseline="central"
+					font-size="13"
+					fill={MUTED}
+				>
+					{tok}
+				</text>
+			{/each}
+
+			<!-- Heatmap cells -->
+			{#each tokens as _q, i}
+				{#each tokens as _k, j}
+					{@const allowed = panel.causal ? j <= i : true}
+					{@const rp = rowProgress(i)}
+					{@const isFocus = focusRow === i}
+					{#if allowed && rp > 0.02}
+						<rect
+							x={cellX(panel.x, j)}
+							y={cellY(i)}
+							width={CELL}
+							height={CELL}
+							rx={2}
+							ry={2}
+							fill={heatColor(panel.heat(i, j))}
+							stroke={CELL_STROKE}
+							stroke-width="0.75"
+							opacity={rp}
+						/>
+						{#if isFocus}
+							<rect
+								x={cellX(panel.x, j) - 1}
+								y={cellY(i) - 1}
+								width={CELL + 2}
+								height={CELL + 2}
+								rx={3}
+								ry={3}
+								fill="none"
+								stroke={FOCUS_STROKE}
+								stroke-width="1.5"
+								opacity={0.9}
+							/>
+						{/if}
+					{/if}
+				{/each}
+			{/each}
+
+			<!-- Input-token strip below the matrix -->
+			{#each tokens as tok, j}
+				{@const isTarget = focusRow === j}
+				<text
+					x={kLabelX(panel.x, j)}
+					y={ARROW_LABEL_Y}
+					text-anchor="middle"
+					dominant-baseline="hanging"
+					font-size="13"
+					font-weight={isTarget ? 700 : 400}
+					fill={isTarget ? FOCUS_STROKE : MUTED}
+				>
+					{tok}
+				</text>
+			{/each}
+
+			<!-- Pulses travel along invisible arcs from each source token to
+			     the current query's target token. Only a short lit segment
+			     of each arc is drawn; the underlying arc itself is hidden. -->
+			{#if focusRow !== null}
+				{@const tgt = focusRow}
+				{@const tgtX = kLabelX(panel.x, tgt)}
+				{#each tokens as _tok, j}
+					{@const allowed = panel.causal ? j <= tgt : true}
+					{#if allowed && j !== tgt}
+						{@const srcX = kLabelX(panel.x, j)}
+						{@const dx = Math.abs(tgtX - srcX)}
+						{@const peakY = ARROW_BASE_Y - Math.min(ARROW_ARC_H, 10 + dx * 0.55)}
+						{@const y0 = ARROW_BASE_Y - 6}
+						{@const cx = (srcX + tgtX) / 2}
+						{@const head = rowFrac * (1 + PULSE_LEN)}
+						{#if head > 0 && head - PULSE_LEN < 1}
+							<path
+								d={pulsePath(Math.min(1, head), srcX, y0, cx, peakY, tgtX, y0)}
+								fill="none"
+								stroke={FOCUS_STROKE}
+								stroke-width="2"
+								stroke-linecap="round"
+								opacity={0.9}
+							/>
+						{/if}
+					{/if}
+				{/each}
+			{/if}
+		{/each}
 	</svg>
 </div>
 

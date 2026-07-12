@@ -784,12 +784,11 @@
 	{/snippet}
 	{#snippet caption()}
 		<span class="figure-number">Figure 6.</span> Causal self-attention
-		unrolled over time. Each row is a query at one position; each column
-		is a key. The attention mask restricts every query to attend only to
-		past-and-current keys, so cells appear only along the lower triangle,
-		one row per beat. Below the matrix, the horizontal arrows show the
-		one-directional flow of information from past to future &mdash; the
-		asymmetry that makes KV caching work.
+		(left) versus bidirectional attention (right). Each row is a query;
+		each column is a key. Under the causal mask, every query attends only
+		to past-and-current keys and the matrix is lower-triangular. Under
+		bidirectional attention every query can see every key, so the full
+		square fills in &mdash; there is no past-only structure to cache.
 	{/snippet}
 </Figure>
 
