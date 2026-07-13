@@ -30,6 +30,8 @@
 	import MLMLossInline from './figures/MLMLossInline.svelte';
 	import MaskToken from './figures/MaskToken.svelte';
 	import AbsorbingMaskFigure from './figures/AbsorbingMaskFigure.svelte';
+	import OrderMattersFigure from './figures/OrderMattersFigure.svelte';
+	import RepresentationRippleFigure from './figures/RepresentationRippleFigure.svelte';
 	import {
 		buildForwardReverseTimeline,
 		type ForwardReverseState,
@@ -63,6 +65,8 @@
 	const modelPredictionInlineFullMaskActive = writable(false);
 	const mlmLossInlineActive = writable(false);
 	const absorbingMaskActive = writable(false);
+	const orderMattersActive = writable(false);
+	const representationRippleActive = writable(false);
 
 	// Shared clock driving both ForwardReverseFigure variants (continuous +
 	// masked). Built on mount so SSR sees an undefined player (the figure
@@ -805,72 +809,114 @@
 
 <h2 id="idiosyncrasies">Idiosyncrasies of Masked Diffusion</h2>
 
-<!-- PLAN: what happens when you actually try to use one of these things.
-	Preamble (~1 short paragraph): the previous section defined what a
-	masked diffusion model IS; this section is about three quirks the
-	reader should know before diving into the literature. Order matters,
-	joint incoherence, bidirectional context updates. Each subsection
-	builds on the last. -->
+<p>
+	The previous section defined what a masked diffusion model <em>is</em>.
+	Once you actually try to sample from one, two quirks that don't come up
+	in autoregressive generation start to matter. Both trace back to the
+	same structural fact &mdash; the reverse step factorizes across
+	positions &mdash; and they set the terms of the speed-versus-coherence
+	tradeoffs that dominate the follow-up post on efficient decoding.
+</p>
 
 <h3 id="order-matters">Generation Order Matters</h3>
 
-<!-- PLAN:
-	- The forward process spec is order-agnostic (each position corrupts
-	  independently). The reverse process at inference time is NOT — you
-	  have to pick an order to unmask in.
-	- Naive schedule: random order. Works, but leaves quality on the table.
-	- Adaptive strategies: pick the position where the model is most
-	  confident (or lowest-entropy) first. Consistently better on
-	  structured tasks.
-	- Cite Kim et al. 2025 (kim2025trainworstplanbest). Headline: order
-	  choice is a real lever; adaptive orderings substantially beat random
-	  on tasks whose dependency structure isn't left-to-right.
-	- No figure. Prose-only, tight. -->
+<p>
+	The forward process corrupts each token position independently; that's
+	how the model is trained. The reverse step inherits the same shape.
+	In one forward pass the model produces, for every masked position, a
+	categorical distribution over the vocabulary &mdash; and if a step
+	unmasks more than one position, those samples are drawn independently.
+	The sampler treats
+	<Katex math={"p_\\theta(\\mathbf{x}_M \\mid \\mathbf{x}_U)"} /> as
+	<Katex math={"\\prod_{i \\in M} p_\\theta(\\mathbf{x}^i \\mid \\mathbf{x}_U)"} />
+	&mdash; a product of per-position marginals, not the true joint. The
+	reverse distribution is <em>factorized</em>.
+</p>
 
-<h3 id="joint-incoherence">Joint Incoherence Under Parallel Unmasking</h3>
+<p>
+	The consequence is easy to see on a short example. Consider the sentence
+	&ldquo;A dog was [MASK]. He wants to [MASK].&rdquo; A well-trained model
+	will produce roughly even marginals at each masked slot &mdash; the first
+	between something like <em>tired</em> and <em>hungry</em>, the second
+	between <em>eat</em> and <em>sleep</em>. Both marginals are individually
+	plausible. But the joint concentrates on the two coherent pairs
+	(<em>tired</em>, <em>sleep</em>) and (<em>hungry</em>, <em>eat</em>); the
+	other two are semantically incoherent. Sampling the two positions
+	independently produces an incoherent pair roughly half the time.
+</p>
 
-<!-- PLAN:
-	- The reverse step factorizes across positions: each masked slot gets
-	  its own categorical, sampled independently. Fine at one-position-
-	  per-step; broken at multi-position-per-step.
-	- Example: "___ and ___ love baseball" with the model's belief 50/50
-	  over {Alice, Bob} at each slot. Marginally calibrated; jointly, an
-	  "Alice and Alice" sample is 25% likely even though it's globally
-	  wrong.
-	- Consequence: real MDLM inference typically unmasks one or a few
-	  tokens per step and iterates many times. The many-small-steps
-	  regime keeps the factorized approximation close to the true
-	  posterior.
-	- Recovery via remasking — commit a token, notice inconsistency
-	  later, remask and re-sample. Cite Wang 2026
-	  (wang2026remaskingdiscretediffusionmodels).
-	- Figure: IndependentFactorizationFigure (already copied into this
-	  app's figures/ dir). Two phases: (A) the Alice-Alice failure,
-	  (B) remasking recovers. Reuse the caption from the original
-	  miscellaneous route, possibly trimmed. -->
+<Figure backgroundVisible={false} isActive={orderMattersActive}>
+	{#snippet children()}
+		<OrderMattersFigure
+			isActive={orderMattersActive}
+			maskColor={MASK_COLOR}
+			maskTextColor={MASK_TEXT_COLOR}
+		/>
+	{/snippet}
+</Figure>
+
+<p>
+	Order is the fix. Commit the first mask &mdash; say to <em>tired</em>
+	&mdash; and the next forward pass conditions on that commit; the second
+	position's marginal now concentrates sharply on <em>sleep</em>. This is
+	why real inference typically unmasks a small number of tokens per step
+	and iterates: each step's marginal is close to the correct conditional
+	given every commit so far. Which mask to fill next is a real lever too.
+	Adaptive orderings that pick the most confident (or lowest-entropy)
+	position at each step consistently outperform a random schedule on
+	tasks whose dependency structure isn't left-to-right
+	<HoverableReference
+		id="kim2025trainworstplanbest"
+		{bibEntries}
+		{citations}
+	/>.
+</p>
+
+<p>
+	The punchline: parallel decoding is not a structural free lunch.
+	Committing <Katex math={"K"} /> tokens in one step means sampling from a
+	product of <Katex math={"K"} /> marginals rather than the
+	<Katex math={"K"} />-way joint &mdash; the more masks you fill at once,
+	the further you draw from the true distribution the model was trained
+	on. Sequential decoding trades wall-clock for coherence; parallel
+	decoding trades coherence for wall-clock. This tension isn't an
+	implementation quirk; it's the modeling reason behind the caching
+	story in the follow-up post.
+</p>
 
 <h3 id="bidirectional-context-updates">Every Commit Rewrites Every Logit</h3>
 
-<!-- PLAN:
-	- Because attention is bidirectional (see §The Transformer), the
-	  hidden state at every position depends on the entire current
-	  sequence — not just tokens to the left.
-	- Practical: the moment you commit a token, the next forward pass
-	  sees new context, and every other masked position's categorical
-	  shifts. The prediction at position j depends on what you just
-	  committed at position i, even when i is to the RIGHT of j.
-	- Framing: this is not a bug, it's what makes iterative refinement
-	  worth doing. Every commit gives the model more evidence and
-	  sharpens beliefs about remaining positions.
-	- Contrast with AR: in AR past KVs are frozen after commit, model can
-	  only condition forward. In MDLM there's no "past" — the state is
-	  bidirectional through and through.
-	- Figure: RepresentationRippleFigure (already copied). Two forward
-	  passes on the same sentence with one mask committed between them;
-	  hidden state at EVERY position shifts. REWRITE the caption from
-	  blog 2's efficiency framing ("this is why KV caching breaks") to
-	  the idiosyncrasy framing ("this is what makes iterative refinement
-	  informative — every commit updates every belief"). -->
+<p>
+	The factorized reverse step said something about which positions'
+	<em>samples</em> depend on each other. There's a companion fact about
+	which positions' <em>logits</em> depend on each other, and it comes
+	from bidirectional attention. Every hidden state in a masked
+	transformer attends to every other position, so committing a single
+	token doesn't just fix that one slot &mdash; it changes the
+	representation at every other position, including the ones that stay
+	masked.
+</p>
+
+<Figure backgroundVisible={false} isActive={representationRippleActive}>
+	{#snippet children()}
+		<RepresentationRippleFigure
+			isActive={representationRippleActive}
+			maskColor={MASK_COLOR}
+			maskTextColor={MASK_TEXT_COLOR}
+		/>
+	{/snippet}
+</Figure>
+
+<p>
+	This is a feature, not a bug. In autoregressive generation, past
+	key-value activations are frozen the moment a token commits; the model
+	can only condition forward. In a masked diffusion model there is no
+	&ldquo;past&rdquo; &mdash; the state is bidirectional through and
+	through, so every commit is an opportunity to sharpen beliefs about
+	every remaining position, including ones to its left. It's what makes
+	iterative refinement worth doing. It's also what makes those iterations
+	expensive, but that's a story for the next post.
+</p>
 
 <h2 id="extensions">Extensions and Further Reading</h2>
 
