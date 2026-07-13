@@ -4,16 +4,27 @@
 	// Two-column composition:
 	//   LHS: "High Bandwidth Memory" box containing one KV cache per layer.
 	//   RHS: text prompt at top, Embedding block, then N_LAYERS attention
-	//        layers with residual-stream token rows between them.
+	//        layers with residual-stream token rows between them, then
+	//        Unembedding and an Output Tokens row.
+	//
+	// Column / slot semantics (causal-LM shift by one):
+	//   The transformer's INPUT COLUMNS run 0..N_INPUT_COLS-1 (= N_TOKENS-1).
+	//   Column c holds the residual for the token at TEXT SLOT c, and its
+	//   unembed produces the logits for TEXT SLOT c+1. So the last text
+	//   slot has no corresponding input column — nothing after it needs
+	//   predicting. There is no explicit "<next>" placeholder token fed in.
 	//
 	// Animation (continuous loop):
 	//   Prefill: prompt tokens flow through Embed and each attention layer
-	//     in parallel across all prompt positions; K/V pairs populate every
-	//     cache row simultaneously per layer.
-	//   Decode: for each token to be predicted (positions past the prompt),
-	//     the model runs serially — one flow through Embed → attention
-	//     stack, reading every cached position at each layer, then
-	//     appending its own K/V.
+	//     in parallel across all prompt columns (0..N_PROMPT-1); K/V pairs
+	//     populate every cache column simultaneously per layer.
+	//   Prefill-tail unembed: the residual at column N_PROMPT-1 flows into
+	//     Unembedding, producing the FIRST output token at text-slot
+	//     N_PROMPT. No separate forward pass is needed for it.
+	//   Decode: for each remaining text slot, one serial forward pass at
+	//     the corresponding input column — embed the previously-committed
+	//     token, flow through every layer (reading cache 0..col-1,
+	//     appending K/V at col), unembed at col → reveal slot col+1.
 	//
 	// Every animated object owns one named channel in `animState`:
 	//   channelName -> { progress: number }
@@ -26,7 +37,7 @@
 	import { onMount } from 'svelte';
 	import type { Writable } from 'svelte/store';
 	import { TimelineBuilder, Player } from '@helblazer811/tempus';
-	import { NarratedTimeline, type Chapter } from '@diffusion-explorer/ui';
+	import { TabbedFolder, type Stage } from '@diffusion-explorer/ui';
 
 	interface Props {
 		isActive?: Writable<boolean>;
@@ -65,8 +76,9 @@
 	const KV_STROKE = '#8892a0';
 
 	// --- Prompt / generation configuration ---
-	// 8 total token positions. Positions 0..5 form the prompt (prefix).
-	// Positions 6..7 are decoded serially, one per decode iteration.
+	// 8 total text slots. Slots 0..5 form the prompt (prefix). Slot 6 is
+	// revealed by prefill's tail unembed (residual at col 5 → slot 6).
+	// Slot 7 is revealed by ONE decode iteration at input column 6.
 	// Punctuation split off from words (BPE-faithful).
 	const inputWords: string[] = [
 		'Where',
@@ -79,10 +91,34 @@
 		'Paris'
 	];
 	const N_TOKENS = inputWords.length;
-	const N_PROMPT = 6; // positions 0..N_PROMPT-1 are prefix
-	const N_DECODE = N_TOKENS - N_PROMPT;
+	const N_PROMPT = 6; // text-slot positions 0..N_PROMPT-1 are prefix
+	// N_INPUT_COLS = the number of columns that ever appear inside the
+	// transformer stack (embed, residuals, attention layers, cache). In a
+	// causal LM with a KV cache, input column i produces the logits for
+	// text slot i+1, so the transformer only ever needs columns
+	// 0..N_TOKENS-2 to fill text slots 0..N_TOKENS-1. The last text slot
+	// has no corresponding input column — nothing after it needs to be
+	// predicted.
+	const N_INPUT_COLS = N_TOKENS - 1;
 	const promptIndices = Array.from({ length: N_PROMPT }, (_, i) => i);
-	const decodeIndices = Array.from({ length: N_DECODE }, (_, i) => N_PROMPT + i);
+	// Input column ↔ output text slot mapping. In a causal LM, input
+	// column c produces the logits for text slot c+1. So:
+	//   - Prefill runs input columns 0..N_PROMPT-1 (= 0..5) in parallel,
+	//     and its last column's unembed (col 5) reveals text slot 6.
+	//   - Decoding is one iteration per remaining slot: input col 6 →
+	//     text slot 7. Text slot 6 comes "for free" out of prefill.
+	// With N_TOKENS = 8 output slots, the transformer only ever needs
+	// input columns 0..6 (N_INPUT_COLS = 7). The last text slot has no
+	// corresponding input column — nothing after it needs predicting.
+	const LAST_PREFILL_COL = N_PROMPT - 1; // 5
+	// `decodeIndices` denotes the INPUT COLUMNS that decode iterations
+	// operate on (each such iteration produces text slot `col + 1`).
+	const decodeIndices = Array.from(
+		{ length: N_TOKENS - 1 - LAST_PREFILL_COL },
+		(_, i) => LAST_PREFILL_COL + 1 + i
+	); // [6] — one decode iteration at column 6, produces text slot 7
+	// Text slot that appears via prefill's tail unembed.
+	const prefillRevealedSlot = LAST_PREFILL_COL + 1; // 6
 
 	// --- Geometry ---
 	const W = width;
@@ -188,7 +224,7 @@
 	const KV_INNER_PADDING = 6;
 	const KV_LABEL_W = 16;
 	const KV_ROW_W = CACHE_W - 2 * KV_INNER_PADDING - KV_LABEL_W;
-	const KV_STRIDE = KV_ROW_W / N_TOKENS;
+	const KV_STRIDE = KV_ROW_W / N_INPUT_COLS;
 	function kvCellX(_cacheI: number, tokenI: number): number {
 		return CACHE_X + KV_INNER_PADDING + KV_LABEL_W + tokenI * KV_STRIDE + KV_STRIDE / 2 - KV_CELL_W / 2;
 	}
@@ -289,16 +325,6 @@
 		};
 	}
 
-	// A "reveal" is a plain opacity ramp (0 → 1) driven by the same
-	// [progress] channel convention. Used for static-position elements
-	// like the decoded token text fading in.
-	function revealOpacity(p: number): number {
-		if (p <= 0) return 0;
-		if (p >= 1) return 1;
-		return p;
-	}
-
-
 	// Residual-stream cells at (row, position) become visible only *after*
 	// the ghost that produces them has completed its clip. For prompt
 	// positions the producer is a prefill_* channel; for decoded positions
@@ -322,27 +348,51 @@
 		const p = animState[ch]?.progress ?? -1;
 		return p >= 1;
 	}
-	// A position is "active" (orange) only during decode of that column,
-	// and only until the decode-return has landed. After that the column
-	// stays blue for the rest of the loop. Prompt positions are never
-	// active — they're background context, not being generated.
-	// This prevents the visual flashing back to orange during hold gaps
-	// between clips at each layer.
-	function isActivePosition(pos: number): boolean {
-		if (pos < N_PROMPT) return false;
-		const revealP = animState[`decode_reveal_${pos}`]?.progress ?? -1;
-		const returnP = animState[`decode_return_${pos}`]?.progress ?? -1;
-		return revealP > 0 && returnP < 1;
+	// Return-ghost progress for text slot `slot`. Slot 6 is produced by
+	// prefill's unembed; every other decoded slot c+1 comes from decode
+	// iteration at column c. Prompt slots have no return ghost.
+	function returnProgressForSlot(slot: number): number {
+		if (slot < N_PROMPT) return -1;
+		if (slot === prefillRevealedSlot) {
+			return animState[`prefill_return`]?.progress ?? -1;
+		}
+		const col = slot - 1;
+		return animState[`decode_return_${col}`]?.progress ?? -1;
 	}
-	// Text shown in the text-row slot for position `pos`. Prompt slots
-	// always show their word. Decoded slots show `<next>` while the
-	// transformer is still processing this position; the actual word
-	// only appears after the Unembed → return-to-text ghost lands.
-	function textForPosition(pos: number): string {
-		if (pos < N_PROMPT) return inputWords[pos];
-		const returnCh = `decode_return_${pos}`;
-		const returnP = animState[returnCh]?.progress ?? -1;
-		return returnP >= 1 ? inputWords[pos] : '<next>';
+	// A residual/cache COLUMN is "active" (orange) while a decode
+	// iteration is running through it. Prompt columns are never active —
+	// they're background context populated during prefill. Ends once the
+	// column's cache-write has landed (append.progress ≥ 1 in the last
+	// layer means the iteration is essentially done from the network's
+	// perspective).
+	function isActiveColumn(col: number): boolean {
+		if (!decodeIndices.includes(col)) return false;
+		const embedP = animState[`decode_embed_${col}`]?.progress ?? -1;
+		const finalAppendP =
+			animState[`decode_l${N_LAYERS - 1}_append_${col}`]?.progress ?? -1;
+		return embedP > 0 && finalAppendP < 1;
+	}
+	// A text SLOT is "active" while its unembed→return sequence is
+	// running. Slot 6 goes active during prefill_unembed/prefill_return;
+	// slot col+1 goes active during decode_unembed_col/decode_return_col.
+	function isActiveTextSlot(slot: number): boolean {
+		if (slot < N_PROMPT) return false;
+		if (slot === prefillRevealedSlot) {
+			const uP = animState[`prefill_unembed`]?.progress ?? -1;
+			const rP = animState[`prefill_return`]?.progress ?? -1;
+			return uP > 0 && rP < 1;
+		}
+		const col = slot - 1;
+		const uP = animState[`decode_unembed_${col}`]?.progress ?? -1;
+		const rP = animState[`decode_return_${col}`]?.progress ?? -1;
+		return uP > 0 && rP < 1;
+	}
+	// Combined activity for a shared visual: text-row slot at index `i`
+	// is highlighted when EITHER it's an actively-filling slot (target)
+	// OR when it's the input to a currently-running decode iteration
+	// (source column c = slot i, with decode running at col i).
+	function isActivePosition(i: number): boolean {
+		return isActiveTextSlot(i) || isActiveColumn(i);
 	}
 	// The Embedding block is "active" while any embed channel (prefill
 	// or decode) is running.
@@ -351,19 +401,23 @@
 			const p = animState[`prefill_embed_${i}`]?.progress ?? -1;
 			if (p > 0 && p < 1) return true;
 		}
-		for (const pos of decodeIndices) {
-			const p = animState[`decode_embed_${pos}`]?.progress ?? -1;
+		for (const col of decodeIndices) {
+			const p = animState[`decode_embed_${col}`]?.progress ?? -1;
 			if (p > 0 && p < 1) return true;
 		}
 		return false;
 	}
-	// The Unembedding block is "active" during either the unembed OR the
-	// return-to-text step of any decoded position.
+	// The Unembedding block is "active" during the unembed or return
+	// step of prefill (producing slot 6) or any decode iteration.
 	function isActiveUnembed(): boolean {
-		for (const pos of decodeIndices) {
-			const uP = animState[`decode_unembed_${pos}`]?.progress ?? -1;
+		const pU = animState[`prefill_unembed`]?.progress ?? -1;
+		if (pU > 0 && pU < 1) return true;
+		const pR = animState[`prefill_return`]?.progress ?? -1;
+		if (pR > 0 && pR < 1) return true;
+		for (const col of decodeIndices) {
+			const uP = animState[`decode_unembed_${col}`]?.progress ?? -1;
 			if (uP > 0 && uP < 1) return true;
-			const rP = animState[`decode_return_${pos}`]?.progress ?? -1;
+			const rP = animState[`decode_return_${col}`]?.progress ?? -1;
 			if (rP > 0 && rP < 1) return true;
 		}
 		return false;
@@ -398,14 +452,6 @@
 	function isActiveCache(k: number): boolean {
 		return isCacheWriting(k) || isCacheReading(k);
 	}
-	// Human-readable label describing what the animation is doing right
-	// now. Prefixed with "Prefill:" or "Decoding:" so the reader can
-	// track which phase of the overall algorithm they're watching.
-	// Returns '' during hold gaps between clips.
-	// (Phase narration was previously computed here from `animState` and
-	// displayed in a passive .status div. It's now handled by the
-	// NarratedTimeline component below, which reads chapters built from
-	// the same phase catalog inside `buildTimeline()`.)
 	// A layer is "active" from the moment its first flow-in ghost starts
 	// until its last emerge ghost completes. Covers the whole per-layer
 	// arc: flow-in → cache read → cache write + emerge. Highlighted with
@@ -536,53 +582,92 @@
 		return [...flows, ...appends, ...emerges];
 	}
 
-	// Decode embed ghost for one position: text glyph at pos → Row 0 cell pos.
-	function buildDecodeEmbedGhost(pos: number): GhostSpec {
+	// Decode embed ghost for one input column: text glyph at slot `col` →
+	// Row 0 cell at column `col`. The token feeding input column c is the
+	// token already sitting at text-slot c (in a causal LM, input at
+	// column c is used to predict slot c+1, so slot c is its input).
+	function buildDecodeEmbedGhost(col: number): GhostSpec {
 		return {
-			id: `decode_embed_${pos}`,
+			id: `decode_embed_${col}`,
 			kind: 'rect' as const,
 			layer: 'behind' as const,
-			tokenIdx: pos,
-			from: { x: tokenCenterX(pos), y: Y_TEXT + TEXT_ROW_H / 2 },
-			to: { x: tokenCenterX(pos), y: Y_ROW[0] + TOKEN_ROW_H / 2 },
+			tokenIdx: col,
+			from: { x: tokenCenterX(col), y: Y_TEXT + TEXT_ROW_H / 2 },
+			to: { x: tokenCenterX(col), y: Y_ROW[0] + TOKEN_ROW_H / 2 },
 			size: RS_SIZE,
 			style: RS_STYLE
 		};
 	}
 
-	// Decode unembed ghost for one position: OUTPUT row[pos] center → top
-	// of Unembed block. Same visual language as the flow ghost feeding
+	// Decode unembed ghost for one input column: OUTPUT row[col] center →
+	// top of Unembed block. Same visual language as the flow ghost feeding
 	// the very first attention layer.
-	function buildDecodeUnembedGhost(pos: number): GhostSpec {
+	function buildDecodeUnembedGhost(col: number): GhostSpec {
 		return {
-			id: `decode_unembed_${pos}`,
+			id: `decode_unembed_${col}`,
 			kind: 'rect' as const,
 			layer: 'behind' as const,
-			tokenIdx: pos,
-			from: { x: tokenCenterX(pos), y: Y_ROW_OUT + TOKEN_ROW_H / 2 },
-			to: { x: tokenCenterX(pos), y: Y_UNEMBED },
+			tokenIdx: col,
+			from: { x: tokenCenterX(col), y: Y_ROW_OUT + TOKEN_ROW_H / 2 },
+			to: { x: tokenCenterX(col), y: Y_UNEMBED },
 			size: RS_SIZE,
 			style: RS_STYLE
 		};
 	}
 
-	// Decode return ghost for one position: a COPY of the predicted-word
-	// text flies from the Output-Tokens row (below Unembed) back up to
-	// the text row slot at pos. The original in the Output-Tokens row
-	// stays put — the ghost is an animated duplicate. Kind='text'.
-	function buildDecodeReturnGhost(pos: number): GhostSpec {
+	// Decode return ghost for one input column: a COPY of the predicted-
+	// word text flies from the Output-Tokens row (below Unembed) back up
+	// to the text row slot `col + 1` — the slot this column's unembed
+	// produces. The original in the Output-Tokens row stays put — the
+	// ghost is an animated duplicate. Kind='text'.
+	function buildDecodeReturnGhost(col: number): GhostSpec {
+		const outputSlot = col + 1;
 		return {
-			id: `decode_return_${pos}`,
+			id: `decode_return_${col}`,
 			kind: 'text' as const,
 			// Float on top of ALL RHS layer blocks and the HBM box so the
 			// freshly-decoded word stays visible as it crosses the network
 			// on its way back to the text row.
 			layer: 'above-all' as const,
-			tokenIdx: pos,
-			from: { x: tokenCenterX(pos), y: Y_OUTPUT_TOKENS + TEXT_ROW_H / 2 },
-			to: { x: tokenCenterX(pos), y: Y_TEXT + TEXT_ROW_H / 2 },
+			tokenIdx: outputSlot,
+			from: { x: tokenCenterX(outputSlot), y: Y_OUTPUT_TOKENS + TEXT_ROW_H / 2 },
+			to: { x: tokenCenterX(outputSlot), y: Y_TEXT + TEXT_ROW_H / 2 },
 			size: { w: TOKEN_SIZE, h: TOKEN_SIZE },
-			style: { text: inputWords[pos], textFill: ACTIVE_STROKE, textFontSize: 15 }
+			style: { text: inputWords[outputSlot], textFill: ACTIVE_STROKE, textFontSize: 15 }
+		};
+	}
+
+	// Prefill unembed ghost: at the tail of prefill, the residual at the
+	// last prefix column (LAST_PREFILL_COL = 5) unembeds into text slot 6.
+	// This is the "first decoded token" — it emerges directly from
+	// prefill's own forward pass, before any per-token decode iteration.
+	function buildPrefillUnembedGhost(): GhostSpec {
+		const col = LAST_PREFILL_COL;
+		return {
+			id: `prefill_unembed`,
+			kind: 'rect' as const,
+			layer: 'behind' as const,
+			tokenIdx: col,
+			from: { x: tokenCenterX(col), y: Y_ROW_OUT + TOKEN_ROW_H / 2 },
+			to: { x: tokenCenterX(col), y: Y_UNEMBED },
+			size: RS_SIZE,
+			style: RS_STYLE
+		};
+	}
+
+	// Prefill return ghost: predicted-word text flies from OUTPUT_TOKENS
+	// row at slot 6 → text-slot 6. Mirror of the decode return ghost.
+	function buildPrefillReturnGhost(): GhostSpec {
+		const slot = prefillRevealedSlot;
+		return {
+			id: `prefill_return`,
+			kind: 'text' as const,
+			layer: 'above-all' as const,
+			tokenIdx: slot,
+			from: { x: tokenCenterX(slot), y: Y_OUTPUT_TOKENS + TEXT_ROW_H / 2 },
+			to: { x: tokenCenterX(slot), y: Y_TEXT + TEXT_ROW_H / 2 },
+			size: { w: TOKEN_SIZE, h: TOKEN_SIZE },
+			style: { text: inputWords[slot], textFill: ACTIVE_STROKE, textFontSize: 15 }
 		};
 	}
 
@@ -648,27 +733,51 @@
 		return [flow, ...reads, append, emerge];
 	}
 
+	// (col, slot) pairs describing every "unembedding event" — each entry
+	// binds an input column to the output slot it produces (slot = col +
+	// 1). One entry per prefill-tail unembed plus one per decode iteration.
+	// Used by the SVG to render the diagonal Unembed → Output arrow and
+	// the persistent output-tokens text.
+	type UnembedProduction = {
+		col: number;
+		slot: number;
+		unembedChannel: string;
+		returnChannel: string;
+	};
+	const unembedProductions: UnembedProduction[] = [
+		{
+			col: LAST_PREFILL_COL,
+			slot: prefillRevealedSlot,
+			unembedChannel: `prefill_unembed`,
+			returnChannel: `prefill_return`
+		},
+		...decodeIndices.map((col) => ({
+			col,
+			slot: col + 1,
+			unembedChannel: `decode_unembed_${col}`,
+			returnChannel: `decode_return_${col}`
+		}))
+	];
+
 	// Build the full spec array once. (Everything geometry-derived is a
 	// constant at this point in the module.)
 	const ghostSpecs: GhostSpec[] = [
 		...buildPrefillEmbedGhosts(),
 		...Array.from({ length: N_LAYERS }, (_, k) => buildPrefillLayerGhosts(k)).flat(),
-		...decodeIndices.map((pos) => buildDecodeEmbedGhost(pos)),
+		buildPrefillUnembedGhost(),
+		buildPrefillReturnGhost(),
+		...decodeIndices.map((col) => buildDecodeEmbedGhost(col)),
 		...decodeIndices
-			.map((pos) => Array.from({ length: N_LAYERS }, (_, k) => buildDecodeLayerGhosts(k, pos)))
+			.map((col) => Array.from({ length: N_LAYERS }, (_, k) => buildDecodeLayerGhosts(k, col)))
 			.flat(2),
-		...decodeIndices.map((pos) => buildDecodeUnembedGhost(pos)),
-		...decodeIndices.map((pos) => buildDecodeReturnGhost(pos))
+		...decodeIndices.map((col) => buildDecodeUnembedGhost(col)),
+		...decodeIndices.map((col) => buildDecodeReturnGhost(col))
 	];
 	// Partition by z-order group. Order within each group is preserved,
 	// which matters when many ghosts overlap (later ghosts paint on top).
 	const behindGhosts = ghostSpecs.filter((g) => g.layer === 'behind');
 	const aboveHbmGhosts = ghostSpecs.filter((g) => g.layer === 'above-hbm');
 	const aboveAllGhosts = ghostSpecs.filter((g) => g.layer === 'above-all');
-
-	// Decoded-token text reveal channels — one per decoded position.
-	// These are NOT ghosts; they're opacity ramps on the static text row.
-	const decodeRevealChannels = decodeIndices.map((pos) => `decode_reveal_${pos}`);
 
 	// ================================================================
 	// Animation state — dynamic channel bag.
@@ -679,14 +788,13 @@
 	function buildInitialState(): AnimationState {
 		const s: AnimationState = {};
 		for (const g of ghostSpecs) s[g.id] = { progress: -1 };
-		for (const c of decodeRevealChannels) s[c] = { progress: -1 };
 		return s;
 	}
 	const INITIAL_STATE: AnimationState = buildInitialState();
 
 	let animState = $state<AnimationState>(buildInitialState());
 	let player = $state<Player<AnimationState> | undefined>(undefined);
-	let chapters = $state<Chapter[]>([]);
+	let stages = $state<Stage[]>([]);
 
 	function endPhaseFor(ids: string[]): Partial<AnimationState> {
 		const patch: AnimationState = {};
@@ -700,7 +808,6 @@
 	// Timing (ms). Tuned once here; entire animation scales together.
 	const T_FLOW = 1400;
 	const T_HOLD = 400;
-	const T_REVEAL = 450;
 	const T_APPEND = 1600; // decode single-position cache write
 	const T_WRITE = 2200; // prefill per-token cache write (staggered — slower)
 	const T_DECODE_FLOW = 1200;
@@ -772,52 +879,42 @@
 
 	function buildTimeline(): {
 		timeline: ReturnType<TimelineBuilder<AnimationState>['build']>;
-		chapters: Chapter[];
+		stages: Stage[];
 	} {
 		const b = new TimelineBuilder<AnimationState>().setInitialState(INITIAL_STATE);
 
-		// Chapter list: each entry has its start time in ms (converted to
-		// normalized [0,1] at the end). Holds are NOT their own chapter —
-		// they inherit the prior chapter's narration (floor semantics).
-		const rawChapters: { ms: number; label: string }[] = [];
-		function chap(label: string) {
-			rawChapters.push({ ms: b.totalDurationMs, label });
+		// Stage boundaries: each entry marks the start (in ms) of a top-level
+		// phase of the algorithm. Converted to normalized [0,1] ranges at the
+		// end (endTime of stage i = startTime of stage i+1; final stage runs
+		// to 1.0).
+		const stageStartMs: { label: string; description: string; ms: number }[] = [];
+		function stage(label: string, description: string) {
+			stageStartMs.push({ label, description, ms: b.totalDurationMs });
 		}
 
-		// --- Prefill: embed step — parallel, no stagger (all tokens flow
-		// through embed at once). ---
+		// --- Stage 1: Prefill ---
+		//   Embed the prefix, then per layer: flow-in, emerge, staggered cache
+		//   writes. All prefix tokens are processed in parallel; the K/V cache
+		//   is populated for autoregressive decoding.
+		stage(
+			'Prefill',
+			'The prefix tokens are embedded and pass through every attention layer in parallel. As they emerge from each layer, their K/V pairs are written to the cache. The last prefix column\'s residual then flows through Unembedding, producing the first output token — for free, as part of the same forward pass.'
+		);
 		const embedIds = promptIndices.map((i) => `prefill_embed_${i}`);
-		chap('Prefill: Embedding prefix tokens');
 		b.add(parallelFlow(embedIds), { durationMs: T_FLOW });
 		b.add(parallelHold(embedIds), { durationMs: T_HOLD });
 
-		// --- Prefill: for each layer:
-		//   Phase 1: flow into layer's top edge. Layer 0's flow is fully
-		//     parallel (residuals arrived from Embed all at once). Layers
-		//     1+ inherit stagger from the previous layer's emerge (residuals
-		//     arrive one-after-another).
-		//   Phase 2: append + emerge, paired per token, staggered. Cache
-		//     writes and layer-exits happen simultaneously per position.
 		for (let k = 0; k < N_LAYERS; k++) {
 			const flowIds = promptIndices.map((i) => `prefill_l${k}_flow_${i}`);
 			const appendIds = promptIndices.map((i) => `prefill_l${k}_append_${i}`);
 			const emergeIds = promptIndices.map((i) => `prefill_l${k}_emerge_${i}`);
 
-			// Phase 1: flow into layer — always fully parallel across
-			// tokens. All positions enter the layer's top at once.
-			chap(`Prefill: Attention Layer ${k + 1} computation`);
 			b.add(parallelFlow(flowIds), { durationMs: T_FLOW });
 			b.add(parallelHold(flowIds), { durationMs: T_HOLD });
 
-			// Phase 2: all outputs emerge from the layer bottom simultaneously
-			// (tokens exit the layer BEFORE the cache is written).
-			chap(`Prefill: Attention Layer ${k + 1} output`);
 			b.add(parallelFlow(emergeIds), { durationMs: T_FLOW });
 			b.add(parallelHold(emergeIds), { durationMs: T_HOLD });
 
-			// Phase 3: staggered cache writes. Nothing else animates so the
-			// reader's attention lands on the K/V pairs being cached.
-			chap(`Prefill: Writing K/V to Layer ${k + 1} cache`);
 			{
 				const { clips, durationMs } = staggeredParallelFlow(appendIds, T_WRITE, T_STAGGER);
 				b.add(clips, { durationMs });
@@ -834,70 +931,61 @@
 			{ durationMs: T_HOLD }
 		);
 
-		// --- Decode: iterate over each decoded position ---
-		for (const pos of decodeIndices) {
-			// Reveal the token text at `pos` in the top row.
-			const revealId = `decode_reveal_${pos}`;
-			chap('Decoding: Preparing to generate next token');
-			b.add(singleFlow(revealId), { durationMs: T_REVEAL });
-			// (Don't `endPhase` reveals — we want them to stay visible.)
+		// Prefill's last-column unembed reveals the first output token:
+		// residual at column LAST_PREFILL_COL flows into Unembed, which
+		// produces text slot 6. This falls out of prefill "for free" —
+		// no separate forward pass needed for slot 6.
+		b.add(singleFlow(`prefill_unembed`), { durationMs: T_DECODE_FLOW });
+		b.add(singleHold(`prefill_unembed`), { durationMs: T_HOLD });
+		b.add(singleFlow(`prefill_return`), { durationMs: T_DECODE_FLOW * 2 });
 
-			// Embed the newly revealed token → row 0.
-			const embedId = `decode_embed_${pos}`;
-			chap('Decoding: Embedding new token');
+		// --- Stage 2: Decoding ---
+		//   Each remaining output slot (col+1) needs one forward pass at
+		//   input column col: embed the token at slot col → run through
+		//   every layer (reading cache 0..col-1, writing at col) →
+		//   unembed at col → reveal slot col+1.
+		stage(
+			'Decoding',
+			'For every remaining output slot, the model runs one more forward pass — embedding the previously-committed token, reading cached K/V from every earlier position, appending its own K/V, and unembedding the result into the next text slot.'
+		);
+		for (const col of decodeIndices) {
+			// Embed the token at text-slot `col` → residual col `col`.
+			const embedId = `decode_embed_${col}`;
 			b.add(singleFlow(embedId), { durationMs: T_DECODE_FLOW });
 			b.add(singleHold(embedId), { durationMs: T_HOLD });
 
-			// Per layer:
-			//   1) flow-in (token enters layer top)
-			//   2) cache read (parallel across previously-cached positions)
-			//   3) cache write + flow-out (simultaneous — K/V flies into
-			//      the cache AND the residual emerges from the layer bottom)
 			for (let k = 0; k < N_LAYERS; k++) {
-				const flowId = `decode_l${k}_flow_${pos}`;
-				chap(`Decoding: Attention Layer ${k + 1} computation`);
+				const flowId = `decode_l${k}_flow_${col}`;
 				b.add(singleFlow(flowId), { durationMs: T_DECODE_FLOW });
 				b.add(singleHold(flowId), { durationMs: T_HOLD });
 
-				// Cache read: all previously-cached positions (0..pos-1).
+				// Cache read: all previously-cached positions (0..col-1).
 				const readIds: string[] = [];
-				for (let i = 0; i < pos; i++) readIds.push(`decode_l${k}_read_${pos}_from_${i}`);
+				for (let i = 0; i < col; i++) readIds.push(`decode_l${k}_read_${col}_from_${i}`);
 				if (readIds.length > 0) {
-					chap(`Decoding: Reading K/V from Layer ${k + 1} cache`);
 					b.add(parallelFlow(readIds), { durationMs: T_DECODE_READS });
 					b.add(parallelHold(readIds), { durationMs: T_HOLD });
 				}
 
 				// Emerge first (token exits the layer), then cache write.
-				// Sequential — one thing happens at a time.
-				const emergeId = `decode_l${k}_emerge_${pos}`;
-				chap(`Decoding: Attention Layer ${k + 1} output`);
+				const emergeId = `decode_l${k}_emerge_${col}`;
 				b.add(singleFlow(emergeId), { durationMs: T_DECODE_FLOW });
 				b.add(singleHold(emergeId), { durationMs: T_HOLD });
 
-				const appendId = `decode_l${k}_append_${pos}`;
-				chap(`Decoding: Writing K/V to Layer ${k + 1} cache`);
+				const appendId = `decode_l${k}_append_${col}`;
 				b.add(singleFlow(appendId), { durationMs: T_APPEND });
 				b.add(singleHold(appendId), { durationMs: T_HOLD });
 			}
 
-			// Unembed: OUTPUT row[pos] → top of Unembed block.
-			const unembedId = `decode_unembed_${pos}`;
-			chap('Decoding: Unembedding to next token');
+			// Unembed at column `col` → produces text slot `col + 1`.
+			const unembedId = `decode_unembed_${col}`;
 			b.add(singleFlow(unembedId), { durationMs: T_DECODE_FLOW });
 			b.add(singleHold(unembedId), { durationMs: T_HOLD });
 
-			// Return: the predicted word flies from OUTPUT_TOKENS back up
-			// to the text row's active slot — this is what swaps <next>
-			// for the actual token. Slower duration because the ghost
-			// covers the full figure height (Unembed → text row), so the
-			// pixel-speed matches the per-layer emerge cadence.
-			const returnId = `decode_return_${pos}`;
-			chap('Decoding: Committing token to context');
+			// Return: predicted word flies from OUTPUT slot col+1 up to
+			// text-slot col+1.
+			const returnId = `decode_return_${col}`;
 			b.add(singleFlow(returnId), { durationMs: T_DECODE_FLOW * 2 });
-			// Don't endPhase return — we want the actual word to stay
-			// visible (returnP stays at 1, so textForPosition keeps
-			// returning the real word).
 		}
 
 		// Final hold before looping.
@@ -910,16 +998,21 @@
 		);
 
 		const totalMs = b.totalDurationMs;
-		const chapters: Chapter[] = rawChapters.map((c) => ({
-			time: totalMs > 0 ? c.ms / totalMs : 0,
-			label: c.label
+		const stages: Stage[] = stageStartMs.map((s, i) => ({
+			label: s.label,
+			description: s.description,
+			startTime: totalMs > 0 ? s.ms / totalMs : 0,
+			endTime:
+				i + 1 < stageStartMs.length && totalMs > 0
+					? stageStartMs[i + 1].ms / totalMs
+					: 1
 		}));
-		return { timeline: b.build(), chapters };
+		return { timeline: b.build(), stages };
 	}
 
 	onMount(() => {
 		const built = buildTimeline();
-		chapters = built.chapters;
+		stages = built.stages;
 		player = new Player<AnimationState>(built.timeline, { looping: true, endPause: 0.05 });
 		player.onTick((_t, s) => {
 			animState = s;
@@ -952,7 +1045,7 @@
 	}
 </script>
 
-<div class="wrap" style="max-width: {W}px">
+<TabbedFolder player={player ?? null} {stages} maxWidth="{W}px" accentColor={ACTIVE_STROKE}>
 	<svg viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet">
 		<defs>
 			<marker
@@ -1022,7 +1115,7 @@
 		<!-- Flow arrows: thin vertical connectors between RHS rows.       -->
 		<!-- ============================================================ -->
 		{#each flowSegments as seg}
-			{#each Array(N_TOKENS) as _, i}
+			{#each Array(N_INPUT_COLS) as _, i}
 				<line
 					x1={tokenCenterX(i)}
 					y1={seg.fromY}
@@ -1193,8 +1286,12 @@
 			</text>
 
 			<!-- K/V pair cells: prompt positions always filled; decoded
-				 positions only filled AFTER their append clip has run. -->
-			{#each Array(N_TOKENS) as _, i}
+				 input columns only filled AFTER their append clip has run.
+				 There's one cache column per transformer input column
+				 (N_INPUT_COLS), not per text slot — the last text slot has
+				 no cache column since nothing after it needs to be
+				 predicted. -->
+			{#each Array(N_INPUT_COLS) as _, i}
 				{@const isPromptSlot = i < N_PROMPT}
 				{@const cx = kvCellX(k, i)}
 				{@const cy = kvCellY(k)}
@@ -1380,23 +1477,14 @@
 			stroke-linejoin="round"
 		/>
 
-		<!-- Text tokens: prompt tokens always visible; decoded tokens
-			 fade in via their `decode_reveal_{pos}` channel. -->
+		<!-- Text tokens: prompt tokens always visible; decoded slots appear
+			 as dashed placeholders and fade in as their return ghost lands
+			 (prefill_return for slot 6, decode_return_{col} for slot col+1). -->
 		{#each inputWords as word, i}
 			{@const isPromptSlot = i < N_PROMPT}
-			{@const revealCh = `decode_reveal_${i}`}
-			{@const revealP = animState[revealCh]?.progress ?? -1}
-			{@const returnP = animState[`decode_return_${i}`]?.progress ?? -1}
-			{@const opacity =
-				isPromptSlot
-					? 1
-					: returnP >= 1
-						? 1
-						: revealOpacity(revealP) * (returnP > 0 ? 1 - returnP : 1)}
-			{@const displayText = textForPosition(i)}
+			{@const returnP = returnProgressForSlot(i)}
+			{@const opacity = isPromptSlot ? 1 : returnP >= 1 ? 1 : Math.max(0, returnP)}
 			{@const active = isActivePosition(i)}
-			<!-- Dashed placeholder box for not-yet-revealed decode slots.
-				 Fades out as the text fades in. -->
 			{#if !isPromptSlot && opacity < 1}
 				<rect
 					x={tokenCenterX(i) - TOKEN_SIZE / 2}
@@ -1420,7 +1508,7 @@
 				fill={active ? ACTIVE_STROKE : BLOCK_LABEL_COLOR}
 				opacity={opacity}
 			>
-				{displayText}
+				{word}
 			</text>
 		{/each}
 
@@ -1456,7 +1544,7 @@
 				 yet are dashed placeholders; once their producing ghost
 				 completes, they appear filled. The column at the currently-
 				 decoded position is highlighted green. -->
-			{#each Array(N_TOKENS) as _, i}
+			{#each Array(N_INPUT_COLS) as _, i}
 				{@const visible = residualVisible(k, i)}
 				{@const active = isActivePosition(i)}
 				<rect
@@ -1501,7 +1589,7 @@
 
 		<!-- Output residual row (below last layer). Uses rowIdx=N_LAYERS
 			 in residualProducerChannel — producer is the last layer's flow. -->
-		{#each Array(N_TOKENS) as _, i}
+		{#each Array(N_INPUT_COLS) as _, i}
 			{@const visible = residualVisible(N_LAYERS, i)}
 			{@const active = isActivePosition(i)}
 			<rect
@@ -1542,16 +1630,18 @@
 			Unembedding
 		</text>
 
-		<!-- Unembed → OUTPUT_TOKENS: one arrow per decoded column, appears
-			 only once the token's unembed animation has started, and stays
-			 for the rest of the loop (persistent artifact of decoding). -->
-		{#each decodeIndices as pos}
-			{@const unembedP = animState[`decode_unembed_${pos}`]?.progress ?? -1}
+		<!-- Unembed → OUTPUT_TOKENS: one arrow per (input column, output
+			 slot) pair. Diagonal — column c's residual maps to slot c+1
+			 in the output-tokens row. This is where the shift-by-one is
+			 visually explicit. Appears once the unembed animation begins
+			 and stays for the rest of the loop. -->
+		{#each unembedProductions as prod}
+			{@const unembedP = animState[prod.unembedChannel]?.progress ?? -1}
 			{#if unembedP > 0}
 				<line
-					x1={tokenCenterX(pos)}
+					x1={tokenCenterX(prod.col)}
 					y1={Y_UNEMBED + LAYER_BLOCK_H}
-					x2={tokenCenterX(pos)}
+					x2={tokenCenterX(prod.slot)}
 					y2={Y_OUTPUT_TOKENS - FLOW_INSET}
 					stroke={FLOW_STROKE}
 					stroke-width="2"
@@ -1560,16 +1650,16 @@
 			{/if}
 		{/each}
 
-		<!-- Output-tokens row: each decoded position's predicted word
-			 appears here once Unembed produces it. Sits statically once
-			 revealed; the return ghost animates a COPY up to the text row. -->
-		{#each decodeIndices as pos}
-			{@const unembedP = animState[`decode_unembed_${pos}`]?.progress ?? -1}
-			{@const returnP = animState[`decode_return_${pos}`]?.progress ?? -1}
+		<!-- Output-tokens row: predicted word appears at slot col+1 once
+			 Unembed produces it. Sits statically once revealed; the
+			 corresponding return ghost animates a COPY up to the text row. -->
+		{#each unembedProductions as prod}
+			{@const unembedP = animState[prod.unembedChannel]?.progress ?? -1}
+			{@const returnP = animState[prod.returnChannel]?.progress ?? -1}
 			{@const shown = unembedP >= 1}
 			{#if shown}
 				<text
-					x={tokenCenterX(pos)}
+					x={tokenCenterX(prod.slot)}
 					y={Y_OUTPUT_TOKENS + TEXT_ROW_H / 2}
 					text-anchor="middle"
 					dominant-baseline="central"
@@ -1577,7 +1667,7 @@
 					font-weight="600"
 					fill={returnP >= 1 ? BLOCK_LABEL_COLOR : ACTIVE_STROKE}
 				>
-					{inputWords[pos]}
+					{inputWords[prod.slot]}
 				</text>
 			{/if}
 		{/each}
@@ -1647,31 +1737,13 @@
 			</g>
 		{/each}
 	</svg>
-	<div class="timeline-slot">
-		<NarratedTimeline
-			timeline={player ?? null}
-			{chapters}
-			color={ACTIVE_STROKE}
-			narrationColor={ACTIVE_STROKE}
-		/>
-	</div>
-</div>
+</TabbedFolder>
 
 <style>
-	.wrap {
-		width: 100%;
-		margin: 0 auto;
-	}
 	svg {
 		width: 100%;
 		height: auto;
 		display: block;
-	}
-	.timeline-slot {
-		margin-top: -1.2em;
-		width: 100%;
-		display: flex;
-		justify-content: center;
 	}
 	/* Marching-ants outline on the active attention layer. Total dash
 	 * pattern (dash + gap) = 12; animating stroke-dashoffset from 0 to 12
