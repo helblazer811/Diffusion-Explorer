@@ -52,25 +52,27 @@
     aria-label={ariaLabel}
   >
     {#if isComplete}
-      <!-- Restart icon (matches the replay glyph used elsewhere in the blog) -->
+      <!-- Restart icon: arc centered at (13, 13), arrowhead on right end with wider base -->
       <svg
         width="24"
         height="24"
-        viewBox="0 0 21 21"
+        viewBox="0 0 24 24"
         fill="none"
       >
-        <g
-          fill="none"
-          fill-rule="evenodd"
+        <path
+          d="M 9 6.07 A 8 8 0 1 0 17 6.07"
           stroke="currentColor"
           stroke-width="2.4"
           stroke-linecap="round"
+          fill="none"
+        />
+        <path
+          d="M 14.4 4.57 L 15.75 8.235 L 18.25 3.905 Z"
+          fill="currentColor"
+          stroke="currentColor"
+          stroke-width="0.6"
           stroke-linejoin="round"
-          transform="matrix(0 1 1 0 2.5 2.5)"
-        >
-          <path d="m3.98652376 1.07807068c-2.38377179 1.38514556-3.98652376 3.96636605-3.98652376 6.92192932 0 4.418278 3.581722 8 8 8s8-3.581722 8-8-3.581722-8-8-8" />
-          <path d="m4 1v4h-4" transform="matrix(1 0 0 -1 0 6)" />
-        </g>
+        />
       </svg>
     {:else if isPlaying}
       <!-- Pause icon (two vertical bars) -->
