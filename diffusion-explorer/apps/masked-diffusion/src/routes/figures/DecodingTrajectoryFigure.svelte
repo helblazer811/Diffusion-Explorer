@@ -18,9 +18,9 @@
 	import { TimelineBuilder, Player } from '@helblazer811/tempus';
 	import { tokenize, buildMaskSchedule } from './masked_diffusion_math';
 
-	// Short line, exactly 8 word tokens (punctuation is folded into whitespace
+	// Short line, exactly 9 word tokens (punctuation is folded into whitespace
 	// so the two columns read cleanly and align row-by-row).
-	const DEFAULT_LINE = 'The little cat sat on the warm mat';
+	const DEFAULT_LINE = 'The little cat sat on the warm mat again';
 
 	interface Props {
 		isActive?: Writable<boolean>;
@@ -185,6 +185,12 @@
 		width: 100%;
 		margin: 0 auto;
 		flex-wrap: wrap;
+	}
+
+	@media (max-width: 700px) {
+		.wrap {
+			row-gap: 1.25rem;
+		}
 	}
 
 	.block {

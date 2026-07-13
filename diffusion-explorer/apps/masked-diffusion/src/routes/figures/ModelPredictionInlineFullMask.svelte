@@ -16,7 +16,6 @@
 	import { onMount } from 'svelte';
 	import type { Writable } from 'svelte/store';
 	import { TimelineBuilder, Player } from '@helblazer811/tempus';
-	import { PlayPauseResetButton } from '@diffusion-explorer/ui';
 
 	interface Props {
 		isActive?: Writable<boolean>;
@@ -74,8 +73,6 @@
 	}
 	let u = $state(0);
 	let player = $state<Player<State> | undefined>(undefined);
-	let isPlaying = $state(false);
-	const normalizedTime = $derived(Math.min(1, u / ANIMATED_PHASES.length));
 
 	function smoothstep(x: number): number {
 		const c = Math.max(0, Math.min(1, x));
@@ -118,21 +115,6 @@
 		return b.build();
 	}
 
-	function replay() {
-		if (!player) return;
-		player.reset();
-		u = 0;
-		player.play();
-		isPlaying = player.isPlaying;
-	}
-
-	function togglePlayPause() {
-		if (!player) return;
-		if (player.isPlaying) player.pause();
-		else player.play();
-		isPlaying = player.isPlaying;
-	}
-
 	onMount(() => {
 		player = new Player<State>(buildTimeline(), {
 			looping: false,
@@ -140,7 +122,6 @@
 		});
 		player.onTick((_t, s) => {
 			u = s.u;
-			if (player) isPlaying = player.isPlaying;
 		});
 		const unsubActive = isActive?.subscribe((v) => {
 			if (!player) return;
@@ -150,7 +131,6 @@
 				player.reset();
 				u = 0;
 			}
-			isPlaying = player.isPlaying;
 		});
 		return () => {
 			unsubActive?.();
@@ -160,12 +140,6 @@
 </script>
 
 <div class="wrap" style="--mask-color: {maskColor};">
-	<PlayPauseResetButton
-		{isPlaying}
-		time={normalizedTime}
-		onclick={togglePlayPause}
-		onreset={replay}
-	/>
 	<svg
 		class="canvas"
 		viewBox={`0 0 ${W} ${H}`}

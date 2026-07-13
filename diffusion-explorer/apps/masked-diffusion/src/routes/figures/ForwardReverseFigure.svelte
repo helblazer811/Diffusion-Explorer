@@ -16,7 +16,7 @@
 
 	import { onMount } from 'svelte';
 	import type { Writable } from 'svelte/store';
-	import { TimelineBuilder, Player } from '@helblazer811/tempus';
+	import { Player } from '@helblazer811/tempus';
 	import { base } from '$app/paths';
 	import SmileyDiffusionFlow from './SmileyDiffusionFlow.svelte';
 	import { TimeSlider } from '@diffusion-explorer/ui';
@@ -32,6 +32,13 @@
 		cosineSchedule,
 		flipInstant
 	} from './masked_diffusion_math';
+	import {
+		buildForwardReverseTimeline,
+		FORWARD_REVERSE_HALF_MS,
+		FORWARD_REVERSE_HOLD_MS,
+		FORWARD_REVERSE_TOTAL_MS,
+		type ForwardReverseState
+	} from './forward_reverse_timeline';
 
 	interface Props {
 		isActive?: Writable<boolean>;
@@ -49,6 +56,34 @@
 		 *  timeline drives what's rendered, so a single time slider still scrubs
 		 *  it correctly. */
 		variant?: 'both' | 'continuous' | 'masked';
+		/** Optional externally-owned Player. When provided, this figure skips
+		 *  building its own timeline/player and only subscribes to the shared
+		 *  clock. Used to keep the paired continuous+masked figures in the
+		 *  "Relation to Continuous Diffusion" section in exact lockstep. The
+		 *  parent owns play/pause/reset lifecycle and disposal. */
+		sharedPlayer?: Player<ForwardReverseState>;
+		/** When false, suppress the per-figure <TimeSlider>. Used by the
+		 *  top-of-page hero, which renders a single slider outside the two
+		 *  paired figures and drives them via `sharedPlayer`. */
+		showSlider?: boolean;
+		/** How the masked panel renders its tokens.
+		 *   - 'flowing' (default): a natural paragraph with variable-width
+		 *     slots and preserved whitespace. Used in §Relation to Continuous
+		 *     Diffusion.
+		 *   - 'grid': a fixed-width 12-column token grid with literal [MASK]
+		 *     pill placeholders, matching the crown-jewel layout used by
+		 *     GenerationComparisonFigure in the sequel post. Semantics stay
+		 *     plain-MDM (each token has its own random flip time). */
+		maskedLayout?: 'flowing' | 'grid';
+		/** When false, suppress the per-figure "Forward"/"Reverse" direction
+		 *  badge that normally sits above the section. Used by the top-of-page
+		 *  hero, which renders a single shared badge above the whole pair. */
+		showDirectionBadge?: boolean;
+		/** Number of columns in the grid-layout masked panel. Only meaningful
+		 *  when `maskedLayout='grid'`. Default 12. The hero uses 11 so the
+		 *  bottom panel's tokens-per-row is one less than the crown jewel in
+		 *  the sequel post, giving a slightly taller grid at the same width. */
+		gridColumns?: number;
 	}
 
 	let {
@@ -59,7 +94,12 @@
 		maskColor = '#cfe0f2',
 		scalePulse = true,
 		crossFade = true,
-		variant = 'both'
+		variant = 'both',
+		sharedPlayer,
+		showSlider = true,
+		maskedLayout = 'flowing',
+		showDirectionBadge = true,
+		gridColumns = 12
 	}: Props = $props();
 
 	const showContinuous = variant === 'both' || variant === 'continuous';
@@ -137,18 +177,29 @@
 	const N = $derived(tokens.length);
 	const uniforms = $derived(drawFlipUniforms(N, seed));
 	// Per-token mask instant in [0, 1] under the chosen schedule.
-	const flipTimes = $derived(uniforms.map((u) => flipInstant(u, cosineSchedule)));
+	// The token "birds" is pinned to the earliest possible flip instant so
+	// it's always the first word to become [MASK] on the forward pass —
+	// useful when this figure sits in a still image and the callout below
+	// needs to point at a token that's already been masked. The rest of the
+	// sequence keeps its stochastic cosine-schedule order.
+	const flipTimes = $derived.by(() => {
+		const t = uniforms.map((u) => flipInstant(u, cosineSchedule));
+		for (let i = 0; i < tokens.length; i++) {
+			if (tokens[i] === 'birds') t[i] = 0.001;
+		}
+		return t;
+	});
 
 	// --- Timeline: forward leg → hold at noise → reverse leg → hold at data.
 	// We fold to a 0 → 1 → 0 triangle wave on `progress`; `u ∈ [0, 2]` encodes
 	// which leg we're on for the direction label + slider seek mapping.
-	const HALF_MS = 5440; // 3200 × 1.7
-	const HOLD_MS = 1530; // 900  × 1.7
-	const TOTAL_MS = HALF_MS * 2 + HOLD_MS * 2;
+	// Constants + builder live in ./forward_reverse_timeline so a parent can
+	// build an equivalent shared Player and pass it in via `sharedPlayer`.
+	const HALF_MS = FORWARD_REVERSE_HALF_MS;
+	const HOLD_MS = FORWARD_REVERSE_HOLD_MS;
+	const TOTAL_MS = FORWARD_REVERSE_TOTAL_MS;
 
-	interface TState {
-		u: number;
-	}
+	type TState = ForwardReverseState;
 	let u = $state(0);
 
 	const progress = $derived(u <= 1 ? u : 2 - u);
@@ -192,60 +243,29 @@
 
 	let player = $state<Player<TState> | undefined>(undefined);
 
-	function buildTimeline() {
-		const forwardClip = {
-			name: 'forward',
-			reduce(t: number): Partial<TState> {
-				return { u: t };
-			}
-		};
-		const holdNoiseClip = {
-			name: 'hold-noise',
-			reduce(_t: number): Partial<TState> {
-				return { u: 1 };
-			}
-		};
-		const reverseClip = {
-			name: 'reverse',
-			reduce(t: number): Partial<TState> {
-				return { u: 1 + t };
-			}
-		};
-		const holdDataClip = {
-			name: 'hold-data',
-			reduce(_t: number): Partial<TState> {
-				return { u: 0 };
-			}
-		};
-		return new TimelineBuilder<TState>()
-			.setInitialState({ u: 0 })
-			.add(forwardClip, { durationMs: HALF_MS })
-			.add(holdNoiseClip, { durationMs: HOLD_MS })
-			.add(reverseClip, { durationMs: HALF_MS })
-			.add(holdDataClip, { durationMs: HOLD_MS })
-			.build();
-	}
-
 	onMount(() => {
 		let unsubActive: (() => void) | undefined;
 
-		player = new Player<TState>(buildTimeline(), {
-			looping: true,
-			endPause: 0.15
-		});
-		player.onTick((_t, s) => {
-			u = s.u;
-		});
+		if (!sharedPlayer) {
+			// This instance owns its clock. Build a Player + wire visibility.
+			player = new Player<TState>(buildForwardReverseTimeline(), {
+				looping: true,
+				endPause: 0.15
+			});
+			player.onTick((_t, s) => {
+				u = s.u;
+			});
 
-		unsubActive = isActive?.subscribe((v) => {
-			if (!player) return;
-			if (v) player.play();
-			else {
-				player.pause();
-				player.reset();
-				u = 0;
-			}
-		});
+			unsubActive = isActive?.subscribe((v) => {
+				if (!player) return;
+				if (v) player.play();
+				else {
+					player.pause();
+					player.reset();
+					u = 0;
+				}
+			});
+		}
 
 		// Load the smiley-face point cloud (300 [x, y] pairs).
 		fetch(`${base}/data/smiley_face.json`)
@@ -258,7 +278,22 @@
 
 		return () => {
 			unsubActive?.();
-			player?.dispose();
+			if (!sharedPlayer) player?.dispose();
+		};
+	});
+
+	// When a `sharedPlayer` is passed in (possibly after mount, since the
+	// parent may build it in its own onMount), subscribe to its tick stream.
+	// The parent owns play/pause/reset and disposal for a shared player, so
+	// we only mirror state here. Runs client-side only.
+	$effect(() => {
+		if (!sharedPlayer) return;
+		player = sharedPlayer;
+		const unsubTick = sharedPlayer.onTick((_t, s) => {
+			u = s.u;
+		});
+		return () => {
+			unsubTick();
 		};
 	});
 
@@ -311,7 +346,7 @@
 <div class="wrap" style="--mask-color: {maskColor}">
 	{#if showContinuous}
 		<div class="section">
-			{@render directionBadge()}
+			{#if showDirectionBadge}{@render directionBadge()}{/if}
 			<div class="canvas-row">
 				<SmileyDiffusionFlow
 					{trajectory}
@@ -327,37 +362,61 @@
 
 	{#if showMasked}
 		<div class="section">
-			{@render directionBadge()}
-			<p class="paragraph">
-				{#each tokens as tok, i (i)}
-					<span class="pre">{leading[i]}</span><span class="slot" aria-label={tok}>
-						<span class="word" style="opacity: {tokenOpacity(i)}">{tok}</span
-						><span
-						class="mask"
-						style="opacity: {1 - tokenOpacity(i)}; transform: scale({maskScale(i)});"
-						>&nbsp;</span
-					>
-					</span><span class="post">{trailing[i]}</span>
-				{/each}
-			</p>
+			{#if showDirectionBadge}{@render directionBadge()}{/if}
+			{#if maskedLayout === 'grid'}
+				<!-- Grid layout: a fixed-column token grid with fixed-width slots
+					 and literal [MASK] pill placeholders. Matches the crown-jewel
+					 aesthetic used by GenerationComparisonFigure in the sequel
+					 post. Semantics stay plain-MDM (each token has its own
+					 random flip time via `tokenOpacity(i)`). The column count is
+					 configurable via `gridColumns` (default 12); the hero uses
+					 11 to give the panel a slightly taller shape at the same
+					 width. -->
+				<div class="grid-paragraph" style="--grid-columns: {gridColumns};">
+					{#each tokens as tok, i (i)}
+						<div class="grid-slot" aria-label={tok}>
+							<span class="grid-word" style="opacity: {tokenOpacity(i)}"
+								>{tok}</span
+							><span class="grid-mask" style="opacity: {1 - tokenOpacity(i)}"
+								>[MASK]</span
+							>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<p class="paragraph">
+					{#each tokens as tok, i (i)}
+						<span class="pre">{leading[i]}</span><span class="slot" aria-label={tok}>
+							<span class="word" style="opacity: {tokenOpacity(i)}">{tok}</span
+							><span
+								class="mask"
+								style="opacity: {1 - tokenOpacity(i)}; transform: scale({maskScale(i)});"
+								>&nbsp;</span
+							>
+						</span><span class="post">{trailing[i]}</span>
+					{/each}
+				</p>
+			{/if}
 		</div>
 	{/if}
 
-	<div class="slider-row">
-		<TimeSlider
-			timeline={player ?? null}
-			min={0}
-			max={1}
-			step={0.001}
-			showTicks={true}
-			showTimeLabel={false}
-			minLabel="t=0"
-			maxLabel="t=1"
-			displayTime={progress}
-			{onSeekByDisplayTime}
-			color="#f17720"
-		/>
-	</div>
+	{#if showSlider}
+		<div class="slider-row">
+			<TimeSlider
+				timeline={player ?? null}
+				min={0}
+				max={1}
+				step={0.001}
+				showTicks={true}
+				showTimeLabel={false}
+				minLabel="t=0"
+				maxLabel="t=1"
+				displayTime={progress}
+				{onSeekByDisplayTime}
+				color="#f17720"
+			/>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -414,7 +473,6 @@
 		justify-items: center;
 		margin: 0 2px;
 	}
-
 	.slot > .word,
 	.slot > .mask {
 		grid-row: 1;
@@ -428,6 +486,50 @@
 		background: var(--mask-color, #cfe0f2);
 		border-radius: 3px;
 		color: transparent;
+	}
+
+	/* Grid layout: alternate rendering of the masked panel used when
+	   `maskedLayout='grid'` (top-of-page hero). Tokens are laid out on a
+	   12-column grid with fixed-width cells and literal [MASK] pill
+	   placeholders. Matches the crown-jewel aesthetic in the sequel post. */
+	.grid-paragraph {
+		font-size: 1.05rem;
+		line-height: 1.4;
+		color: #333;
+		margin: 0.5rem 0;
+		width: 100%;
+		max-width: 780px;
+		display: grid;
+		grid-template-columns: repeat(var(--grid-columns, 12), 1fr);
+		gap: 0.5rem 4px;
+	}
+	.grid-slot {
+		grid-column: span 1;
+		display: grid;
+		grid-template-columns: 1fr;
+		grid-template-rows: 1fr;
+		align-items: center;
+		justify-items: center;
+		min-width: 0;
+		min-height: 1.4em;
+	}
+	.grid-slot > .grid-word,
+	.grid-slot > .grid-mask {
+		grid-row: 1;
+		grid-column: 1;
+		white-space: nowrap;
+	}
+	.grid-mask {
+		background: var(--mask-color, #cfe0f2);
+		color: #33506e;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+		font-size: 0.7em;
+		font-weight: 500;
+		padding: 0.15em 0.15em;
+		border-radius: 3px;
+		line-height: 1.25;
+		max-width: 100%;
+		box-sizing: border-box;
 	}
 
 	.slider-row {

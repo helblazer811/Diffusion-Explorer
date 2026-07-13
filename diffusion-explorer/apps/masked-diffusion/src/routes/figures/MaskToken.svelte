@@ -17,12 +17,14 @@
 
 <style>
 	.mask-token {
+		display: inline-block;
+		vertical-align: middle;
 		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 		font-size: 0.85em;
 		font-weight: 500;
 		padding: 0.2em 0.3em;
 		border-radius: 3px;
 		white-space: nowrap;
-		line-height: 1.25;
+		line-height: 1;
 	}
 </style>

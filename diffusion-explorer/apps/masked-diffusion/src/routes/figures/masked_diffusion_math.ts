@@ -5,11 +5,16 @@
 // SSR-safe (no Math.random, no Date.now) so the server and client agree on
 // the initial render.
 
-/** A short TinyStories-style paragraph, hand-written for the figure. */
+/** A short TinyStories-style paragraph, hand-written for the figure.
+ *  Sized to exactly 48 tokens under the shared `tokenize()` rules so the
+ *  block-diffusion figure lays out cleanly on 4 lines × 12 tokens each.
+ *  Every word is at most 6 characters long so constant-width token cells
+ *  can hold each word without truncation or an ellipsis. */
 export const TINY_STORY =
-	'Once there was a little cat named Milo who lived in a tall red house. ' +
-	'Every morning Milo would sit by the window and watch the birds fly. ' +
-	'One day a small yellow bird landed on the sill and chirped hello.';
+	'Once there was a small cat named Milo. ' +
+	'He lived in a tall red house on a big green hill. ' +
+	'Every day he sat by the door and saw the birds fly by. ' +
+	'One day a bird came and sang a song for him.';
 
 export interface Tokenized {
 	/** The word tokens themselves (no leading whitespace or punctuation). */

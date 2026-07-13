@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>A Visual Introduction to Masked Diffusion Language Models</title>
+	<title>A Visual Introduction to Masked Diffusion Models</title>
 </svelte:head>
 
 <TopNav

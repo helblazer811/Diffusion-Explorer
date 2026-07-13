@@ -31,7 +31,7 @@
 		fontSize?: number;
 	}
 
-	let { isActive, maskColor = '#cfe0f2', maskTextColor = '#33506e', width = 780, fontSize = 16 }: Props = $props();
+	let { isActive, maskColor = '#cfe0f2', maskTextColor = '#33506e', width = 780, fontSize = 18 }: Props = $props();
 
 	const maskLabelSize = fontSize * (12 / 16);
 	const txLabelSize = fontSize * (18 / 16);

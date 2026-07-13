@@ -16,7 +16,7 @@
 	import { onMount } from 'svelte';
 	import type { Writable } from 'svelte/store';
 	import { TimelineBuilder, Player } from '@helblazer811/tempus';
-	import { PlayPauseResetButton, Katex } from '@diffusion-explorer/ui';
+	import { PlayPauseResetButton } from '@diffusion-explorer/ui';
 
 	// ----------------------------------------------------------------
 	// Props
@@ -65,26 +65,28 @@
 		const set = new Set(MASK_ORDER.slice(0, k));
 		return Array.from({ length: N }, (_, c) => set.has(c));
 	});
-	// The annotation arrow points at the first row where column 0 gets
-	// masked. This anchors the message on the leftmost column — the
-	// reader's eye naturally drops down column 0 and sees the mask
-	// persist through every subsequent row.
-	const ANCHOR_COL = 0;
-	const anchorRow = rowMasked.findIndex((row) => row[ANCHOR_COL]);
+	// The annotation now anchors below the whole rollout, with the arrow
+	// pointing UP at a masked cell in the final row. We pick a column that
+	// (a) is masked in the final row (always true — the final row is all
+	// masked) and (b) got masked partway through, so the reader can trace
+	// down the column and see the mask persisting.
+	const ANCHOR_COL = 3;
+	const anchorRow = ROWS - 1;
 
 	// Geometry.
 	const W = width;
-	const SLOT_W = 62;
-	const SLOT_H = 24;
+	const SLOT_W = 74;
+	const SLOT_H = 28;
 	const ROW_GAP = 6; // vertical space between rows
 	const ROW_PITCH = SLOT_H + ROW_GAP;
 	const TOP_PAD = 20;
+	// Room at the bottom for the "Once masked, stays masked." annotation
+	// that now sits under the last row and points up at a masked cell.
+	const BOTTOM_LABEL_H = 60;
 	const FOOTER_H = 6;
-	const H = TOP_PAD + ROWS * ROW_PITCH + FOOTER_H;
+	const H = TOP_PAD + ROWS * ROW_PITCH + BOTTOM_LABEL_H + FOOTER_H;
 	const seqTotalW = N * SLOT_W;
-	// Grid is centered in the full SVG width — the label sits in the
-	// natural whitespace to the left of the centered grid, without
-	// pushing anything.
+	// Grid is centered in the full SVG width.
 	const seqX0 = (W - seqTotalW) / 2;
 
 	function slotX(c: number): number {
@@ -93,14 +95,6 @@
 	function rowY(r: number): number {
 		return TOP_PAD + r * ROW_PITCH + SLOT_H / 2;
 	}
-
-	// Per-row math label ("z_{t_r}") sitting just left of the grid, so the
-	// visualization is tied to the theory notation used in the surrounding
-	// prose. Rendered via foreignObject + Katex.
-	const ROW_LABEL_W = 40;
-	const ROW_LABEL_H = 26;
-	const ROW_LABEL_GAP = 6; // gap between the label and the grid's left edge
-	const ROW_LABEL_X = seqX0 - ROW_LABEL_GAP - ROW_LABEL_W;
 
 	// Timeline scalar: u ∈ [0, ROWS] — floor(u) = last fully-visible row,
 	// fractional part = fade-in progress of the next row.
@@ -154,35 +148,25 @@
 	const TIME_AXIS_Y_BOTTOM = rowY(ROWS - 1);
 
 	// --- Static annotation geometry.
-	// Label sits in the whitespace to the left of the centered grid,
-	// vertically aligned with the row where column 0 first flips.
-	// A short curved arrow reaches horizontally into the left edge of
-	// that cell (column 0, anchorRow).
-	const LABEL_X = 20;
-	const LABEL_LINE_HEIGHT = 20;
-	const LABEL_CENTER_Y = rowY(anchorRow);
-	const LABEL_LINE1_Y = LABEL_CENTER_Y - LABEL_LINE_HEIGHT / 2 + 4;
+	// Label sits below the entire rollout and a short curved arrow reaches
+	// up to the bottom edge of a masked cell in the final row.
+	const LABEL_LINE_HEIGHT = 22;
+	const LAST_ROW_Y = rowY(ROWS - 1);
+	const LABEL_LINE1_Y = LAST_ROW_Y + SLOT_H / 2 + 44;
 	const LABEL_LINE2_Y = LABEL_LINE1_Y + LABEL_LINE_HEIGHT;
+	const LABEL_X = slotX(ANCHOR_COL);
 
-	// Arrow: short horizontal cubic from just past the "Once masked,
-	// stays masked." label to just before the left edge of the row's
-	// z_{t_r} math label. Both ends leave a small gap so the arrow
-	// visually floats between them rather than touching either the text
-	// or the row label.
-	const arrowTargetX = ROW_LABEL_X - 6;
-	const arrowTargetY = rowY(anchorRow);
-	// Start the arrow just past the callout text and end it just before
-	// the row's z_{t_r} label. The clamp below caps it if the target sits
-	// close.
-	const arrowStartX = LABEL_X + 100;
-	const arrowStartY = LABEL_CENTER_Y;
-	// Clamp so we don't overrun the target if the label is close.
-	const arrowStartXClamped = Math.min(arrowStartX, arrowTargetX - 12);
-	const arrowC1X = arrowStartXClamped + 10;
-	const arrowC1Y = arrowStartY;
-	const arrowC2X = arrowTargetX - 10;
-	const arrowC2Y = arrowTargetY;
-	const arrowPath = `M ${arrowStartXClamped} ${arrowStartY} C ${arrowC1X} ${arrowC1Y}, ${arrowC2X} ${arrowC2Y}, ${arrowTargetX} ${arrowTargetY}`;
+	// Arrow: short vertical-ish cubic from the label's top up to just
+	// below the anchor cell in the final row.
+	const arrowTargetX = slotX(ANCHOR_COL);
+	const arrowTargetY = LAST_ROW_Y + SLOT_H / 2 + 6;
+	const arrowStartX = slotX(ANCHOR_COL);
+	const arrowStartY = LABEL_LINE1_Y - 16;
+	const arrowC1X = arrowStartX;
+	const arrowC1Y = arrowStartY - 8;
+	const arrowC2X = arrowTargetX;
+	const arrowC2Y = arrowTargetY + 8;
+	const arrowPath = `M ${arrowStartX} ${arrowStartY} C ${arrowC1X} ${arrowC1Y}, ${arrowC2X} ${arrowC2Y}, ${arrowTargetX} ${arrowTargetY}`;
 
 	// ----------------------------------------------------------------
 	// Animations
@@ -276,15 +260,16 @@
 		role="img"
 		aria-label="Eight-token sequence unrolled vertically over six timesteps. Each row shows the sequence at a progressive forward-process step; tokens flip to gray mask rectangles and never flip back. A label points at the first-masked cell: once masked, stays masked."
 	>
-		<!-- Annotation: label in the left column + short curved arrow
-		     reaching into the first-masked cell. Fades in with row 1. -->
+		<!-- Annotation: label under the entire rollout + short curved arrow
+		     reaching up into a masked cell in the final row. Fades in as
+		     the trajectory finishes. -->
 		<g opacity={annotationOpacity}>
 			<text
 				x={LABEL_X}
 				y={LABEL_LINE1_Y}
-				text-anchor="start"
+				text-anchor="middle"
 				dominant-baseline="alphabetic"
-				font-size="17"
+				font-size="18"
 				fill={LABEL_COLOR}
 				font-style="italic"
 			>
@@ -293,9 +278,9 @@
 			<text
 				x={LABEL_X}
 				y={LABEL_LINE2_Y}
-				text-anchor="start"
+				text-anchor="middle"
 				dominant-baseline="alphabetic"
-				font-size="17"
+				font-size="18"
 				fill={LABEL_COLOR}
 				font-style="italic"
 			>
@@ -342,7 +327,7 @@
 				y={TIME_AXIS_Y_TOP}
 				text-anchor="start"
 				dominant-baseline="central"
-				font-size="14"
+				font-size="16"
 				fill={LABEL_COLOR}
 			>
 				t=0
@@ -352,23 +337,35 @@
 				y={TIME_AXIS_Y_BOTTOM}
 				text-anchor="start"
 				dominant-baseline="central"
-				font-size="14"
+				font-size="16"
 				fill={LABEL_COLOR}
 			>
 				t=1
 			</text>
-			<text
-				x={TIME_AXIS_X + 22}
-				y={(TIME_AXIS_Y_TOP + TIME_AXIS_Y_BOTTOM) / 2}
-				text-anchor="middle"
-				dominant-baseline="central"
-				font-size="16"
-				fill={LABEL_COLOR}
-				font-style="italic"
-				transform={`rotate(90 ${TIME_AXIS_X + 22} ${(TIME_AXIS_Y_TOP + TIME_AXIS_Y_BOTTOM) / 2})`}
-			>
-				Forward Process
-			</text>
+			<g transform={`rotate(90 ${TIME_AXIS_X + 30} ${(TIME_AXIS_Y_TOP + TIME_AXIS_Y_BOTTOM) / 2})`}>
+				<text
+					x={TIME_AXIS_X + 30}
+					y={(TIME_AXIS_Y_TOP + TIME_AXIS_Y_BOTTOM) / 2 - 9}
+					text-anchor="middle"
+					dominant-baseline="central"
+					font-size="17"
+					fill={LABEL_COLOR}
+					font-style="italic"
+				>
+					Forward
+				</text>
+				<text
+					x={TIME_AXIS_X + 30}
+					y={(TIME_AXIS_Y_TOP + TIME_AXIS_Y_BOTTOM) / 2 + 9}
+					text-anchor="middle"
+					dominant-baseline="central"
+					font-size="17"
+					fill={LABEL_COLOR}
+					font-style="italic"
+				>
+					Process
+				</text>
+			</g>
 		</g>
 
 		<!-- Grid: one row per timestep, each row stagger-fades in on the
@@ -377,20 +374,6 @@
 			{@const op = rowOpacity(r)}
 			{@const y = rowY(r)}
 			<g opacity={op}>
-				<!-- Row label: z_{t_r} tying visualization to prose notation. -->
-				<foreignObject
-					x={ROW_LABEL_X}
-					y={y - ROW_LABEL_H / 2}
-					width={ROW_LABEL_W}
-					height={ROW_LABEL_H}
-				>
-					<div
-						xmlns="http://www.w3.org/1999/xhtml"
-						style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: flex-end; font-size: 15px; color: {LABEL_COLOR};"
-					>
-						<Katex math={`\\mathbf{z}_{t_{${r}}}`} />
-					</div>
-				</foreignObject>
 				{#each row as isMasked, c}
 					{@const cx = slotX(c)}
 					{#if isMasked}
@@ -408,7 +391,7 @@
 							y={y}
 							text-anchor="middle"
 							dominant-baseline="central"
-							font-size="14"
+							font-size="16"
 							font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, monospace"
 							fill={maskTextColor}
 						>
@@ -420,7 +403,7 @@
 							y={y}
 							text-anchor="middle"
 							dominant-baseline="central"
-							font-size="16"
+							font-size="18"
 							fill={TEXT_COLOR}
 						>
 							{tokens[c]}

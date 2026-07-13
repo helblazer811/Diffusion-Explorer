@@ -194,10 +194,9 @@
 </script>
 
 <div class="smiley-flow">
-	<div class="stage" style="width: {W}px;">
+	<div class="stage" style="max-width: {W}px; aspect-ratio: {W} / {H};">
 		<canvas
 			bind:this={canvasEl}
-			style="width: {W}px; height: {H}px;"
 			aria-label="A single sample point tracing a Brownian-motion path from the data distribution (smiley face, left) to a Gaussian (right) under the DDPM forward SDE."
 		></canvas>
 	</div>
@@ -212,13 +211,13 @@
 	}
 
 	.stage {
-		max-width: 100%;
+		width: 100%;
 	}
 
 	canvas {
 		display: block;
-		max-width: 100%;
-		height: auto;
+		width: 100%;
+		height: 100%;
 		border-radius: 4px;
 	}
 
