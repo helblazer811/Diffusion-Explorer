@@ -45,6 +45,8 @@ export { default as Slider } from './components/Slider.svelte';
 export { default as TimeSlider } from './components/TimeSlider.svelte';
 export { default as NarratedTimeline } from './components/NarratedTimeline.svelte';
 export type { Chapter } from './components/NarratedTimeline.svelte';
+export { default as TabbedFolder } from './components/TabbedFolder.svelte';
+export type { Stage } from './components/TabbedFolder.svelte';
 export { default as TextToggleButton } from './components/TextToggleButton.svelte';
 export { default as MultiStateToggleButton } from './components/MultiStateToggleButton.svelte';
 export { default as FigureLegend } from './components/FigureLegend.svelte';
