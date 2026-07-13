@@ -1,0 +1,30 @@
+/* ==========================================================================
+   App-Specific Styles
+
+   Base styles (reset, typography, layout) are imported from @diffusion-explorer/ui
+   This file only contains styles specific to the masked-diffusion app.
+   ========================================================================== */
+
+/* Tighten the bottom margin on borderless (inline) figures so they hug the
+   following paragraph. The shared Figure component sets margin: 2rem 0 and
+   then overrides margin-top for no-background variants, but leaves the 2rem
+   bottom in place — which reads as too much space in this article. */
+.figure.no-background-figure {
+  margin-bottom: 0.5rem;
+}
+
+/* Scale up KaTeX-rendered math across the whole article — both inline
+   (which inherits from surrounding text) and display (which sets its own
+   font-size on .katex-display-wrapper). 1.1em applied to `.katex` bumps
+   both without needing to touch each call site's `displayFontSize` prop. */
+.katex {
+  font-size: 1.1em;
+}
+
+/* Display equations (block math) run larger — the individual callsites
+   pass displayFontSize="1.15em" on the wrapper; we bump that by ~25%
+   article-wide so full equation lines read at ~1.44em without editing
+   each Katex invocation. */
+.katex-display-wrapper {
+  font-size: 1.44em !important;
+}

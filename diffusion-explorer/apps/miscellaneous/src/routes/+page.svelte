@@ -38,8 +38,9 @@
 		<li><a href="/class_conditioning">Class Conditioning</a></li>
 		<li><a href="/svgd">SVGD (Stein Variational Gradient Descent)</a></li>
 		<li><a href="/s_curve_springs">Dimensionality Reduction as Solving a Spring System</a></li>
+		<li><a href="/remasking">Remasking in Masked Diffusion</a></li>
+		<li><a href="/adaptive_unmasking">Adaptive Unmasking Strategies</a></li>
 		<li><a href="/dflash">DFlash: Speculative Decoding with a Block Diffusion Drafter</a></li>
-		<li><a href="/hamiltonian_monte_carlo">HMC (Hamiltonian Monte Carlo)</a></li>
 	</ul>
 </section>
 
