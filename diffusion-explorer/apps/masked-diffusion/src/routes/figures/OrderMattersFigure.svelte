@@ -5,7 +5,7 @@
 	// transformer block → two categorical distributions → argmax fills in
 	// the decoded sentence. What's different is the example. The sentence
 	//
-	//     "A dog was [MASK]. He wants to [MASK]."
+	//     "The dog is [MASK] and wants to [MASK]"
 	//
 	// has two masked positions whose marginals look individually plausible
 	// but whose joint concentrates on two coherent modes (tired→sleep,
@@ -47,19 +47,17 @@
 	const TX_STROKE = '#c8ccd1';
 
 	// --- Content ---
-	// 10-token sequence including punctuation as its own slot. Masks at
-	// indices 3 and 8 sit at the "state" and "action" positions.
+	// 8-token sentence. Masks at indices 3 and 7 sit at the "state" and
+	// "action" positions of a single clause: state → action.
 	const inputTokens: (string | null)[] = [
-		'A',
+		'The',
 		'dog',
-		'was',
+		'is',
 		null,
-		'.',
-		'He',
+		'and',
 		'wants',
 		'to',
-		null,
-		'.'
+		null
 	];
 	const maskedIndices = inputTokens
 		.map((t, i) => (t === null ? i : -1))
@@ -244,7 +242,7 @@
 		viewBox={`0 0 ${W} ${H}`}
 		preserveAspectRatio="xMidYMid meet"
 		role="img"
-		aria-label="Animated pipeline diagram showing the sentence 'A dog was [MASK]. He wants to [MASK].' fed into a Transformer block, which emits two categorical distributions; the independent argmax picks land on the incoherent pair (tired, eat)."
+		aria-label="Animated pipeline diagram showing the sentence 'The dog is [MASK] and wants to [MASK]' fed into a Transformer block, which emits two categorical distributions; the independent argmax picks land on the incoherent pair (tired, eat)."
 	>
 		<defs>
 			<marker

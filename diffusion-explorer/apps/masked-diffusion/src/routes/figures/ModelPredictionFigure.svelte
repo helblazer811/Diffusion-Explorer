@@ -9,11 +9,11 @@
 	//   Phase 1: (a) masked input sequence fades in.
 	//   Phase 2: (b) arrows down from each input into the transformer draw in.
 	//   Phase 3: (c) transformer block fades/pulses in.
-	//   Phase 4: (d) two orange arrows from the transformer's masked positions
-	//               fan down to the bar-chart panels.
-	//   Phase 5: (e) bar-chart panels + their bars grow in.
-	//   Phase 6: (f)+(g) argmax arrows sweep down and the decoded sentence
-	//               reveals with the two filled-in tokens in orange.
+	//   Phase 4: (d) an orange arrow from the transformer's masked position
+	//               fans down to the bar-chart panel.
+	//   Phase 5: (e) bar-chart panel + its bars grow in.
+	//   Phase 6: (f)+(g) argmax arrow sweeps down and the decoded sentence
+	//               reveals with the filled-in token in orange.
 	//
 	// Between phases we hold briefly so the reader can absorb each stage; at
 	// the end of the loop we hold on the finished picture before restarting.
@@ -48,13 +48,18 @@
 	const TX_STROKE = '#c8ccd1';
 
 	// --- Content ---
+	// One masked position, placed slightly left of center — enough that the
+	// figure doesn't look like a fixed-window convolution over the sentence,
+	// but close enough that the transformer→panel→decoded arrow stays
+	// readable. A single mask keeps the MLM story minimal — the reader sees
+	// one categorical prediction filled in, without the joint-sampling
+	// distraction the §Idiosyncrasies figure raises later.
 	const inputTokens: (string | null)[] = [
 		'The',
-		null,
 		'cat',
-		'sat',
-		'on',
 		null,
+		'on',
+		'the',
 		'warm',
 		'mat'
 	];
@@ -63,23 +68,15 @@
 		.filter((i) => i >= 0);
 	const candidates: { word: string; p: number }[][] = [
 		[
-			{ word: 'little', p: 0.62 },
-			{ word: 'black', p: 0.21 },
-			{ word: 'sleepy', p: 0.12 },
-			{ word: 'angry', p: 0.05 }
-		],
-		[
-			{ word: 'the', p: 0.55 },
-			{ word: 'a', p: 0.24 },
-			{ word: 'this', p: 0.13 },
-			{ word: 'some', p: 0.08 }
+			{ word: 'sat', p: 0.62 },
+			{ word: 'lay', p: 0.21 },
+			{ word: 'slept', p: 0.12 },
+			{ word: 'jumped', p: 0.05 }
 		]
 	];
-	// Which candidate row is "sampled" at each masked position. Hard-coded so
-	// the story is legible: position 0 lands on the argmax (little), position
-	// 1 lands on the 2nd row (jumped, p=0.22) so the reader sees the process
-	// is stochastic — not always the top row.
-	const sampledIndex: number[] = [0, 1];
+	// Sampled row for the one masked position. Argmax (sat) — the picture
+	// is about *what the model predicts*, not the sampling stochasticity.
+	const sampledIndex: number[] = [0];
 	const decoded = inputTokens.map((tok, i) => {
 		if (tok !== null) return tok;
 		const which = maskedIndices.indexOf(i);
@@ -273,7 +270,7 @@
 		viewBox={`0 0 ${W} ${H}`}
 		preserveAspectRatio="xMidYMid meet"
 		role="img"
-		aria-label="Animated pipeline diagram showing a masked 8-token sentence fed into a Transformer block, which emits categorical distributions at the two masked positions; the argmax picks fill in the final decoded sentence."
+		aria-label="Animated pipeline diagram showing a masked 7-token sentence fed into a Transformer block, which emits a categorical distribution at the masked position; the argmax pick fills in the final decoded sentence."
 	>
 		<defs>
 			<marker

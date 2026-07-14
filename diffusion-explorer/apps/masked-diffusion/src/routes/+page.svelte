@@ -835,7 +835,7 @@
 
 <p>
 	The consequence is easy to see on a short example. Consider the sentence
-	&ldquo;A dog was [MASK]. He wants to [MASK].&rdquo; A well-trained model
+	&ldquo;The dog is [MASK] and wants to [MASK].&rdquo; A well-trained model
 	will produce roughly even marginals at each masked slot &mdash; the first
 	between something like <em>tired</em> and <em>hungry</em>, the second
 	between <em>eat</em> and <em>sleep</em>. Both marginals are individually
