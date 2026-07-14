@@ -34,6 +34,7 @@
 	import MaskToken from './figures/MaskToken.svelte';
 	import AbsorbingMaskFigure from './figures/AbsorbingMaskFigure.svelte';
 	import OrderMattersFigure from './figures/OrderMattersFigure.svelte';
+	import SequentialRecoveryFigure from './figures/SequentialRecoveryFigure.svelte';
 	import RepresentationRippleFigure from './figures/RepresentationRippleFigure.svelte';
 	import {
 		buildForwardReverseTimeline,
@@ -70,6 +71,7 @@
 	const causalAttentionActive = writable(false);
 	const absorbingMaskActive = writable(false);
 	const orderMattersActive = writable(false);
+	const sequentialRecoveryActive = writable(false);
 	const representationRippleActive = writable(false);
 
 	// Shared clock driving both ForwardReverseFigure variants (continuous +
@@ -871,7 +873,9 @@
 	The scaffolding is otherwise identical.
 </p>
 
-<h3 id="relation-to-continuous-diffusion">Relation to Continuous Diffusion</h3>
+<hr class="section-divider" />
+
+<h2 id="relation-to-continuous-diffusion">Relation to Continuous Diffusion</h2>
 
 <p>
 	In <strong>continuous diffusion</strong>, the forward process transforms
@@ -910,18 +914,16 @@
 	{/snippet}
 </Figure>
 
-<h2 id="idiosyncrasies">Idiosyncrasies of Masked Diffusion</h2>
+<hr class="section-divider" />
+
+<h2 id="order-matters">Generation Order Matters</h2>
 
 <p>
 	The previous section defined what a masked diffusion model <em>is</em>.
-	Once you actually try to sample from one, two quirks that don't come up
-	in autoregressive generation start to matter. Both trace back to the
-	same structural fact &mdash; the reverse step factorizes across
-	positions &mdash; and they set the terms of the speed-versus-coherence
-	tradeoffs that dominate the follow-up post on efficient decoding.
+	Once you actually try to sample from one, a quirk that doesn't come up
+	in autoregressive generation starts to matter, and it traces back to
+	the structural fact that the reverse step factorizes across positions.
 </p>
-
-<h3 id="order-matters">Generation Order Matters</h3>
 
 <p>
 	The forward process corrupts each token position independently; that's
@@ -975,6 +977,24 @@
 	/>.
 </p>
 
+<Figure backgroundVisible={false} isActive={sequentialRecoveryActive}>
+	{#snippet children()}
+		<SequentialRecoveryFigure
+			isActive={sequentialRecoveryActive}
+			maskColor={MASK_COLOR}
+			maskTextColor={MASK_TEXT_COLOR}
+		/>
+	{/snippet}
+	{#snippet caption()}
+		Rolling out one commit at a time recovers the joint. Pass&nbsp;1 uses
+		the same near-50/50 marginals as the previous figure, but commits
+		only the first mask to its argmax, <em>tired</em>. Pass&nbsp;2 re-runs
+		the model with <em>tired</em> in place; the second position's
+		marginal has now concentrated sharply on <em>sleep</em>, and the
+		coherent sentence falls out.
+	{/snippet}
+</Figure>
+
 <p>
 	The punchline: parallel decoding is not a structural free lunch.
 	Committing <Katex math={"K"} /> tokens in one step means sampling from a
@@ -987,39 +1007,43 @@
 	story in the follow-up post.
 </p>
 
-<h3 id="bidirectional-context-updates">Every Commit Rewrites Every Logit</h3>
+<!-- Hidden: "Every Commit Rewrites Every Logit" subsection. Kept in
+     source for future use; not rendered. -->
+{#if false}
+	<h3 id="bidirectional-context-updates">Every Commit Rewrites Every Logit</h3>
 
-<p>
-	The factorized reverse step said something about which positions'
-	<em>samples</em> depend on each other. There's a companion fact about
-	which positions' <em>logits</em> depend on each other, and it comes
-	from bidirectional attention. Every hidden state in a masked
-	transformer attends to every other position, so committing a single
-	token doesn't just fix that one slot &mdash; it changes the
-	representation at every other position, including the ones that stay
-	masked.
-</p>
+	<p>
+		The factorized reverse step said something about which positions'
+		<em>samples</em> depend on each other. There's a companion fact about
+		which positions' <em>logits</em> depend on each other, and it comes
+		from bidirectional attention. Every hidden state in a masked
+		transformer attends to every other position, so committing a single
+		token doesn't just fix that one slot &mdash; it changes the
+		representation at every other position, including the ones that stay
+		masked.
+	</p>
 
-<Figure backgroundVisible={false} isActive={representationRippleActive}>
-	{#snippet children()}
-		<RepresentationRippleFigure
-			isActive={representationRippleActive}
-			maskColor={MASK_COLOR}
-			maskTextColor={MASK_TEXT_COLOR}
-		/>
-	{/snippet}
-</Figure>
+	<Figure backgroundVisible={false} isActive={representationRippleActive}>
+		{#snippet children()}
+			<RepresentationRippleFigure
+				isActive={representationRippleActive}
+				maskColor={MASK_COLOR}
+				maskTextColor={MASK_TEXT_COLOR}
+			/>
+		{/snippet}
+	</Figure>
 
-<p>
-	This is a feature, not a bug. In autoregressive generation, past
-	key-value activations are frozen the moment a token commits; the model
-	can only condition forward. In a masked diffusion model there is no
-	&ldquo;past&rdquo; &mdash; the state is bidirectional through and
-	through, so every commit is an opportunity to sharpen beliefs about
-	every remaining position, including ones to its left. It's what makes
-	iterative refinement worth doing. It's also what makes those iterations
-	expensive, but that's a story for the next post.
-</p>
+	<p>
+		This is a feature, not a bug. In autoregressive generation, past
+		key-value activations are frozen the moment a token commits; the model
+		can only condition forward. In a masked diffusion model there is no
+		&ldquo;past&rdquo; &mdash; the state is bidirectional through and
+		through, so every commit is an opportunity to sharpen beliefs about
+		every remaining position, including ones to its left. It's what makes
+		iterative refinement worth doing. It's also what makes those iterations
+		expensive, but that's a story for the next post.
+	</p>
+{/if}
 
 <h2 id="extensions">Extensions and Further Reading</h2>
 

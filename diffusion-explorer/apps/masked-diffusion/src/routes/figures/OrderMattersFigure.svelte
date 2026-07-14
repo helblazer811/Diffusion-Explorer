@@ -65,19 +65,17 @@
 		.map((t, i) => (t === null ? i : -1))
 		.filter((i) => i >= 0);
 	// Two ~50/50 marginals whose joint is bimodal on (tired, sleep) and
-	// (hungry, eat). Independent argmax lands on (tired, eat) — incoherent.
+	// (hungry, eat). Only the top-2 candidates per marginal are shown so
+	// the eye lands on the bimodality without vocabulary noise.
+	// Independent argmax lands on (tired, eat) — incoherent.
 	const candidates: { word: string; p: number }[][] = [
 		[
-			{ word: 'tired', p: 0.48 },
-			{ word: 'hungry', p: 0.42 },
-			{ word: 'bored', p: 0.06 },
-			{ word: 'alone', p: 0.04 }
+			{ word: 'tired', p: 0.53 },
+			{ word: 'hungry', p: 0.47 }
 		],
 		[
-			{ word: 'eat', p: 0.46 },
-			{ word: 'sleep', p: 0.44 },
-			{ word: 'play', p: 0.06 },
-			{ word: 'run', p: 0.04 }
+			{ word: 'eat', p: 0.51 },
+			{ word: 'sleep', p: 0.49 }
 		]
 	];
 	// Hard-coded outcome: position 3 samples "tired" (row 0), position 8
