@@ -514,23 +514,10 @@
 	its left.
 </p>
 
-<Figure backgroundVisible={false} isActive={causalAttentionActive}>
-	{#snippet children()}
-		<CausalAttentionFigure isActive={causalAttentionActive} />
-	{/snippet}
-	{#snippet caption()}
-		The underlying attention masks. Each row is a query; each column
-		is a key. Under the causal mask used by autoregressive
-		transformers, every query attends only to past-and-current keys
-		and the matrix is lower-triangular. Under bidirectional attention
-		every query sees every key, and the full square fills in.
-	{/snippet}
-</Figure>
-
 <p>
-	The same distinction plays out at the graph level: which input
-	positions actually route information into a given output? Hover any
-	node below to see the pattern for that position.
+	At the graph level, this is which input positions actually route
+	information into a given output. Hover any node below to see the
+	pattern for that position.
 </p>
 
 <Figure backgroundVisible={false}>
@@ -546,6 +533,27 @@
 		output &mdash; under causal attention it only sees itself and the
 		three tokens to its left; under bidirectional attention it sees
 		every position.
+	{/snippet}
+</Figure>
+
+<p>
+	Under the hood, this is enforced by a mask matrix added to the
+	attention logits before the softmax &mdash; every entry
+	<Katex math={"(i, j)"} /> the query is not allowed to attend to gets
+	set to <Katex math={"-\\infty"} />, so its softmax weight becomes
+	zero.
+</p>
+
+<Figure backgroundVisible={false} isActive={causalAttentionActive}>
+	{#snippet children()}
+		<CausalAttentionFigure isActive={causalAttentionActive} />
+	{/snippet}
+	{#snippet caption()}
+		The underlying attention masks. Each row is a query; each column
+		is a key. Under the causal mask used by autoregressive
+		transformers, every query attends only to past-and-current keys
+		and the matrix is lower-triangular. Under bidirectional attention
+		every query sees every key, and the full square fills in.
 	{/snippet}
 </Figure>
 
