@@ -29,7 +29,6 @@
 	import MLMLossInline from './figures/MLMLossInline.svelte';
 	import MLMPreambleFigure from './figures/MLMPreambleFigure.svelte';
 	import MaskedTransformerFigure from './figures/MaskedTransformerFigure.svelte';
-	import InformationFlowFigure from './figures/InformationFlowFigure.svelte';
 	import CausalAttentionFigure from './figures/CausalAttentionFigure.svelte';
 	import AttentionPatternFigure from './figures/AttentionPatternFigure.svelte';
 	import MaskToken from './figures/MaskToken.svelte';
@@ -68,7 +67,6 @@
 	const modelPredictionInlineFullMaskActive = writable(false);
 	const mlmLossInlineActive = writable(false);
 	const maskedTransformerActive = writable(false);
-	const informationFlowActive = writable(false);
 	const causalAttentionActive = writable(false);
 	const absorbingMaskActive = writable(false);
 	const orderMattersActive = writable(false);
@@ -515,19 +513,6 @@
 	query attends to every other position's keys, not just the ones to
 	its left.
 </p>
-
-<Figure backgroundVisible={false} isActive={informationFlowActive}>
-	{#snippet children()}
-		<InformationFlowFigure isActive={informationFlowActive} />
-	{/snippet}
-	{#snippet caption()}
-		Information flow under causal (left) versus bidirectional (right)
-		attention. On the left, every past token sends information into
-		the next-token prediction &mdash; strictly one direction. On the
-		right, the mask at the interior position receives information
-		from every other position, both left and right.
-	{/snippet}
-</Figure>
 
 <Figure backgroundVisible={false} isActive={causalAttentionActive}>
 	{#snippet children()}
