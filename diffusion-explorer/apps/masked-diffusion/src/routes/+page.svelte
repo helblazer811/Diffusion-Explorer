@@ -318,6 +318,10 @@
 		id="sahoo2024simpleeffectivemaskeddiffusion"
 		{bibEntries}
 		{citations}
+	/><HoverableReference
+		id="shi2025simplifiedgeneralizedmaskeddiffusion"
+		{bibEntries}
+		{citations}
 	/>. Diffusion is the dominant paradigm for image and video generation.
 	On text it has more recently shown promise, with the largest masked
 	diffusion language models scaling to 8 billion parameters
@@ -442,12 +446,11 @@
 />
 
 <p>
-	Geometrically, cross-entropy is a force pulling the model's predicted
-	distribution <Katex math={"p_\\theta(\\cdot \\mid \\tilde{\\mathbf{x}})"} />
-	at position <Katex math={"\\ell"} /> toward the one-hot target
-	<Katex math={"\\mathbf{x}^\\ell"} />. As training progresses, whatever
-	mass the model is currently spreading over near-miss vocabulary words
-	gets pulled onto the single correct word.
+	<strong>Cross-entropy is KL to the one-hot target.</strong> For a
+	one-hot target the negative log-likelihood equals
+	<Katex math={"D_{\\mathrm{KL}}(\\mathbf{x}^\\ell \\,\\|\\, p_\\theta(\\cdot \\mid \\tilde{\\mathbf{x}}))"} />
+	exactly, and minimizing it pulls the model's predicted distribution
+	toward the target.
 </p>
 
 <Figure backgroundVisible={false} isActive={mlmLossInlineActive}>
@@ -516,8 +519,7 @@
 
 <p>
 	At the graph level, this is which input positions actually route
-	information into a given output. Hover any node below to see the
-	pattern for that position.
+	information into a given output.
 </p>
 
 <Figure backgroundVisible={false}>
@@ -532,7 +534,12 @@
 		the pattern for the <MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} />'s
 		output &mdash; under causal attention it only sees itself and the
 		three tokens to its left; under bidirectional attention it sees
-		every position.
+		every position. Hover or tap
+		<img
+			src="{base}/icons/tap.svg"
+			alt="tap"
+			style="width: 24px; height: 24px; vertical-align: middle; margin: 0 2px; filter: invert(30%) sepia(0%) saturate(0%) brightness(60%) contrast(90%);"
+		/> any node to see the pattern for that position.
 	{/snippet}
 </Figure>
 
