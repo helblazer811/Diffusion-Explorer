@@ -301,64 +301,66 @@
 <p>
 	Autoregressive language models are the workhorse of modern AI.
 	Practically every major LLM in production today, from GPT to Claude to
-	Gemini, is autoregressive at its core: they generate text one
-	token at a time, left to right, each token conditioned on everything that
-	came before. A remarkable amount of engineering effort has gone into
-	making this loop fast. Techniques like kernel optimization, KV caching,
-	and speculative decoding <HoverableReference
-		id="leviathan2023fastinferencetransformersspeculative"
-		{bibEntries}
-		{citations}
-	/> shave cost off every generated token, and modern
-	GPU architectures and custom accelerators like TPUs are co-designed with
-	this particular workload in mind, all to squeeze more tokens per second
-	out of the same fundamentally sequential recipe. But at some point it's
-	worth asking: what comes next? What are the alternatives to
-	autoregression?
+	Gemini, is autoregressive at its core: they generate text one token at
+	a time, left to right, each token conditioned on everything that came
+	before. Autoregressive models have earned their dominance: the recipe
+	works, scales, and produces the frontier systems we use every day. But
+	are there other viable paradigms for language modeling?
 </p>
 
 <p>
-	Masked diffusion language models <HoverableReference
+	One alternative is <em>masked diffusion language models</em>
+	<HoverableReference
 		id="sahoo2024simpleeffectivemaskeddiffusion"
 		{bibEntries}
 		{citations}
-	/> offer one such alternative. Where an
-	autoregressive model builds a sequence left to right one token at a time,
-	a masked diffusion model starts from a fully-masked sequence and
-	progressively unmasks tokens in any order, potentially several at once.
-	The most immediately appealing consequence is parallelism:
-	because multiple tokens can be unmasked in a single reverse step,
-	generation is no longer bottlenecked on producing one token at a time.
-	There are other reasons to be interested. The model can revisit
-	and revise tokens it already committed to, a technique called
-	<em>remasking</em> <HoverableReference
+	/>. Diffusion is the dominant paradigm for image and video generation.
+	On text it has more recently shown promise, with the largest masked
+	diffusion language models scaling to 8 billion parameters
+	<HoverableReference
+		id="nie2025largelanguagediffusionmodels"
+		{bibEntries}
+		{citations}
+	/>. Like their continuous cousins, masked diffusion language models
+	frame generation as reversing a corruption process: they start from a
+	fully-masked sequence and progressively unmask tokens in any order,
+	potentially several at once. This opens up several core capabilities.
+	Multiple tokens can be unmasked in one reverse step, so generation is
+	no longer serial. Tokens can be revisited and revised after they're
+	first produced, a technique called <em>remasking</em>
+	<HoverableReference
 		id="wang2026remaskingdiscretediffusionmodels"
 		{bibEntries}
 		{citations}
-	/>. And there is evidence that a non-autoregressive unmasking
-	order is a better inductive bias for problems whose dependency
-	structure isn't left-to-right <HoverableReference
+	/>. And the unmasking order isn't fixed left-to-right, letting the
+	model attack problems in an order that matches their dependency
+	structure, useful for tasks like Sudoku
+	<HoverableReference
 		id="kim2025trainworstplanbest"
 		{bibEntries}
 		{citations}
-	/>. But the parallelism
-	argument is the one that promises a clean systems win, and it is what
-	first drew attention to this paradigm.
+	/>.
 </p>
 
 <p>
-	But applied naively, <em>they aren't actually faster</em>. Unmasking
-	many tokens per step sounds like a straightforward speedup, and it
-	would be, if inference cost were just "number of forward passes." It
-	isn't. Masked diffusion models leverage
-	bidirectional attention, which is strictly more powerful than the
-	causal attention that autoregressive models use, but at the cost of
-	violating core assumptions required for KV caching. KV caching is the
-	ability to reuse computed keys and values from previous passes, made
-	possible by the one-way flow of information from left to right. The rest of this post is about that
-	tradeoff: what assumptions enable efficient AR inference, why masked
-	diffusion violates these assumptions, and how the field is putting
-	the pieces back together.
+	These capabilities are real, but not without their idiosyncrasies.
+	Parallel decoding isn't a free speedup. Autoregressive models cache
+	their past keys and values, something not possible due to the
+	bidirectional attention of masked transformers. I hope to cover this
+	in a future post. Committing multiple tokens at once can also produce
+	jointly incoherent output: the reverse step samples each position
+	independently, so two locally-plausible draws can be globally wrong.
+	Choosing an unmasking order is itself a design decision. Random works,
+	but adaptive orderings, picking the highest-confidence position first,
+	do noticeably better on structured problems
+	<HoverableReference
+		id="kim2025trainworstplanbest"
+		{bibEntries}
+		{citations}
+	/>. The rest of this post covers what a masked diffusion model is,
+	how it generalizes BERT-style masked language modeling, the shared
+	theoretical scaffolding it inherits from continuous diffusion, and
+	the practical quirks that come with the paradigm.
 </p>
 
 <hr class="section-divider" />
