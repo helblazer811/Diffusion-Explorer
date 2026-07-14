@@ -5,13 +5,13 @@
 	// transformer block → two categorical distributions → argmax fills in
 	// the decoded sentence. What's different is the example. The sentence
 	//
-	//     "The dog is [MASK] and wants to [MASK]"
+	//     "The dog is [MASK] so he wants to [MASK]"
 	//
 	// has two masked positions whose marginals look individually plausible
 	// but whose joint concentrates on two coherent modes (tired→sleep,
-	// hungry→eat). The independent argmax lands on (tired, eat) — one of
-	// the incoherent pairs — and a warning line under the decoded row
-	// makes the point explicit.
+	// hungry→eat). The "so" makes the causal link explicit, so the
+	// independent argmax landing on (tired, eat) reads as clearly
+	// incoherent — the reader knows a tired dog would sleep, not eat.
 	//
 	// Timeline phases mirror ModelPredictionFigure exactly.
 
@@ -28,7 +28,7 @@
 		fontSize?: number;
 	}
 
-	let { isActive, maskColor = '#cfe0f2', maskTextColor = '#33506e', width = 900, fontSize = 18 }: Props = $props();
+	let { isActive, maskColor = '#cfe0f2', maskTextColor = '#33506e', width = 1000, fontSize = 18 }: Props = $props();
 
 	const maskLabelSize = fontSize * (12 / 16);
 	const txLabelSize = fontSize * (18 / 16);
@@ -47,14 +47,16 @@
 	const TX_STROKE = '#c8ccd1';
 
 	// --- Content ---
-	// 8-token sentence. Masks at indices 3 and 7 sit at the "state" and
-	// "action" positions of a single clause: state → action.
+	// 9-token sentence with an explicit causal link ("so"), so the reader
+	// judges coherence on the state → action pairing rather than on a
+	// looser conjunction. Masks at indices 3 and 8.
 	const inputTokens: (string | null)[] = [
 		'The',
 		'dog',
 		'is',
 		null,
-		'and',
+		'so',
+		'he',
 		'wants',
 		'to',
 		null
@@ -242,7 +244,7 @@
 		viewBox={`0 0 ${W} ${H}`}
 		preserveAspectRatio="xMidYMid meet"
 		role="img"
-		aria-label="Animated pipeline diagram showing the sentence 'The dog is [MASK] and wants to [MASK]' fed into a Transformer block, which emits two categorical distributions; the independent argmax picks land on the incoherent pair (tired, eat)."
+		aria-label="Animated pipeline diagram showing the sentence 'The dog is [MASK] so he wants to [MASK]' fed into a Transformer block, which emits two categorical distributions; the independent argmax picks land on the incoherent pair (tired, eat)."
 	>
 		<defs>
 			<marker
@@ -505,7 +507,7 @@
 	.wrap {
 		position: relative;
 		width: 100%;
-		max-width: 900px;
+		max-width: 1000px;
 		margin: 0 auto;
 	}
 	svg {
