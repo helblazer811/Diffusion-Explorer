@@ -69,14 +69,17 @@
 	const candidates: { word: string; p: number }[][] = [
 		[
 			{ word: 'sat', p: 0.62 },
-			{ word: 'lay', p: 0.21 },
-			{ word: 'slept', p: 0.12 },
+			{ word: 'slept', p: 0.21 },
+			{ word: 'rested', p: 0.12 },
 			{ word: 'jumped', p: 0.05 }
 		]
 	];
-	// Sampled row for the one masked position. Argmax (sat) — the picture
-	// is about *what the model predicts*, not the sampling stochasticity.
-	const sampledIndex: number[] = [0];
+	// Sampled row for the one masked position. Deliberately NOT the
+	// argmax: we pick the second-most-likely candidate ("lay") so the
+	// figure communicates that this is a random draw from a categorical,
+	// not a top-1 selection. The roulette animation reinforces the same
+	// point visually.
+	const sampledIndex: number[] = [1];
 	const decoded = inputTokens.map((tok, i) => {
 		if (tok !== null) return tok;
 		const which = maskedIndices.indexOf(i);
@@ -135,7 +138,7 @@
 	// Timeline `u` runs 0 → 5 across the 5 animated phases (in order 2, 4, 5, 6, 7).
 	const P_IN = 700;
 	const P_HOLD = 500;
-	const P_SAMPLE = 730;
+	const P_SAMPLE = 2800;
 	const END_HOLD = 6500;
 	// Which phase indices are actually animated on the timeline, in play order.
 	const ANIMATED_PHASES = [2, 4, 5, 6, 7] as const;
@@ -173,21 +176,48 @@
 	let pSample = $derived(animatedPhaseProgress(SAMPLE_PHASE)); // raw (no ease) for the wheel
 	let p7 = $derived(smoothstep(animatedPhaseProgress(7)));
 
-	// Flash-highlight sampling: after the bars are grown, the sampled bar
-	// briefly flashes brighter (a short parabolic "pulse") and then locks
-	// to full orange. The pulse peaks about a third of the way into the
-	// sampling phase and fades to a steady state.
-	const FLASH_PEAK = 0.35; // where in the sampling phase the pulse peaks
+	// Roulette-then-lock sampling. The sampling phase has two sub-phases:
+	//
+	//   Spin  (s ∈ [0, SPIN_END]): a "hot" row cycles through the
+	//         candidates with a decelerating dwell time — early on we
+	//         switch rows quickly, then slower and slower, so the eye
+	//         reads it as a spinning wheel losing momentum.
+	//   Lock  (s ∈ [SPIN_END, 1]): the hot row is pinned to
+	//         `sampledIndex[which]` and a flash pulse brightens it.
+	//
+	// This communicates that the outcome is a random draw from the
+	// categorical, not always the tallest bar.
+	const SPIN_END = 0.75;
+	// Total number of row-swaps during the spin. Fewer = each dwell is
+	// longer and the eye can register each candidate; the deceleration
+	// schedule below stretches the last few dwells further still.
+	const SPIN_STEPS = 16;
+
+	function rouletteHotRow(s: number, rowCount: number, sampled: number): number {
+		// s ∈ [0, 1] over the whole sampling phase. Returns the currently
+		// highlighted row.
+		if (s >= SPIN_END) return sampled;
+		// Normalize to [0, 1] over just the spin sub-phase.
+		const u = s / SPIN_END;
+		// Deceleration: cubic ease-out on the "how many swaps have we
+		// done" curve. At u=0 → step 0; at u=1 → step SPIN_STEPS. The
+		// ease-out means most swaps happen early and later ones are
+		// slower, mimicking a decelerating wheel.
+		const eased = 1 - Math.pow(1 - u, 3);
+		const step = Math.floor(eased * SPIN_STEPS);
+		// Cycle through rows in order. Offset by 1 so we don't happen to
+		// start on the eventual sampled row (that would look static early
+		// on and defeat the illusion).
+		return (step + 1) % rowCount;
+	}
 
 	function flashIntensity(s: number): number {
-		// s ∈ [0, 1]. Returns a scalar ∈ [0, 1] that ramps up quickly to a
-		// peak of 1 at FLASH_PEAK, then decays gracefully back toward 1
-		// (steady-state = "sampled"). We keep the steady state at 1 so the
-		// bar stays highlighted after the pulse.
-		if (s <= 0) return 0;
-		if (s >= 1) return 1;
-		// Ramp: 0 → 1 over the first quarter of the phase (ease-out).
-		const ramp = Math.min(1, s / 0.15);
+		// Flash pulse during the LOCK sub-phase only. Ramps 0 → 1 over the
+		// first slice of the lock and stays at 1 thereafter so the
+		// sampled bar remains highlighted.
+		if (s <= SPIN_END) return 0;
+		const t = (s - SPIN_END) / (1 - SPIN_END);
+		const ramp = Math.min(1, t / 0.25);
 		return ramp * ramp * (3 - 2 * ramp);
 	}
 
@@ -406,6 +436,8 @@
 			{#each candidates as panel, which}
 				{@const px = panelX(which)}
 				{@const flash = flashIntensity(pSample)}
+				{@const isSpinning = pSample > 0 && pSample < SPIN_END}
+				{@const spinHot = rouletteHotRow(pSample, panel.length, sampledIndex[which])}
 				<text
 					x={px + PANEL_W / 2}
 					y={BAR_Y_TOP - 22}
@@ -421,9 +453,10 @@
 				{#each panel as row, r}
 					{@const rowY = BAR_Y_TOP + r * BAR_ROW_H}
 					{@const isSampled = r === sampledIndex[which]}
-					{@const isHot = isSampled && flash > 0}
+					{@const isLocked = isSampled && flash > 0}
+					{@const isSpinHot = isSpinning && r === spinHot}
 					{@const baseW = row.p * BAR_MAX_W * p5}
-					{@const grow = 1 + 0.1 * (isHot ? flash : 0)}
+					{@const grow = 1 + 0.1 * (isLocked ? flash : isSpinHot ? 1 : 0)}
 					{@const barW = baseW * grow}
 					{@const barX = px + BAR_LABEL_W}
 					{@const numFitsInside = barW >= 32}
@@ -433,8 +466,8 @@
 						text-anchor="end"
 						dominant-baseline="central"
 						font-size={barWordSize}
-						fill={isHot ? ACCENT : TEXT_COLOR}
-						font-weight={isHot ? '600' : '400'}
+						fill={isLocked ? ACCENT : TEXT_COLOR}
+						font-weight={isLocked || isSpinHot ? '600' : '400'}
 					>
 						{row.word}
 					</text>
@@ -445,8 +478,8 @@
 						height={BAR_H * grow}
 						rx={3}
 						ry={3}
-						fill={isHot ? ACCENT : BAR_COLOR}
-						opacity={isHot ? 0.75 + 0.2 * flash : 0.75}
+						fill={isLocked ? ACCENT : BAR_COLOR}
+						opacity={isLocked ? 0.75 + 0.2 * flash : isSpinHot ? 0.95 : 0.75}
 					/>
 					{#if numFitsInside}
 						<text
@@ -473,6 +506,52 @@
 						</text>
 					{/if}
 				{/each}
+				{@const rowsCount = panel.length}
+				{@const panelMidY = BAR_Y_TOP + ((rowsCount - 1) * BAR_ROW_H) / 2 + BAR_ROW_H / 2 + 10}
+				{@const labelX = px + PANEL_W - 24}
+				{@const labelSize = fontSize}
+				{@const labelLineH = labelSize * 1.4}
+				<line
+					x1={labelX - 95}
+					y1={panelMidY}
+					x2={labelX - 11}
+					y2={panelMidY}
+					stroke={MUTED}
+					stroke-width="1.4"
+				/>
+				<text
+					x={labelX}
+					y={panelMidY - labelLineH}
+					text-anchor="start"
+					dominant-baseline="alphabetic"
+					font-size={labelSize}
+					fill={MUTED}
+					font-style="italic"
+				>
+					Randomly sample
+				</text>
+				<text
+					x={labelX}
+					y={panelMidY}
+					text-anchor="start"
+					dominant-baseline="alphabetic"
+					font-size={labelSize}
+					fill={MUTED}
+					font-style="italic"
+				>
+					from this
+				</text>
+				<text
+					x={labelX}
+					y={panelMidY + labelLineH}
+					text-anchor="start"
+					dominant-baseline="alphabetic"
+					font-size={labelSize}
+					fill={MUTED}
+					font-style="italic"
+				>
+					distribution.
+				</text>
 			{/each}
 		</g>
 

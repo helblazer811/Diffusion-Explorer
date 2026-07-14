@@ -43,7 +43,7 @@
 
 	// --- Geometry ---
 	const W = width;
-	const H = 200;
+	const H = 190;
 	const SEQ_Y_TOP = 25;
 	const SEQ_Y_BOTTOM = 175;
 	const SLOT_W = 60;

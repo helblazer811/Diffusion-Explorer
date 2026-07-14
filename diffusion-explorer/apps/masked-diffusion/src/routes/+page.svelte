@@ -23,11 +23,15 @@
 	import { Player } from '@helblazer811/tempus';
 
 	import DecodingTrajectoryFigure from './figures/DecodingTrajectoryFigure.svelte';
-	import CausalAttentionFigure from './figures/CausalAttentionFigure.svelte';
 	import ForwardReverseFigure from './figures/ForwardReverseFigure.svelte';
 	import ModelPredictionFigure from './figures/ModelPredictionFigure.svelte';
 	import ModelPredictionInlineFullMask from './figures/ModelPredictionInlineFullMask.svelte';
 	import MLMLossInline from './figures/MLMLossInline.svelte';
+	import MLMPreambleFigure from './figures/MLMPreambleFigure.svelte';
+	import MaskedTransformerFigure from './figures/MaskedTransformerFigure.svelte';
+	import InformationFlowFigure from './figures/InformationFlowFigure.svelte';
+	import CausalAttentionFigure from './figures/CausalAttentionFigure.svelte';
+	import AttentionPatternFigure from './figures/AttentionPatternFigure.svelte';
 	import MaskToken from './figures/MaskToken.svelte';
 	import AbsorbingMaskFigure from './figures/AbsorbingMaskFigure.svelte';
 	import OrderMattersFigure from './figures/OrderMattersFigure.svelte';
@@ -44,7 +48,6 @@
 	// IntersectionObserver + tab visibility), and the figure inside reads it to
 	// play/pause its tempus animation only while on-screen.
 	const trajectoryActive = writable(false);
-	const causalAttentionActive = writable(false);
 	// Visibility stores for the four ForwardReverseFigure instances on this
 	// page: the two stacked panels of the top-of-page hero, plus the two
 	// panels in the "Relation to Continuous Diffusion" section. All four
@@ -64,6 +67,9 @@
 	const modelPredictionActive = writable(false);
 	const modelPredictionInlineFullMaskActive = writable(false);
 	const mlmLossInlineActive = writable(false);
+	const maskedTransformerActive = writable(false);
+	const informationFlowActive = writable(false);
+	const causalAttentionActive = writable(false);
 	const absorbingMaskActive = writable(false);
 	const orderMattersActive = writable(false);
 	const representationRippleActive = writable(false);
@@ -325,9 +331,11 @@
 	frame generation as reversing a corruption process: they start from a
 	fully-masked sequence and progressively unmask tokens in any order,
 	potentially several at once. This opens up several core capabilities.
-	Multiple tokens can be unmasked in one reverse step, so generation is
-	no longer serial. Tokens can be revisited and revised after they're
-	first produced, a technique called <em>remasking</em>
+	Multiple tokens can be unmasked in a single reverse step, so
+	generation is no longer strictly serial &mdash; a potential path to
+	faster inference than one-token-at-a-time autoregression. Tokens
+	can also be revisited and revised after they're first produced, a
+	technique called <em>remasking</em>
 	<HoverableReference
 		id="wang2026remaskingdiscretediffusionmodels"
 		{bibEntries}
@@ -369,12 +377,38 @@
 
 <p>
 	Before we get to masked diffusion, it is worth revisiting the idea it
-	builds on: <em>masked language modeling</em>. The task is simple to state.
-	Take a sentence, replace a few of its tokens with a special
-	<MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} /> symbol, and ask a neural network to predict the
-	original tokens at the masked positions. For each masked position, the
-	network emits a full <em>categorical distribution</em> over the vocabulary,
-	and we take the argmax (or sample from it) to fill the slot in.
+	builds on: <em>masked language modeling</em>
+	<HoverableReference
+		id="devlin2019bertpretrainingdeepbidirectional"
+		{bibEntries}
+		{citations}
+	/>. A masked language model is trained to predict the value of a
+	token given surrounding context. That target position can be anywhere
+	in the sequence, not necessarily just the end, and the model uses
+	whatever tokens are visible on <em>either</em> side as context.
+</p>
+
+<Figure backgroundVisible={false}>
+	{#snippet children()}
+		<MLMPreambleFigure />
+	{/snippet}
+</Figure>
+
+<p>
+	From this angle, an autoregressive model can be thought of as a
+	particular instance of a masked language model with a restricted
+	unmasking pattern: the target position is always the next one, and
+	the visible context is always the tokens to its left.
+</p>
+
+<h3 id="mlm-framework">The Framework</h3>
+
+<p>
+	Concretely: masked positions are marked with a special
+	<MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} /> symbol,
+	and at every masked position the model outputs a
+	<em>categorical distribution</em> over the vocabulary, which we
+	sample from to fill the slot.
 </p>
 
 <Figure backgroundVisible={false} isActive={modelPredictionActive}>
@@ -398,7 +432,7 @@
 	&mdash; canonically <em>15%</em> of them &mdash; and replaces each of those
 	tokens with <MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} /> to produce a corrupted sequence
 	<Katex math={"\\tilde{\\mathbf{x}}"} />. A bidirectional transformer
-	<Katex math={"\\mathbf{x}_\\theta"} /> then predicts a categorical
+	parameterizes <Katex math={"p_\\theta"} />, which predicts a categorical
 	distribution over the vocabulary at every masked position, and the loss is
 	cross-entropy on those positions only:
 </p>
@@ -411,10 +445,11 @@
 
 <p>
 	Geometrically, cross-entropy is a force pulling the model's predicted
-	distribution <Katex math={"\\mathbf{x}_\\theta^\\ell"} /> toward the
-	one-hot target <Katex math={"\\mathbf{x}^\\ell"} />. As training
-	progresses, whatever mass the model is currently spreading over
-	near-miss vocabulary words gets pulled onto the single correct word.
+	distribution <Katex math={"p_\\theta(\\cdot \\mid \\tilde{\\mathbf{x}})"} />
+	at position <Katex math={"\\ell"} /> toward the one-hot target
+	<Katex math={"\\mathbf{x}^\\ell"} />. As training progresses, whatever
+	mass the model is currently spreading over near-miss vocabulary words
+	gets pulled onto the single correct word.
 </p>
 
 <Figure backgroundVisible={false} isActive={mlmLossInlineActive}>
@@ -427,16 +462,129 @@
 	This loss is fantastic for <em>representation learning</em>: fill-in-the-blank
 	is a hard enough task that the transformer has to build genuinely useful
 	features to solve it, which is why BERT is such a strong starting point
-	for downstream classifiers and encoders. But BERT was never designed to
-	<em>generate</em> text, and it turns out that a 15%-MLM model can't do it,
-	for a subtle reason.
+	for downstream classifiers and encoders.
+</p>
+
+<h3 id="masked-transformers">Masked Transformers</h3>
+
+<p>
+	The neural network doing the predicting is a <em>transformer</em>:
+	the same stack a modern large language model would use, with an
+	embedding layer at the input, an alternation of self-attention blocks
+	and feed-forward MLPs in the middle, a residual stream, layer
+	normalization, and a tied unembedding at the top that maps back to a
+	categorical distribution over the vocabulary at every position.
+</p>
+
+<Figure backgroundVisible={false} isActive={maskedTransformerActive}>
+	{#snippet children()}
+		<MaskedTransformerFigure
+			isActive={maskedTransformerActive}
+			maskColor={MASK_COLOR}
+			maskTextColor={MASK_TEXT_COLOR}
+		/>
+	{/snippet}
+</Figure>
+
+<p>
+	<strong>Self Attention</strong>. Inside each self-attention block,
+	a familiar equation. Every position's hidden state is projected
+	into a query, key, and value vector, and each query mixes the
+	values in proportion to how much its own key aligns with every
+	other position's key:
+</p>
+
+<Katex
+	displayMode
+	displayFontSize="1.15em"
+	math={"\\mathrm{Attention}(Q, K, V) = \\mathrm{softmax}\\!\\left(\\frac{QK^\\top}{\\sqrt{d}} + M\\right) V"}
+/>
+
+<p>
+	<strong>Causal vs Bidirectional Attention</strong>. The only piece
+	that changes between an autoregressive and a masked transformer is
+	the mask <Katex math={"M"} />: it is upper-triangular full of
+	<Katex math={"-\\infty"} /> in the causal case, and all zeros in
+	the bidirectional case.
 </p>
 
 <p>
+	What distinguishes a masked transformer from the autoregressive stack
+	behind a GPT is a single detail inside the self-attention layers:
+	the attention pattern is <em>bidirectional</em>. Every position's
+	query attends to every other position's keys, not just the ones to
+	its left.
+</p>
+
+<Figure backgroundVisible={false} isActive={informationFlowActive}>
+	{#snippet children()}
+		<InformationFlowFigure isActive={informationFlowActive} />
+	{/snippet}
+	{#snippet caption()}
+		Information flow under causal (left) versus bidirectional (right)
+		attention. On the left, every past token sends information into
+		the next-token prediction &mdash; strictly one direction. On the
+		right, the mask at the interior position receives information
+		from every other position, both left and right.
+	{/snippet}
+</Figure>
+
+<Figure backgroundVisible={false} isActive={causalAttentionActive}>
+	{#snippet children()}
+		<CausalAttentionFigure isActive={causalAttentionActive} />
+	{/snippet}
+	{#snippet caption()}
+		The underlying attention masks. Each row is a query; each column
+		is a key. Under the causal mask used by autoregressive
+		transformers, every query attends only to past-and-current keys
+		and the matrix is lower-triangular. Under bidirectional attention
+		every query sees every key, and the full square fills in.
+	{/snippet}
+</Figure>
+
+<p>
+	The same distinction plays out at the graph level: which input
+	positions actually route information into a given output? Hover any
+	node below to see the pattern for that position.
+</p>
+
+<Figure backgroundVisible={false}>
+	{#snippet children()}
+		<AttentionPatternFigure maskColor={MASK_COLOR} maskTextColor={MASK_TEXT_COLOR} />
+	{/snippet}
+	{#snippet caption()}
+		Bipartite view of information flow. In each panel, the top row of
+		rectangles is the embedding at each position; the bottom row is
+		the output at each position; a line means &ldquo;that output
+		attends to that embedding.&rdquo; By default both panels highlight
+		the pattern for the <MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} />'s
+		output &mdash; under causal attention it only sees itself and the
+		three tokens to its left; under bidirectional attention it sees
+		every position.
+	{/snippet}
+</Figure>
+
+<p>
+	This is exactly the attention pattern BERT and other MLMs use. In an
+	autoregressive transformer the query at position <em>t</em> can only
+	attend to keys at positions <Katex math={"\\le t"} />, so information
+	flows strictly one way: past to future. In a masked transformer that
+	constraint is lifted. Every hidden state is a function of the whole
+	current context &mdash; both the tokens to its left and the tokens
+	to its right. That is the property that lets the model fill in an
+	interior <MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} />
+	sensibly: it can condition on evidence from either side.
+</p>
+
+<h3 id="generative-bert">Generative BERT</h3>
+
+<p>
 	<strong>How would we go about <em>generating</em> a novel sequence with a
-	model trained like this?</strong> The natural thing to try is to hand it
-	an input that
-	is <em>entirely</em> <MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} /> and ask it to fill in every
+	model trained like this?</strong> BERT was never designed to
+	<em>generate</em> text, and it turns out that a 15%-MLM model can't
+	quite do it &mdash; for a subtle reason we will unpack in the next
+	section. The natural thing to try is to hand it an input that is
+	<em>entirely</em> <MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} /> and ask it to fill in every
 	position at once:
 </p>
 
@@ -451,24 +599,16 @@
 </Figure>
 
 <p>
-	But this input is drawn from a distribution the model has never
-	encountered during training: every training example BERT ever saw had
-	85% of its tokens still visible as context. With no real tokens to
-	condition on, the model has nothing to anchor its predictions to &mdash;
-	the outputs are essentially untrained behavior. And the problem is not
-	unique to the 100% case. To generate a sequence <em>from scratch</em>
-	we need a model that behaves sensibly all the way from &ldquo;fully
-	masked&rdquo; to &ldquo;almost done&rdquo;, which is a continuum of
-	masking rates that BERT's fixed 15% schedule simply never visits.
-</p>
-
-<p>
-	This is the gap masked diffusion closes. The core observation is small
-	but transformative: instead of training on a single fixed masking rate,
-	train the same architecture on a whole <em>family</em> of masking rates
-	&mdash; every rate from 0% to 100%. The resulting model can be handed an
-	input at any level of corruption and produce a sensible prediction, and
-	that turns it from a representation learner into a generative model.
+	But BERT has never seen an input like this: BERT-style models are
+	typically trained with only a small fraction of their tokens masked
+	(~15%), so with nothing to condition on the outputs are essentially
+	untrained. And the problem isn't unique to the 100% case &mdash;
+	generating from scratch requires a model that behaves sensibly at
+	<em>every</em> masking rate from &ldquo;fully masked&rdquo; to
+	&ldquo;almost done&rdquo;, a continuum this fixed schedule never
+	visits. This is the gap masked diffusion closes: train the same
+	architecture on a whole <em>family</em> of masking rates, and it
+	turns from a representation learner into a generative model.
 </p>
 
 <hr class="section-divider" />
@@ -499,48 +639,9 @@
 	{/snippet}
 </Figure>
 
-<h3 id="the-transformer">The Transformer</h3>
-
-<p>
-	The neural network doing the work in a masked diffusion model is the same
-	transformer stack a modern large language model would use &mdash; the
-	same embedding layer, the same alternation of self-attention blocks and
-	feed-forward MLPs, the same residual stream and layer normalization,
-	the same tied unembedding at the top. What changes is a single detail
-	inside the self-attention layers: the attention pattern is
-	<em>bidirectional</em>. Every position's query attends to every other
-	position's keys, not just the ones to its left.
-</p>
-
-<Figure backgroundVisible={false} isActive={causalAttentionActive}>
-	{#snippet children()}
-		<CausalAttentionFigure isActive={causalAttentionActive} />
-	{/snippet}
-	{#snippet caption()}
-		<span class="figure-number">Figure 10.</span> Causal self-attention
-		(left) versus bidirectional attention (right). Each row is a query;
-		each column is a key. Under the causal mask used by autoregressive
-		transformers, every query attends only to past-and-current keys and
-		the matrix is lower-triangular. Under bidirectional attention every
-		query sees every key, and the full square fills in.
-	{/snippet}
-</Figure>
-
-<p>
-	This is exactly the attention pattern BERT and other MLMs use. In an
-	autoregressive transformer the query at position <em>t</em> can only
-	attend to keys at positions <Katex math={"\\le t"} />, so information
-	flows strictly one way: past to future. In a masked diffusion
-	transformer that constraint is lifted. Every hidden state is a function
-	of the whole current context &mdash; both the tokens to its left and
-	the tokens to its right. That is the property that lets the model fill
-	in an interior <MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} />
-	sensibly: it can condition on evidence from either side.
-</p>
-
 <p>
 	Everything downstream of this choice treats the transformer as a black
-	box &mdash; a function <Katex math={"\\mathbf{x}_\\theta(\\mathbf{z}_t, t)"} />
+	box &mdash; a function <Katex math={"p_\\theta(\\cdot \\mid \\mathbf{z}_t, t)"} />
 	that maps a partially-masked sequence and a timestep to a categorical
 	distribution over the vocabulary at each masked position. The rest of
 	this section is about how to train and sample from that function.
@@ -620,12 +721,12 @@
 <h3 id="reverse-process">Reverse Process</h3>
 
 <p>
-	The model <Katex math={"\\mathbf{x}_\\theta(\\mathbf{z}_t, t)"} /> is
-	trained to predict a categorical over the <em>clean</em> token at each
-	masked position (the <em>SUBS</em> parameterization: mask probability is
+	The model <Katex math={"p_\\theta(\\cdot \\mid \\mathbf{z}_t, t)"} />
+	predicts a categorical over the <em>clean</em> token at each masked
+	position (the <em>SUBS</em> parameterization: mask probability is
 	fixed at zero, and unmasked positions carry over unchanged). Plugging
-	<Katex math={"\\mathbf{x}_\\theta"} /> into the true posterior of the
-	forward process gives the reverse step
+	<Katex math={"p_\\theta"} /> into the true posterior of the forward
+	process gives the reverse step
 	<Katex math={"p_\\theta(\\mathbf{z}_s \\mid \\mathbf{z}_t)"} /> for
 	<Katex math={"s < t"} />:
 </p>
