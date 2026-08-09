@@ -529,6 +529,7 @@
 		<AttentionPatternFigure maskColor={MASK_COLOR} maskTextColor={MASK_TEXT_COLOR} />
 	{/snippet}
 	{#snippet caption()}
+		<span class="figure-number">Figure 6.</span>
 		Bipartite view of information flow. In each panel, the top row of
 		rectangles is the embedding at each position; the bottom row is
 		the output at each position; a line means &ldquo;that output
@@ -752,130 +753,29 @@
 <h3 id="training-loss">Training Loss</h3>
 
 <p>
-	With the forward and reverse processes fixed, the training objective
-	writes itself. We want the model to be accurate at <em>every</em> masking
-	rate visited by the schedule, so we take an expectation of the
-	per-rate MLM loss from the previous section over
-	<Katex math={"t"} /> as well as over the corruption
-	<Katex math={"q(\\mathbf{z}_t \\mid \\mathbf{x})"} /> at that rate. The
-	continuous-time NELBO
-	<HoverableReference
-		id="sahoo2024simpleeffectivemaskeddiffusion"
-		{bibEntries}
-		{citations}
-	/> collapses (after the SUBS parameterization) to exactly this &mdash; a
-	weighted cross-entropy on the masked positions:
+	The model is trained by minimizing a weighted cross-entropy on the
+	masked positions, averaged over noise levels
+	<Katex math={"t"} /> and corruptions <Katex math={"\\mathbf{z}_t"} />
+	drawn from the forward process:
 </p>
 
 <Katex
 	displayMode
 	displayFontSize="1.15em"
-	math={"\\mathcal{L}_{\\mathrm{MDLM}} = \\mathbb{E}_t \\left[ \\dfrac{\\alpha'_t}{1 - \\alpha_t} \\smash{\\underbrace{\\left(-\\, \\mathbb{E}_{q(\\mathbf{z}_t \\mid \\mathbf{x})} \\left[ \\sum_{\\ell \\in M_t} \\log p_\\theta(\\mathbf{x}^\\ell \\mid \\mathbf{z}_t) \\right]\\right)}_{\\mathcal{L}_{\\mathrm{MLM}}(\\mathbf{z}_t)}} \\right]"}
+	math={"\\mathcal{L}_{\\mathrm{MDLM}}(\\theta) \\;=\\; -\\, \\mathbb{E}_{t}\\, \\mathbb{E}_{q(\\mathbf{z}_t \\mid \\mathbf{x})} \\left[ \\dfrac{\\alpha'_t}{1 - \\alpha_t} \\sum_{\\ell \\in M_t} \\log p_\\theta(\\mathbf{x}^\\ell \\mid \\mathbf{z}_t) \\right]."}
 />
 
 <p>
-	Here <Katex math={"M_t = \\{\\ell : \\mathbf{z}_t^\\ell = \\mathbf{m}\\}"} />
-	is the set of positions masked at time <Katex math={"t"} />, so the
-	underbraced term is literally the MLM loss from the previous section,
-	evaluated on the corrupted sequence <Katex math={"\\mathbf{z}_t"} />. The
-	MDLM objective is that same MLM loss, averaged over all rates
-	<Katex math={"t"} /> in the schedule and weighted by
-	<Katex math={"\\alpha'_t / (1 - \\alpha_t)"} />. Unmasked positions
-	contribute zero, since carry-over guarantees a perfect prediction there.
+	Here <Katex math={"M_t"} /> is the set of positions masked in
+	<Katex math={"\\mathbf{z}_t"} />, and
+	<Katex math={"\\alpha'_t / (1 - \\alpha_t)"} /> is a per-timestep
+	weight that comes out of the forward-process schedule. Concretely, at
+	each training step we sample a random <Katex math={"t"} />, mask that
+	fraction of the tokens, and take a cross-entropy on the model's
+	predictions at the masked positions.
 </p>
 
-<h3 id="mdlm-loss-as-elbo">The MDLM Loss as an ELBO</h3>
-
-<p>
-	It's worth asking where the weighting
-	<Katex math={"\\alpha'_t / (1 - \\alpha_t)"} /> comes from. The MLM
-	term is easy to motivate &mdash; we already know cross-entropy at
-	masked positions from the previous section &mdash; but why this
-	particular schedule-dependent prefactor? The answer is that MDLM's
-	training objective is not a heuristic. It is the negative
-	<em>evidence lower bound</em> (ELBO) of an absorbing-state discrete
-	diffusion process, and the weighting drops out of a standard
-	variational argument. This section sketches that argument at a
-	high level; the full derivation lives in the MDLM paper
-	<HoverableReference
-		id="sahoo2024simpleeffectivemaskeddiffusion"
-		{bibEntries}
-		{citations}
-	/>.
-</p>
-
-<p>
-	The setup mirrors continuous diffusion almost verbatim. We want to
-	model a data distribution <Katex math={"p(\\mathbf{x})"} /> over
-	sequences that is otherwise intractable to write down. Instead of
-	fitting it directly, we introduce a hand-crafted forward corruption
-	<Katex math={"q(\\mathbf{z}_t \\mid \\mathbf{x})"} /> &mdash; the
-	absorbing-mask schedule from a few sections up &mdash; and a
-	parameterized reverse step
-	<Katex math={"p_\\theta(\\mathbf{z}_s \\mid \\mathbf{z}_t)"} /> that
-	tries to undo it. The variational bound then decomposes the intractable
-	log-likelihood into a sum of tractable KL divergences, one per timestep:
-</p>
-
-<div class="equation-scroll">
-<Katex
-	displayMode
-	displayFontSize="1.15em"
-	math={"\\log p_\\theta(\\mathbf{x}) \\;\\ge\\; - \\sum_t \\mathbb{E}_q \\big[ \\mathrm{KL}\\!\\left( q(\\mathbf{z}_s \\mid \\mathbf{z}_t, \\mathbf{x}) \\;\\|\\; p_\\theta(\\mathbf{z}_s \\mid \\mathbf{z}_t) \\right) \\big] \\;+\\; \\text{(boundary terms)}"}
-/>
-</div>
-
-<p>
-	This is the same ELBO you would write down for continuous diffusion,
-	just with a categorical corruption process instead of a Gaussian one.
-	Maximizing this lower bound on <Katex math={"\\log p(\\mathbf{x})"} />
-	is our training objective. The interesting step is what happens to a
-	single term in the sum.
-</p>
-
-<p>
-	Under the SUBS parameterization from the previous subsection, the true
-	posterior <Katex math={"q(\\mathbf{z}_s \\mid \\mathbf{z}_t, \\mathbf{x})"} />
-	is deterministic at unmasked positions and a simple two-outcome
-	categorical at masked positions. Plugging in
-	<Katex math={"p_\\theta(\\mathbf{z}_s \\mid \\mathbf{z}_t)"} /> and
-	unrolling the KL yields, at each masked position <Katex math={"\\ell"} />,
-	a scalar multiple of cross-entropy against the clean token:
-</p>
-
-<Katex
-	displayMode
-	displayFontSize="1.15em"
-	math={"\\mathrm{KL}\\!\\left( q \\;\\|\\; p_\\theta \\right) \\;=\\; \\frac{\\alpha_s - \\alpha_t}{1 - \\alpha_t} \\, \\big[ -\\log p_\\theta(\\mathbf{x}^\\ell \\mid \\mathbf{z}_t) \\big] \\quad \\text{for } \\ell \\in M_t"}
-/>
-
-<p>
-	Two things fall out. First, the summand is cross-entropy at masked
-	positions &mdash; exactly the object introduced in the MLM section.
-	Second, it comes with a schedule-dependent prefactor
-	<Katex math={"(\\alpha_s - \\alpha_t) / (1 - \\alpha_t)"} />. Taking
-	the continuous-time limit of the sum turns
-	<Katex math={"(\\alpha_s - \\alpha_t)"} /> into
-	<Katex math={"\\alpha'_t \\, dt"} />, and the sum becomes an integral
-	over <Katex math={"t"} /> whose integrand is
-	<Katex math={"\\alpha'_t / (1 - \\alpha_t)"} /> times the per-rate MLM
-	loss. That is exactly the objective from the previous subsection.
-</p>
-
-<p>
-	The upshot: MDLM is not diffusion-<em>flavored</em>. It is a specific
-	instance of the same variational recipe that produces continuous
-	diffusion &mdash; data plus a hand-crafted noising process, a
-	parameterized reverse step, an ELBO on the log-likelihood, a per-step
-	KL that collapses to a familiar loss. What differs is the corruption
-	(categorical absorbing state instead of Gaussian noise) and, as a
-	consequence, the shape of the per-step KL and the resulting weighting.
-	The scaffolding is otherwise identical.
-</p>
-
-<hr class="section-divider" />
-
-<h2 id="relation-to-continuous-diffusion">Relation to Continuous Diffusion</h2>
+<h3 id="relation-to-continuous-diffusion">Relation to Continuous Diffusion</h3>
 
 <p>
 	In <strong>continuous diffusion</strong>, the forward process transforms
@@ -884,14 +784,47 @@
 	process.
 </p>
 
+<div class="hero-badge" class:is-reverse={!heroGoingForward} aria-hidden="true">
+	<svg class="hero-badge-arrow" viewBox="0 0 440 40" role="presentation">
+		<defs>
+			<marker
+				id="relation-arrowhead-continuous"
+				viewBox="0 0 12 12"
+				refX="10"
+				refY="6"
+				markerWidth="12"
+				markerHeight="12"
+				markerUnits="userSpaceOnUse"
+				orient="auto"
+			>
+				<path d="M0,0 L12,6 L0,12 Z" fill="#f17720" />
+			</marker>
+		</defs>
+		<line
+			x1={heroGoingForward ? 20 : 420}
+			y1={20}
+			x2={heroGoingForward ? 420 : 20}
+			y2={20}
+			stroke="#f17720"
+			stroke-width="3.5"
+			stroke-dasharray="12 8"
+			marker-end="url(#relation-arrowhead-continuous)"
+		/>
+	</svg>
+	<span class="hero-badge-text">
+		{heroGoingForward ? 'Forward' : 'Reverse'}
+	</span>
+</div>
+
 <Figure backgroundVisible={false} isActive={forwardReverseContinuousActive}>
 	{#snippet children()}
 		<ForwardReverseFigure
 			isActive={forwardReverseContinuousActive}
 			variant="continuous"
-			maskColor="#99BCDC"
+			maskColor={MASK_COLOR}
 			crossFade={false}
 			sharedPlayer={forwardReverseSharedPlayer}
+			showDirectionBadge={false}
 		/>
 	{/snippet}
 </Figure>
@@ -902,17 +835,324 @@
 	as reversing this forward masking process.
 </p>
 
+<div class="hero-badge" class:is-reverse={!heroGoingForward} aria-hidden="true">
+	<svg class="hero-badge-arrow" viewBox="0 0 440 40" role="presentation">
+		<defs>
+			<marker
+				id="relation-arrowhead-masked"
+				viewBox="0 0 12 12"
+				refX="10"
+				refY="6"
+				markerWidth="12"
+				markerHeight="12"
+				markerUnits="userSpaceOnUse"
+				orient="auto"
+			>
+				<path d="M0,0 L12,6 L0,12 Z" fill="#f17720" />
+			</marker>
+		</defs>
+		<line
+			x1={heroGoingForward ? 20 : 420}
+			y1={20}
+			x2={heroGoingForward ? 420 : 20}
+			y2={20}
+			stroke="#f17720"
+			stroke-width="3.5"
+			stroke-dasharray="12 8"
+			marker-end="url(#relation-arrowhead-masked)"
+		/>
+	</svg>
+	<span class="hero-badge-text">
+		{heroGoingForward ? 'Forward' : 'Reverse'}
+	</span>
+</div>
+
 <Figure backgroundVisible={false} isActive={forwardReverseMaskedActive}>
 	{#snippet children()}
 		<ForwardReverseFigure
 			isActive={forwardReverseMaskedActive}
 			variant="masked"
-			maskColor="#99BCDC"
+			maskColor={MASK_COLOR}
 			crossFade={false}
 			sharedPlayer={forwardReverseSharedPlayer}
+			showDirectionBadge={false}
+			maskedLayout="grid"
+			gridColumns={11}
+			text={'Once there was a small cat named Milo. ' +
+				'He lived in a tall red house on a big green hill. ' +
+				'Every day he sat by the door and saw the birds fly by. ' +
+				'One day a bird came and sang a song for him. ' +
+				'He felt very happy that day.'}
 		/>
 	{/snippet}
 </Figure>
+
+<hr class="section-divider" />
+
+<h2 id="deriving-training-loss">Deriving the Training Loss</h2>
+
+<p>
+	The previous section stated the MDLM training loss without saying
+	where it comes from. Where does this specific objective come from?
+	And is the analogy to diffusion just heuristic, or something deeper?
+	The rest of this section derives it from first principles.
+</p>
+
+<Katex
+	displayMode
+	displayFontSize="1.15em"
+	math={"\\mathcal{L}_{\\mathrm{MDLM}}(\\theta) \\;=\\; -\\, \\mathbb{E}_{t}\\, \\mathbb{E}_{q(\\mathbf{z}_t \\mid \\mathbf{x})} \\left[ \\dfrac{\\alpha'_t}{1 - \\alpha_t} \\sum_{\\ell \\in M_t} \\log p_\\theta(\\mathbf{x}^\\ell \\mid \\mathbf{z}_t) \\right]."}
+/>
+
+<p class="stub-lead"><strong>Framing.</strong></p>
+
+<ul class="stub-list">
+	<li>
+		Masked diffusion is not diffusion in a hand-wavy sense. The model
+		has a well-defined joint distribution
+		<Katex math={"p_\\theta(\\mathbf{x})"} /> as the marginal of a
+		stochastic reverse process.
+	</li>
+	<li>
+		We can honestly bound
+		<Katex math={"\\log p_\\theta(\\mathbf{x})"} /> with the standard
+		diffusion ELBO &mdash; the same one continuous diffusion uses. Cite
+		Sohl-Dickstein 2015 and Ho et al. 2020 for the ELBO's origin in the
+		diffusion context. (Need to add both to
+		<code>bibliography.bib</code>.)
+	</li>
+	<li>
+		Aside for readers who wondered "isn't this just cross-entropy
+		training?": unlike AR, whose <Katex math={"p_\\theta(\\mathbf{x})"} />
+		is a direct network output (product of per-token conditionals),
+		MDLM's <Katex math={"p_\\theta(\\mathbf{x})"} /> is a marginal over
+		a stochastic reverse process, so we can't compute it exactly. ELBO
+		gives a tractable lower bound.
+	</li>
+	<li>
+		Punchline: under our absorbing corruption + SUBS parameterization,
+		the ELBO collapses dramatically to a weighted masked-language-
+		modeling loss. This section is that collapse, one term at a time.
+	</li>
+</ul>
+
+<p class="stub-lead"><strong>The Diffusion ELBO.</strong></p>
+
+<ul class="stub-list">
+	<li>
+		State the standard three-term diffusion ELBO decomposition
+		(reconstruction + prior + matching sum). Display equation:
+	</li>
+</ul>
+
+<div class="equation-scroll">
+<Katex
+	displayMode
+	displayFontSize="1.05em"
+	math={"\\log p_\\theta(\\mathbf{x}) \\;\\ge\\; \\underbrace{\\mathbb{E}_q[\\log p_\\theta(\\mathbf{x} \\mid \\mathbf{z}_0)]}_{\\text{reconstruction}} \\;-\\; \\underbrace{D_{\\mathrm{KL}}(q(\\mathbf{z}_T \\mid \\mathbf{x}) \\,\\|\\, p(\\mathbf{z}_T))}_{\\text{prior}} \\;-\\; \\sum_{t=2}^{T} \\underbrace{\\mathbb{E}_q[D_{\\mathrm{KL}}(q(\\mathbf{z}_{t-1} \\mid \\mathbf{z}_t, \\mathbf{x}) \\,\\|\\, p_\\theta(\\mathbf{z}_{t-1} \\mid \\mathbf{z}_t))]}_{\\text{matching}}"}
+/>
+</div>
+
+<ul class="stub-list">
+	<li>One sentence per term naming what each measures.</li>
+	<li>
+		Say we'll take them in order and see what each collapses to under
+		the MDLM assumptions.
+	</li>
+</ul>
+
+<p class="stub-lead"><strong>The Reconstruction Term Vanishes.</strong></p>
+
+<ul class="stub-list">
+	<li>
+		In MDLM's absorbing schedule <Katex math={"\\alpha_0 = 1"} />, so
+		<Katex math={"q(\\mathbf{z}_0 \\mid \\mathbf{x})"} /> is a Dirac on
+		<Katex math={"\\mathbf{x}"} /> itself &mdash; nothing gets masked at
+		<Katex math={"t = 0"} />.
+	</li>
+	<li>
+		Therefore
+		<Katex math={"\\log p_\\theta(\\mathbf{x} \\mid \\mathbf{z}_0) = \\log p_\\theta(\\mathbf{x} \\mid \\mathbf{x})"} />,
+		which is trivially handled by the SUBS carryover rule: the reverse
+		step at <Katex math={"t = 0"} /> copies unmasked positions through.
+		Zero contribution.
+	</li>
+	<li>One-liner: reconstruction term drops.</li>
+</ul>
+
+<p class="stub-lead"><strong>The Prior Term Vanishes.</strong></p>
+
+<ul class="stub-list">
+	<li>
+		At <Katex math={"t = T = 1"} />, <Katex math={"\\alpha_1 = 0"} />, so
+		<Katex math={"q(\\mathbf{z}_1 \\mid \\mathbf{x})"} /> is a Dirac on
+		the fully-masked sequence
+		<MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} />
+		<MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} /> &hellip;
+		<MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} />.
+	</li>
+	<li>
+		The sampling prior <Katex math={"p(\\mathbf{z}_1)"} /> is <em>also</em>
+		the fully-masked sequence (that's where we start sampling from in
+		the reverse process).
+	</li>
+	<li>
+		Both distributions are Diracs on the same point,
+		so <Katex math={"D_{\\mathrm{KL}} = 0"} /> exactly.
+	</li>
+	<li>One-liner: prior term drops.</li>
+</ul>
+
+<p class="stub-lead"><strong>What Survives: The Matching Sum.</strong></p>
+
+<ul class="stub-list">
+	<li>Only the sum over <Katex math={"t"} /> remains. Restate:</li>
+</ul>
+
+<Katex
+	displayMode
+	displayFontSize="1.05em"
+	math={"\\mathcal{L} \\;=\\; \\sum_t \\mathbb{E}_q\\!\\left[D_{\\mathrm{KL}}(q(\\mathbf{z}_s \\mid \\mathbf{z}_t, \\mathbf{x}) \\,\\|\\, p_\\theta(\\mathbf{z}_s \\mid \\mathbf{z}_t))\\right]"}
+/>
+
+<ul class="stub-list">
+	<li>
+		All the work of MDLM training is in fitting per-timestep reverse-
+		step distributions to the ground-truth posterior.
+	</li>
+</ul>
+
+<p class="stub-lead"><strong>Substituting the Masked Transformer via SUBS.</strong></p>
+
+<ul class="stub-list">
+	<li>
+		Now we need to say what
+		<Katex math={"p_\\theta(\\mathbf{z}_s \\mid \\mathbf{z}_t)"} />
+		actually is. The masked transformer outputs a per-position
+		categorical over
+		<Katex math={"\\mathcal{V} \\cup \\{\\mathbf{m}\\}"} />. SUBS turns
+		this into a valid reverse-step distribution.
+	</li>
+	<li>Two rules:</li>
+	<li style="margin-left: 1.5em;">
+		<strong>Zero-mask.</strong> The network's probability of
+		<MaskToken color={MASK_COLOR} textColor={MASK_TEXT_COLOR} /> is
+		forced to zero and the vocabulary categorical is renormalized. The
+		mask symbol isn't a real answer.
+	</li>
+	<li style="margin-left: 1.5em;">
+		<strong>Carryover.</strong> At unmasked positions, the reverse step
+		is a Dirac on the current token. Only masked positions are
+		stochastic.
+	</li>
+	<li>
+		Result: at each currently-masked position, the reverse distribution
+		is a two-outcome categorical over "stay masked" (weight
+		<Katex math={"(1 - \\alpha_s)/(1 - \\alpha_t)"} />) and "flip to a
+		clean token" (weight
+		<Katex math={"(\\alpha_s - \\alpha_t)/(1 - \\alpha_t)"} />,
+		distributed per the zero-mask network output).
+	</li>
+</ul>
+
+<p class="stub-lead"><strong>KL Collapse at One Timestep.</strong></p>
+
+<ul class="stub-list">
+	<li>Compute one summand's KL under SUBS.</li>
+	<li>
+		At unmasked positions: <Katex math={"q"} /> and
+		<Katex math={"p_\\theta"} /> both Dirac on the same value, so KL
+		contribution is zero. Only masked positions matter.
+	</li>
+	<li>
+		At masked position <Katex math={"\\ell"} />: <Katex math={"q"} /> is
+		a 2-outcome categorical, <Katex math={"p_\\theta"} /> under SUBS is
+		a 2-outcome categorical of the same shape. Both put mass
+		<Katex math={"(1 - \\alpha_s)/(1 - \\alpha_t)"} /> on "stay masked";
+		only the "flip to clean token" part differs
+		(<Katex math={"q"} /> knows the true <Katex math={"\\mathbf{x}^\\ell"} />,
+		<Katex math={"p_\\theta"} /> has the network's guess).
+	</li>
+	<li>Display equation:</li>
+</ul>
+
+<Katex
+	displayMode
+	displayFontSize="1.05em"
+	math={"D_{\\mathrm{KL}}(q \\,\\|\\, p_\\theta) \\;=\\; \\frac{\\alpha_s - \\alpha_t}{1 - \\alpha_t} \\, \\big[ -\\log p_\\theta(\\mathbf{x}^\\ell \\mid \\mathbf{z}_t) \\big] \\quad \\text{for } \\ell \\in M_t"}
+/>
+
+<ul class="stub-list">
+	<li>
+		Punchline: this is cross-entropy at position <Katex math={"\\ell"} />,
+		times a schedule-dependent scalar.
+	</li>
+</ul>
+
+<p class="stub-lead"><strong>Final Loss: The Continuous-Time Limit.</strong></p>
+
+<ul class="stub-list">
+	<li>
+		Sum over <Katex math={"t"} /> becomes an integral over
+		<Katex math={"t \\in [0, 1]"} /> as we take
+		<Katex math={"T \\to \\infty"} />.
+	</li>
+	<li>
+		<Katex math={"(\\alpha_s - \\alpha_t) \\to \\alpha'_t \\, dt"} />.
+	</li>
+	<li>
+		Integral becomes an expectation over <Katex math={"t"} />.
+	</li>
+	<li>Display equation:</li>
+</ul>
+
+<Katex
+	displayMode
+	displayFontSize="1.15em"
+	math={"\\mathcal{L}_{\\mathrm{MDLM}} \\;=\\; \\mathbb{E}_t\\!\\left[\\frac{\\alpha'_t}{1 - \\alpha_t} \\, \\mathcal{L}_{\\mathrm{MLM}}(\\mathbf{z}_t)\\right]"}
+/>
+
+<ul class="stub-list">
+	<li>
+		Where the inner <Katex math={"\\mathcal{L}_{\\mathrm{MLM}}(\\mathbf{z}_t)"} />
+		is the MLM loss from §MLM evaluated on the corrupted sequence
+		<Katex math={"\\mathbf{z}_t"} />.
+	</li>
+	<li>
+		One-sentence interpretation: the MDLM loss is the MLM loss,
+		averaged over all masking rates, weighted by
+		<Katex math={"\\alpha'_t / (1 - \\alpha_t)"} />.
+	</li>
+</ul>
+
+<p class="stub-lead"><strong>Upshot.</strong></p>
+
+<ul class="stub-list">
+	<li>
+		The MDLM loss is not a heuristic. It <em>is</em> the standard
+		diffusion ELBO evaluated under the absorbing-corruption + SUBS
+		assumptions.
+	</li>
+	<li>Every simplification was a consequence of a specific choice:</li>
+	<li style="margin-left: 1.5em;">
+		Reconstruction vanishes because <Katex math={"\\alpha_0 = 1"} />
+		(absorbing).
+	</li>
+	<li style="margin-left: 1.5em;">
+		Prior vanishes because the prior matches the corrupt endpoint
+		(absorbing).
+	</li>
+	<li style="margin-left: 1.5em;">
+		Unmasked positions drop because SUBS carryover makes them
+		deterministic.
+	</li>
+	<li style="margin-left: 1.5em;">
+		The surviving weighted cross-entropy: because SUBS produces a
+		2-outcome categorical whose KL against <Katex math={"q"} />
+		collapses cleanly.
+	</li>
+	<li>Natural handoff to §Relation to Continuous Diffusion next.</li>
+</ul>
 
 <hr class="section-divider" />
 
@@ -1082,6 +1322,42 @@
 <h2 id="comments" class="section-heading">Comments</h2>
 
 <style>
+	/* Visible outline stubs for sections whose prose is still in-progress.
+	   `.stub-note` is a section-level intro comment; `.stub-list` is a
+	   bulleted plan of what each paragraph will contain. Both render at
+	   reduced opacity with a subtle tint so a scanning reader can tell
+	   the section isn't final. Remove these blocks and their styling once
+	   the section is written. */
+	.stub-note,
+	.stub-list {
+		background: #fff8ec;
+		border-left: 3px solid #f1942b;
+		padding: 0.5rem 0.8rem;
+		color: #6b5a3a;
+		font-size: 0.95rem;
+	}
+	.stub-note {
+		font-style: italic;
+	}
+	.stub-list {
+		margin: 0.5rem 0;
+	}
+	.stub-list li {
+		margin: 0.25rem 0;
+	}
+	/* Bold lead-in phrase that sits above each stub-list block, functioning
+	   as the paragraph's inline "title" now that we no longer use h3
+	   headings for these sub-topics. Slightly bigger than body text and
+	   uses the accent-orange to match the stub-note bar on the left. */
+	.stub-lead {
+		font-size: 1.05rem;
+		color: #6b5a3a;
+		margin: 1.25rem 0 0.25rem;
+	}
+	.stub-lead strong {
+		color: #b06a10;
+	}
+
 	.section-divider {
 		border: none;
 		border-top: 1px solid #e0e0e0;

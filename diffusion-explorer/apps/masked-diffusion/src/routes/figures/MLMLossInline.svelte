@@ -57,15 +57,18 @@
 	// --- Geometry ---
 	const W = width;
 	const N = bars.length;
-	const ROW_H = 28;
-	const BAR_H = 20;
+	const ROW_H = 24;
+	const BAR_H = 18;
 	const ZERO_STEM_W = 6;
 	const BARS_TOP = 14;
 	const PANEL_H = BARS_TOP + N * ROW_H + 10;
 	const H = PANEL_H;
 
-	// Two panels split the width, with a narrow arrow region between them.
-	const ARROW_W = 44;
+	// Two panels split the width, with a wide arrow region between them.
+	// The KL label rendered as Katex sits directly above the arrow line
+	// (see `.kl-label` in the template), so the arrow gap has to be wide
+	// enough for the label to breathe without crowding either bar chart.
+	const ARROW_W = 180;
 	const PANEL_W = (W - ARROW_W) / 2;
 	const LEFT_X = 0;
 	const RIGHT_X = PANEL_W + ARROW_W;
@@ -178,6 +181,7 @@
 		</div>
 	</div>
 
+	<div class="canvas-wrap">
 	<svg
 		class="canvas"
 		viewBox={`0 0 ${W} ${H}`}
@@ -242,7 +246,8 @@
 			{/each}
 		</g>
 
-		<!-- Arrow between panels -->
+		<!-- Arrow between panels. The KL label sits above in the title bar
+			 (as a Katex render), so we render just the arrow itself here. -->
 		<g>
 			<line
 				x1={arrowX}
@@ -298,6 +303,13 @@
 			{/each}
 		</g>
 	</svg>
+	<div
+		class="kl-label"
+		style="left: {((LEFT_X + PANEL_W + ARROW_W / 2) / W) * 100}%; top: {(arrowY / H) * 100}%;"
+	>
+		<Katex math={"\\min D_{\\mathrm{KL}}(\\mathbf{x}^\\ell \\,\\|\\, p_\\theta)"} />
+	</div>
+	</div>
 </div>
 
 <style>
@@ -329,9 +341,28 @@
 	.arrow-spacer {
 		flex-shrink: 0;
 	}
+	/* Wrap around the SVG so the KL label can be positioned absolutely on
+	   top of the canvas without moving with page scroll. */
+	.canvas-wrap {
+		position: relative;
+		width: 100%;
+	}
 	.canvas {
 		width: 100%;
 		height: auto;
 		display: block;
+	}
+	/* KL label sitting directly above the arrow inside the canvas. Its
+	   left/top positions are inline-styled from the SVG geometry so the
+	   label follows the arrow if ARROW_W or panel widths change. The
+	   extra translate offset lifts the label a bit further above the
+	   arrow line so it doesn't crowd the arrowhead. */
+	.kl-label {
+		position: absolute;
+		transform: translate(-50%, calc(-100% - 10px));
+		font-size: 1.4rem;
+		color: #666;
+		white-space: nowrap;
+		pointer-events: none;
 	}
 </style>

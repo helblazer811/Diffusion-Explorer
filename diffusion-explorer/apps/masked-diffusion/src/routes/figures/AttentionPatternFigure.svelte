@@ -61,7 +61,7 @@
 
 	// --- Geometry ---
 	const W = width;
-	const H = 270;
+	const H = 298;
 
 	// Two panels side by side, with a clear visual gap so the reader
 	// treats them as independent hover contexts.
@@ -87,9 +87,9 @@
 	const NODE_RX = 4;
 
 	const HEADER_Y = 24;
-	const WORD_Y = 72;
-	const EMBED_Y = 106; // top of embedding rect
-	const OUTPUT_Y = 200; // top of output rect
+	const WORD_Y = 100;
+	const EMBED_Y = 134; // top of embedding rect
+	const OUTPUT_Y = 228; // top of output rect
 
 	function embedCX(panel: number, i: number): number {
 		return slotXInPanel(panel, i);
@@ -246,6 +246,23 @@
 				{panel === 0 ? 'Causal Attention' : 'Bidirectional Attention'}
 			</text>
 
+			<!-- Subtitle: one-line description of the information-flow pattern
+				 the panel shows. -->
+			<text
+				x={panelOriginX(panel) + PANEL_W / 2}
+				y={HEADER_Y + 26}
+				text-anchor="middle"
+				dominant-baseline="central"
+				font-size="22"
+				font-weight="400"
+				fill={HEADER_COLOR}
+				font-style="italic"
+			>
+				{panel === 0
+					? 'Information flows one way.'
+					: 'Information flows both ways.'}
+			</text>
+
 			<!-- Word row -->
 			{#each tokens as tok, i}
 				{@const cx = slotXInPanel(panel, i)}
@@ -261,11 +278,6 @@
 						rx={4}
 						ry={4}
 						fill={maskColor}
-						style="cursor: pointer;"
-						onmouseenter={() => setSelection({ kind: 'input', index: i })}
-						role="button"
-						tabindex="0"
-						aria-label={`Hover to show attention pattern for the mask at position ${i}`}
 					/>
 					<text
 						x={cx}
@@ -288,8 +300,6 @@
 						font-size="22"
 						fill={isFocused ? ACCENT : TEXT_COLOR}
 						font-weight={isFocused ? '600' : '400'}
-						style="cursor: pointer;"
-						onmouseenter={() => setSelection({ kind: 'input', index: i })}
 					>
 						{tok}
 					</text>
@@ -339,6 +349,20 @@
 				{/if}
 			{/each}
 
+			<!-- Row label for the embedding row (post-layer-1 hidden states) -->
+			<text
+				x={slotXInPanel(panel, 0) - NODE_W / 2 - 12}
+				y={embedCY()}
+				text-anchor="end"
+				dominant-baseline="central"
+				font-size="14"
+				font-family="ui-serif, Georgia, serif"
+				font-style="italic"
+				fill="#5a5a5a"
+			>
+				h₁
+			</text>
+
 			<!-- Embedding nodes -->
 			{#each tokens as _tok, i}
 				{@const cx = slotXInPanel(panel, i)}
@@ -361,6 +385,20 @@
 					aria-label={`Embedding at position ${i}. Hover to see which outputs it sends information to.`}
 				/>
 			{/each}
+
+			<!-- Row label for the output row (post-layer-2 hidden states) -->
+			<text
+				x={slotXInPanel(panel, 0) - NODE_W / 2 - 12}
+				y={outputCY()}
+				text-anchor="end"
+				dominant-baseline="central"
+				font-size="14"
+				font-family="ui-serif, Georgia, serif"
+				font-style="italic"
+				fill="#5a5a5a"
+			>
+				h₂
+			</text>
 
 			<!-- Output nodes -->
 			{#each tokens as _tok, j}

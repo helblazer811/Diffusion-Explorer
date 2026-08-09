@@ -18,29 +18,31 @@
 	import { TimelineBuilder, Player } from '@helblazer811/tempus';
 	import { tokenize, buildMaskSchedule } from './masked_diffusion_math';
 
-	// Short line, exactly 9 word tokens (punctuation is folded into whitespace
-	// so the two columns read cleanly and align row-by-row).
-	const DEFAULT_LINE = 'The little cat sat on the warm mat again';
+	// Short line, exactly 7 word tokens. Every column has a fixed slot
+	// width so the two paradigms align cleanly and pending [MASK] pills
+	// don't reshape the row as tokens fill in.
+	const DEFAULT_LINE = 'The cat sat on the mat';
 
 	interface Props {
 		isActive?: Writable<boolean>;
 		text?: string;
 		seed?: number;
-		/** Background color of the pending-token rectangle. */
+		/** Background color of the [MASK] pill. */
 		maskColor?: string;
+		/** Text color for the [MASK] label. */
+		maskTextColor?: string;
 	}
 
 	let {
 		isActive,
 		text = DEFAULT_LINE,
 		seed = 3,
-		maskColor = '#c4c8ce'
+		maskColor = '#cfe0f2',
+		maskTextColor = '#33506e'
 	}: Props = $props();
 
 	const tokenized = $derived(tokenize(text));
 	const tokens = $derived(tokenized.tokens);
-	const leading = $derived(tokenized.leading);
-	const trailing = $derived(tokenized.trailing);
 	const N = $derived(tokens.length);
 
 	// AR reveal order = identity. Masked-diffusion order = seeded permutation.
@@ -129,23 +131,20 @@
 	});
 </script>
 
-<div class="wrap" style="--mask-color: {maskColor}">
+<div class="wrap" style="--mask-color: {maskColor}; --mask-text-color: {maskTextColor}">
 	<div class="block">
 		<div class="label">Autoregressive</div>
 		<div class="stack">
 			{#each Array(nRows) as _, step (step)}
-				{@const rev = revealedAt}
 				<p class="line" style="opacity: {rowOpacity(step)}">
 					{#each tokens as tok, i (i)}
-						<span class="pre">{leading[i]}</span><span class="slot" aria-label={tok}>
-							<span
-								class="content"
-								style="opacity: {rev(arPos, i, step) ? 1 : 0}">{tok}</span
-							><span
-								class="placeholder ar"
-								style="opacity: {rev(arPos, i, step) ? 0 : 1}">&nbsp;</span
-							>
-						</span><span class="post">{trailing[i]}</span>
+						<span class="slot" aria-label={tok}>
+							{#if revealedAt(arPos, i, step)}
+								<span class="content">{tok}</span>
+							{:else}
+								<span class="ar-placeholder"></span>
+							{/if}
+						</span>
 					{/each}
 				</p>
 			{/each}
@@ -156,18 +155,15 @@
 		<div class="label">Masked Diffusion</div>
 		<div class="stack">
 			{#each Array(nRows) as _, step (step)}
-				{@const rev = revealedAt}
 				<p class="line" style="opacity: {rowOpacity(step)}">
 					{#each tokens as tok, i (i)}
-						<span class="pre">{leading[i]}</span><span class="slot" aria-label={tok}>
-							<span
-								class="content"
-								style="opacity: {rev(mdPos, i, step) ? 1 : 0}">{tok}</span
-							><span
-								class="placeholder mask"
-								style="opacity: {rev(mdPos, i, step) ? 0 : 1}">&nbsp;</span
-							>
-						</span><span class="post">{trailing[i]}</span>
+						<span class="slot" aria-label={tok}>
+							{#if revealedAt(mdPos, i, step)}
+								<span class="content">{tok}</span>
+							{:else}
+								<span class="mask-pill">[MASK]</span>
+							{/if}
+						</span>
 					{/each}
 				</p>
 			{/each}
@@ -181,7 +177,7 @@
 		flex-direction: row;
 		justify-content: center;
 		align-items: flex-start;
-		gap: 4rem;
+		gap: 2rem;
 		width: 100%;
 		margin: 0 auto;
 		flex-wrap: wrap;
@@ -220,49 +216,44 @@
 		margin: 0;
 		text-align: left;
 		white-space: nowrap;
+		display: flex;
+		gap: 4px;
 	}
 
-	.pre,
-	.post {
-		white-space: pre;
-	}
-
+	/* Fixed-width slot: every column is the same width regardless of what
+	 * token or [MASK] pill sits inside it, so rows stay aligned. */
 	.slot {
-		display: inline-grid;
-		grid-template-columns: 1fr;
-		grid-template-rows: 1fr;
-		vertical-align: middle;
-		line-height: inherit;
+		display: inline-flex;
 		align-items: center;
-		justify-items: center;
-		margin: 0 2px;
-	}
-
-	.slot > .content,
-	.slot > .placeholder {
-		grid-row: 1;
-		grid-column: 1;
-		white-space: nowrap;
+		justify-content: center;
+		width: 60px;
+		height: 1.6em;
+		flex: 0 0 60px;
 	}
 
 	.slot > .content {
 		color: #333;
 	}
 
-	.slot > .placeholder {
-		width: 100%;
-		color: transparent;
-	}
-
-	.placeholder.ar {
-		/* No [MASK] for autoregressive — a subtle dashed underline hints at
-		 * where the next token will land, so the row keeps its line rhythm. */
+	/* Dashed underline placeholder for autoregressive pending slots: keeps
+	 * the row rhythm without introducing a [MASK] visual on the AR side. */
+	.ar-placeholder {
+		display: inline-block;
+		width: 70%;
 		border-bottom: 1px dashed #c8c8c8;
 	}
 
-	.placeholder.mask {
-		height: 1em;
-		background: var(--mask-color, #c4c8ce);
-		border-radius: 3px;
+	.mask-pill {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.35em 0.4em;
+		background: var(--mask-color, #cfe0f2);
+		color: var(--mask-text-color, #33506e);
+		border-radius: 4px;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+		font-size: 0.75rem;
+		font-weight: 500;
+		line-height: 1;
 	}
 </style>
