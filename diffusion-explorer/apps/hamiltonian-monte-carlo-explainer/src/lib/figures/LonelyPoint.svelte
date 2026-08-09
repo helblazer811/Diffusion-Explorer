@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import * as d3 from "d3";
   import {
@@ -10,8 +10,12 @@
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import { mulberry32 } from "$lib/hmc/random";
+  import type { Vec2 } from "$lib/hmc/random";
   import { computeRectKDE } from "$lib/hmc/kde";
-  import { sampleGMMBatch } from "$lib/hmc/gmm";
+  import { sampleGMMBatch, GMM_STD } from "$lib/hmc/gmm";
+  import { settings, heatmapColor } from "$lib/settings";
+
+  const { colors, point } = settings.stylingSettings;
 
   // ----------------------------------------------------------------
   // Props
@@ -32,23 +36,25 @@
     labelFontSize?: number;
     captionFontSize?: number;
     seed?: number;
+    caption?: Snippet;
   }
 
   let {
     canvasWidth = 720,
-    canvasHeight = 405,
-    domainRange = { xMin: -2.5, xMax: 2.5, yMin: -1.406, yMax: 1.406 },
+    canvasHeight = 230,
+    domainRange = { xMin: -2.5, xMax: 2.5, yMin: -0.35, yMax: 1.05 },
     heatmapResolution = 480,
     heatmapBandwidth = 10,
-    pointPosition = { x: 1.7, y: 0.95 },
-    pointRadius = 8,
-    pointColor = "#1e40af",
+    pointPosition = { x: 0.0, y: 0.7 },
+    pointRadius = point.radius,
+    pointColor = colors.point,
     pulseMaxRadius = 22,
     pulseLineWidth = 2,
     pulsePeriod = 1.6,
-    labelFontSize = 18,
-    captionFontSize = 16,
+    labelFontSize = 24,
+    captionFontSize = 20,
     seed = 42,
+    caption,
   }: Props = $props();
 
   // ----------------------------------------------------------------
@@ -85,6 +91,14 @@
     heatmapCanvas = buildHeatmapCanvas(rng);
   }
 
+  // Three Gaussian modes arranged side-by-side along x, used only by this figure.
+  const SIDE_BY_SIDE_MEANS: Vec2[] = [
+    [-1.6, 0.15],
+    [0.0, 0.15],
+    [1.6, 0.15],
+  ];
+  const SIDE_BY_SIDE_WEIGHTS: number[] = [1 / 3, 1 / 3, 1 / 3];
+
   /**
    * Render the 3-Gaussian-mixture target density to an offscreen canvas
    * using a blue colormap. Low-density pixels fade to transparent so the
@@ -95,7 +109,13 @@
     const gridW = heatmapResolution;
     const gridH = Math.round(gridW * (canvasHeight / canvasWidth));
 
-    const samples = sampleGMMBatch(rng, 60000);
+    const samples = sampleGMMBatch(
+      rng,
+      60000,
+      SIDE_BY_SIDE_MEANS,
+      SIDE_BY_SIDE_WEIGHTS,
+      GMM_STD,
+    );
     const density = computeRectKDE(
       samples,
       [xMin, xMax, yMin, yMax],
@@ -115,11 +135,15 @@
     const offCtx = offscreen.getContext("2d")!;
     const img = offCtx.createImageData(gridW, gridH);
 
+    // Soft threshold: anything below `floor` of normalized density fades fully
+    // to transparent so mode boundaries blend into the page background.
+    const floor = 0.18;
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
         const v = blurred[gy * gridW + gx] * invMax;
-        const t = Math.pow(v, 0.85);
-        const c = d3.color(d3.interpolateBlues(0.15 + 0.85 * t))?.rgb() ?? d3.rgb(255, 255, 255);
+        const vClipped = Math.max(0, (v - floor) / (1 - floor));
+        const t = Math.pow(vClipped, 0.85);
+        const c = heatmapColor(t);
         const idx = ((gridH - 1 - gy) * gridW + gx) * 4;
         img.data[idx] = c.r;
         img.data[idx + 1] = c.g;
@@ -174,19 +198,23 @@
     ctx.arc(px, py, pointRadius, 0, 2 * Math.PI);
     ctx.fill();
 
-    // "x" label above the point.
-    ctx.fillStyle = pointColor;
-    ctx.font = `italic ${labelFontSize}px serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText("x", px, py - pointRadius - 8);
-
-    // "A Lonely Point" caption below the point.
+    // "A Lonely Point" caption above the point.
     ctx.fillStyle = "#444";
     ctx.font = `${captionFontSize}px ${getComputedStyle(canvas!).fontFamily || "sans-serif"}`;
     ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText("A Lonely Point", px, py + pointRadius + 8);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("A Lonely Point", px, py - pulseMaxRadius - 4);
+
+    // "x" label to the upper-left of the point, with a thin white outline for legibility.
+    ctx.font = `italic ${labelFontSize}px serif`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "alphabetic";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineJoin = "round";
+    ctx.strokeText("x", px - pointRadius - 4, py - pointRadius - 2);
+    ctx.fillStyle = pointColor;
+    ctx.fillText("x", px - pointRadius - 4, py - pointRadius - 2);
 
     // --- Dynamic foreground: pulsing outline ring ---
     const t = state.pulse;
@@ -280,7 +308,7 @@
   }
 </script>
 
-<Figure bind:isActive={figureIsActive} backgroundVisible={false}>
+<Figure bind:isActive={figureIsActive} backgroundVisible={false} {caption}>
   <div class="canvas-wrapper" style="max-width: {canvasWidth}px;">
     <canvas
       bind:this={canvas}

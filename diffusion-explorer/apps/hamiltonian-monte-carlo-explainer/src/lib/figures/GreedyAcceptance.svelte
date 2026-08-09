@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import * as d3 from "d3";
   import {
@@ -11,13 +11,18 @@
   } from "@diffusion-explorer/ui";
   import { mulberry32, boxMuller, type Vec2 } from "$lib/hmc/random";
   import { computeRectKDE } from "$lib/hmc/kde";
-  import {
-    sampleGMMBatch,
-    gmmLogProbAt,
-    GMM_MEANS,
-    GMM_WEIGHTS,
-    GMM_STD,
-  } from "$lib/hmc/gmm";
+  import { sampleGMMBatch, gmmLogProbAt, GMM_STD } from "$lib/hmc/gmm";
+  import { settings, heatmapColor } from "$lib/settings";
+
+  const { colors, point } = settings.stylingSettings;
+
+  // Two side-by-side Gaussian modes — the chain starts on the left and
+  // greedily climbs into the left mode, leaving the right mode unsampled.
+  const SIDE_BY_SIDE_MEANS: Vec2[] = [
+    [-1.2, 0.0],
+    [1.2, 0.0],
+  ];
+  const SIDE_BY_SIDE_WEIGHTS: number[] = [0.5, 0.5];
 
   // ----------------------------------------------------------------
   // Props
@@ -30,35 +35,39 @@
     heatmapResolution?: number;
     heatmapBandwidth?: number;
     proposalStd?: number;
-    stepsPerLoop?: number;
-    numLoops?: number;
-    loopFadeSteps?: number;
+    maxSteps?: number;
+    convergenceWindow?: number;
+    convergenceThreshold?: number;
+    convergenceTailSteps?: number;
     stepDuration?: number;
+    holdDuration?: number;
     chainColor?: string;
     sampleColor?: string;
     sampleAlpha?: number;
     pointRadius?: number;
-    trailLength?: number;
     seed?: number;
+    caption?: Snippet;
   }
 
   let {
     canvasWidth = 720,
-    canvasHeight = 405,
-    domainRange = { xMin: -2.5, xMax: 2.5, yMin: -1.406, yMax: 1.406 },
+    canvasHeight = 220,
+    domainRange = { xMin: -2.5, xMax: 2.5, yMin: -0.65, yMax: 0.65 },
     heatmapResolution = 480,
     heatmapBandwidth = 10,
-    proposalStd = 0.18,
-    stepsPerLoop = 280,
-    numLoops = 4,
-    loopFadeSteps = 36,
+    proposalStd = 0.08,
+    maxSteps = 1200,
+    convergenceWindow = 40,
+    convergenceThreshold = 0.01,
+    convergenceTailSteps = 12,
     stepDuration = 0.04,
-    chainColor = "#1e3a8a",
-    sampleColor = "#1e3a8a",
-    sampleAlpha = 0.18,
-    pointRadius = 5,
-    trailLength = 10,
+    holdDuration = 1.2,
+    chainColor = colors.point,
+    sampleColor = colors.point,
+    sampleAlpha = 0.55,
+    pointRadius = point.radius,
     seed = 11,
+    caption,
   }: Props = $props();
 
   // ----------------------------------------------------------------
@@ -74,14 +83,11 @@
 
   let heatmapCanvas: HTMLCanvasElement | null = null;
 
-  type ChainLoop = { states: Vec2[]; startSeed: number };
-  let loops: ChainLoop[] = [];
+  let chainStates: Vec2[] = [];
 
   type AnimationState = {
-    loopIndex: number;
     stepIndex: number;
-    phaseAlpha: number;
-    mode: "run" | "fade";
+    mode: "run" | "hold";
   };
 
   let player: Player<AnimationState> | null = null;
@@ -96,14 +102,15 @@
 
   function pickStart(rng: () => number): Vec2 {
     const { xMin, xMax, yMin, yMax } = domainRange;
-    // Sample uniformly across the domain so different loops start near
-    // different modes. Pull in slightly from the edges so no chain spawns
-    // in dead-zero density and stalls.
-    const padX = (xMax - xMin) * 0.12;
-    const padY = (yMax - yMin) * 0.12;
+    // Start on the far left, with a small jitter so reseeding still varies
+    // the entry path slightly. The chain greedily climbs into the left mode.
+    const padX = (xMax - xMin) * 0.04;
+    const xJitter = (xMax - xMin) * 0.03;
+    const yJitter = (yMax - yMin) * 0.25;
+    const cy = (yMin + yMax) / 2;
     return [
-      xMin + padX + rng() * (xMax - xMin - 2 * padX),
-      yMin + padY + rng() * (yMax - yMin - 2 * padY),
+      xMin + padX + rng() * xJitter,
+      cy + (rng() - 0.5) * yJitter,
     ];
   }
 
@@ -113,20 +120,43 @@
       cur[0] + proposalStd * z1,
       cur[1] + proposalStd * z2,
     ];
-    return gmmLogProbAt(proposal, GMM_MEANS, GMM_WEIGHTS, GMM_STD) >
-      gmmLogProbAt(cur, GMM_MEANS, GMM_WEIGHTS, GMM_STD)
+    return gmmLogProbAt(proposal, SIDE_BY_SIDE_MEANS, SIDE_BY_SIDE_WEIGHTS, GMM_STD) >
+      gmmLogProbAt(cur, SIDE_BY_SIDE_MEANS, SIDE_BY_SIDE_WEIGHTS, GMM_STD)
       ? proposal
       : cur;
   }
 
-  function runGreedyChain(start: Vec2, chainSeed: number): ChainLoop {
+  /**
+   * Generate the chain until it has "converged" — i.e. the point has barely
+   * moved over the last `convergenceWindow` accepted-or-not steps — then
+   * append `convergenceTailSteps` more frames so the held state is visible
+   * before the timeline pauses on it.
+   */
+  function runGreedyChainUntilConverged(start: Vec2, chainSeed: number): Vec2[] {
     const rng = mulberry32(chainSeed);
-    const states: Vec2[] = new Array(stepsPerLoop);
-    states[0] = [start[0], start[1]];
-    for (let i = 1; i < stepsPerLoop; i++) {
-      states[i] = greedyStep(states[i - 1], rng);
+    const states: Vec2[] = [[start[0], start[1]]];
+    let convergedAt = -1;
+    for (let i = 1; i < maxSteps; i++) {
+      const next = greedyStep(states[i - 1], rng);
+      states.push(next);
+      if (i >= convergenceWindow) {
+        const a = states[i - convergenceWindow];
+        const b = states[i];
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        if (Math.hypot(dx, dy) < convergenceThreshold) {
+          convergedAt = i;
+          break;
+        }
+      }
     }
-    return { states, startSeed: chainSeed };
+    if (convergedAt < 0) return states;
+    // Pad with stationary frames so the "stopped" state lingers on screen.
+    const last = states[states.length - 1];
+    for (let i = 0; i < convergenceTailSteps; i++) {
+      states.push([last[0], last[1]]);
+    }
+    return states;
   }
 
   function dataToPx(p: Vec2): { x: number; y: number } {
@@ -145,12 +175,8 @@
     const startRng = mulberry32(seed);
     heatmapCanvas = buildHeatmapCanvas(startRng);
 
-    loops = new Array(numLoops);
-    for (let l = 0; l < numLoops; l++) {
-      const start = pickStart(startRng);
-      // Distinct seed per loop so the proposal noise differs across loops.
-      loops[l] = runGreedyChain(start, seed + 101 * (l + 1));
-    }
+    const start = pickStart(startRng);
+    chainStates = runGreedyChainUntilConverged(start, seed + 101);
   }
 
   /**
@@ -162,7 +188,13 @@
     const gridW = heatmapResolution;
     const gridH = Math.round(gridW * (canvasHeight / canvasWidth));
 
-    const samples = sampleGMMBatch(rng, 60000);
+    const samples = sampleGMMBatch(
+      rng,
+      60000,
+      SIDE_BY_SIDE_MEANS,
+      SIDE_BY_SIDE_WEIGHTS,
+      GMM_STD,
+    );
     const density = computeRectKDE(
       samples,
       [xMin, xMax, yMin, yMax],
@@ -182,11 +214,16 @@
     const offCtx = offscreen.getContext("2d")!;
     const img = offCtx.createImageData(gridW, gridH);
 
+    // Floor-clip low-density values so the heatmap only colors the high-prob
+    // mode regions. Without this, the long Gaussian tails fill the canvas
+    // vertically and read as a stretched band rather than three round modes.
+    const floor = 0.18;
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
         const v = blurred[gy * gridW + gx] * invMax;
-        const t = Math.pow(v, 0.85);
-        const c = d3.color(d3.interpolateBlues(0.15 + 0.85 * t))?.rgb() ?? d3.rgb(255, 255, 255);
+        const vClipped = Math.max(0, (v - floor) / (1 - floor));
+        const t = Math.pow(vClipped, 0.85);
+        const c = heatmapColor(t);
         const idx = ((gridH - 1 - gy) * gridW + gx) * 4;
         img.data[idx] = c.r;
         img.data[idx + 1] = c.g;
@@ -203,36 +240,29 @@
   // ----------------------------------------------------------------
 
   function setupTimeline(): void {
-    const totalSteps = numLoops * stepsPerLoop;
-    const duration = totalSteps * stepDuration;
+    const totalSteps = chainStates.length;
+    const runDuration = totalSteps * stepDuration;
+    const duration = runDuration + holdDuration;
+    const runFrac = runDuration / duration;
 
     const chainClip = {
       name: "GreedyChain",
       reduce(t: number): AnimationState {
-        const float = t * totalSteps;
-        const globalStep = Math.min(Math.floor(float), totalSteps - 1);
-        const loopIndex = Math.min(
-          numLoops - 1,
-          Math.floor(globalStep / stepsPerLoop),
-        );
-        const stepIndex = globalStep - loopIndex * stepsPerLoop;
-        const stepsRemaining = stepsPerLoop - 1 - stepIndex;
-        if (stepsRemaining < loopFadeSteps) {
-          const fadeFrac = (loopFadeSteps - stepsRemaining) / loopFadeSteps;
-          return {
-            loopIndex,
-            stepIndex,
-            phaseAlpha: Math.max(0, 1 - fadeFrac),
-            mode: "fade",
-          };
+        if (t >= runFrac) {
+          return { stepIndex: totalSteps - 1, mode: "hold" };
         }
-        return { loopIndex, stepIndex, phaseAlpha: 1, mode: "run" };
+        const localT = t / runFrac;
+        const stepIndex = Math.min(
+          totalSteps - 1,
+          Math.floor(localT * totalSteps),
+        );
+        return { stepIndex, mode: "run" };
       },
     };
 
     const tl = Timeline.from<AnimationState>({
       duration,
-      initialState: { loopIndex: 0, stepIndex: 0, phaseAlpha: 1, mode: "run" },
+      initialState: { stepIndex: 0, mode: "run" },
       clips: [{ clip: chainClip, start: 0, end: 1 }],
     });
 
@@ -245,52 +275,55 @@
   // ----------------------------------------------------------------
 
   function draw(state: AnimationState): void {
-    if (!ctx || !heatmapCanvas || !xScale || !yScale || loops.length === 0) return;
+    if (!ctx || !heatmapCanvas || !xScale || !yScale || chainStates.length === 0) return;
 
     // --- Static background ---
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     ctx.drawImage(heatmapCanvas, 0, 0, canvasWidth, canvasHeight);
 
     // --- Dynamic foreground ---
-    const { loopIndex, stepIndex, phaseAlpha } = state;
-    const loop = loops[loopIndex];
-    if (!loop) return;
+    const { stepIndex } = state;
 
-    // Accumulated samples for the current loop (faded near loop end).
-    ctx.save();
-    ctx.fillStyle = sampleColor;
-    ctx.globalAlpha = sampleAlpha * phaseAlpha;
-    for (let i = 0; i <= stepIndex; i++) {
-      const { x, y } = dataToPx(loop.states[i]);
-      ctx.beginPath();
-      ctx.arc(x, y, 2.2, 0, 2 * Math.PI);
-      ctx.fill();
-    }
-    ctx.restore();
-
-    // Last `trailLength` chain segments as a polyline for visual life.
-    const trailStart = Math.max(0, stepIndex - trailLength);
-    if (stepIndex > trailStart) {
+    // Polyline connecting every visited state so the path is fully visible.
+    if (stepIndex > 0) {
       ctx.save();
       ctx.strokeStyle = chainColor;
       ctx.lineWidth = 1.5;
       ctx.lineCap = "round";
-      ctx.globalAlpha = 0.35 * phaseAlpha;
+      ctx.lineJoin = "round";
+      ctx.globalAlpha = 0.55;
       ctx.beginPath();
-      const start = dataToPx(loop.states[trailStart]);
+      const start = dataToPx(chainStates[0]);
       ctx.moveTo(start.x, start.y);
-      for (let i = trailStart + 1; i <= stepIndex; i++) {
-        const p = dataToPx(loop.states[i]);
+      for (let i = 1; i <= stepIndex; i++) {
+        const p = dataToPx(chainStates[i]);
         ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
       ctx.restore();
     }
 
-    // Current point with white stroke for legibility over heatmap + scatter.
-    const cur = dataToPx(loop.states[stepIndex]);
+    // Visited samples as small dots. Skip rejected (== previous) states so
+    // stacked translucent fills don't make some points read darker.
     ctx.save();
-    ctx.globalAlpha = phaseAlpha;
+    ctx.fillStyle = sampleColor;
+    ctx.globalAlpha = sampleAlpha;
+    for (let i = 0; i <= stepIndex; i++) {
+      if (i > 0) {
+        const prev = chainStates[i - 1];
+        const cur = chainStates[i];
+        if (prev[0] === cur[0] && prev[1] === cur[1]) continue;
+      }
+      const { x, y } = dataToPx(chainStates[i]);
+      ctx.beginPath();
+      ctx.arc(x, y, pointRadius, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Current point with white stroke for legibility over heatmap + scatter.
+    const cur = dataToPx(chainStates[stepIndex]);
+    ctx.save();
     ctx.fillStyle = chainColor;
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1.5;
@@ -362,7 +395,7 @@
       isInitialized = true;
       runInitialComputation();
       setupTimeline();
-      draw({ loopIndex: 0, stepIndex: 0, phaseAlpha: 1, mode: "run" });
+      draw({ stepIndex: 0, mode: "run" });
       player?.play();
     }
   });
@@ -377,7 +410,7 @@
   });
 </script>
 
-<Figure bind:isActive={figureIsActive} backgroundVisible={false}>
+<Figure bind:isActive={figureIsActive} backgroundVisible={false} {caption}>
   <div class="canvas-wrapper" style="max-width: {canvasWidth}px;">
     <canvas
       bind:this={canvas}

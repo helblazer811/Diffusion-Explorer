@@ -3,13 +3,14 @@
   import type { Writable } from "svelte/store";
   import {
     Figure,
+    MultiStateToggleButton,
     Player,
     Timeline,
     useCanvas2D,
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
   import * as d3 from "d3";
-  import { mulberry32 } from "$lib/hmc/random";
+  import { mulberry32, boxMuller } from "$lib/hmc/random";
   import type { Vec2 } from "$lib/hmc/random";
   import { computeRectKDE } from "$lib/hmc/kde";
   import { sampleGMMBatch, GMM_STD } from "$lib/hmc/gmm";
@@ -31,21 +32,13 @@
     heatmapDimAlpha?: number;
     numSteps?: number;
     stepsPerSecond?: number;
+    /** Proposal std in *data* units. Small → chain gets stuck near a mode. */
     proposalStd?: number;
-    /**
-     * Burn-in is the first iteration at which the chain enters the
-     * `burnInRadiusSigmas`-σ ball around the target's mode (in data units).
-     * Defaults to 3σ.
-     */
-    burnInRadiusSigmas?: number;
-    /** Where the chain starts, in data coords — far from the mode. */
-    startPos?: Vec2;
     pointRadius?: number;
     trailDotRadius?: number;
     connectorLineWidth?: number;
     trailAlpha?: number;
     connectorAlpha?: number;
-    pointColor?: string;
     fadeOutDuration?: number;
     seed?: number;
     caption?: Snippet;
@@ -53,24 +46,21 @@
 
   let {
     canvasWidth = 720,
-    canvasHeight = 260,
-    domainRange = { xMin: -2.5, xMax: 2.5, yMin: -0.9, yMax: 0.9 },
+    canvasHeight = 220,
+    domainRange = { xMin: -2.5, xMax: 2.5, yMin: -0.65, yMax: 0.65 },
     heatmapResolution = 480,
     heatmapBandwidth = 10,
     heatmapDimAlpha = 0.5,
-    numSteps = 300,
-    stepsPerSecond = 22,
+    numSteps = 400,
+    stepsPerSecond = 18,
     proposalStd = 0.08,
-    burnInRadiusSigmas = 3,
-    startPos = [-2.1, 0.0],
     pointRadius = point.radius,
     trailDotRadius = point.trailRadius,
     connectorLineWidth = path.connectorWidth,
     trailAlpha = 0.55,
     connectorAlpha = 0.4,
-    pointColor = colors.point,
     fadeOutDuration = 0.6,
-    seed = 7,
+    seed = 11,
     caption,
   }: Props = $props();
 
@@ -82,49 +72,40 @@
   const canvas2d = useCanvas2D(canvasWidth, canvasHeight);
   let ctx = $derived(canvas && canvas2d.ctx);
 
-  // Single Gaussian centered at the origin — the stationary distribution.
-  const TARGET_MEANS: Vec2[] = [[0.0, 0.0]];
-  const TARGET_WEIGHTS: number[] = [1.0];
+  // Three side-by-side Gaussian modes, identical layout to GaussianRandomWalk.
+  const SIDE_BY_SIDE_MEANS: Vec2[] = [
+    [-1.6, 0.0],
+    [0.0, 0.0],
+    [1.6, 0.0],
+  ];
+  const SIDE_BY_SIDE_WEIGHTS: number[] = [1 / 3, 1 / 3, 1 / 3];
 
+  // All chains share the same orange to match the rest of the explainer.
+  const CHAIN_COLOR = colors.point;
+
+  // Each "view" is a list of chains; each chain is a list of pixel-space
+  // positions (one per MH iteration). Single → 1 chain, Multiple → 3 chains.
   type Chain = { x: number; y: number }[];
-  let chain: Chain = [];
+  let singleChains: Chain[] = [];
+  let multiChains: Chain[] = [];
 
   let heatmapCanvas: HTMLCanvasElement | null = null;
 
-  type AnimationState = {
-    stepIndex: number;
-    loopAlpha: number;
-    progress: number;
-    /** 0 = bracket not yet drawn, 1 = full |---| bracket. */
-    bracketProgress: number;
-  };
+  type AnimationState = { stepIndex: number; loopAlpha: number };
 
-  /** Seconds it takes to sweep the bracket from left tick to right tick. */
-  const BRACKET_REVEAL_SECONDS = 0.6;
+  // Two players — one timeline per view — so toggling preserves each view's
+  // state and avoids re-running MH on every click.
+  let singlePlayer: Player<AnimationState> | null = null;
+  let multiPlayer: Player<AnimationState> | null = null;
+  let mode: number = $state(0); // 0 = single, 1 = multiple
+  let lastState: AnimationState = $state({ stepIndex: 0, loopAlpha: 1 });
 
-  let player: Player<AnimationState> | null = null;
   let isInitialized = $state(false);
 
-  // Reactive copies of the latest animation state — drive the timeline
-  // marker and burn-in bracket below the canvas.
-  let progress: number = $state(0);
-  let bracketProgress: number = $state(0);
-
-  // First iteration at which the chain entered the 3σ ball around the mode.
-  // Computed once from the precomputed chain. Drives the bracket position.
-  let burnInEndIndex: number = $state(0);
-
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
-  const { handleVisibilityChange } = useVisibilityHandler(() => player);
-
-  // Timeline / annotation layout (in pixels, beneath the canvas).
-  const TIMELINE_HEIGHT = 96;
-  const TIMELINE_PAD_X = 12;
-  const TIMELINE_BAR_Y = 50;
-  const TIMELINE_BAR_HEIGHT = 8;
-  const BRACKET_Y = 28;
-  const BRACKET_TICK_HEIGHT = 8;
-  const AXIS_LABEL_Y = 82;
+  const { handleVisibilityChange } = useVisibilityHandler(() =>
+    mode === 0 ? singlePlayer : multiPlayer,
+  );
 
   // ----------------------------------------------------------------
   // Helpers
@@ -163,120 +144,114 @@
     heatmapCanvas = buildHeatmapCanvas(rng);
 
     const logProb = (x: Vec2) =>
-      gmmLogProb(x, TARGET_MEANS, TARGET_WEIGHTS, GMM_STD);
+      gmmLogProb(x, SIDE_BY_SIDE_MEANS, SIDE_BY_SIDE_WEIGHTS, GMM_STD);
 
-    const steps = runMetropolisHastings({
-      start: [startPos[0], startPos[1]],
+    // Single chain: start at left mode, small proposal → stays stuck there.
+    const singleSteps = runMetropolisHastings({
+      start: [SIDE_BY_SIDE_MEANS[0][0], SIDE_BY_SIDE_MEANS[0][1]],
       numSteps,
       proposalStd,
       logProb,
       rng: mulberry32(seed + 1),
       bounds: domainRange,
     });
-    chain = chainFromMHSteps(steps);
+    singleChains = [chainFromMHSteps(singleSteps)];
 
-    // Find first iteration where the chain has entered the 3σ ball around
-    // the (single) target mode. The chain index after step s is s+1; the
-    // pre-step starting point sits at index 0.
-    const [mx, my] = TARGET_MEANS[0];
-    const radius = burnInRadiusSigmas * GMM_STD;
-    const radiusSq = radius * radius;
-    const startDx = startPos[0] - mx;
-    const startDy = startPos[1] - my;
-    let endIdx = numSteps; // fall back to "never converged" — bracket spans full track
-    if (startDx * startDx + startDy * startDy <= radiusSq) {
-      endIdx = 0;
-    } else {
-      for (let i = 0; i < steps.length; i++) {
-        const s = steps[i];
-        const pos: Vec2 = s.accepted ? s.proposal : s.from;
-        const dx = pos[0] - mx;
-        const dy = pos[1] - my;
-        if (dx * dx + dy * dy <= radiusSq) {
-          endIdx = i + 1;
-          break;
-        }
-      }
-    }
-    burnInEndIndex = endIdx;
+    // Multiple chains: one per mode, each with its own RNG stream so they
+    // don't all draw the same proposal sequence.
+    multiChains = SIDE_BY_SIDE_MEANS.map((mu, k) => {
+      const steps = runMetropolisHastings({
+        start: [mu[0], mu[1]],
+        numSteps,
+        proposalStd,
+        logProb,
+        rng: mulberry32(seed + 100 + k),
+        bounds: domainRange,
+      });
+      return chainFromMHSteps(steps);
+    });
   }
 
   // ----------------------------------------------------------------
   // Animations
   // ----------------------------------------------------------------
 
-  function setupTimeline(): void {
+  function buildPlayer(): Player<AnimationState> {
     const walkDuration = numSteps / stepsPerSecond;
     const duration = walkDuration + fadeOutDuration;
 
     const walkClip = {
-      name: "MCMCBurnIn",
-      reduce(t: number): Partial<AnimationState> {
+      name: "MHWalk",
+      reduce(t: number): AnimationState {
         const tt = t * duration;
         if (tt <= walkDuration) {
           const stepIndex = Math.min(
             numSteps - 1,
             Math.floor(tt * stepsPerSecond),
           );
-          return {
-            stepIndex,
-            loopAlpha: 1,
-            progress: tt / walkDuration,
-          };
+          return { stepIndex, loopAlpha: 1 };
         }
         const fadeT = (tt - walkDuration) / fadeOutDuration;
         return {
           stepIndex: numSteps - 1,
           loopAlpha: Math.max(0, 1 - fadeT),
-          progress: 1,
         };
       },
     };
 
-    // Bracket reveal: a separate clip that runs for BRACKET_REVEAL_SECONDS
-    // starting at the moment the chain crosses the 3σ threshold. Drives
-    // `bracketProgress` from 0 → 1 so the bracket sweeps in left-to-right.
-    const burnInTimeSeconds = burnInEndIndex / stepsPerSecond;
-    const revealStartSeconds = Math.min(burnInTimeSeconds, walkDuration);
-    const revealEndSeconds = Math.min(
-      revealStartSeconds + BRACKET_REVEAL_SECONDS,
-      walkDuration,
-    );
-    const revealStartFrac = revealStartSeconds / duration;
-    const revealEndFrac = revealEndSeconds / duration;
-    const bracketRevealClip = {
-      name: "BracketReveal",
-      reduce(t: number): Partial<AnimationState> {
-        return { bracketProgress: t };
-      },
-    };
-
-    const clips = [{ clip: walkClip, start: 0, end: 1 }];
-    if (revealEndFrac > revealStartFrac) {
-      clips.push({
-        clip: bracketRevealClip,
-        start: revealStartFrac,
-        end: revealEndFrac,
-      });
-    }
-
     const tl = Timeline.from<AnimationState>({
       duration,
-      initialState: {
-        stepIndex: 0,
-        loopAlpha: 1,
-        progress: 0,
-        bracketProgress: 0,
-      },
-      clips,
+      initialState: { stepIndex: 0, loopAlpha: 1 },
+      clips: [{ clip: walkClip, start: 0, end: 1 }],
     });
 
-    player = new Player(tl, { looping: true });
-    player.onTick((_t, state) => {
-      progress = state.progress;
-      bracketProgress = state.bracketProgress;
-      draw(state);
+    return new Player(tl, { looping: true });
+  }
+
+  // Per-player previous t, used to detect a loop boundary (t wraps from
+  // near-1 back to near-0). When the active player completes a loop we flip
+  // the toggle to the other view automatically.
+  let prevSingleT = 0;
+  let prevMultiT = 0;
+
+  function setupTimeline(): void {
+    singlePlayer = buildPlayer();
+    multiPlayer = buildPlayer();
+
+    // Only the active player drives draw() and triggers auto-toggle. The
+    // inactive player is paused so it doesn't burn cycles in the background.
+    singlePlayer.onTick((t, state) => {
+      if (mode === 0) {
+        if (t < prevSingleT - 0.5) autoToggleTo(1);
+        prevSingleT = t;
+        lastState = state;
+        draw(state);
+      }
     });
+    multiPlayer.onTick((t, state) => {
+      if (mode === 1) {
+        if (t < prevMultiT - 0.5) autoToggleTo(0);
+        prevMultiT = t;
+        lastState = state;
+        draw(state);
+      }
+    });
+  }
+
+  function autoToggleTo(newMode: number): void {
+    if (newMode === mode) return;
+    mode = newMode;
+    if (newMode === 0) {
+      multiPlayer?.pause();
+      singlePlayer?.reset();
+      prevSingleT = 0;
+      singlePlayer?.play();
+    } else {
+      singlePlayer?.pause();
+      multiPlayer?.reset();
+      prevMultiT = 0;
+      multiPlayer?.play();
+    }
   }
 
   // ----------------------------------------------------------------
@@ -291,7 +266,7 @@
   ): void {
     if (!ctx || chain.length === 0) return;
 
-    // Connectors.
+    // Connectors first so dots sit on top.
     ctx.save();
     ctx.strokeStyle = color;
     ctx.lineWidth = connectorLineWidth;
@@ -343,13 +318,15 @@
     }
 
     // --- Dynamic foreground ---
-    drawChain(chain, pointColor, state.stepIndex, state.loopAlpha);
+    const chains = mode === 0 ? singleChains : multiChains;
+    for (let k = 0; k < chains.length; k++) {
+      drawChain(chains[k], CHAIN_COLOR, state.stepIndex, state.loopAlpha);
+    }
   }
 
   /**
-   * Render a single isotropic Gaussian centered at the origin into an
-   * offscreen canvas. Same pipeline as the GMM heatmaps elsewhere — KDE on
-   * sampled points so the visual style matches the rest of the explainer.
+   * Render the same 3-Gaussian-mixture target density used elsewhere in the
+   * explainer so the chain animations sit over a shared visual reference.
    */
   function buildHeatmapCanvas(rng: () => number): HTMLCanvasElement {
     const { xMin, xMax, yMin, yMax } = domainRange;
@@ -359,8 +336,8 @@
     const samples = sampleGMMBatch(
       rng,
       60000,
-      TARGET_MEANS,
-      TARGET_WEIGHTS,
+      SIDE_BY_SIDE_MEANS,
+      SIDE_BY_SIDE_WEIGHTS,
       GMM_STD,
     );
     const density = computeRectKDE(
@@ -445,11 +422,34 @@
   }
 
   // ----------------------------------------------------------------
+  // Event Handlers
+  // ----------------------------------------------------------------
+
+  function onToggle(newMode: number): void {
+    if (newMode === mode) return;
+    mode = newMode;
+    // Pause the leaving player; resume (and reset) the entering player so the
+    // user sees the new view animate from the start.
+    if (newMode === 0) {
+      multiPlayer?.pause();
+      singlePlayer?.reset();
+      prevSingleT = 0;
+      singlePlayer?.play();
+    } else {
+      singlePlayer?.pause();
+      multiPlayer?.reset();
+      prevMultiT = 0;
+      multiPlayer?.play();
+    }
+  }
+
+  // ----------------------------------------------------------------
   // Lifecycle
   // ----------------------------------------------------------------
 
   onDestroy(() => {
-    player?.dispose();
+    singlePlayer?.dispose();
+    multiPlayer?.dispose();
   });
 
   // ----------------------------------------------------------------
@@ -461,8 +461,8 @@
       isInitialized = true;
       runInitialComputation();
       setupTimeline();
-      draw({ stepIndex: 0, loopAlpha: 1, progress: 0, bracketProgress: 0 });
-      player?.play();
+      draw({ stepIndex: 0, loopAlpha: 1 });
+      singlePlayer?.play();
     }
   });
 
@@ -474,28 +474,6 @@
       return unsubscribe;
     }
   });
-
-  // Derived geometry for the SVG timeline + bracket.
-  let trackX0 = $derived(TIMELINE_PAD_X);
-  let trackX1 = $derived(canvasWidth - TIMELINE_PAD_X);
-  let trackWidth = $derived(trackX1 - trackX0);
-  let burnInFraction = $derived(
-    numSteps > 0 ? Math.min(1, burnInEndIndex / numSteps) : 0,
-  );
-  let burnInX1 = $derived(trackX0 + trackWidth * burnInFraction);
-  let markerX = $derived(trackX0 + trackWidth * progress);
-  let bracketCenterX = $derived((trackX0 + burnInX1) / 2);
-  // Bracket reveal animation. Three sub-phases of bracketProgress p ∈ [0, 1]:
-  //   p == 0   : nothing drawn
-  //   p > 0    : left tick visible, horizontal line growing right
-  //   p ≥ 0.85 : right tick + label fade in
-  let bracketActive = $derived(bracketProgress > 0 && burnInFraction > 0);
-  let bracketLineEndX = $derived(
-    trackX0 + (burnInX1 - trackX0) * Math.min(1, bracketProgress),
-  );
-  let bracketRightAlpha = $derived(
-    Math.max(0, Math.min(1, (bracketProgress - 0.85) / 0.15)),
-  );
 </script>
 
 <Figure bind:isActive={figureIsActive} backgroundVisible={false} {caption}>
@@ -503,103 +481,17 @@
     <canvas
       bind:this={canvas}
       use:canvas2d.bindCanvas
-      class="mcmc-burn-in-canvas"
+      class="stuck-chain-canvas"
     ></canvas>
-    <svg
-      class="mcmc-burn-in-timeline"
-      viewBox="0 0 {canvasWidth} {TIMELINE_HEIGHT}"
-      preserveAspectRatio="xMidYMid meet"
-      aria-hidden="true"
-    >
-      <!-- Burn-in bracket: |-----| spanning [trackX0, burnInX1].
-           Sweeps in left → right once the chain crosses the 3σ threshold. -->
-      {#if bracketActive}
-        <g>
-          <!-- Left tick: appears immediately at the start of the reveal -->
-          <line
-            x1={trackX0}
-            y1={BRACKET_Y - BRACKET_TICK_HEIGHT / 2}
-            x2={trackX0}
-            y2={BRACKET_Y + BRACKET_TICK_HEIGHT / 2}
-            stroke="#374151"
-            stroke-width="1.5"
-          />
-          <!-- Horizontal line: grows from the left tick toward burnInX1 -->
-          <line
-            x1={trackX0}
-            y1={BRACKET_Y}
-            x2={bracketLineEndX}
-            y2={BRACKET_Y}
-            stroke="#374151"
-            stroke-width="1.5"
-          />
-          <!-- Right tick + label: fade in once the line reaches the right edge -->
-          <line
-            x1={burnInX1}
-            y1={BRACKET_Y - BRACKET_TICK_HEIGHT / 2}
-            x2={burnInX1}
-            y2={BRACKET_Y + BRACKET_TICK_HEIGHT / 2}
-            stroke="#374151"
-            stroke-width="1.5"
-            opacity={bracketRightAlpha}
-          />
-          <text
-            x={bracketCenterX}
-            y={BRACKET_Y - 8}
-            text-anchor="middle"
-            font-size="17"
-            font-family="ui-sans-serif, system-ui, sans-serif"
-            fill="#374151"
-            opacity={bracketRightAlpha}
-          >
-            Burn In
-          </text>
-        </g>
-      {/if}
-
-      <!-- Timeline track -->
-      <rect
-        x={trackX0}
-        y={TIMELINE_BAR_Y}
-        width={trackWidth}
-        height={TIMELINE_BAR_HEIGHT}
-        rx={TIMELINE_BAR_HEIGHT / 2}
-        ry={TIMELINE_BAR_HEIGHT / 2}
-        fill="#e5e7eb"
+    <div class="toggle-wrapper">
+      <MultiStateToggleButton
+        labels={["Single Chain", "Multiple Chains"]}
+        value={mode}
+        fontSize={16}
+        padding="8px 20px"
+        onchange={onToggle}
       />
-      <!-- Filled portion up to current progress -->
-      <rect
-        x={trackX0}
-        y={TIMELINE_BAR_Y}
-        width={Math.max(0, markerX - trackX0)}
-        height={TIMELINE_BAR_HEIGHT}
-        rx={TIMELINE_BAR_HEIGHT / 2}
-        ry={TIMELINE_BAR_HEIGHT / 2}
-        fill={pointColor}
-        opacity="0.85"
-      />
-      <!-- Playhead -->
-      <circle
-        cx={markerX}
-        cy={TIMELINE_BAR_Y + TIMELINE_BAR_HEIGHT / 2}
-        r={7}
-        fill={pointColor}
-        stroke="#ffffff"
-        stroke-width="1.5"
-      />
-
-      <!-- Axis label -->
-      <text
-        x={(trackX0 + trackX1) / 2}
-        y={AXIS_LABEL_Y}
-        text-anchor="middle"
-        font-size="17"
-        font-family="ui-sans-serif, system-ui, sans-serif"
-        fill="#374151"
-      >
-        Iterations
-      </text>
-    </svg>
+    </div>
   </div>
 </Figure>
 
@@ -613,18 +505,14 @@
     align-items: center;
   }
 
-  .mcmc-burn-in-canvas {
+  .stuck-chain-canvas {
     width: 100%;
     height: auto;
     display: block;
     background: transparent;
   }
 
-  .mcmc-burn-in-timeline {
-    width: 100%;
-    height: auto;
-    display: block;
-    margin-top: 4px;
-    pointer-events: none;
+  .toggle-wrapper {
+    margin-top: 15px;
   }
 </style>

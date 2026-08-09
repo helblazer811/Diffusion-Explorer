@@ -10,7 +10,7 @@
 import * as tf from "@tensorflow/tfjs";
 import { boxMuller, type Vec2 } from "./random";
 import { gmmLogProb as gmmLogProbScalar } from "./mcmc";
-import type { LogProbFn } from "./hmc";
+import type { GradLogProbFn, LogProbFn } from "./hmc";
 
 export const GMM_MEANS: Vec2[] = [
   [-0.7, -0.4],
@@ -65,9 +65,63 @@ export function gmmLogProbAt(
 }
 
 /**
- * TensorFlow.js log-probability function for the shared GMM, suitable for
- * `tf.grad` inside the HMC leapfrog integrator. Returns a scalar tensor and
- * is end-to-end differentiable in `pos`.
+ * Closed-form gradient + log-probability for the shared GMM, in pure JS.
+ * For p(x) = Σₖ wₖ · N(x | μₖ, σ²I):
+ *   lₖ = log wₖ + logNorm − ‖x − μₖ‖² / (2σ²)
+ *   log p(x) = LSE_k(lₖ)
+ *   rₖ = exp(lₖ − log p(x))         (component responsibilities, sum to 1)
+ *   ∇log p(x) = Σₖ rₖ · (μₖ − x) / σ²
+ *
+ * Returns both `logProb` and `grad` from one pass — the HMC leapfrog reuses
+ * the log-density it just computed for the MH accept step.
+ */
+export function makeGMMGradLogProb(
+  means: Vec2[] = GMM_MEANS,
+  weights: number[] = GMM_WEIGHTS,
+  std: number = GMM_STD,
+): GradLogProbFn {
+  const K = means.length;
+  const inv2sig2 = 1 / (2 * std * std);
+  const invSig2 = 1 / (std * std);
+  const logNorm = -Math.log(2 * Math.PI * std * std);
+  const logWeights = weights.map((w) => Math.log(w));
+
+  // Per-call scratch is small (K terms); allocate once and reuse.
+  const logTerms = new Float64Array(K);
+
+  return (pos: Vec2) => {
+    let maxLog = -Infinity;
+    for (let k = 0; k < K; k++) {
+      const dx = pos[0] - means[k][0];
+      const dy = pos[1] - means[k][1];
+      const lt = logWeights[k] + logNorm - (dx * dx + dy * dy) * inv2sig2;
+      logTerms[k] = lt;
+      if (lt > maxLog) maxLog = lt;
+    }
+
+    let sumExp = 0;
+    for (let k = 0; k < K; k++) sumExp += Math.exp(logTerms[k] - maxLog);
+    const logProb = maxLog + Math.log(sumExp);
+
+    let gx = 0;
+    let gy = 0;
+    for (let k = 0; k < K; k++) {
+      // responsibility rₖ = exp(lₖ − logProb)
+      const r = Math.exp(logTerms[k] - logProb);
+      gx += r * (means[k][0] - pos[0]);
+      gy += r * (means[k][1] - pos[1]);
+    }
+    gx *= invSig2;
+    gy *= invSig2;
+
+    return { logProb, grad: [gx, gy] as Vec2 };
+  };
+}
+
+/**
+ * TensorFlow.js log-probability function for the shared GMM. Used as input
+ * to the autodiff gradient adapter (./autodiff) when the autodiff backend
+ * is selected. The fast path (`makeGMMGradLogProb` above) does not use this.
  */
 export function makeGMMLogProb(
   means: Vec2[] = GMM_MEANS,

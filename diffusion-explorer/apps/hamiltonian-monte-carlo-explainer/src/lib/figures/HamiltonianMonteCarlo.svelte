@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, type Snippet } from "svelte";
   import type { Writable } from "svelte/store";
   import * as d3 from "d3";
-  import * as tf from "@tensorflow/tfjs";
   import {
     Figure,
     Player,
@@ -13,8 +12,17 @@
   } from "@diffusion-explorer/ui";
   import { mulberry32 } from "$lib/hmc/random";
   import { computeRectKDE } from "$lib/hmc/kde";
-  import { runHMCChain, type Vec2 } from "$lib/hmc/hmc";
-  import { makeGMMLogProb, sampleGMMBatch } from "$lib/hmc/gmm";
+  import type { Vec2 } from "$lib/hmc/hmc";
+  import { sampleGMMBatch } from "$lib/hmc/gmm";
+  import HmcChainWorker from "$lib/hmc/hmcChain.worker?worker";
+  import type {
+    HmcChainRequest,
+    HmcChainResponse,
+    HmcTarget,
+  } from "$lib/hmc/hmcChain.worker";
+  import { settings, heatmapColor } from "$lib/settings";
+
+  const { colors, point, path } = settings.stylingSettings;
 
   // ----------------------------------------------------------------
   // Props
@@ -37,25 +45,36 @@
     particleOpacity?: number;
     animationDuration?: number;
     seed?: number;
+    /**
+     * Selects how the HMC integrator gets ∇log π(x). Defaults to the
+     * analytic GMM gradient — sub-millisecond per call. Switch to
+     * `{ kind: "gmm-autodiff" }` to exercise the TensorFlow.js autodiff
+     * path (much slower, but useful as a sanity check or as a template
+     * for figures whose target log-density has no closed-form gradient).
+     */
+    target?: HmcTarget;
+    caption?: Snippet;
   }
 
   let {
-    canvasWidth = 1440,
-    canvasHeight = 810,
+    canvasWidth = 720,
+    canvasHeight = 405,
     numProposals = 150,
     leapfrogSteps = 60,
     stepSize = 0.05,
     domainRange = { xMin: -2.5, xMax: 2.5, yMin: -1.406, yMax: 1.406 },
-    heatmapResolution = 960,
+    heatmapResolution = 480,
     heatmapBandwidth = 10,
-    pathlineLength = 80,
-    pathlineWidth = 10,
+    pathlineLength = 40,
+    pathlineWidth = path.pathlineWidth,
     pathlineFalloff = 1.5,
-    particleColor = "#1e40af",
-    particleRadius = 12,
+    particleColor = colors.point,
+    particleRadius = point.particleRadius,
     particleOpacity = 0.95,
     animationDuration = 180000,
     seed = 42,
+    target = { kind: "gmm-analytic" } as HmcTarget,
+    caption,
   }: Props = $props();
 
   // ----------------------------------------------------------------
@@ -78,6 +97,9 @@
 
   let player: Player<AnimationState> | null = null;
   let isInitialized = $state(false);
+  let chainWorker: Worker | null = null;
+
+  const initialPos: Vec2 = [-0.7, -0.4];
 
   let figureIsActive: Writable<boolean> | undefined = $state(undefined);
   const { handleVisibilityChange } = useVisibilityHandler(() => player);
@@ -86,28 +108,51 @@
   // Setup
   // ----------------------------------------------------------------
 
-  async function runInitialComputation(): Promise<void> {
-    await tf.ready();
-
+  /**
+   * Synchronous main-thread setup: scales + heatmap. Runs in ~250ms so the
+   * figure is visually present immediately. The HMC chain itself is dispatched
+   * to a worker (see `requestChainFromWorker`) so it doesn't block the page.
+   */
+  function runInitialComputation(): void {
     const { xMin, xMax, yMin, yMax } = domainRange;
     xScale = d3.scaleLinear().domain([xMin, xMax]).range([0, canvasWidth]);
     yScale = d3.scaleLinear().domain([yMin, yMax]).range([canvasHeight, 0]);
 
     const rng = mulberry32(seed);
+    heatmapCanvas = buildHeatmapCanvas(rng);
+  }
 
-    const logProbFn = makeGMMLogProb();
+  function requestChainFromWorker(): void {
+    chainWorker = new HmcChainWorker();
+    const ownWorker = chainWorker;
+    chainWorker.onmessage = (e: MessageEvent<HmcChainResponse>) => {
+      // If the component was destroyed before the chain came back, drop it.
+      if (chainWorker !== ownWorker) return;
+      const msg = e.data;
+      if (msg.type === "error") {
+        console.error("[HamiltonianMonteCarlo] worker error:", msg.error);
+        return;
+      }
+      const flat = msg.trajectory;
+      const n = flat.length / 2;
+      const traj: Vec2[] = new Array(n);
+      for (let i = 0; i < n; i++) traj[i] = [flat[2 * i], flat[2 * i + 1]];
+      trajectory = traj;
 
-    const initialPos: Vec2 = [-0.7, -0.4];
-    trajectory = runHMCChain(
+      setupTimeline();
+      draw({ time: 0, stepIndex: 0, alpha: 0 });
+      player?.play();
+    };
+    const req: HmcChainRequest = {
+      type: "run",
+      target,
       initialPos,
       numProposals,
       leapfrogSteps,
       stepSize,
-      logProbFn,
-      rng,
-    );
-
-    heatmapCanvas = buildHeatmapCanvas(rng);
+      seed,
+    };
+    chainWorker.postMessage(req);
   }
 
   /**
@@ -145,7 +190,7 @@
       for (let gx = 0; gx < gridW; gx++) {
         const v = blurred[gy * gridW + gx] * invMax;
         const t = Math.pow(v, 0.85);
-        const c = d3.color(d3.interpolateBlues(0.15 + 0.85 * t))?.rgb() ?? d3.rgb(255, 255, 255);
+        const c = heatmapColor(t);
         const idx = ((gridH - 1 - gy) * gridW + gx) * 4;
         img.data[idx] = c.r;
         img.data[idx + 1] = c.g;
@@ -186,6 +231,24 @@
   // ----------------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------------
+
+  /**
+   * Paint the heatmap + initial dot before the worker has returned a
+   * trajectory, so the figure is not blank during chain compute.
+   */
+  function drawStaticInitialFrame(): void {
+    if (!ctx || !heatmapCanvas || !xScale || !yScale) return;
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    ctx.drawImage(heatmapCanvas, 0, 0, canvasWidth, canvasHeight);
+    const px = xScale(initialPos[0]);
+    const py = yScale(initialPos[1]);
+    ctx.fillStyle = particleColor;
+    ctx.globalAlpha = particleOpacity;
+    ctx.beginPath();
+    ctx.arc(px, py, particleRadius, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 
   function draw(state: AnimationState): void {
     if (!ctx || !heatmapCanvas || !xScale || !yScale) return;
@@ -260,6 +323,8 @@
 
   onDestroy(() => {
     player?.dispose();
+    chainWorker?.terminate();
+    chainWorker = null;
   });
 
   // ----------------------------------------------------------------
@@ -269,12 +334,11 @@
   $effect(() => {
     if (canvas && ctx && !isInitialized) {
       isInitialized = true;
-      (async () => {
-        await runInitialComputation();
-        setupTimeline();
-        draw({ time: 0, stepIndex: 0, alpha: 0 });
-        player?.play();
-      })();
+      runInitialComputation();
+      // Render heatmap + initial dot immediately so the figure is visible
+      // before the chain finishes computing in the worker.
+      drawStaticInitialFrame();
+      requestChainFromWorker();
     }
   });
 
@@ -335,7 +399,7 @@
   }
 </script>
 
-<Figure bind:isActive={figureIsActive} backgroundVisible={false}>
+<Figure bind:isActive={figureIsActive} backgroundVisible={false} {caption}>
   <div class="canvas-wrapper" style="max-width: {canvasWidth}px;">
     <canvas
       bind:this={canvas}

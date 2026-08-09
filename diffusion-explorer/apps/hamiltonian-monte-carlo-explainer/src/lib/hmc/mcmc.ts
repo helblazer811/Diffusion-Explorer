@@ -6,7 +6,7 @@
  * so the figure can render the propose/accept/reject beats explicitly.
  */
 
-import { boxMuller, type Vec2 } from "./random";
+import { boxMuller, inBounds, type Bounds, type Vec2 } from "./random";
 
 /**
  * Scalar log-density of an isotropic Gaussian mixture
@@ -56,6 +56,12 @@ export interface RunMHOptions {
   proposalStd: number;
   logProb: (x: Vec2) => number;
   rng: () => number;
+  /**
+   * Optional axis-aligned rectangle. Proposals outside the box are rejected
+   * before evaluating the MH ratio — purely a visualization aid to keep the
+   * chain on-canvas.
+   */
+  bounds?: Bounds;
 }
 
 /**
@@ -70,6 +76,7 @@ export function runMetropolisHastings({
   proposalStd,
   logProb,
   rng,
+  bounds,
 }: RunMHOptions): MHStep[] {
   const steps: MHStep[] = new Array(numSteps);
   let current: Vec2 = [start[0], start[1]];
@@ -81,9 +88,11 @@ export function runMetropolisHastings({
       current[0] + proposalStd * z1,
       current[1] + proposalStd * z2,
     ];
-    const proposalLogProb = logProb(proposal);
-    const logAlpha = proposalLogProb - currentLogProb;
-    const accepted = Math.log(rng()) < logAlpha;
+
+    const outOfBounds = bounds !== undefined && !inBounds(proposal, bounds);
+    const proposalLogProb = outOfBounds ? -Infinity : logProb(proposal);
+    const logAlpha = outOfBounds ? -Infinity : proposalLogProb - currentLogProb;
+    const accepted = !outOfBounds && Math.log(rng()) < logAlpha;
 
     steps[s] = {
       from: [current[0], current[1]],

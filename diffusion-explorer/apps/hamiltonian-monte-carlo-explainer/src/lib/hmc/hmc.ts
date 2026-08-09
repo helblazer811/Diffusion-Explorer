@@ -1,18 +1,32 @@
 /**
- * Hamiltonian Monte Carlo on a lemniscate Gaussian target.
- * Uses TensorFlow.js for automatic differentiation of the log-density.
+ * Hamiltonian Monte Carlo. The integrator is backend-agnostic — it consumes a
+ * `GradLogProbFn`, which can be either a closed-form analytic gradient (fast
+ * path, used for our GMM visualizations) or an autodiff-backed adapter around
+ * a TensorFlow.js `LogProbFn` (slow path, used when the target log-density
+ * doesn't have a tractable closed-form gradient).
+ *
+ * Lemniscate helpers below still use TensorFlow.js to define a tensor-shaped
+ * `LogProbFn`, which can be wrapped by `autodiffGradLogProb` (./autodiff) when
+ * needed.
  */
 
 import * as tf from "@tensorflow/tfjs";
-import { boxMuller, type Vec2 } from "./random";
+import { boxMuller, inBounds, type Bounds, type Vec2 } from "./random";
 
-export type { Vec2 } from "./random";
+export type { Bounds, Vec2 } from "./random";
 
 /**
- * Standard interface for a log-probability function used by HMC.
- * Takes a position as a TensorFlow 1D tensor and returns a scalar tensor.
+ * Tensor-shaped log-probability function. Used as the input to the autodiff
+ * gradient adapter; never consumed by the HMC integrator directly.
  */
 export type LogProbFn = (pos: tf.Tensor1D) => tf.Scalar;
+
+/**
+ * Unified gradient interface consumed by the HMC integrator. Returns both
+ * `logProb(pos)` and `∇log p(pos)` from a single call so the leapfrog loop
+ * can reuse the log-density it just computed for the MH accept step.
+ */
+export type GradLogProbFn = (pos: Vec2) => { logProb: number; grad: Vec2 };
 
 // ================================================================
 // Lemniscate of Bernoulli
@@ -114,96 +128,97 @@ export function sampleLemniscate(
 /**
  * Run a single HMC proposal using leapfrog integration.
  * Returns the trajectory of positions over numSteps leapfrog steps,
- * including the initial position at index 0.
+ * including the initial position at index 0. Also returns the final
+ * `logProb` so `runHMCChain` can use it for MH acceptance without an
+ * extra evaluation.
+ *
+ * Pure JS — no tensor machinery. Leapfrog calls `gradLogProbFn` twice per
+ * step (half-step momentum, full-step position, half-step momentum) and
+ * reuses the `logProb` returned alongside the gradient.
  */
 export function runHMCLeapfrog(
   pos: Vec2,
   numSteps: number,
   stepSize: number,
-  logProbFn: LogProbFn,
+  gradLogProbFn: GradLogProbFn,
   rng: () => number,
-): Vec2[] {
-  const trajectory: Vec2[] = new Array(numSteps + 1);
-  trajectory[0] = [...pos];
-
-  // Sample random momentum p ~ N(0, I)
+): { trajectory: Vec2[]; finalLogProb: number } {
   const [p0, p1] = boxMuller(rng);
+  const half = stepSize / 2;
 
-  const gradLogProb = tf.grad(logProbFn as (p: tf.Tensor) => tf.Tensor);
+  let x = pos[0];
+  let y = pos[1];
+  let px = p0;
+  let py = p1;
 
-  let [x, y] = pos;
-  let [px, py] = [p0, p1];
+  const trajectory: Vec2[] = new Array(numSteps + 1);
+  trajectory[0] = [x, y];
+
+  let lastLogProb = gradLogProbFn([x, y]).logProb;
 
   for (let step = 0; step < numSteps; step++) {
-    // Half-step in momentum
-    const posTensor = tf.tensor1d([x, y]);
-    const grad = gradLogProb(posTensor);
-    const gradArray = grad.dataSync();
-    px += (stepSize / 2) * gradArray[0];
-    py += (stepSize / 2) * gradArray[1];
-    grad.dispose();
-    posTensor.dispose();
+    // Half-step in momentum: p += (h/2) · ∇log π(x)
+    const g1 = gradLogProbFn([x, y]).grad;
+    px += half * g1[0];
+    py += half * g1[1];
 
-    // Full step in position
+    // Full step in position: x += h · p
     x += stepSize * px;
     y += stepSize * py;
 
-    // Half-step in momentum
-    const posTensor2 = tf.tensor1d([x, y]);
-    const grad2 = gradLogProb(posTensor2);
-    const gradArray2 = grad2.dataSync();
-    px += (stepSize / 2) * gradArray2[0];
-    py += (stepSize / 2) * gradArray2[1];
-    grad2.dispose();
-    posTensor2.dispose();
+    // Half-step in momentum at the new position. Capture logProb here so
+    // the final iteration leaves us with logProb at the end of the trajectory.
+    const r = gradLogProbFn([x, y]);
+    px += half * r.grad[0];
+    py += half * r.grad[1];
+    lastLogProb = r.logProb;
 
     trajectory[step + 1] = [x, y];
   }
 
-  return trajectory;
+  return { trajectory, finalLogProb: lastLogProb };
 }
 
 /**
  * Run the full HMC chain with Metropolis-Hastings acceptance.
  * Each proposal uses leapfrog integration to generate a candidate,
  * which is accepted or rejected via MH ratio based on log-density.
+ *
+ * If `bounds` is supplied, proposals landing outside the box are rejected
+ * outright before the MH ratio is evaluated — visualization-only behavior
+ * to keep the animated chain inside the figure's domain.
  */
 export function runHMCChain(
   initialPos: Vec2,
   numProposals: number,
   leapfrogSteps: number,
   stepSize: number,
-  logProbFn: LogProbFn,
+  gradLogProbFn: GradLogProbFn,
   rng: () => number,
+  bounds?: Bounds,
 ): Vec2[] {
   const result: Vec2[] = [];
-  let currentPos: Vec2 = [...initialPos];
-
-  const posInitTensor = tf.tensor1d(currentPos);
-  let currentLogProb = logProbFn(posInitTensor).dataSync()[0];
-  posInitTensor.dispose();
+  let currentPos: Vec2 = [initialPos[0], initialPos[1]];
+  let currentLogProb = gradLogProbFn(currentPos).logProb;
 
   for (let proposal = 0; proposal < numProposals; proposal++) {
-    const trajectory = runHMCLeapfrog(
+    const { trajectory, finalLogProb } = runHMCLeapfrog(
       currentPos,
       leapfrogSteps,
       stepSize,
-      logProbFn,
+      gradLogProbFn,
       rng,
     );
 
     const proposedPos = trajectory[trajectory.length - 1];
+    const outOfBounds = bounds !== undefined && !inBounds(proposedPos, bounds);
 
-    const proposedTensor = tf.tensor1d(proposedPos);
-    const proposedLogProb = logProbFn(proposedTensor).dataSync()[0];
-    proposedTensor.dispose();
-
-    const logAlpha = proposedLogProb - currentLogProb;
-    const accept = Math.log(rng()) < logAlpha;
-
-    if (accept) {
-      currentPos = proposedPos;
-      currentLogProb = proposedLogProb;
+    if (!outOfBounds) {
+      const logAlpha = finalLogProb - currentLogProb;
+      if (Math.log(rng()) < logAlpha) {
+        currentPos = proposedPos;
+        currentLogProb = finalLogProb;
+      }
     }
 
     for (const pos of trajectory) {

@@ -5,9 +5,11 @@
   import {
     Figure,
     Player,
-    Timeline,
+    TimelineBuilder,
+    createPauseClip,
     useCanvas2D,
     useVisibilityHandler,
+    type Clip,
   } from "@diffusion-explorer/ui";
   import { settings } from "$lib/settings";
 
@@ -64,9 +66,12 @@
 
   type AnimationState = {
     stepIndex: number;
-    phase: "point" | "contour" | "hold" | "blink" | "line" | "fade";
-    phaseAlpha: number;
-    blinkOn: boolean;
+    contourAlpha: number;
+    proposalAlpha: number;
+    lineAlpha: number;
+    lineGrowT: number;
+    fadeToPast: number;
+    showArrow: boolean;
   };
 
   let player: Player<AnimationState> | null = null;
@@ -135,72 +140,118 @@
   // Animations
   // ----------------------------------------------------------------
 
-  // Phase fractions within a single step. They sum to 1.
-  const PHASE_FRACTIONS = {
+  // Per-step phase weights. Scaled by stepDuration to get clip durations
+  // in milliseconds; total per step = stepDuration seconds.
+  const PHASE_WEIGHTS = {
     point: 0.12,
-    contour: 0.20,
+    contour: 0.22,
     hold: 0.10,
     blink: 0.16,
     line: 0.16,
-    fade: 0.26,
+    fade: 0.24,
   } as const;
 
   function setupTimeline(): void {
     const totalSteps = Math.max(1, points.length - 1);
-    const duration = stepDuration * totalSteps;
+    const stepMs = stepDuration * 1000;
+    const ms = (w: number) => Math.max(1, Math.round(stepMs * w));
 
-    const stepClip = {
-      name: "GaussianRandomWalk",
-      reduce(t: number): AnimationState {
-        const float = t * totalSteps;
-        const stepIndex = Math.min(Math.floor(float), totalSteps - 1);
-        const local = float - stepIndex;
-
-        // Walk phases left-to-right within [0,1).
-        let acc = 0;
-        let phase: AnimationState["phase"] = "point";
-        let phaseAlpha = 0;
-        const order: AnimationState["phase"][] = [
-          "point",
-          "contour",
-          "hold",
-          "blink",
-          "line",
-          "fade",
-        ];
-        for (const p of order) {
-          const f = PHASE_FRACTIONS[p];
-          if (local < acc + f) {
-            phase = p;
-            phaseAlpha = f > 0 ? (local - acc) / f : 0;
-            break;
-          }
-          acc += f;
-        }
-
-        // Blink the proposed point during the "blink" phase: 2 off-pulses
-        // across 5 equal slices (on, off, on, off, on) to draw attention to
-        // x' the moment it appears.
-        const blinkOn = phase === "blink"
-          ? Math.floor(phaseAlpha * 5) % 2 === 0
-          : phase === "line" || phase === "fade";
-
-        return { stepIndex, phase, phaseAlpha, blinkOn };
-      },
+    const initialState: AnimationState = {
+      stepIndex: 0,
+      contourAlpha: 0,
+      proposalAlpha: 0,
+      lineAlpha: 0,
+      lineGrowT: 0,
+      fadeToPast: 1,
+      showArrow: false,
     };
 
-    const tl = Timeline.from<AnimationState>({
-      duration,
-      initialState: {
-        stepIndex: 0,
-        phase: "point",
-        phaseAlpha: 0,
-        blinkOn: false,
-      },
-      clips: [{ clip: stepClip, start: 0, end: 1 }],
+    const builder = new TimelineBuilder<AnimationState>().setInitialState({
+      ...initialState,
     });
 
-    player = new Player(tl, { looping: true });
+    for (let i = 0; i < totalSteps; i++) {
+      // Set the active step index and reset per-step envelopes. Instant clip
+      // (1ms) so it lands at the start of every step without consuming
+      // visible time.
+      const setStep: Clip<AnimationState> = {
+        name: `Step${i}/SetIndex`,
+        reduce: () => ({
+          stepIndex: i,
+          contourAlpha: 0,
+          proposalAlpha: 0,
+          lineAlpha: 0,
+          lineGrowT: 0,
+          fadeToPast: 1,
+          showArrow: false,
+        }),
+      };
+      builder.add(setStep, { durationMs: 1 });
+
+      // Anchor: the current point is already on screen — nothing animates
+      // here, but we keep a beat so the eye settles before the contour
+      // appears.
+      builder.add(createPauseClip<AnimationState>(), {
+        durationMs: ms(PHASE_WEIGHTS.point),
+      });
+
+      // Contour grows in around the current point.
+      const contourGrow: Clip<AnimationState> = {
+        name: `Step${i}/ContourGrow`,
+        reduce: (t) => ({ contourAlpha: t }),
+      };
+      builder.add(contourGrow, { durationMs: ms(PHASE_WEIGHTS.contour) });
+
+      // Hold the fully-drawn proposal distribution before x' appears.
+      builder.add(createPauseClip<AnimationState>(), {
+        durationMs: ms(PHASE_WEIGHTS.hold),
+      });
+
+      // Proposed point blinks on/off (on, off, on, off, on) to grab the eye.
+      const proposalBlink: Clip<AnimationState> = {
+        name: `Step${i}/ProposalBlink`,
+        reduce: (t) => ({
+          contourAlpha: 1,
+          proposalAlpha: Math.floor(t * 5) % 2 === 0 ? 1 : 0,
+        }),
+      };
+      builder.add(proposalBlink, { durationMs: ms(PHASE_WEIGHTS.blink) });
+
+      // Connector grows from current to proposed point with arrowhead.
+      const connectorGrow: Clip<AnimationState> = {
+        name: `Step${i}/ConnectorGrow`,
+        reduce: (t) => ({
+          contourAlpha: 1,
+          proposalAlpha: 1,
+          lineAlpha: 1,
+          lineGrowT: t,
+          showArrow: true,
+        }),
+      };
+      builder.add(connectorGrow, { durationMs: ms(PHASE_WEIGHTS.line) });
+
+      // Fade to past: contour fades away; current dot, proposed dot, and
+      // connector all lerp 1 → pastAlpha together. Strip the arrowhead so
+      // the connector lands as a plain line matching past-step appearance.
+      const fadeToPastClip: Clip<AnimationState> = {
+        name: `Step${i}/FadeToPast`,
+        reduce: (t) => {
+          const f = 1 - (1 - pastAlpha) * t;
+          return {
+            contourAlpha: 1 - t,
+            proposalAlpha: f,
+            lineAlpha: f,
+            lineGrowT: 1,
+            fadeToPast: f,
+            showArrow: false,
+          };
+        },
+      };
+      builder.add(fadeToPastClip, { durationMs: ms(PHASE_WEIGHTS.fade) });
+    }
+
+    const timeline = builder.build();
+    player = new Player(timeline, { looping: true });
     player.onTick((_t, state) => draw(state));
   }
 
@@ -223,43 +274,17 @@
     }
 
     // --- Dynamic foreground ---
-    const { stepIndex, phase, phaseAlpha, blinkOn } = state;
+    const {
+      stepIndex,
+      contourAlpha,
+      proposalAlpha,
+      lineAlpha,
+      lineGrowT,
+      fadeToPast,
+      showArrow,
+    } = state;
     const cur = points[stepIndex];
     const next = points[Math.min(stepIndex + 1, points.length - 1)];
-
-    // Contour opacity envelope: ramps in during "contour", full during "blink"+"line",
-    // fades out during "fade".
-    let contourAlpha = 0;
-    if (phase === "contour") contourAlpha = phaseAlpha;
-    else if (phase === "hold" || phase === "blink" || phase === "line") contourAlpha = 1;
-    else if (phase === "fade") contourAlpha = 1 - phaseAlpha;
-
-    // Shared "fade-to-past" envelope: during the "fade" phase, every element
-    // that will become a past-step element on the next tick (current dot,
-    // proposed dot, connector) lerps from 1 → pastAlpha together. Then on
-    // step k+1's first frame the past-loop renders them at pastAlpha, with
-    // no blink at the handoff.
-    const fadeToPast =
-      phase === "fade" ? 1 - (1 - pastAlpha) * phaseAlpha : 1;
-
-    // Proposed point: blinks on/off during "blink" to grab the eye, holds
-    // full opacity during "line", then follows the shared fade-to-past.
-    let proposalAlpha = 0;
-    if (phase === "blink") proposalAlpha = blinkOn ? 1 : 0;
-    else if (phase === "line") proposalAlpha = 1;
-    else if (phase === "fade") proposalAlpha = fadeToPast;
-
-    // Connector: grows once during "line", holds full-length, then follows
-    // the shared fade-to-past envelope.
-    let lineAlpha = 0;
-    let lineGrowT = 0;
-    if (phase === "line") {
-      lineAlpha = 1;
-      lineGrowT = phaseAlpha;
-    } else if (phase === "fade") {
-      lineAlpha = fadeToPast;
-      lineGrowT = 1;
-    }
 
     if (contourAlpha > 0) {
       drawProposalContours(cur.x, cur.y, contourAlpha);
@@ -272,18 +297,12 @@
     }
 
     if (lineAlpha > 0) {
-      // Show the arrowhead only while the line is actively growing toward x';
-      // once it reaches the destination (fade phase), strip the head so the
-      // segment lands as a plain line that matches its past-step appearance.
-      const showArrow = phase === "line";
       drawConnector(cur, next, lineAlpha, lineGrowT, showArrow);
     }
 
-    // Current point — full opacity, then follows the shared fade-to-past.
     drawDot(cur.x, cur.y, pointColor, fadeToPast);
     drawLabel("x", cur.x, cur.y - pointRadius - 10, fadeToPast);
 
-    // Proposed point.
     if (proposalAlpha > 0) {
       drawDot(next.x, next.y, proposalColor, proposalAlpha);
       drawLabel("x'", next.x, next.y - pointRadius - 10, proposalAlpha);
@@ -428,9 +447,12 @@
       setupTimeline();
       draw({
         stepIndex: 0,
-        phase: "point",
-        phaseAlpha: 0,
-        blinkOn: false,
+        contourAlpha: 0,
+        proposalAlpha: 0,
+        lineAlpha: 0,
+        lineGrowT: 0,
+        fadeToPast: 1,
+        showArrow: false,
       });
       player?.play();
     }

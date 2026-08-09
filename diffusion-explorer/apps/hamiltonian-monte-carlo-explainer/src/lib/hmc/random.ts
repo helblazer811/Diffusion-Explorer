@@ -4,6 +4,21 @@
 
 export type Vec2 = [number, number];
 
+/**
+ * Axis-aligned rectangular boundary used for visualization-only rejection
+ * in MCMC/HMC: proposals landing outside the box are rejected outright.
+ */
+export interface Bounds {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
+export function inBounds(p: Vec2, b: Bounds): boolean {
+  return p[0] >= b.xMin && p[0] <= b.xMax && p[1] >= b.yMin && p[1] <= b.yMax;
+}
+
 export function mulberry32(seed: number): () => number {
   let a = seed;
   return function () {
