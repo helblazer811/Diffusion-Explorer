@@ -60,6 +60,22 @@ export interface SpringSolverOptions {
    *           progress over `maxIter` iterations.
    */
   stepSize?: number;
+  /** Optional caller-supplied pairwise rest lengths d_ij. Flat n×n
+   *  Float64Array (row-major) or n×n nested array; only the upper triangle
+   *  is read. When provided, the solver uses these as the target distances
+   *  instead of computing the 2D Euclidean distance between input points
+   *  — useful when the "true" distance is along an intrinsic 1D curve
+   *  (e.g. arclength along a spiral) rather than the ambient embedding. */
+  targetDistances?: ReadonlyArray<ReadonlyArray<number>> | Float64Array;
+  /** Per-spring weight scheme.
+   *  - 'sammon' (default): w_ij = 1/d_ij² — short distances dominate the
+   *    energy, which is mathematically standard but causes a violent first
+   *    few iterations followed by a long tail of barely-visible motion.
+   *  - 'uniform': w_ij = 1 — every spring contributes equally. The
+   *    relaxation paces evenly across iterations, which reads better as
+   *    a "spring system slowly settling" animation.
+   */
+  weights?: 'sammon' | 'uniform';
 }
 
 export function solveSpringSystem1D(
@@ -73,21 +89,36 @@ export function solveSpringSystem1D(
     rng = Math.random,
     init,
     stepSize = method === 'gradient' ? 1e-4 : 1.0,
+    targetDistances,
+    weights = 'sammon',
   } = options;
   const n = points.length;
 
   // Pairwise target distances + Sammon weights. Stored as flat n×n arrays
-  // for tight inner loops.
+  // for tight inner loops. If `targetDistances` is supplied we use it as-is
+  // (the caller knows the intrinsic geometry); otherwise we fall back to
+  // the 2D Euclidean distance between input points.
   const D = new Float64Array(n * n);
   const W = new Float64Array(n * n);
   let wSumTotal = 0;
+  const readTarget = targetDistances
+    ? (targetDistances instanceof Float64Array
+        ? (i: number, j: number) => (targetDistances as Float64Array)[i * n + j]
+        : (i: number, j: number) =>
+            (targetDistances as ReadonlyArray<ReadonlyArray<number>>)[i][j])
+    : null;
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      const dx = points[i][0] - points[j][0];
-      const dy = points[i][1] - points[j][1];
-      const d = Math.hypot(dx, dy);
+      let d: number;
+      if (readTarget) {
+        d = readTarget(i, j);
+      } else {
+        const dx = points[i][0] - points[j][0];
+        const dy = points[i][1] - points[j][1];
+        d = Math.hypot(dx, dy);
+      }
       const dEps = Math.max(d, 1e-6);
-      const w = 1 / (dEps * dEps);
+      const w = weights === 'uniform' ? 1 : 1 / (dEps * dEps);
       D[i * n + j] = d;
       D[j * n + i] = d;
       W[i * n + j] = w;
@@ -178,6 +209,194 @@ export function solveSpringSystem1D(
 
     if (Math.abs(prev - stress) / Math.max(prev, 1e-12) < tol) break;
     prev = stress;
+  }
+
+  return { trajectory, stressTrace };
+}
+
+// ============================================================================
+// 2D heavy-ball variant.
+//
+// The 1D solver above is a pure first-order method: each step strictly
+// decreases the energy. That's the wrong physics if you want the points to
+// behave like an actual spring system that overshoots its rest length and
+// oscillates as it relaxes. Heavy-ball momentum gets the dynamics right
+// with one extra term:
+//   v_{k+1} = γ · v_k − η · ∇E(x_k)
+//   x_{k+1} = x_k + v_{k+1}
+// γ ∈ [0, 1) is the velocity retention (1 − damping). γ near 1 = lightly
+// damped (rings out for many iterations); γ ≈ 0 collapses to plain
+// gradient descent.
+//
+// We also drive points toward a target line y = collapseY via a per-point
+// linear pull k_y · (collapseY − y). This is a separate spring on each
+// point's y-coordinate, NOT part of the pairwise energy, so it doesn't
+// disturb the in-line geometry — it just slowly compresses the cloud onto
+// the line over the course of the run.
+// ============================================================================
+
+export interface SpringSolver2DResult {
+  /** Point cloud at each iteration. trajectory[k][i] = [x, y] of point i
+   *  at iteration k. */
+  trajectory: [number, number][][];
+  /** Energy at each iteration (same definition as σ above, computed in
+   *  2D from |X_i − X_j|). */
+  stressTrace: number[];
+}
+
+export interface SpringSolver2DOptions {
+  /** Iteration cap. Default 800. */
+  maxIter?: number;
+  /** Energy-change tolerance for early termination. Default 0 (run to cap),
+   *  because for an oscillating system the energy is non-monotonic and
+   *  ratio-based stopping criteria don't apply. */
+  tol?: number;
+  /** RNG used for tie-breaking jitter. */
+  rng?: () => number;
+  /** Initial 2D positions. Defaults to the input `points`. */
+  init?: ReadonlyArray<readonly [number, number]>;
+  /** Learning rate η on the spring force. Default 1e-5. */
+  stepSize?: number;
+  /** Momentum coefficient γ ∈ [0, 1). Default 0.92 — visibly oscillates
+   *  but eventually settles within ~hundreds of iterations. */
+  momentum?: number;
+  /** Per-step pull strength toward `collapseY` along y, applied as
+   *  v_y += k_y · (collapseY − y). Default 5e-4. The animation is more
+   *  legible when this is small enough that y oscillation persists for
+   *  many iterations. */
+  collapseStrength?: number;
+  /** Target y-coordinate every point eventually settles onto. */
+  collapseY?: number;
+  /** Pairwise rest lengths. Same shape as the 1D solver's option. */
+  targetDistances?: ReadonlyArray<ReadonlyArray<number>> | Float64Array;
+  /** Per-spring weight scheme. Same as the 1D solver's option. */
+  weights?: 'sammon' | 'uniform';
+}
+
+export function solveSpringSystem2D(
+  points: ReadonlyArray<readonly [number, number]>,
+  options: SpringSolver2DOptions = {},
+): SpringSolver2DResult {
+  const {
+    maxIter = 800,
+    tol = 0,
+    rng = Math.random,
+    init,
+    stepSize = 1e-5,
+    momentum = 0.92,
+    collapseStrength = 5e-4,
+    collapseY = 0,
+    targetDistances,
+    weights = 'uniform',
+  } = options;
+  const n = points.length;
+
+  const D = new Float64Array(n * n);
+  const W = new Float64Array(n * n);
+  let wSumTotal = 0;
+  const readTarget = targetDistances
+    ? (targetDistances instanceof Float64Array
+        ? (i: number, j: number) => (targetDistances as Float64Array)[i * n + j]
+        : (i: number, j: number) =>
+            (targetDistances as ReadonlyArray<ReadonlyArray<number>>)[i][j])
+    : null;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      let d: number;
+      if (readTarget) {
+        d = readTarget(i, j);
+      } else {
+        const dx = points[i][0] - points[j][0];
+        const dy = points[i][1] - points[j][1];
+        d = Math.hypot(dx, dy);
+      }
+      const dEps = Math.max(d, 1e-6);
+      const w = weights === 'uniform' ? 1 : 1 / (dEps * dEps);
+      D[i * n + j] = d;
+      D[j * n + i] = d;
+      W[i * n + j] = w;
+      W[j * n + i] = w;
+      wSumTotal += 2 * w;
+    }
+  }
+
+  const X = new Float64Array(n);
+  const Y = new Float64Array(n);
+  const VX = new Float64Array(n);
+  const VY = new Float64Array(n);
+  const seed = init ?? points;
+  for (let i = 0; i < n; i++) {
+    X[i] = seed[i][0] + 1e-3 * (rng() - 0.5);
+    Y[i] = seed[i][1] + 1e-3 * (rng() - 0.5);
+  }
+
+  function stressOf(): number {
+    let s = 0;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const dx = X[i] - X[j];
+        const dy = Y[i] - Y[j];
+        const r = Math.hypot(dx, dy) - D[i * n + j];
+        s += W[i * n + j] * r * r;
+      }
+    }
+    return s / wSumTotal;
+  }
+
+  const trajectory: [number, number][][] = [];
+  const stressTrace: number[] = [];
+  function snapshot() {
+    const frame: [number, number][] = new Array(n);
+    for (let i = 0; i < n; i++) frame[i] = [X[i], Y[i]];
+    trajectory.push(frame);
+    stressTrace.push(stressOf());
+  }
+  snapshot();
+
+  let prev = stressTrace[0];
+  for (let it = 0; it < maxIter; it++) {
+    // Compute spring forces (negative gradient of the pairwise energy).
+    // Force on i from j is along the unit vector from j to i, magnitude
+    // 2·w·(|x_i − x_j| − d_ij). We accumulate Δv per point first so we
+    // don't bias later points within the iteration.
+    const dvx = new Float64Array(n);
+    const dvy = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let fx = 0;
+      let fy = 0;
+      const xi = X[i];
+      const yi = Y[i];
+      for (let j = 0; j < n; j++) {
+        if (j === i) continue;
+        const dx = xi - X[j];
+        const dy = yi - Y[j];
+        const len = Math.hypot(dx, dy);
+        if (len < 1e-12) continue;
+        const w = W[i * n + j];
+        const ext = len - D[i * n + j];
+        const k = 2 * w * ext / len; // shared scalar for the unit vector
+        fx += k * dx;
+        fy += k * dy;
+      }
+      // Negative gradient → minus sign on the accumulated force above.
+      dvx[i] = -stepSize * fx;
+      dvy[i] = -stepSize * fy;
+    }
+    // Heavy-ball update + soft attractor on y.
+    for (let i = 0; i < n; i++) {
+      VX[i] = momentum * VX[i] + dvx[i];
+      VY[i] =
+        momentum * VY[i] + dvy[i] + collapseStrength * (collapseY - Y[i]);
+      X[i] += VX[i];
+      Y[i] += VY[i];
+    }
+    snapshot();
+
+    if (tol > 0) {
+      const cur = stressTrace[stressTrace.length - 1];
+      if (Math.abs(prev - cur) / Math.max(prev, 1e-12) < tol) break;
+      prev = cur;
+    }
   }
 
   return { trajectory, stressTrace };

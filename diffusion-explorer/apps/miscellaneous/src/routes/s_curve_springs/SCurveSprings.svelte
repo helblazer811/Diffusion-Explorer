@@ -1,5 +1,11 @@
-<!-- Sketch figure: viridis-colored S-curve scatter, then highlight one point and
-     draw springs to its neighbors while energy decays on a side panel. -->
+<!-- Sketch figure: dimensionality reduction as solving a spring system.
+     The `dataset` prop selects what's rolled up:
+       'crumpled-patch' — a 2D lattice deformed into a wrinkled blob; the
+                          springs un-crumple toward an intrinsic 2D layout.
+       'spiral'         — a 1D Archimedean curve rolled up in 2D; the
+                          springs unroll it into a straight line.
+     In both cases the cloud highlights a point, shows springs to its
+     neighbors, and plots the spring-system stress as it relaxes. -->
 
 <script lang="ts">
   import { onDestroy } from "svelte";
@@ -14,7 +20,7 @@
     useCanvas2D,
     useVisibilityHandler,
   } from "@diffusion-explorer/ui";
-  import { solveSpringSystem1D } from "./spring_solver";
+  import { solveSpringSystem1D, solveSpringSystem2D } from "./spring_solver";
 
   // ----------------------------------------------------------------
   // Props
@@ -28,11 +34,23 @@
   export let energyPanelGap = 22;     // gap between scatter region and energy strip
   export let energyBottomLabelSpace = 50; // extra space under the strip for the x-axis label
 
-  export let numPoints = 200;
-  export let noiseSigma = 0.045;         // gaussian perturbation in normalized data units
+  // Which dataset is rolled up underneath the spring system.
+  //   'crumpled-patch' — 2D lattice → un-crumpled 2D layout
+  //   'spiral'         — 1D Archimedean curve → unrolled 1D line
+  export let dataset: 'crumpled-patch' | 'spiral' = 'crumpled-patch';
+
+  export let numPoints = 400;
+  // Noise magnitude in normalized data units. For 'crumpled-patch' this is
+  // 2D Gaussian perturbation; for 'spiral' it's perpendicular-to-curve only.
+  export let noiseSigma = 0.045;
+
+  // Spiral-only knobs.
+  export let spiralTurns = 2.5;          // number of turns of the Archimedean spiral
+  export let spiralInnerRadius = 0.08;   // r at s=0
+  export let spiralOuterRadius = 1.15;   // r at s=1
 
   export let springCount = 3;            // springs from the highlighted point
-  export let springNotches = 8;          // default zigzag count per spring
+  export let springNotches = 16;         // default zigzag count per spring
   export let springNotchesPerSpring: number[] | null = null;
 
   export let seed = 7;
@@ -49,8 +67,22 @@
 
   let isInitialized = false;
 
-  // Computed once in runInitialComputation
-  type Sample = { x: number; y: number; t: number };
+  // Computed once in runInitialComputation. The intrinsic-coord field set
+  // depends on `dataset`:
+  //   'crumpled-patch' → (u, v) ∈ [-1, 1]² (2D intrinsic). Pairwise (u, v)
+  //                      Euclidean distances are the spring rest lengths.
+  //   'spiral'         → s ∈ [0, 1] (1D arclength fraction). Pairwise |s_i − s_j|
+  //                      are the spring rest lengths — springs unroll the curve.
+  // x, y is always the displayed 2D position (with noise), and t ∈ [0, 1]
+  // is the per-point parameterization used for viridis color.
+  type Sample = {
+    x: number;
+    y: number;
+    t: number;
+    u?: number;
+    v?: number;
+    s?: number;
+  };
   let samples: Sample[] = [];
   let pointPixels: [number, number][] = [];        // original 2D pixel positions
   // SMACOF trajectory in pixel space. trajectoryPixels[k][i] = [x, y] of point i
@@ -62,6 +94,10 @@
   let colors: string[] = [];
   let highlightIdx = 0;
   let springTargets: number[] = [];
+  // Per-spring notch counts. Derived from each spring's rest length so that
+  // notch spacing (rest length / notch count) is constant across springs;
+  // at rest every spring then has the same spatial frequency.
+  let springNotchCounts: number[] = [];
   let stressTrace: number[] = [];                  // real SMACOF stress per iteration
 
   type AnimationState = {
@@ -140,11 +176,77 @@
     return x * x * (3 - 2 * x);
   }
 
-  // Analytic S-curve, t ∈ [0, 1] → (x, y) in approximately [-1, 1]^2.
-  function sCurve(t: number): [number, number] {
-    const x = lerp(-1, 1, t);
-    const y = Math.sin(Math.PI * (2 * t - 1));
-    return [x, y];
+  // 2D-patch dataset: each point has intrinsic (u, v) ∈ [-1, 1]² on a
+  // flat patch. The patch is crumpled by a smooth radius-dependent
+  // rotation so that pairwise (u, v) distances no longer match the
+  // displayed (x, y) distances. With `crumpleStrength = 0` it's the
+  // identity. The springs (rest length = (u, v) distance) then pull the
+  // crumpled cloud back toward an un-crumpled lattice.
+  const crumpleStrength = 0.9;
+  const crumpleFreq = 1.6;
+  function crumple(u: number, v: number): [number, number] {
+    const r = Math.hypot(u, v);
+    const theta = crumpleStrength * Math.sin(crumpleFreq * Math.PI * r);
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    return [c * u - s * v, s * u + c * v];
+  }
+
+  // 1D-curve dataset: every point has an intrinsic 1D coordinate
+  // s ∈ [0, 1] (fractional arclength along the spiral). The spiral is an
+  // Archimedean curve r(θ) = a + b·θ rolled up in 2D. Spring rest lengths
+  // are |s_i − s_j| · pxSpan, so the springs are trying to UNROLL the
+  // spiral into a straight 1D line — a task that's actually achievable
+  // (the intrinsic geometry is genuinely 1D), so the final stress
+  // approaches zero rather than plateauing.
+  //
+  // Sampling is uniform in arclength (not in θ), so points are evenly
+  // spaced along the curve regardless of how tight the inner turns are.
+  // For an Archimedean spiral, arclength as a function of θ is
+  //   L(θ) = (1/2) · b · [θ·√(1+θ²) + asinh(θ)]   (with a=0)
+  // We use a numerical inversion (precomputed lookup) so we don't need
+  // to solve transcendentals at sample time.
+  function buildSpiralArcInverter(
+    a: number,
+    b: number,
+    thetaMax: number,
+    samples: number,
+  ): (sFrac: number) => number {
+    // Tabulate (θ, arclength) pairs by trapezoidal integration of
+    // ds/dθ = √(r² + (dr/dθ)²) = √((a + b·θ)² + b²).
+    const thetas = new Float64Array(samples + 1);
+    const arcs = new Float64Array(samples + 1);
+    let acc = 0;
+    thetas[0] = 0;
+    arcs[0] = 0;
+    let prevDs = Math.hypot(a, b);
+    for (let i = 1; i <= samples; i++) {
+      const th = (i / samples) * thetaMax;
+      const r = a + b * th;
+      const ds = Math.hypot(r, b);
+      acc += 0.5 * (prevDs + ds) * (thetaMax / samples);
+      thetas[i] = th;
+      arcs[i] = acc;
+      prevDs = ds;
+    }
+    const total = arcs[samples] || 1;
+    // Returns the θ corresponding to the given fractional arclength.
+    return (sFrac: number) => {
+      const target = sFrac * total;
+      // Binary search arcs[] for `target`.
+      let lo = 0;
+      let hi = samples;
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (arcs[mid] < target) lo = mid + 1;
+        else hi = mid;
+      }
+      if (lo === 0) return thetas[0];
+      const a0 = arcs[lo - 1];
+      const a1 = arcs[lo];
+      const t = a1 > a0 ? (target - a0) / (a1 - a0) : 0;
+      return thetas[lo - 1] + t * (thetas[lo] - thetas[lo - 1]);
+    };
   }
 
   // Spring renderer: straight notch → zigzag → straight notch → connect.
@@ -224,56 +326,122 @@
   function runInitialComputation() {
     const rng = mulberry32(seed);
 
-    // 1. Sample points along the S with Gaussian perturbation.
+    // ---- 1. Sample generation (dataset-specific) -----------------------
     samples = [];
-    for (let i = 0; i < numPoints; i++) {
-      const t = rng();
-      const [cx, cy] = sCurve(t);
-      samples.push({
-        x: cx + noiseSigma * randNormal(rng),
-        y: cy + noiseSigma * randNormal(rng),
-        t,
-      });
+    let dataDomain: [number, number];
+    if (dataset === 'spiral') {
+      // Sample uniformly in arclength along an Archimedean spiral
+      //   r(θ) = innerR + b·θ
+      // and add Gaussian noise PERPENDICULAR to the curve (so the noise
+      // reads as thickness rather than radial wobble). Each sample stores
+      // its intrinsic 1D coord s ∈ [0, 1] and the displayed (x, y).
+      const thetaMax = spiralTurns * 2 * Math.PI;
+      const a = spiralInnerRadius;
+      const b = (spiralOuterRadius - spiralInnerRadius) / thetaMax;
+      const arcInv = buildSpiralArcInverter(a, b, thetaMax, 4096);
+      // Spiral-perpendicular noise reads as line thickness; reuse a
+      // smaller default if the caller hasn't overridden it.
+      const sigma = noiseSigma;
+      for (let i = 0; i < numPoints; i++) {
+        const sFrac = (i + 0.5) / numPoints;
+        const theta = arcInv(sFrac);
+        const r = a + b * theta;
+        const cx = r * Math.cos(theta);
+        const cy = r * Math.sin(theta);
+        const dxdth = b * Math.cos(theta) - r * Math.sin(theta);
+        const dydth = b * Math.sin(theta) + r * Math.cos(theta);
+        const tlen = Math.hypot(dxdth, dydth) || 1;
+        const nx = -dydth / tlen;
+        const ny = dxdth / tlen;
+        const noise = sigma * randNormal(rng);
+        samples.push({
+          x: cx + nx * noise,
+          y: cy + ny * noise,
+          s: sFrac,
+          t: sFrac,
+        });
+      }
+      const dom = spiralOuterRadius * 1.15;
+      dataDomain = [-dom, dom];
+    } else {
+      // 2D-patch dataset: regular g × g lattice on (u, v) ∈ [-1, 1]²,
+      // crumpled into displayed (x, y), with isotropic 2D Gaussian noise.
+      // numPoints is a soft target — we use g² where g = round(√n).
+      const grid = Math.max(2, Math.round(Math.sqrt(numPoints)));
+      const total = grid * grid;
+      for (let gi = 0; gi < grid; gi++) {
+        for (let gj = 0; gj < grid; gj++) {
+          const u = grid === 1 ? 0 : (2 * gi) / (grid - 1) - 1;
+          const v = grid === 1 ? 0 : (2 * gj) / (grid - 1) - 1;
+          const [cx, cy] = crumple(u, v);
+          samples.push({
+            x: cx + noiseSigma * randNormal(rng),
+            y: cy + noiseSigma * randNormal(rng),
+            u,
+            v,
+            t: (u + 1) / 2, // color is a 1-D gradient along intrinsic u
+          });
+        }
+      }
+      numPoints = total;
+      dataDomain = [-1.3, 1.3];
     }
 
-    // 2. Pixel scaling onto the scatter region (top of the canvas).
-    const xDomain: [number, number] = [-1.3, 1.3];
-    const yDomain: [number, number] = [-1.3, 1.3];
+    // ---- 2. Pixel scaling onto the scatter region ----------------------
     const xScale = (x: number) =>
       marginWidth +
-      ((x - xDomain[0]) / (xDomain[1] - xDomain[0])) * (width - 2 * marginWidth);
+      ((x - dataDomain[0]) / (dataDomain[1] - dataDomain[0])) *
+        (width - 2 * marginWidth);
     const yScale = (y: number) =>
       scatterBottom -
-      ((y - yDomain[0]) / (yDomain[1] - yDomain[0])) * (scatterBottom - marginHeight);
-
+      ((y - dataDomain[0]) / (dataDomain[1] - dataDomain[0])) *
+        (scatterBottom - marginHeight);
     pointPixels = samples.map((p) => [xScale(p.x), yScale(p.y)]);
 
-    // 3. Per-point viridis color from arclength fraction.
+    // ---- 3. Color (viridis along the per-sample t) ---------------------
     colors = samples.map((p) => interpolateViridis(p.t));
 
-    // 4. Highlight: pick the sample closest to the middle of the S.
-    let bestT = Infinity;
-    for (let i = 0; i < samples.length; i++) {
-      const d = Math.abs(samples[i].t - 0.5);
-      if (d < bestT) {
-        bestT = d;
-        highlightIdx = i;
+    // ---- 4. Highlight selection (dataset-specific) ---------------------
+    if (dataset === 'spiral') {
+      // Middle of arclength. Index ordering already follows s since we
+      // sampled uniformly in s.
+      highlightIdx = Math.floor(samples.length / 2);
+    } else {
+      // Sample closest to the patch's intrinsic center (u = v = 0).
+      let bestUV = Infinity;
+      for (let i = 0; i < samples.length; i++) {
+        const d = Math.hypot(samples[i].u ?? 0, samples[i].v ?? 0);
+        if (d < bestUV) {
+          bestUV = d;
+          highlightIdx = i;
+        }
       }
     }
 
-    // 5. Spring targets: pick FAR points (top 40% by distance from the
-    //    highlight), then fan them out by angle so the springs don't bunch.
+    // ---- 5. Spring targets -------------------------------------------
+    // Pick "far" candidates by INTRINSIC distance (so the dramatic, long-
+    // rest-length springs get drawn) then fan by display-space angle
+    // so the springs don't visually bunch.
     const [hx, hy] = pointPixels[highlightIdx];
-    const candidates: { idx: number; dist: number; angle: number }[] = [];
+    const intrinsicDist = (i: number, j: number): number => {
+      if (dataset === 'spiral') {
+        return Math.abs((samples[i].s ?? 0) - (samples[j].s ?? 0));
+      }
+      const du = (samples[i].u ?? 0) - (samples[j].u ?? 0);
+      const dv = (samples[i].v ?? 0) - (samples[j].v ?? 0);
+      return Math.hypot(du, dv);
+    };
+    const candidates: { idx: number; dIntrinsic: number; angle: number }[] = [];
     for (let i = 0; i < pointPixels.length; i++) {
       if (i === highlightIdx) continue;
       const [px, py] = pointPixels[i];
-      const dx = px - hx;
-      const dy = py - hy;
-      const dist = Math.hypot(dx, dy);
-      candidates.push({ idx: i, dist, angle: Math.atan2(dy, dx) });
+      candidates.push({
+        idx: i,
+        dIntrinsic: intrinsicDist(highlightIdx, i),
+        angle: Math.atan2(py - hy, px - hx),
+      });
     }
-    candidates.sort((a, b) => b.dist - a.dist); // farthest first
+    candidates.sort((a, b) => b.dIntrinsic - a.dIntrinsic);
     const farPool = candidates.slice(
       0,
       Math.max(springCount, Math.floor(candidates.length * 0.4)),
@@ -287,47 +455,163 @@
       }
     }
 
-    // 6. Run SMACOF on the original 2D pixel cloud to project to 1D.
-    //    Capture the full per-iteration trajectory + stress trace so the
-    //    animation can replay the optimization.
-    const result = solveSpringSystem1D(
-      pointPixels.map((p) => [p[0], p[1]] as [number, number]),
-      {
-        method: 'gradient',
-        rng,
-        maxIter: 600,
-        tol: 1e-7,
-        stepSize: 2.5,
-      },
+    // ---- 6. Pairwise rest lengths (dataset-specific) ------------------
+    // Rest lengths are pairwise distances on the INTRINSIC manifold
+    // (1D arclength for the spiral, 2D (u,v) for the patch), rescaled
+    // to pixel units so spring magnitudes are commensurate with the
+    // canvas. Two points that are near in display space but far on the
+    // intrinsic manifold get a long spring — that's what drives the
+    // un-crumpling / unrolling.
+    const xPx = pointPixels.map((p) => p[0]);
+    const yPx = pointPixels.map((p) => p[1]);
+    const pxSpanX = Math.max(...xPx) - Math.min(...xPx);
+    const pxSpan = Math.hypot(
+      pxSpanX,
+      Math.max(...yPx) - Math.min(...yPx),
     );
-    stressTrace = result.stressTrace;
-
-    // Convert each iteration's 1D coordinates into pixel-space (x, y) pairs.
-    // The 1D embedding x's come straight out of SMACOF (already in pixel
-    // units since we fed it pixel-space points). Center and rescale to the
-    // scatter region's full width so the line is visible end-to-end. y is
-    // pinned to `collapseY` for every iteration EXCEPT iteration 0, which
-    // we override to the original 2D positions so the animation has somewhere
-    // to start (otherwise frame 0 would already look like a horizontal line).
-    let minX = Infinity;
-    let maxX = -Infinity;
-    const lastIter = result.trajectory[result.trajectory.length - 1];
-    for (const v of lastIter) {
-      if (v < minX) minX = v;
-      if (v > maxX) maxX = v;
+    const intrinsicScale =
+      dataset === 'spiral'
+        ? pxSpanX             // s ∈ [0, 1] → fill the scatter width when unrolled
+        : pxSpan / (2 * Math.SQRT2); // (u, v) ∈ [-1, 1]² → pxSpan on the diagonal
+    const targetD = new Float64Array(numPoints * numPoints);
+    for (let i = 0; i < numPoints; i++) {
+      for (let j = i + 1; j < numPoints; j++) {
+        const d = intrinsicDist(i, j) * intrinsicScale;
+        targetD[i * numPoints + j] = d;
+        targetD[j * numPoints + i] = d;
+      }
     }
-    const targetLeft = scatterLeft + 20;
-    const targetRight = scatterRight - 20;
-    const span = Math.max(maxX - minX, 1e-6);
-    const remap = (v: number) =>
-      targetLeft + ((v - minX) / span) * (targetRight - targetLeft);
 
-    trajectoryPixels = result.trajectory.map((iter, k) =>
-      iter.map<[number, number]>((v, i) => {
-        if (k === 0) return [pointPixels[i][0], pointPixels[i][1]];
-        return [remap(v), collapseY];
-      }),
+    // ---- 6b. Per-spring notch counts ---------------------------------
+    // Pick spacing so the median spring lands on `springNotches` notches;
+    // longer springs get proportionally more notches at rest. This keeps
+    // notch spacing visually constant across the drawn springs.
+    const springRest = springTargets.map(
+      (idx) => targetD[highlightIdx * numPoints + idx],
     );
+    const sortedRest = [...springRest].sort((a, b) => a - b);
+    const medianRest =
+      sortedRest.length === 0
+        ? 1
+        : sortedRest[Math.floor(sortedRest.length / 2)] || 1;
+    const notchSpacing = medianRest / Math.max(springNotches, 1);
+    springNotchCounts = springRest.map((d) =>
+      Math.max(1, Math.round(d / Math.max(notchSpacing, 1e-9))),
+    );
+
+    // ---- 7. Solve the spring system (dataset-specific) ----------------
+    if (dataset === 'spiral') {
+      // 1D gradient descent: the springs unroll the spiral to a straight
+      // line. The intrinsic geometry is genuinely 1D, so the final stress
+      // approaches zero rather than plateauing.
+      const result = solveSpringSystem1D(
+        pointPixels.map((p) => [p[0], p[1]] as [number, number]),
+        {
+          rng,
+          method: 'gradient',
+          maxIter: 400,
+          stepSize: 4e-5,
+          weights: 'uniform',
+          targetDistances: targetD,
+        },
+      );
+      stressTrace = result.stressTrace;
+
+      // Lift the 1D trajectory to 2D pixel frames: each frame blends
+      // between the spiral (frame 0) and the unrolled line (final frame,
+      // y = collapseY). The 1D solver's converged coordinate sets x;
+      // y eases from spiral-y down to collapseY.
+      const T = result.trajectory.length;
+      const final1D = result.trajectory[T - 1];
+      let minX1 = Infinity;
+      let maxX1 = -Infinity;
+      for (const v of final1D) {
+        if (v < minX1) minX1 = v;
+        if (v > maxX1) maxX1 = v;
+      }
+      const span1D = Math.max(maxX1 - minX1, 1e-6);
+      const targetLeft = scatterLeft + 20;
+      const targetRight = scatterRight - 20;
+      const cxDst = (targetLeft + targetRight) / 2;
+      const cxSrc = (minX1 + maxX1) / 2;
+      const widthScale = (targetRight - targetLeft) / span1D;
+      const lineXOf = (v: number) => cxDst + (v - cxSrc) * widthScale;
+
+      trajectoryPixels = result.trajectory.map((iter, k) => {
+        const progress = T <= 1 ? 0 : k / (T - 1);
+        const ease = smoothstep(progress);
+        return iter.map<[number, number]>((v, i) => {
+          const lineX = lineXOf(v);
+          const sx = pointPixels[i][0];
+          const sy = pointPixels[i][1];
+          return [
+            sx + (lineX - sx) * ease,
+            sy + (collapseY - sy) * ease,
+          ];
+        });
+      });
+    } else {
+      // 2D heavy-ball (momentum) gradient descent — physically faithful
+      // springs that ring out as they relax. No y-attractor: the
+      // intrinsic (u, v) distances ARE 2D, so the cloud should land in a
+      // 2D un-crumpled lattice rather than collapse to a line. Tuned
+      // (γ=0.99, η=4e-6) for visible overshoot + ringing rather than
+      // a smooth monotonic relaxation.
+      const result = solveSpringSystem2D(
+        pointPixels.map((p) => [p[0], p[1]] as [number, number]),
+        {
+          rng,
+          maxIter: 800,
+          stepSize: 4e-6,
+          momentum: 0.99,
+          collapseStrength: 0,
+          collapseY,
+          weights: 'uniform',
+          targetDistances: targetD,
+        },
+      );
+      stressTrace = result.stressTrace;
+
+      // Uniform affine remap so the FINAL frame's bounding box fits in
+      // the scatter region with aspect ratio preserved (otherwise an
+      // un-crumpled square patch reads stretched).
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      const lastIter = result.trajectory[result.trajectory.length - 1];
+      for (const [x, y] of lastIter) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+      const xSpan = Math.max(maxX - minX, 1e-6);
+      const ySpan = Math.max(maxY - minY, 1e-6);
+      const targetLeft = scatterLeft + 20;
+      const targetRight = scatterRight - 20;
+      const targetTop = marginHeight + 20;
+      const targetBottom = scatterBottom - 20;
+      const scale = Math.min(
+        (targetRight - targetLeft) / xSpan,
+        (targetBottom - targetTop) / ySpan,
+      );
+      const cxSrc = (minX + maxX) / 2;
+      const cySrc = (minY + maxY) / 2;
+      const cxDst = (targetLeft + targetRight) / 2;
+      const cyDst = (targetTop + targetBottom) / 2;
+      const remap = (x: number, y: number): [number, number] => [
+        cxDst + (x - cxSrc) * scale,
+        cyDst + (y - cySrc) * scale,
+      ];
+
+      trajectoryPixels = result.trajectory.map((iter, k) => {
+        if (k === 0) {
+          return iter.map<[number, number]>(
+            (_p, i) => [pointPixels[i][0], pointPixels[i][1]],
+          );
+        }
+        return iter.map<[number, number]>(([x, y]) => remap(x, y));
+      });
+    }
   }
 
   // ----------------------------------------------------------------
@@ -400,11 +684,14 @@
         {
           name: "DrawEnergy",
           reduce(t) {
-            return { energyProgress: t };
+            // Match `compress`'s smoothstep so the leading edge of the
+            // stress curve and the marker dot stay in lockstep with the
+            // points easing into 1D.
+            return { energyProgress: smoothstep(t) };
           },
         },
       ],
-      { durationMs: 2600 },
+      { durationMs: 5200 },
     );
     builder.add(createPauseClip(), { durationMs: 1500 });
 
@@ -456,6 +743,11 @@
   // Drawing
   // ----------------------------------------------------------------
 
+  // Spring endpoints (the highlight + the targets we draw springs to) stay
+  // at full opacity even when the rest of the cloud dims, so the visible
+  // springs read clearly.
+  $: springEndpointSet = new Set<number>([highlightIdx, ...springTargets]);
+
   function drawScatter(state: AnimationState) {
     if (!ctx) return;
     const appear = state.pointsAppear;
@@ -463,7 +755,8 @@
     for (let i = 0; i < pointPixels.length; i++) {
       const [px, py] = pointAt(i, state.compress);
       const isHighlight = i === highlightIdx;
-      const alpha = appear * (isHighlight ? 1 : state.dimAlpha);
+      const isSpringEndpoint = springEndpointSet.has(i);
+      const alpha = appear * (isSpringEndpoint ? 1 : state.dimAlpha);
       if (alpha <= 0.001) continue;
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -496,8 +789,11 @@
     for (let k = 0; k < springTargets.length; k++) {
       const tgt = springTargets[k];
       const [tx, ty] = pointAt(tgt, state.compress);
+      // Prop override > rest-length-derived count > flat default.
       const notches =
-        (springNotchesPerSpring && springNotchesPerSpring[k]) || springNotches;
+        (springNotchesPerSpring && springNotchesPerSpring[k]) ||
+        springNotchCounts[k] ||
+        springNotches;
       drawSpring(
         ctx,
         hx,
