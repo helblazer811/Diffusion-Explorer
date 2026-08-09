@@ -27,7 +27,7 @@
 	import InformationFlowFigure from './figures/InformationFlowFigure.svelte';
 	import CausalLanguageModelingFigure from './figures/CausalLanguageModelingFigure.svelte';
 	import CausalAttentionFigure from './figures/CausalAttentionFigure.svelte';
-	import DualRoleHiddenStatesFigure from './figures/DualRoleHiddenStatesFigure.svelte';
+	import DualRoleFigure from './figures/DualRoleFigure.svelte';
 	import KVCacheFigure from './figures/KVCacheFigure.svelte';
 	import RepresentationRippleFigure from './figures/RepresentationRippleFigure.svelte';
 	import BlockDiffusionFigure from './figures/BlockDiffusionFigure.svelte';
@@ -637,19 +637,24 @@
 
 <Figure backgroundVisible={false} isActive={dualRoleActive}>
 	{#snippet children()}
-		<DualRoleHiddenStatesFigure isActive={dualRoleActive} />
+		<DualRoleFigure
+			isActive={dualRoleActive}
+			maskColor={MASK_COLOR}
+			maskTextColor={MASK_TEXT_COLOR}
+		/>
 	{/snippet}
 	{#snippet caption()}
 		<span class="figure-number">Figure 4.</span> The dual role of a
-		hidden state in a causal transformer. Left: the model is predicting
-		<em>x<sub>3</sub></em>; the top-of-column-3 hidden state is read up
-		through the unembedding as logits for the next token &mdash; the
-		<em>belief</em> role. Right: the model has advanced and is now
-		predicting <em>x<sub>5</sub></em>; the K and V projections of the
-		<em>same</em> hidden state at position 3, at every attention layer,
-		are read by the query at position 5 as durable context &mdash; the
-		<em>content</em> role. Belief lives one decode step; content lives
-		for the rest of the sequence, but the KV cache freezes both.
+		hidden state in a causal transformer. The same 2-layer stack is drawn
+		twice, both panels focused on the hidden state at position 3.
+		<em>Left (Belief):</em> the top-of-column-3 hidden state is read
+		<em>up</em> through the unembedding as a distribution over the next
+		token &mdash; a role that dies the moment <em>x<sub>3</sub></em> is
+		sampled. <em>Right (Content):</em> the K and V projections at column
+		3, at every attention layer, are read <em>right</em> by every
+		subsequent query as durable context about what sits at position 3.
+		Belief lives one decode step; content lives for the rest of the
+		sequence &mdash; and the KV cache freezes both.
 	{/snippet}
 </Figure>
 
